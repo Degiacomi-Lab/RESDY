@@ -1,0 +1,21 @@
+REQUIREMENTS
+------------
+
+- a shell environment
+- VMD
+- PROPKA
+- Python with standard scientific packages (numpy, matplotlib)
+
+
+HOW TO RUN
+----------
+
+1. Download PDB file 6kgx-assembly1.cif from PDB databank
+2. Enter folder 1_selections, open VMD and execute the script extractor_chain.tcl
+   This will create PDB files for every chain in the large protein assembly 6kgx along with adjacent chains
+3. Enter in folder 2_pka and execute launch.sh.
+   This will call PROPKA on each previously extracted atomic structure
+4. Enter in folder 3_sasa, open VMD and call extract_sasa.tcl.
+   This will calculate the SASA of all lysine side chains.
+5. Enter in folder 4_aggregate and call aggregate_data.py.
+   This will aggregate data gathered in folders 2_pka and 3_sasa, using information from file chains_summary.dat (manually created from PDB databank data).
