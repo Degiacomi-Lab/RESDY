@@ -1,0 +1,69 @@
+NAME;FAMILY;GROUPS;PDB;CHAIN;ALTERNATE_MODEL;SPECIES;LIGAND;PDB_IDENTIFIER;ALLOSTERIC_NAME;ALLOSTERIC_PDB;DFG;AC_HELIX
+CSNK2A1 (CK2a1);CK2;CMGC;4bxa;A;B;Human;4-[4-[2-[4,5,6,7-tetrakis(bromanyl)benzotriazol-2-yl]ethyl]-1,2,3-triazol-1-yl]butan-1-amine;JRJ;-;-;in;in
+EPHA7 (EphA7);Eph;TK;3dko;A;B;Human;5-[(2-methyl-5-{[3-(trifluoromethyl)phenyl]carbamoyl}phenyl)amino]pyridine-3-carboxamide;IHZ;-;-;out;out
+EPHA7 (EphA7);Eph;TK;2rei;A;A;Human;-;-;-;-;in;in
+ITK;Tec;TK;3miy;B;-;Human;N-[2-(diethylamino)ethyl]-5-[(Z)-(5-fluoro-2-oxo-1,2-dihydro-3H-indol-3-ylidene)methyl]-2,4-dimethyl-1H-pyrrole-3-carboxamide;B49;-;-;in;out-like
+ITK;Tec;TK;4ppc;A;B;Human;N-{1-[(1R)-3-(dimethylamino)-1-phenylpropyl]-1H-pyrazol-4-yl}-6-(1H-pyrazol-4-yl)-1H-indazole-3-carboxamide;2VW;-;-;in;out
+ITK;Tec;TK;3qgy;A;A;Human;3-[(8-phenylthieno[2,3-h]quinazolin-2-yl)amino]benzenesulfonamide;PQC;-;-;in;out
+ITK;Tec;TK;4l7s;B;B;Human;trans-4-({4-[difluoro(4-fluorophenyl)methyl]-6-[(5-methoxy[1,3]thiazolo[5,4-b]pyridin-2-yl)amino]pyrimidin-2-yl}amino)cyclohexanol;G7K;-;-;in;out-like
+ITK;Tec;TK;1snu;B;-;Human;STAUROSPORINE;STU;-;-;na;na
+ITK;Tec;TK;4kio;D;A;Human;1-[(3S)-3-{[4-(morpholin-4-ylmethyl)-6-([1,3]thiazolo[5,4-b]pyridin-2-ylamino)pyrimidin-2-yl]amino}pyrrolidin-1-yl]propan-1-one;G6K;-;-;in;out-like
+ITK;Tec;TK;4m12;A;A;Human;-;-;4-(carbamoylamino)-1-(7-ethoxynaphthalen-1-yl)-1H-pyrazole-3-carboxamide;1YZ;in;out
+ITK;Tec;TK;3v8t;A;B;Human;3-{2-[5-(difluoromethyl)-2H-thieno[3,2-c]pyrazol-3-yl]-1H-indol-6-yl}pentan-3-ol;477;-;-;in;out-like
+ITK;Tec;TK;4qd6;A;A;Human;trans-4-({6-[(5-phenyl-1H-pyrazol-3-yl)amino]-4-(phenylsulfonyl)pyridin-2-yl}amino)cyclohexanol;30T;-;-;in;out
+ITK;Tec;TK;3v8t;B;A;Human;3-{2-[5-(difluoromethyl)-2H-thieno[3,2-c]pyrazol-3-yl]-1H-indol-6-yl}pentan-3-ol;477;-;-;in;out-like
+ITK;Tec;TK;4ppa;B;-;Human;N-[1-(3-cyanobenzyl)-1H-pyrazol-4-yl]-6-(1H-pyrazol-4-yl)-1H-indazole-3-carboxamide;2VU;-;-;in;out
+ITK;Tec;TK;3v8w;B;-;Human;3-[2-(5-phenyl-2H-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl]pentan-3-ol;0G2;-;-;in;out-like
+ITK;Tec;TK;4mf1;B;B;Human;(1S,2S)-2-{4-[(dimethylamino)methyl]phenyl}-N-[6-(1H-pyrazol-4-yl)-1,3-benzothiazol-2-yl]cyclopropanecarboxamide;29Y;-;-;in;out-like
+ITK;Tec;TK;3v5l;C;-;Human;3-[3-(4-methoxyphenyl)-2-(1H-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl]pentan-3-ol;0G1;-;-;in;out-like
+ITK;Tec;TK;4pqn;A;B;Human;N-{1-[(1S)-3-(dimethylamino)-1-phenylpropyl]-1H-pyrazol-4-yl}-6,6-dimethyl-4,5,6,7-tetrahydro-1H-indazole-3-carboxamide;2W6;1-ETHOXY-2-(2-ETHOXYETHOXY)ETHANE;P4G;in;in
+ITK;Tec;TK;4mf0;B;-;Human;(1S,2S)-2-{4-[(dimethylamino)methyl]phenyl}-N-[6-(pyridin-3-yl)-1,3-benzothiazol-2-yl]cyclopropanecarboxamide;29Z;-;-;in;out
+ITK;Tec;TK;4hcv;A;-;Human;3-{4-amino-1-[(3S)-1-propanoylpiperidin-3-yl]-1H-pyrazolo[3,4-d]pyrimidin-3-yl}-N-[4-(propan-2-yl)phenyl]benzamide;13J;-;-;in;out
+ITK;Tec;TK;4m15;A;-;Human;ADENOSINE-5'-DIPHOSPHATE;ADP;4-(carbamoylamino)-1-[7-(propan-2-yloxy)naphthalen-1-yl]-1H-pyrazole-3-carboxamide;QWS;in;out
+ITK;Tec;TK;4m13;A;B;Human;-;-;4-(carbamoylamino)-1-(7-propoxynaphthalen-1-yl)-1H-pyrazole-3-carboxamide;1E0;in;out
+ITK;Tec;TK;3t9t;A;A;Human;(2Z)-4-(dimethylamino)-N-{7-fluoro-4-[(2-methylphenyl)amino]imidazo[1,5-a]quinoxalin-8-yl}-N-methylbut-2-enamide;IAQ;-;-;in;out
+ITK;Tec;TK;4qd6;B;A;Human;trans-4-({6-[(5-phenyl-1H-pyrazol-3-yl)amino]-4-(phenylsulfonyl)pyridin-2-yl}amino)cyclohexanol;30T;-;-;in;out
+ITK;Tec;TK;4pp9;A;-;Human;N-[1-(3-cyanobenzyl)-1H-pyrazol-4-yl]-2H-indazole-3-carboxamide;2VT;-;-;in;out-like
+ITK;Tec;TK;4hct;A;-;Human;3-{1-[(3R)-1-acryloylpiperidin-3-yl]-4-amino-1H-pyrazolo[3,4-d]pyrimidin-3-yl}-N-(3-tert-butylphenyl)benzamide;18R;-;-;in;out
+ITK;Tec;TK;3qgw;A;A;Human;3-[(8-phenylthieno[2,3-h]quinazolin-2-yl)amino]benzenesulfonamide;PQC;-;-;in;out
+ITK;Tec;TK;4pqn;A;A;Human;N-{1-[(1S)-3-(dimethylamino)-1-phenylpropyl]-1H-pyrazol-4-yl}-6,6-dimethyl-4,5,6,7-tetrahydro-1H-indazole-3-carboxamide;2W6;1-ETHOXY-2-(2-ETHOXYETHOXY)ETHANE;P4G;in;in
+ITK;Tec;TK;4l7s;B;A;Human;trans-4-({4-[difluoro(4-fluorophenyl)methyl]-6-[(5-methoxy[1,3]thiazolo[5,4-b]pyridin-2-yl)amino]pyrimidin-2-yl}amino)cyclohexanol;G7K;-;-;in;out-like
+ITK;Tec;TK;4pp9;B;-;Human;N-[1-(3-cyanobenzyl)-1H-pyrazol-4-yl]-2H-indazole-3-carboxamide;2VT;-;-;in;out-like
+ITK;Tec;TK;3v5l;A;-;Human;3-[3-(4-methoxyphenyl)-2-(1H-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl]pentan-3-ol;0G1;-;-;in;out-like
+ITK;Tec;TK;4kio;C;B;Human;1-[(3S)-3-{[4-(morpholin-4-ylmethyl)-6-([1,3]thiazolo[5,4-b]pyridin-2-ylamino)pyrimidin-2-yl]amino}pyrrolidin-1-yl]prop-2-en-1-one;G5K;-;-;in;out-like
+ITK;Tec;TK;4mf1;A;A;Human;(1S,2S)-2-{4-[(dimethylamino)methyl]phenyl}-N-[6-(1H-pyrazol-4-yl)-1,3-benzothiazol-2-yl]cyclopropanecarboxamide;29Y;-;-;in;out-like
+ITK;Tec;TK;3v8w;A;-;Human;3-[2-(5-phenyl-2H-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl]pentan-3-ol;0G2;-;-;in;out-like
+EPHA7 (EphA7);Eph;TK;2rei;A;B;Human;-;-;-;-;in;in
+DYRK1A;DYRK;CMGC;5a4e;D;B;Human;N-(5-methoxy-1,3-benzothiazol-2-yl)ethanamide;7QQ;-;-;in;in
+PTK2B (PYK2);FAK;TK;3cc6;A;A;Human;-;-;-;-;in;out-like
+ITK;Tec;TK;3t9t;A;B;Human;(2Z)-4-(dimethylamino)-N-{7-fluoro-4-[(2-methylphenyl)amino]imidazo[1,5-a]quinoxalin-8-yl}-N-methylbut-2-enamide;IAQ;-;-;in;out
+ITK;Tec;TK;4ppc;A;A;Human;N-{1-[(1R)-3-(dimethylamino)-1-phenylpropyl]-1H-pyrazol-4-yl}-6-(1H-pyrazol-4-yl)-1H-indazole-3-carboxamide;2VW;-;-;in;out
+ITK;Tec;TK;3miy;A;-;Human;N-[2-(diethylamino)ethyl]-5-[(Z)-(5-fluoro-2-oxo-1,2-dihydro-3H-indol-3-ylidene)methyl]-2,4-dimethyl-1H-pyrrole-3-carboxamide;B49;-;-;in;out-like
+PTK2B (PYK2);FAK;TK;3fzp;A;-;Human;PHOSPHOTHIOPHOSPHORIC ACID-ADENYLATE ESTER;AGS;-;-;out-like;out-like
+ITK;Tec;TK;4l7s;A;B;Human;trans-4-({4-[difluoro(4-fluorophenyl)methyl]-6-[(5-methoxy[1,3]thiazolo[5,4-b]pyridin-2-yl)amino]pyrimidin-2-yl}amino)cyclohexanol;G7K;-;-;in;out-like
+ITK;Tec;TK;4kio;B;B;Human;1-[(3S)-3-{[4-(morpholin-4-ylmethyl)-6-([1,3]thiazolo[5,4-b]pyridin-2-ylamino)pyrimidin-2-yl]amino}pyrrolidin-1-yl]prop-2-en-1-one;G5K;-;-;in;out-like
+ITK;Tec;TK;4m0z;A;B;Human;4-(carbamoylamino)-1-(7-methoxynaphthalen-1-yl)-1H-pyrazole-3-carboxamide;M0Z;4-(carbamoylamino)-1-(7-methoxynaphthalen-1-yl)-1H-pyrazole-3-carboxamide;M0Z;in;out
+ITK;Tec;TK;4qd6;A;B;Human;trans-4-({6-[(5-phenyl-1H-pyrazol-3-yl)amino]-4-(phenylsulfonyl)pyridin-2-yl}amino)cyclohexanol;30T;-;-;in;out
+ITK;Tec;TK;4kio;C;A;Human;1-[(3S)-3-{[4-(morpholin-4-ylmethyl)-6-([1,3]thiazolo[5,4-b]pyridin-2-ylamino)pyrimidin-2-yl]amino}pyrrolidin-1-yl]propan-1-one;G6K;-;-;in;out-like
+ITK;Tec;TK;1sm2;B;-;Human;STAUROSPORINE;STU;-;-;na;na
+ITK;Tec;TK;4mf0;A;-;Human;(1S,2S)-2-{4-[(dimethylamino)methyl]phenyl}-N-[6-(pyridin-3-yl)-1,3-benzothiazol-2-yl]cyclopropanecarboxamide;29Z;-;-;in;out
+ITK;Tec;TK;3v8t;B;B;Human;3-{2-[5-(difluoromethyl)-2H-thieno[3,2-c]pyrazol-3-yl]-1H-indol-6-yl}pentan-3-ol;477;-;-;in;out-like
+ITK;Tec;TK;4m14;A;-;Human;4-(carbamoylamino)-1-[7-(propan-2-yloxy)naphthalen-1-yl]-1H-pyrazole-3-carboxamide;QWS;4-(carbamoylamino)-1-[7-(propan-2-yloxy)naphthalen-1-yl]-1H-pyrazole-3-carboxamide;QWS;in;out
+ITK;Tec;TK;3v5j;B;-;Human;3-{4-[2-(morpholin-4-yl)ethoxy]-2-(4lambda~4~-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl}pentan-3-ol;0F2;-;-;in;out-like
+ITK;Tec;TK;4kio;A;A;Human;1-[(3S)-3-{[4-(morpholin-4-ylmethyl)-6-([1,3]thiazolo[5,4-b]pyridin-2-ylamino)pyrimidin-2-yl]amino}pyrrolidin-1-yl]prop-2-en-1-one;G5K;-;-;in;out-like
+ITK;Tec;TK;4ppb;B;-;Human;N-{1-[(1S)-3-(dimethylamino)-1-phenylpropyl]-1H-pyrazol-4-yl}-6-(1H-pyrazol-4-yl)-1H-indazole-3-carboxamide;2VV;-;-;in;out
+PTK2B (PYK2);FAK;TK;3fzr;A;-;Human;N-methyl-N-{2-[({2-[(2-oxo-2,3-dihydro-1H-indol-5-yl)amino]-5-(trifluoromethyl)pyrimidin-4-yl}amino)methyl]phenyl}methanesulfonamide;3JZ;-;-;out-like;in
+ITK;Tec;TK;3v5l;B;-;Human;3-[3-(4-methoxyphenyl)-2-(1H-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl]pentan-3-ol;0G1;-;-;in;out-like
+PTK2B (PYK2);FAK;TK;3fzt;A;-;Human;1-[5-tert-butyl-2-(4-methylphenyl)-1,2-dihydro-3H-pyrazol-3-ylidene]-3-{3-[(pyridin-3-yloxy)methyl]-1H-pyrazol-5-yl}urea;4JZ;-;-;out;out
+ITK;Tec;TK;3mj2;A;-;Human;N-[5-({5-[(4-acetylpiperazin-1-yl)carbonyl]-4-methoxy-2-methylphenyl}sulfanyl)-1,3-thiazol-2-yl]-4-({[(1S)-1,2,2-trimethylpropyl]amino}methyl)benzamide;MJG;-;-;in;out
+ITK;Tec;TK;3qgw;B;A;Human;N-(6-oxo-1,6-dihydro-3,4'-bipyridin-5-yl)benzamide;L7A;-;-;na;na
+ITK;Tec;TK;3v5l;D;-;Human;3-[3-(4-methoxyphenyl)-2-(1H-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl]pentan-3-ol;0G1;-;-;in;out-like
+ITK;Tec;TK;3v5j;A;-;Human;3-{4-[2-(morpholin-4-yl)ethoxy]-2-(4lambda~4~-thieno[3,2-c]pyrazol-3-yl)-1H-indol-6-yl}pentan-3-ol;0F2;-;-;in;out-like
+ITK;Tec;TK;3v8t;A;A;Human;3-{2-[5-(difluoromethyl)-2H-thieno[3,2-c]pyrazol-3-yl]-1H-indol-6-yl}pentan-3-ol;477;-;-;in;out-like
+ITK;Tec;TK;3qgy;B;A;Human;N-{5-[2-(methylamino)pyrimidin-4-yl]-2-oxo-1,2-dihydropyridin-3-yl}-4-(piperidin-1-yl)benzamide;L7O;-;-;in;in
+ITK;Tec;TK;3qgy;B;B;Human;N-{5-[2-(methylamino)pyrimidin-4-yl]-2-oxo-1,2-dihydropyridin-3-yl}-4-(piperidin-1-yl)benzamide;L7O;-;-;in;in
+ITK;Tec;TK;3qgy;A;B;Human;3-[(8-phenylthieno[2,3-h]quinazolin-2-yl)amino]benzenesulfonamide;PQC;-;-;in;out
+ITK;Tec;TK;4m12;A;B;Human;-;-;4-(carbamoylamino)-1-(7-ethoxynaphthalen-1-yl)-1H-pyrazole-3-carboxamide;1YZ;in;out
+ITK;Tec;TK;4qd6;B;B;Human;trans-4-({6-[(5-phenyl-1H-pyrazol-3-yl)amino]-4-(phenylsulfonyl)pyridin-2-yl}amino)cyclohexanol;30T;-;-;in;out
+ITK;Tec;TK;1snu;A;-;Human;STAUROSPORINE;STU;-;-;in;out
+ITK;Tec;TK;4rfm;A;A;Human;(4aS,5aR)-N-{1-[(R)-[(2R)-1,1-dioxidotetrahydro-2H-thiopyran-2-yl](phenyl)methyl]-1H-pyrazol-4-yl}-5,5-difluoro-5a-methyl-1,4,4a,5,5a,6-hexahydrocyclopropa[f]indazole-3-carboxamide;3P6;-;-;in;out
