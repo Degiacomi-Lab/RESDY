@@ -19,8 +19,8 @@ import autopatch
 
 # control flags
 
-download = False # download PDBs from databank (even if files are downloaded already)
-download_fasta = False # download FASTA sequences associated to non-alternative structures
+download = True # download PDBs from databank (even if files are downloaded already)
+download_fasta = True # download FASTA sequences associated to non-alternative structures
 reprocess = True # force PDB processing and analysis even if results have already been logged
 cutoff = 10 # autopatch cutoff (attempt adding residues to a protein if its gaps are all smaller than this amount of residues)
 
@@ -28,7 +28,7 @@ cutoff = 10 # autopatch cutoff (attempt adding residues to a protein if its gaps
 
 # load PDB file of choice, and return a biobox structure.
 # if needed (outfile != ""), save the cleaned file in a new PDB. 
-def load_and_clean(infile, outfile=""):
+def load_and_clean(infile, outfile = ""):
 
     # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
         # saves a cleaned temporary file called "tmp"
@@ -69,13 +69,10 @@ def load_and_clean(infile, outfile=""):
 def analyze_protein(f):
 
         #attempt loading the protein (error: -2 if unloadable)
-        try:
-                M = load_and_clean(f)
+ 
+        outfile_name = pdb + '_clean.pdb'
+        M = load_and_clean(f, outfile_name)
 
-        except Exception as e:
-                print("> %s"%e)
-                cnt = [-2, -2, -2, -2]
-                return cnt, None
 
         # check backbone geometric split (error:-1 if N and C atoms count mismatch)
         try:
