@@ -1,36 +1,28 @@
-#Goes to uniprot and takes uniprot protein codes then goes and obtains PDB files.
-#First half is for single chromosome species and second is for multi chromosome species
-
+import inquirer
 import urllib.request, urllib.parse, urllib.error
 import re
 from bs4 import BeautifulSoup
 import csv
+import pandas as pd
+import os
+import subprocess
+import numpy as np
 
-def get_pdbs():
-    name_of_organism = input('Name of organism:')
-    name_of_organism = name_of_organism.replace(' ', '+')
-    code = input('Uniprot code:')
-    other_uniprot_code = input('Other uniprot code:')
-    number_of_chromosomes = input('How many chromosomes does the species have?')
-    list_of_pdbs = list()
+def get_pdbs(answer_2, name_of_organism, code, other_uniprot_code, number_of_chromosomes):
 
-    starting_number = 0
     list_of_entries = list()
-
-
     list_of_pdbs = list()
-
+    starting_number = 0
     number_int = int(number_of_chromosomes)
-
     n = 0
-
-
-
-    #FINDS PDB CODES FOR SINGLE CHROMOSOME ORGANISMS
 
     if number_of_chromosomes == '1':
         try:
-            web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3achromosome&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=0&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
+            if answer_2 == 'Yes':
+                chromosome = 'genome'
+            else:
+                chromosome = 'chromosome'
+            web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3a' + chromosome + '&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=0&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
             html = urllib.request.urlopen(web_url)
             soup = BeautifulSoup(html, 'html.parser')
             
@@ -59,7 +51,7 @@ def get_pdbs():
             for number in list_of_entries:
 
                 strnum = str(number)
-                web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3achromosome&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=' + strnum + '&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
+                web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3a' + chromosome + '&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=' + strnum + '&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
                 html = urllib.request.urlopen(web_url)
                 list_UNIPROT_codes = list()
                 soup = BeautifulSoup(html, 'html.parser')
@@ -95,12 +87,6 @@ def get_pdbs():
 
         except:
             print('SEARCH FAILED')
-
-
-
-
-
-
 
     #FINDS PDB CODES FOR MULTI ORGANISM SPECIES
 
@@ -177,24 +163,28 @@ def get_pdbs():
                                     for PDBCODE in stuff_2:
                                         PDBCODE = PDBCODE[5:-1]
                                         list_of_pdbs.append(PDBCODE)
+
+
                                                     
 
                         list_of_pdbs = list(dict.fromkeys(list_of_pdbs))
                         print ("Number of PDB structures obtained: ", len(list_of_pdbs))
+
                         n = n + 1
                         print('Next Page', str(n))
                         number = number + 25
+                        #Need to fix end.
 
         except:
             print('SEARCH FAILED')
 
+    df = pd.DataFrame(list_of_pdbs)
+    df.to_csv('pdb_codes.csv', index=False)
 
-    return(list_of_pdbs)
-    
-get_pdbs()
+    return()
 
-
-
-
-
-
+if __name__ == "__main__":
+    try:    
+        get_pdbs('No', 'Homo+sapiens+(Human)', 'UP000005640', '5b9606', '26')
+    except:
+        print('Error')
