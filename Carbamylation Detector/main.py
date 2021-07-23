@@ -16,7 +16,9 @@ running = True
 while running:
     try:
         list_of_pdbs = list()
-        print('Hello, press Ctrl + C at anytime to return to the start')
+        print('\n' + '------------------------------------------------------------')
+        print('\n' + '  Hello, press Ctrl + C at anytime to return to the start' + '\n')
+        print('------------------------------------------------------------' + '\n')
         questions = [
         inquirer.List('Choice',
                         message="Do you want to search a whole organism's proteome or a single protein?",
@@ -28,24 +30,14 @@ while running:
         if answers["Choice"] == 'Whole Proteome':
 
 
-            question_2 = [
-        inquirer.List('Choice',
-                        message="Is the organism a virus?",
-                        choices=['Yes', 'No'],
-                    ),
-        ]
-            answer_2 = inquirer.prompt(question_2)
-            answer_2 = answer_2['Choice']
-            
+
             name_of_organism = input('Name of organism:')
             name_of_organism = name_of_organism.replace(' ', '+')
             code = input('Uniprot code:')
-            other_uniprot_code = input('Other uniprot code:')
-            number_of_chromosomes = input('How many chromosomes does the species have?')
+
 
             try:
-                print('Ctrl + c at anytime to return to start')
-                list_of_pdbs = get_pdbs(answer_2, name_of_organism, code, other_uniprot_code, number_of_chromosomes)
+                list_of_pdbs = get_pdbs(name_of_organism, code)
             except:
                 print('Try again')
                 skip = 1
@@ -76,5 +68,5 @@ while running:
 
     except:
         if skip == 1:
-            print('Goodbye')
+            print('\n' + 'Goodbye' + '\n')
             running = False
