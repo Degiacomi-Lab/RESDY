@@ -168,6 +168,6 @@ def get_pdbs(name_of_organism, code):
 
 if __name__ == "__main__":
     try:    
-        print(get_pdbs('Escherichia+coli+(strain+K12)', 'UP000000625'))
+        print(get_pdbs('Severe+acute+respiratory+syndrome+coronavirus+2+(2019-nCoV)+(SARS-CoV-2)', 'UP000464024'))
     except Exception as e:
                 print("ERROR: %s"%e)
