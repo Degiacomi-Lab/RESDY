@@ -10,13 +10,18 @@ import numpy as np
 import sys
 
 
-def get_pdbs(name_of_organism, code):
+def get_pdbs(name_of_organism, code, answer_4):
+
+    columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution']
+    df = pd.DataFrame(columns=columns)
+
     list_of_entries = list()
     list_of_pdbs = list()
     list_clean = list()
     starting_number = 0
     n = 0
     end = 0
+    list_UNIPROT_codes = list()
     try:
         web_url = 'https://www.uniprot.org/proteomes/' + code
         html = urllib.request.urlopen(web_url)
@@ -114,7 +119,6 @@ def get_pdbs(name_of_organism, code):
                 strnum = str(number)
                 web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3a%22' + chromosome + '%22&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=' + strnum + '&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
                 html = urllib.request.urlopen(web_url)
-                list_UNIPROT_codes = list()
                 soup = BeautifulSoup(html, 'html.parser')
 
                 for line in soup:
@@ -135,6 +139,7 @@ def get_pdbs(name_of_organism, code):
                 continue
 
             for protein_code_clean in list_UNIPROT_codes:
+
                 try:
                     url_2 = 'https://www.uniprot.org/uniprot/' + protein_code_clean + '.txt'
                                             
@@ -142,21 +147,29 @@ def get_pdbs(name_of_organism, code):
 
                     for line in html_2:
                         line = str(line)
-                        messy_pdb_codes = re.findall('PDB; ....;', line)
-                                                
+                        messy_entry = re.findall('PDB; [\w -. ; \d]*A;', line)
 
-                        for PDBCODE in messy_pdb_codes:
-                            PDBCODE = PDBCODE[5:-1]
-                            list_of_pdbs.append(PDBCODE)
+
+                        for entry in messy_entry:
+                            words = entry.split()
+                            PDBCODE = (words[1])[:-1]
+                            method_obtained = (words[2])[:-1]
+                            resolution = (words[3])[:-1]
+                            data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution})
+                            df = df.append(data, ignore_index=True)
+
+                    if len(messy_entry) == 0:
+                        AF_code = 'AF-' + protein_code_clean + 'F1-model_v1'
+                        data = data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A'})
+                            
 
                 except Exception as e:
                     print("ERROR: %s"%e)
-                    print('Failed to obtain PDB codes for' + protein_code_clean)
+                    print('Failed to obtain PDB codes for ' + protein_code_clean)
 
                                                             
 
             list_of_pdbs = list(dict.fromkeys(list_of_pdbs))
-            print ("Number of PDB structures obtained: ", len(list_of_pdbs))
 
             number = number + 25
             print('Number of Uniprot Entries Searched: ' + str(number) + '\n')
@@ -164,10 +177,12 @@ def get_pdbs(name_of_organism, code):
                 number = number_of_prot_2
             print((str((number/number_of_prot_2)*100))[0:3] + '%')
 
-    return list_of_pdbs
+
+    df = df.drop_duplicates(subset= ['PDB Code'], keep='first')
+    return df
 
 if __name__ == "__main__":
     try:    
-        print(get_pdbs('Severe+acute+respiratory+syndrome+coronavirus+2+(2019-nCoV)+(SARS-CoV-2)', 'UP000464024'))
+        print(get_pdbs('Severe+acute+respiratory+syndrome+coronavirus+2+(2019-nCoV)+(SARS-CoV-2)', 'UP000464024', 'Yes'))
     except Exception as e:
                 print("ERROR: %s"%e)
