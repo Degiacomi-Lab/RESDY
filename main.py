@@ -12,6 +12,7 @@ from biobox.measures.calculators import sasa
 from uniprot import get_pdbs
 from pka_sasa import calculate_pKa_and_SASA
 from search_by_technique import search_by_technique
+from alphafold_certainty import find_AF_plddt
 skip = 0
 running = True
 list_of_techniques = list()
@@ -129,8 +130,8 @@ while running:
             elif answer_4['Choice'] == 'AlphaFold':
                 try:
                     AF_code = input('What is the Uniprot code?')
-                    AF_code = 'AF-' +AF_code + '-F1-model_v1'
-                    d = {'Uniprot Entry': 'N/A', 'PDB Code': AF_code}
+                    AF_code_full = 'AF-' +AF_code + '-F1-model_v1'
+                    d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full}
                     columns = ['Uniprot Entry', 'PDB Code']
                     results_df = pd.DataFrame(columns=columns)
                     results_df = results_df.append(d, ignore_index=True)
@@ -158,13 +159,17 @@ while running:
                 code = results_df.at[num, 'PDB Code']
                 if len(code) == 4:
                     try:
-                        subprocess.Popen("ls", cwd="data/")
+                        #subprocess.Popen("ls", cwd="data/")
                         subprocess.check_call("wget https://files.rcsb.org/download/" + code + ".pdb", shell=True)
+                        columns = ['resid', 'chain', 'plddt']
+                        AF_lysines_df = pd.DataFrame(columns=columns)
                     except Exception as e:
                         print("ERROR: %s"%e)
                 else:
                     try:
                         subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + code + ".pdb", shell=True)
+                        AF_lysines_df = find_AF_plddt(code)
+
                     except Exception as e:
                         print("ERROR: %s"%e)
 
@@ -172,7 +177,7 @@ while running:
                 print(num)
 
                 try:
-                    pka_sasa_df = calculate_pKa_and_SASA(code)
+                    pka_sasa_df = calculate_pKa_and_SASA(code, AF_lysines_df)
                     all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_df)
                     print(all_pka_sasa_res)
                     all_pka_sasa_res.to_csv('results.csv')

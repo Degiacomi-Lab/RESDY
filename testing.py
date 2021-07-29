@@ -1,2 +1,2 @@
-import numpy
-import pandas
+x = None
+print(type(x))
