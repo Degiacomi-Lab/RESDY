@@ -13,6 +13,11 @@ from uniprot import get_pdbs
 from pka_sasa import calculate_pKa_and_SASA
 from search_by_technique import search_by_technique
 from alphafold_certainty import find_AF_plddt
+from data_analysis import analyse_data
+from average_by_prot import average_prot
+from test import test
+
+
 skip = 0
 running = True
 list_of_techniques = list()
@@ -26,8 +31,8 @@ while running:
 
         questions = [
         inquirer.List('Choice',
-                        message="Do you want to search a whole organism's proteome or a single protein?",
-                        choices=['Whole Proteome', 'Single Protein', 'Quit'],
+                        message="Do you want to search a whole organism's proteome or input PDB Codes?",
+                        choices=['Whole Proteome', 'Input PDB Codes', 'Quit'],
                     ),
         ]
         answers = inquirer.prompt(questions)
@@ -46,7 +51,7 @@ while running:
                 skip = 1
             if (len(results_df) == 0):
                 skip = 1
-                #This skip bit doesn't work...
+                
 
             if skip != 1:
                 question_2 = [
@@ -105,47 +110,53 @@ while running:
                     pass
             
 
-        elif answers ['Choice'] == 'Single Protein':
+        elif answers['Choice'] == 'Input PDB Codes':
+            select_strucs = True
 
-            question_4 = [
-            inquirer.List('Choice',
-                            message="Do you want to use a PDB or AlphaFold structure?",
-                            choices=['PDB', 'AlphaFold'],
-                        ),
-            ]
-            answer_4 = inquirer.prompt(question_4)
+            columns = ['Uniprot Entry', 'PDB Code']
+            results_df = pd.DataFrame(columns=columns)
 
-            if answer_4["Choice"] == 'PDB':
-                try:
-                    PDBCODE = input('What is the PDB code?')
-                    d = {'Uniprot Entry': 'N/A', 'PDB Code': PDBCODE}
-                    columns = ['Uniprot Entry', 'PDB Code']
-                    results_df = pd.DataFrame(columns=columns)
-                    results_df = results_df.append(d, ignore_index=True)
-                    print(results_df)
+            while select_strucs == True:
 
-                except Exception as e:
-                    print("ERROR: %s"%e)
+                question_4 = [
+                inquirer.List('Choice',
+                                message="Do you want to use PDB or AlphaFold structure(s)?",
+                                choices=['PDB', 'AlphaFold', 'Done'],
+                            ),
+                ]
+                answer_4 = inquirer.prompt(question_4)
 
-            elif answer_4['Choice'] == 'AlphaFold':
-                try:
-                    AF_code = input('What is the Uniprot code?')
-                    AF_code_full = 'AF-' +AF_code + '-F1-model_v1'
-                    d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full}
-                    columns = ['Uniprot Entry', 'PDB Code']
-                    results_df = pd.DataFrame(columns=columns)
-                    results_df = results_df.append(d, ignore_index=True)
-                    print(results_df)
+                if answer_4["Choice"] == 'PDB':
+                    try:
+                        PDBCODE = input('What is the PDB code?')
+                        UNIPROT_code_pdb = input('What is the Uniprot Code?')
+                        d = {'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': PDBCODE}
+                        results_df = results_df.append(d, ignore_index=True)
+                        print(results_df)
 
-                except Exception as e:
-                    print("ERROR: %s"%e)
+                    except Exception as e:
+                        print("ERROR: %s"%e)
+
+                elif answer_4['Choice'] == 'AlphaFold':
+                    try:
+                        AF_code = input('What is the Uniprot code?')
+                        AF_code_full = 'AF-' +AF_code + '-F1-model_v1'
+                        d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full}
+                        results_df = results_df.append(d, ignore_index=True)
+                        print(results_df)
+
+                    except Exception as e:
+                        print("ERROR: %s"%e)
+                
+                if answer_4['Choice'] == 'Done':
+                    select_strucs = False
 
 
         elif answers ['Choice'] == 'Quit':
             skip = 1
             raise Exception
 
-        columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code']
+        columns = ['Uniprot Code', 'resid', 'chain', 'pKa', 'sasa', 'PDB Code']
         all_pka_sasa_res = pd.DataFrame(columns=columns)
     
         if skip == 0:
@@ -153,10 +164,12 @@ while running:
             results_df.index = pd.RangeIndex(len(results_df.index))
 
             results_df.index = range(len(results_df.index))
+
             while num < len(results_df):
             #while num < 30:
 
                 code = results_df.at[num, 'PDB Code']
+                uniprot_code = results_df.at[num, 'Uniprot Entry']
                 if len(code) == 4:
                     try:
                         #subprocess.Popen("ls", cwd="data/")
@@ -168,7 +181,7 @@ while running:
                 else:
                     try:
                         subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + code + ".pdb", shell=True)
-                        AF_lysines_df = find_AF_plddt(code)
+                        AF_lysines_df = find_AF_plddt(AF_code_full)
 
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -177,8 +190,9 @@ while running:
                 print(num)
 
                 try:
-                    pka_sasa_df = calculate_pKa_and_SASA(code, AF_lysines_df)
+                    pka_sasa_df = calculate_pKa_and_SASA(code, uniprot_code, AF_lysines_df)
                     all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_df)
+                    #all_pka_sasa_res['Uniprot Entry'] = results_df['Uniprot Entry']
                     print(all_pka_sasa_res)
                     all_pka_sasa_res.to_csv('results.csv')
 
@@ -187,22 +201,98 @@ while running:
                     continue
 
                 try:
-                    pathway = '/Users/charliebrown/code/GitHub/carbamylation/Carbamylation_Detector/' + code + '.pdb'
-                    args = ('rm', '-rf', pathway)
-                    subprocess.call('%s %s %s' % args, shell=True)
-
-                    pathway_2 = '/Users/charliebrown/code/GitHub/carbamylation/Carbamylation_Detector/' + code + '.pka'
-                    args_2 = args = ('rm', '-rf', pathway_2)
-                    subprocess.call('%s %s %s' % args_2, shell=True)
+                    code_to_remove = code + '.pdb'
+                    os.remove(code_to_remove)
+                    code_to_remove_2 = code + '.pka'
+                    os.remove(code_to_remove_2)
+                    print('Files removed')
 
                 except Exception as e:
                     print("ERROR: %s"%e)
 
-                
-                
 
-        print(all_pka_sasa_res)
+
+
+        #WORKING!!!!
+
+        question_avgs = [
+        inquirer.List('Choice',
+            message="Do you want to average the data obtained from each of the PDB structures of a protein?",
+                choices=['Yes', 'No'],
+                    ),
+        ]
+        answer_avgs = inquirer.prompt(question_avgs)
+
+        if answer_avgs['Choice'] == 'Yes':
+            try:
+                all_pka_sasa_res = average_prot(all_pka_sasa_res)
+            except Exception as e:
+                    print("ERROR: %s"%e)
+                    print('Failed to average data.')
         
+        else:
+            pass
+
+
+        
+        #NOT WORKING
+        #Also need to add in so that when pdb and resid are selected there options are what is available.
+        carbam_pdb_list = list()
+        carbam_resid_list = list()
+        list_of_ids = list()
+        selecting_carbam_lys = True
+
+        question_data_analysis = [
+        inquirer.List('Choice',
+            message="Would you like the data to be anaylsed?",
+                choices=['Yes', 'No'],
+                    ),
+        ]
+
+        answer_data_analysis = inquirer.prompt(question_data_analysis)
+
+
+        if answer_data_analysis['Choice'] == 'Yes':
+            while selecting_carbam_lys == True:
+                question_carbam = [
+                inquirer.List('Choice',
+                            message="Are there carbamylated lysines you wish to mark?",
+                            choices=['Yes', 'No'],
+                            ),
+                ]
+                answer_carbam = inquirer.prompt(question_carbam)
+
+                if answer_carbam['Choice'] == 'Yes':
+
+                    carbam_pdb = input('Carbamylated lysine PDB Code:')
+                    carbam_pdb_list.append(carbam_pdb)
+                    carbam_resid = input('Carbamylated lysine resid:')
+                    carbam_resid = int(carbam_resid)
+                    carbam_resid_list.append(carbam_resid)
+
+                    continue_q = [
+                    inquirer.List('Choice',
+                            message="Are there more carbamylated lysines to add?",
+                            choices=['Yes', 'No'],
+                            ),
+                    ]
+                    continue_ans = inquirer.prompt(continue_q)
+
+                    if continue_ans['Choice'] == 'Yes':
+                        continue
+
+                    elif continue_ans['Choice'] == 'No':
+                        selecting_carbam_lys = False
+
+                
+                elif answer_carbam['Choice'] == 'No':
+                    selecting_carbam_lys = False
+            try:
+                all_pka_sasa_res = analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
+            except Exception as e:
+                    print("ERROR: %s"%e)
+                
+        print(all_pka_sasa_res)
 
 
     except KeyboardInterrupt:

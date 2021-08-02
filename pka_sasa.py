@@ -10,7 +10,7 @@ import numpy as np
 import biobox as bb
 from biobox.measures.calculators import sasa
 
-def calculate_pKa_and_SASA(code , AF_lysines_df):
+def calculate_pKa_and_SASA(code , uniprot_code, AF_lysines_df):
     try:
         pdb_code = code + '.pdb'
         print('Obtaining pKa data for ' + pdb_code)
@@ -35,7 +35,7 @@ def calculate_pKa_and_SASA(code , AF_lysines_df):
                 chain.append(line[1])
                 pkas.append(line[2])
 
-        df = pd.DataFrame({'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code})
+        df = pd.DataFrame({'Uniprot Code': uniprot_code, 'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code})
         df.sort_values(by=['pKa'], inplace=True)
         convert_dict = {'pKa': float}
         df = df.astype(convert_dict)
@@ -75,13 +75,17 @@ def calculate_pKa_and_SASA(code , AF_lysines_df):
                 percentage_through = (i/(len(resid_list)))*100
                 percentage_through = (str(percentage_through))[:4]
                 print(percentage_through + '%')
+
+
                 chain = chain_list[i]
                 ResidueID = resid_list[i]
                 ResidueID = [int(ResidueID)]
-                pts, indices = M.atomselect(chain,  ResidueID, ["NZ"],  use_resname=False, get_index=True)
+                pts, indices = M.atomselect(chain,  ResidueID, ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
                 x = sasa(M, targets=indices, probe=1.4, n_sphere_point=960, threshold=0.05)
                 acc_surf_area = str(x[0])
                 list_of_sasa.append(acc_surf_area)
+
+
             df['sasa'] = list_of_sasa
             print(df)
                 #s = bb.Structure(p = x[0])

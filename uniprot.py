@@ -19,13 +19,11 @@ def get_pdbs(name_of_organism, code):
     list_of_pdbs = list()
     list_clean = list()
     starting_number = 0
-    n = 0
     end = 0
     list_UNIPROT_codes = list()
     try:
         web_url = 'https://www.uniprot.org/proteomes/' + code
         html = urllib.request.urlopen(web_url)
-        x = 0
         soup = BeautifulSoup(html, 'html.parser')
         table = soup.find_all('table')
         for line in table:
