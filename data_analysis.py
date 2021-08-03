@@ -2,9 +2,12 @@ from os import name
 import numpy
 import pandas as pd
 from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
 import inquirer
 
 def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
+    print(carbam_pdb_list)
+    print(carbam_resid_list)
     try:
         list_of_ids = list()
         all_pka_sasa_res = all_pka_sasa_res.astype({"resid": int})
@@ -16,7 +19,9 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
     for i in range(len(carbam_resid_list)):
 
         try:
-            carbam_res = all_pka_sasa_res.where(all_pka_sasa_res['resid'] == carbam_resid_list[i])
+            print(type(carbam_pdb_list[i]))
+            print(type(carbam_resid_list[i]))
+            carbam_res = all_pka_sasa_res.where(all_pka_sasa_res['resid'] == int(carbam_resid_list[i]))
             carbam_res = carbam_res.where(carbam_res['PDB Code'] == carbam_pdb_list[i])
 
             carbam_res_df = carbam_res[carbam_res['resid'].notna()]
@@ -44,6 +49,8 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
         plt.title('pKa vs sasa')
         plt.xlabel('sasa')
         plt.ylabel('pKa')
+        #ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
+        #ax.set_xticks(ax.get_xticks()[::4])
         plt.show()
 
     except Exception as e:

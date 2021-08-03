@@ -23,6 +23,7 @@ def autopatch(fbasename, gap_cutoff=8):
         _trim_align("alignment.seg.ali")
         patch_status = _gap_check("trimmed_align.ali", gap_cutoff)
 
+
         if patch_status == "yes":
             pdb_out = _patch_model(fbasename, seq_name)
         else:
@@ -48,16 +49,16 @@ def autopatch(fbasename, gap_cutoff=8):
 
 #step 1a. pir format of AA from pdb
 def _pdb2seq(fbasename):
-    env = environ()
-    mdl = model(env, file=fbasename)
-    aln = alignment(env)
+    env = Environ()
+    mdl = Model(env, file=fbasename)
+    aln = Alignment(env)
     aln.append_model(mdl, align_codes=fbasename)
     aln.write(file=fbasename+'.seq')
 
 #step 1b. pir from complete AA fasta 
 def _fasta2pir(fbasename):
-    env = environ()
-    a = alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
+    env = Environ()
+    a = Alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
     a.write(file=fbasename+'.pir', alignment_format='PIR')
 
 #step 2. add sequence name to 2nd line; copy the pir contents and structure info into alignment.seg; align sequences and generate model
@@ -84,9 +85,9 @@ def _full_align(fbasename):
     myCmd_A = 'cat %s %s > alignment.seg'%(pir_fname, seq_fname)
     os.system(myCmd_A)
 
-    env = environ()
+    env = Environ()
     env.io.atom_files_directory = ['.', '../atom_files']
-    a = automodel(env,
+    a = AutoModel(env,
                   # file with template codes and target sequence
                   alnfile  = 'alignment.seg',
                   # PDB codes of the templates
@@ -176,9 +177,9 @@ def _gap_check(align_file, gap_cutoff):
 def _patch_model(fbasename, seq_name):
     print(">> patching model...")
     log.verbose()
-    env = environ()
+    env = Environ()
     env.io.atom_files_directory = ['.', '../atom_files']
-    a = automodel(env,
+    a = AutoModel(env,
                   # file with template codes and target sequence
                   alnfile  = 'trimmed_align.ali',
                   # PDB codes of the templates

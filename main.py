@@ -9,13 +9,13 @@ import subprocess
 import numpy as np
 import biobox as bb
 from biobox.measures.calculators import sasa
+from scipy.spatial.distance import _correlation_pdist_wrap
 from uniprot import get_pdbs
 from pka_sasa import calculate_pKa_and_SASA
 from search_by_technique import search_by_technique
 from alphafold_certainty import find_AF_plddt
 from data_analysis import analyse_data
 from average_by_prot import average_prot
-from test import test
 
 
 skip = 0
@@ -37,6 +37,8 @@ while running:
         ]
         answers = inquirer.prompt(questions)
 
+
+        #Searches Uniprot for PDB codes
         if answers["Choice"] == 'Whole Proteome':
 
             name_of_organism = input('Name of organism:')
@@ -52,6 +54,8 @@ while running:
             if (len(results_df) == 0):
                 skip = 1
                 
+
+            #Allows user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
 
             if skip != 1:
                 question_2 = [
@@ -110,10 +114,12 @@ while running:
                     pass
             
 
+
+        #Allows single structure to be tested (probably needs to be put in a function)
         elif answers['Choice'] == 'Input PDB Codes':
             select_strucs = True
 
-            columns = ['Uniprot Entry', 'PDB Code']
+            columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
             results_df = pd.DataFrame(columns=columns)
 
             while select_strucs == True:
@@ -128,10 +134,41 @@ while running:
 
                 if answer_4["Choice"] == 'PDB':
                     try:
-                        PDBCODE = input('What is the PDB code?')
+                        PDBCODE_inpt = input('What is the PDB code?')
+                        PDBCODE_inpt = PDBCODE_inpt.upper()
+                        print(PDBCODE_inpt)
                         UNIPROT_code_pdb = input('What is the Uniprot Code?')
-                        d = {'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': PDBCODE}
-                        results_df = results_df.append(d, ignore_index=True)
+
+                        url_2 = 'https://www.uniprot.org/uniprot/' + UNIPROT_code_pdb + '.txt'
+                                                
+                        html_2 = urllib.request.urlopen(url_2)
+
+                        for line in html_2:
+                            line = str(line)
+                            messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
+
+
+                            for entry in messy_entry:
+                                words = entry.split()
+                                PDBCODE = (words[1])[:-1]
+                                if PDBCODE_inpt == PDBCODE:
+                                    
+                                    chain_ent_num = (len(words) - 1)
+                                    chain_info = words[chain_ent_num]
+                                    chain_info = chain_info[:-1]
+                                    chain_info = chain_info.split('/')
+                                    method_obtained = (words[2])[:-1]
+                                    resolution = (words[3])[:-1]
+
+                                    for i in range(len(chain_info)):
+                                        if len(chain_info[i]) != 1:
+                                            chain = (chain_info[i])[:1]
+                                        else:
+                                            chain = chain_info[i]
+                                        data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': chain})
+                                        results_df = results_df.append(data, ignore_index=True)
+                                
+
                         print(results_df)
 
                     except Exception as e:
@@ -141,7 +178,7 @@ while running:
                     try:
                         AF_code = input('What is the Uniprot code?')
                         AF_code_full = 'AF-' +AF_code + '-F1-model_v1'
-                        d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full}
+                        d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'}
                         results_df = results_df.append(d, ignore_index=True)
                         print(results_df)
 
@@ -155,6 +192,16 @@ while running:
         elif answers ['Choice'] == 'Quit':
             skip = 1
             raise Exception
+
+
+        cwd = str(os.getcwd())
+        results_df.to_csv(cwd + '/curate_PDB/results.csv')
+
+        os.chdir('curate_PDB')
+        os.system('python get_data.py')
+        print('GOOD')
+
+        #Downloads files from the PDB
 
         columns = ['Uniprot Code', 'resid', 'chain', 'pKa', 'sasa', 'PDB Code']
         all_pka_sasa_res = pd.DataFrame(columns=columns)
@@ -172,10 +219,10 @@ while running:
                 uniprot_code = results_df.at[num, 'Uniprot Entry']
                 if len(code) == 4:
                     try:
-                        #subprocess.Popen("ls", cwd="data/")
                         subprocess.check_call("wget https://files.rcsb.org/download/" + code + ".pdb", shell=True)
                         columns = ['resid', 'chain', 'plddt']
                         AF_lysines_df = pd.DataFrame(columns=columns)
+
                     except Exception as e:
                         print("ERROR: %s"%e)
                 else:
@@ -189,10 +236,14 @@ while running:
                 num = num + 1
                 print(num)
 
+
+                #Calculates pKa and SASA of all lysines in each structure
+
+
+
                 try:
                     pka_sasa_df = calculate_pKa_and_SASA(code, uniprot_code, AF_lysines_df)
                     all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_df)
-                    #all_pka_sasa_res['Uniprot Entry'] = results_df['Uniprot Entry']
                     print(all_pka_sasa_res)
                     all_pka_sasa_res.to_csv('results.csv')
 
@@ -212,8 +263,8 @@ while running:
 
 
 
+        #Averages the pKa/sasa values for a specific residue for the PDB structures for a particular protein
 
-        #WORKING!!!!
 
         question_avgs = [
         inquirer.List('Choice',
@@ -235,8 +286,11 @@ while running:
 
 
         
-        #NOT WORKING
-        #Also need to add in so that when pdb and resid are selected there options are what is available.
+        #Plots pKa vs sasa on scatter plot.
+        #Also allows any known carbamates to be marked.
+
+
+
         carbam_pdb_list = list()
         carbam_resid_list = list()
         list_of_ids = list()
@@ -253,22 +307,56 @@ while running:
 
 
         if answer_data_analysis['Choice'] == 'Yes':
-            while selecting_carbam_lys == True:
-                question_carbam = [
-                inquirer.List('Choice',
-                            message="Are there carbamylated lysines you wish to mark?",
-                            choices=['Yes', 'No'],
-                            ),
-                ]
-                answer_carbam = inquirer.prompt(question_carbam)
+            question_carbam = [
+            inquirer.List('Choice',
+                        message="Are there carbamylated lysines you wish to mark?",
+                        choices=['Yes', 'No'],
+                        ),
+            ]
+            answer_carbam = inquirer.prompt(question_carbam)
 
-                if answer_carbam['Choice'] == 'Yes':
+            if answer_carbam['Choice'] == 'Yes':
 
-                    carbam_pdb = input('Carbamylated lysine PDB Code:')
-                    carbam_pdb_list.append(carbam_pdb)
-                    carbam_resid = input('Carbamylated lysine resid:')
-                    carbam_resid = int(carbam_resid)
-                    carbam_resid_list.append(carbam_resid)
+                while selecting_carbam_lys == True:
+
+                    list_of_pdbs = all_pka_sasa_res['PDB Code']
+                    list_of_pdbs_no_dup = list()
+                    for entry in list_of_pdbs:
+                        if entry not in list_of_pdbs_no_dup:
+                            list_of_pdbs_no_dup.append(entry)
+                        else:
+                            continue
+                
+                    list_of_resids = all_pka_sasa_res['resid']
+                    list_of_resids_no_dup = list()
+                    for entry in list_of_resids:
+                        if entry not in list_of_resids_no_dup:
+                            list_of_resids_no_dup.append(entry)
+                        else:
+                            continue
+
+                    question_carbam_pdb = [
+                    inquirer.List('Choice',
+                                message="Which structure is the residue in?",
+                                choices=list_of_pdbs_no_dup,
+                                ),
+                    ]
+                    answer_carbam_pdb = inquirer.prompt(question_carbam_pdb)
+
+                    carbam_pdb_list.append(answer_carbam_pdb['Choice'])
+                    
+
+
+                    question_carbam_resid = [
+                    inquirer.List('Choice',
+                                message="What is the Residue ID of the carbamylated residue?",
+                                choices=list_of_resids_no_dup,
+                                ),
+                    ]
+                    answer_carbam_resid = inquirer.prompt(question_carbam_resid)
+
+                    carbam_resid_list.append(answer_carbam_resid['Choice'])
+
 
                     continue_q = [
                     inquirer.List('Choice',
@@ -285,8 +373,6 @@ while running:
                         selecting_carbam_lys = False
 
                 
-                elif answer_carbam['Choice'] == 'No':
-                    selecting_carbam_lys = False
             try:
                 all_pka_sasa_res = analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
             except Exception as e:

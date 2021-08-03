@@ -106,9 +106,7 @@ def average_prot(all_pka_sasa_res):
                         PDB_codes_avgd = ''
                         for i in range(len(list_of_pdbs_no_dup)):
                             PDB_codes_avgd = PDB_codes_avgd + '/' + list_of_pdbs_no_dup[i]
-                        
-                        
-                        print(PDB_codes_avgd)
+        
                         d = {'resid': residue, 'chain': chain, 'plddt': avg_plddt, 'Uniprot Code': uniprot_code, 'pKa': avg_pka, 'pKa stdev':stddev_pka, 'PDB Code': PDB_codes_avgd, 'sasa': avg_sasa, 'sasa stdev': stdev_sasa}
                         avgd_pka_sasa = avgd_pka_sasa.append(d, ignore_index=True)
         

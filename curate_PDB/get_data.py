@@ -11,10 +11,8 @@ import subprocess
 import numpy as np
 import biobox as bb
 from copy import deepcopy
-
 # offers automatic automatic structure patching function
 import autopatch
-
 ########################################
 
 # control flags
@@ -55,7 +53,7 @@ def load_and_clean(infile, outfile = ""):
 
     M = Mtmp.get_subset(idxs=idxs)
 
-    if outfile != "":
+    if outfile == "":
         M.write_pdb(outfile)
 
     os.remove("tmp")
@@ -71,8 +69,8 @@ def analyze_protein(f):
         #attempt loading the protein (error: -2 if unloadable)
  
         outfile_name = pdb + '_clean.pdb'
+        print(outfile_name)
         M = load_and_clean(f, outfile_name)
-
 
         # check backbone geometric split (error:-1 if N and C atoms count mismatch)
         try:
@@ -103,7 +101,6 @@ def analyze_protein(f):
             else:
                 gap = True
                 patch.append(r)
-
         return cnt, M
 
 
@@ -121,15 +118,19 @@ if not os.path.exists("clean"):
 # load PDBs and save only chain of interest (pdbcode_chainname.pdb)
 # replace False with True to launch download from PDB databank
 if download:
-
         # data columns stored in data are:
         #NAME FAMILY GROUPS PDB CHAIN ALTERNATE_MODEL SPECIES LIGAND PDB_IDENTIFIER ALLOSTERIC_NAME ALLOSTERIC_PDB DFG AC_HELIX
-        data = np.loadtxt("KLIFS_export.csv", skiprows=1, delimiter=";", dtype=str)
-
+        data = np.loadtxt("results.csv", skiprows=1, delimiter=";", dtype=str)
         # download and save PDBs (chain reported in database)
         for d in data:
-            pdb = d[3]
-            chain = d[4]
+            d = d.split(',')
+            pdb = d[2]
+            if len(pdb) > 5:
+                    os.chdir('clean')
+                    subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + code + ".pdb", shell=True)
+                    os.chdir(oldpwd)
+                    continue
+            chain = d[5]
             fin = "%s.pdb"%pdb
             fout = "%s_%s.pdb"%(pdb, chain)
 
@@ -146,8 +147,11 @@ if download:
                 M = bb.Molecule()
                 M.import_pdb(fin)
                 _, idxs = M.atomselect(chain, "*", "*", get_index=True)
-                M.write_pdb("raw/"%fout, index=idxs)
-            except:
+                path = "raw/" + fout
+                print(path)
+                M.write_pdb(path, index=idxs)
+            except Exception as e:
+                print("ERROR: %s"%e)
                 print("> issue with file %s"%fin)
 
             # remove the downloaded PDB file (we already saved what we need)
@@ -192,18 +196,30 @@ if download_fasta:
                 if "PATCHED" in f:
                     continue
                 pdb = f.split(".")[0].split("_")[0]
+                pdb = pdb[4:]
                 chain = f.split(".")[0].split("_")[1]
-                fin = "downloadFile.do?fileFormat=fastachain&compression=NO&structureId=%s&chainId=%s"%(pdb, chain)
-                fout = "%s_%s.fasta"%(pdb, chain)
-                print("> getting %s"%f)
-                subprocess.check_call("wget \"https://www.rcsb.org/pdb/download/%s\" -O raw/%s"%(fin, fout), shell=True)
+
+                end_url = pdb + '.' + chain
+                oldpwd=os.getcwd()
+                os.chdir('raw')
+                web_url = "https://www.rcsb.org/fasta/chain/" + end_url + '/download'
+                name_output = pdb + '_' + chain + '.fasta'
+                subprocess.check_call("wget -O " + name_output + " " + web_url, shell=True)
+                #fasta_name = pdb + '_' + chain + '.fasta'
+                #os.rename(pdb, fasta_name)
+                os.chdir(oldpwd)
+
+                
+                #fin = "downloadFile.do?fileFormat=fastachain&compression=NO&structureId=%s&chainId=%s"%(pdb, chain)
+                #fout = "%s_%s.fasta"%(pdb, chain)
+                #print("> getting %s"%f)
+                #subprocess.check_call("wget \"https://www.rcsb.org/pdb/download/%s\" -O raw/%s"%(fin, fout), shell=True)
 
         
 
 # clean and analyze downloaded structures: report on gaps and missing residues
 # note: cleaned files are not saved (pass an additional parameter to the load_and_clean function to write them out
 if not os.path.exists("gap_data.txt") or reprocess:
-
         # result will contain output, 4 numbers per protein:
         #sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count (using M.guess_chain_split())
         result = []
@@ -225,10 +241,9 @@ if not os.path.exists("gap_data.txt") or reprocess:
 
                 # if a small amount of geometric gaps are present (or C-N atomcount mismatch), send the structure to patching, and re-analyze result
                 if cnt[3] > 0 or cnt[3] == -1 or cnt[0] > 0:
-
                         # call patching code in autopatch module
-                        f_patched = autopatch.autopatch(f.split(".")[0], cutoff)
 
+                        f_patched = autopatch.autopatch(f.split(".")[0], cutoff)
                         # test if patching has been successful (empty string returned = failure)
                         if f_patched != "":
                                 cnt2, mol2 = analyze_protein(f_patched)
@@ -238,6 +253,7 @@ if not os.path.exists("gap_data.txt") or reprocess:
                                 mol = deepcopy(mol2)
                                 fout = "%s_patched.pdb"%fout.split(".")[0]
                                 patchstat.append(1)
+
                         else:
                                 print(">> PATCH: failed, keeping original results in file %s"%f)
                                 patchstat.append(2)
@@ -268,7 +284,7 @@ if not os.path.exists("gap_data.txt") or reprocess:
 
         result = np.array(result)
         patchstat = np.array(patchstat) # report on whether patching was needed and, if so, successful
-
+        #**********************FAILING HERE*************************
         outdata = np.concatenate((np.array([files]).T, result), axis=1)
         np.savetxt("gap_data.txt", outdata, fmt="%s")
         np.savetxt("patch_data.txt", patchstat)

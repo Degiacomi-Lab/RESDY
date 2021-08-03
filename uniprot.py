@@ -12,7 +12,7 @@ import sys
 
 def get_pdbs(name_of_organism, code):
 
-    columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution']
+    columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
     df = pd.DataFrame(columns=columns)
 
     list_of_entries = list()
@@ -146,20 +146,29 @@ def get_pdbs(name_of_organism, code):
 
                     for line in html_2:
                         line = str(line)
-                        messy_entry = re.findall('PDB; [\w -. ; \d]*A;', line)
+                        messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
 
 
                         for entry in messy_entry:
                             words = entry.split()
+                            chain_ent_num = (len(words) - 1)
+                            chain_info = words[chain_ent_num]
+                            chain_info = chain_info[:-1]
+                            chain_info = chain_info.split('/')
                             PDBCODE = (words[1])[:-1]
                             method_obtained = (words[2])[:-1]
                             resolution = (words[3])[:-1]
-                            data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution})
-                            df = df.append(data, ignore_index=True)
+                            for i in range(len(chain_info)):
+                                if len(chain_info[i]) != 1:
+                                    chain = (chain_info[i])[:1]
+                                else:
+                                    chain = chain_info[i]
+                                data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': chain})
+                                df = df.append(data, ignore_index=True)
 
                     if len(messy_entry) == 0:
                         AF_code = 'AF-' + protein_code_clean + 'F1-model_v1'
-                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A'})
+                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
                         df = df.append(data, ignore_index=True)
 
 
@@ -188,7 +197,8 @@ def get_pdbs(name_of_organism, code):
         if h == 2:
             break
 
-    df = df.drop_duplicates(subset= ['PDB Code'], keep='first')
+    #df = df.drop_duplicates(subset= ['PDB Code'], keep='first')
+    df.to_csv('temp_res.csv')
     return df
 
 if __name__ == "__main__":

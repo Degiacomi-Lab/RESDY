@@ -4,7 +4,6 @@
 # 2 logfiles saved:
 # - gap_data.txt (reports on how many missing residues the protein had)
 # - patch_data.txt (reports on which files had to be patched with modeller, and whether the operation was successful)
-
 import glob
 import os
 import subprocess
@@ -15,11 +14,12 @@ from copy import deepcopy
 # offers automatic automatic structure patching function
 import autopatch
 
+
 ########################################
 
 # control flags
 
-download = False # download PDBs from databank (even if files are downloaded already)
+download = True # download PDBs from databank (even if files are downloaded already)
 download_fasta = False # download FASTA sequences associated to non-alternative structures
 reprocess = True # force PDB processing and analysis even if results have already been logged
 cutoff = 10 # autopatch cutoff (attempt adding residues to a protein if its gaps are all smaller than this amount of residues)
@@ -55,7 +55,8 @@ def load_and_clean(infile, outfile=""):
 
     M = Mtmp.get_subset(idxs=idxs)
 
-    if outfile != "":
+    if outfile == "":
+        print('*************')
         M.write_pdb(outfile)
 
     os.remove("tmp")
@@ -123,8 +124,7 @@ if not os.path.exists("clean"):
 
 # load PDBs and save only chain of interest (pdbcode_chainname.pdb)
 # replace False with True to launch download from PDB databank
-if download:
-
+if download == True:
         # data columns stored in data are:
         #NAME FAMILY GROUPS PDB CHAIN ALTERNATE_MODEL SPECIES LIGAND PDB_IDENTIFIER ALLOSTERIC_NAME ALLOSTERIC_PDB DFG AC_HELIX
         data = np.loadtxt("KLIFS_export.csv", skiprows=1, delimiter=";", dtype=str)
