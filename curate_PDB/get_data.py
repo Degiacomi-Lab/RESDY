@@ -10,11 +10,12 @@ import os
 import subprocess
 import numpy as np
 import biobox as bb
+import pandas as pd
 from copy import deepcopy
 # offers automatic automatic structure patching function
-import autopatch
+from curate_PDB.autopatch import autopatch
+import re
 ########################################
-
 # control flags
 
 download = True # download PDBs from databank (even if files are downloaded already)
@@ -26,188 +27,187 @@ cutoff = 10 # autopatch cutoff (attempt adding residues to a protein if its gaps
 
 # load PDB file of choice, and return a biobox structure.
 # if needed (outfile != ""), save the cleaned file in a new PDB. 
-def load_and_clean(infile, outfile = ""):
+def get_data(pdb, chain):
+        
+        def load_and_clean(infile, outfile = ""):
 
-    # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
-        # saves a cleaned temporary file called "tmp"
-    subprocess.check_call("./clean.sh %s"%infile, shell=True)
+                # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
+                # saves a cleaned temporary file called "tmp"
 
-    Mtmp = bb.Molecule()
-    Mtmp.import_pdb("tmp")
+                subprocess.check_call("./curate_PDB/clean.sh %s"%infile, shell=True)
 
-    if len(Mtmp.coordinates) > 1:
-        Mtmp.coordinates = Mtmp.coordinates[0:1]
-        Mtmp.set_current(0)
 
-    Mtmp.center_to_origin()
+                Mtmp = bb.Molecule()
+                Mtmp.import_pdb("tmp")
 
-        # remove amino acids with resid < 1
-    _, idx = Mtmp.query("resid > 0", get_index=True)
-    Mtmp = Mtmp.get_subset(idx)
+                if len(Mtmp.coordinates) > 1:
+                        Mtmp.coordinates = Mtmp.coordinates[0:1]
+                        Mtmp.set_current(0)
 
-    #extract only protein atoms (no water, ligands, DNA, ...)
-    idxs=[]
-    for i, d in enumerate(Mtmp.data["resname"].values):
-        if d in Mtmp.knowledge['residue_mass'].keys():
-            idxs.append(i)
+                #Mtmp.center_to_origin()
 
-    M = Mtmp.get_subset(idxs=idxs)
+                        # remove amino acids with resid < 1
+                _, idx = Mtmp.query("resid > 0", get_index=True)
+                Mtmp = Mtmp.get_subset(idx)
 
-    if outfile == "":
-        M.write_pdb(outfile)
+                #extract only protein atoms (no water, ligands, DNA, ...)
+                idxs=[]
+                for i, d in enumerate(Mtmp.data["resname"].values):
+                        if d in Mtmp.knowledge['residue_mass'].keys():
+                                idxs.append(i)
 
-    os.remove("tmp")
-    return M
+                M = Mtmp.get_subset(idxs=idxs)
+
+                if outfile == "":
+                        M.write_pdb(outfile)
+
+                os.remove("tmp")
+                return M
 
 
 # report on gaps on a given PDB file
 # returns:
 # - 4 elements list, [sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count]]
 # - biobox.Molecule, of loading was successful, nothing otherwise
-def analyze_protein(f):
+        def analyze_protein(f):
 
-        #attempt loading the protein (error: -2 if unloadable)
+                #attempt loading the protein (error: -2 if unloadable)
  
-        outfile_name = pdb + '_clean.pdb'
-        print(outfile_name)
-        M = load_and_clean(f, outfile_name)
+                outfile_name = pdb + '_clean.pdb'
+                print(outfile_name)
+                M = load_and_clean(f, outfile_name)
 
         # check backbone geometric split (error:-1 if N and C atoms count mismatch)
-        try:
-                c_cnt, _, _ = M.guess_chain_split(distance=3.5)
-                c_cnt -= 1
-        except:
-                c_cnt = -1
+        #Why c_cnt value = 0 ???????- 
+                try:
+                        c_cnt, _, _ = M.guess_chain_split(distance=3.5)
+                        c_cnt -= 1
+
+                except:
+                        c_cnt = -1
 
 
         # check sequence split (note: we avoid residues with negative numbers)
-        res = np.unique(M.data["resid"].values)
-        res = res[res>0]
-        missing = []
-        patch = []
-        cnt = [0, 0, 0, c_cnt]
-        for r in range(np.min(res), np.max(res)+1):
-            if r in res:
-                gap = False
-                if len(patch) > 0:
-                    missing.append(deepcopy(patch))
-                    cnt[0] += 1
-                    cnt[1] += len(patch)
-                    if len(patch) > cnt[2]:
-                        cnt[2] = len(patch)
+                res = np.unique(M.data["resid"].values)
+                res = res[res>0]
+                missing = []
+                patch = []
+                cnt = [0, 0, 0, c_cnt]
+                for r in range(np.min(res), np.max(res)+1):
+                        if r in res:
+                                gap = False
+                                if len(patch) > 0:
+                                        missing.append(deepcopy(patch))
+                                        cnt[0] += 1
+                                        cnt[1] += len(patch)
+                                        if len(patch) > cnt[2]:
+                                                cnt[2] = len(patch)
 
-                    patch = []
+                                        patch = []
                    
-            else:
-                gap = True
-                patch.append(r)
-        return cnt, M
+                        else:
+                                gap = True
+                                patch.append(r)
+                return cnt, M
 
 
 ##############################################################################
 ##############################################################################
 
 # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
-if not os.path.exists("raw"):
-        os.mkdir("raw")
+        if not os.path.exists("raw"):
+                os.mkdir("raw")
 
-if not os.path.exists("clean"):
-        os.mkdir("clean")
+        if not os.path.exists("clean"):
+                os.mkdir("clean")
 
 
 # load PDBs and save only chain of interest (pdbcode_chainname.pdb)
 # replace False with True to launch download from PDB databank
-if download:
+        if download:
         # data columns stored in data are:
         #NAME FAMILY GROUPS PDB CHAIN ALTERNATE_MODEL SPECIES LIGAND PDB_IDENTIFIER ALLOSTERIC_NAME ALLOSTERIC_PDB DFG AC_HELIX
-        data = np.loadtxt("results.csv", skiprows=1, delimiter=";", dtype=str)
+        
         # download and save PDBs (chain reported in database)
-        for d in data:
-            d = d.split(',')
-            pdb = d[2]
-            if len(pdb) > 5:
-                    os.chdir('clean')
-                    subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + code + ".pdb", shell=True)
-                    os.chdir(oldpwd)
-                    continue
-            chain = d[5]
-            fin = "%s.pdb"%pdb
-            fout = "%s_%s.pdb"%(pdb, chain)
 
-            # if file exists, skip
-            if os.path.exists(fout):
-                print("skipping %s"%fout)
-                pass
+                
+                fin = "%s.pdb"%pdb
+                fout = "%s_%s.pdb"%(pdb, chain)
+                        
+                        
 
-            # else, download file, and get the subset out (only the chain indicated in KLIFS database)
-            print("loading %s"%fout)
-            subprocess.check_call("wget https://files.rcsb.org/download/%s"%fin, shell=True)
+                # if file exists, skip
+                if os.path.exists(fout):
+                        print("skipping %s"%fout)
+                        pass
 
-            try:
-                M = bb.Molecule()
-                M.import_pdb(fin)
-                _, idxs = M.atomselect(chain, "*", "*", get_index=True)
-                path = "raw/" + fout
-                print(path)
-                M.write_pdb(path, index=idxs)
-            except Exception as e:
-                print("ERROR: %s"%e)
-                print("> issue with file %s"%fin)
+                # else, download file, and get the subset out (only the chain indicated in KLIFS database)
+                print("loading %s"%fout)
+                subprocess.check_call("wget https://files.rcsb.org/download/%s"%fin, shell=True)
 
-            # remove the downloaded PDB file (we already saved what we need)
-            os.remove(fin)
+                try:
+                        M = bb.Molecule()
+                        M.import_pdb(fin)
+                        _, idxs = M.atomselect(chain, "*", "*", get_index=True)
+                        path = "curate_PDB/raw/" + fout
+                        print(path)
+                        M.write_pdb(path, index=idxs)
+
+                except Exception as e:
+                        print("ERROR: %s"%e)
+                        print("> issue with file %s"%fin)
+
+                # remove the downloaded PDB file (we already saved what we need)
+                os.remove(fin)
 
 
-        # select just one representative from proteins in the same crystal, i.e. that with most atoms (alternative conformations named as *.alt)
-        files = np.array(glob.glob("raw/*pdb"))
-        pdbs = np.array([s.split("_")[0] for s in files])
-        for p in np.unique(pdbs):
-                files = np.array(glob.glob("%s*pdb"%p))
-                if len(files) == 1:
-                        continue
+                # select just one representative from proteins in the same crystal, i.e. that with most atoms (alternative conformations named as *.alt)
+                files = np.array(glob.glob("curate_PDB/raw/*pdb"))
+                print(files)
+                pdbs = np.array([s.split("_")[0] for s in files])
 
-                # read all chains belonging to same PDB, and get their length
-                l = []
-                for f in files:
-                        try:
-                                M = bb.Molecule()
-                                M.import_pdb(f)
-                                l.append(len(M.points))
-                        except:
-                                l.append(-1)
+                for p in np.unique(pdbs):
+                        files = np.array(glob.glob("%s*pdb"%p))
+                        if len(files) == 1:
+                                continue
 
-                l = np.array(l)
-                if len(np.unique(l)) > 1:
-                        print("> different length dectected, selecting largest...")
-                        print("> ", np.unique(l))
+                        # read all chains belonging to same PDB, and get their length
+                        l = []
+                        for f in files:
+                                try:
+                                        M = bb.Molecule()
+                                        M.import_pdb(f)
+                                        l.append(len(M.points))
+                                except:
+                                        l.append(-1)
 
-                # get files sorting by length (smallest to largest)
-                pos = np.argsort(l)
+                        l = np.array(l)
+                        if len(np.unique(l)) > 1:
+                                print("> different length dectected, selecting largest...")
+                                print("> ", np.unique(l))
+
+                        # get files sorting by length (smallest to largest)
+                        pos = np.argsort(l)
 
                 # rename all files but the largest as "alternate"
-                for i in pos[:-1]:
-                        os.rename(files[i], "%s.alt"%files[i])
+                        for i in pos[:-1]:
+                                os.rename(files[i], "%s.alt"%files[i])
 
 
 
 # download FASTA sequences of proteins of interest in "raw" folder (not *alt files)
-if download_fasta:
-        for f in glob.glob("raw/*pdb"):
-                if "PATCHED" in f:
-                    continue
-                pdb = f.split(".")[0].split("_")[0]
-                pdb = pdb[4:]
-                chain = f.split(".")[0].split("_")[1]
+        if download_fasta:
+                for f in glob.glob("curate_PDB/raw/*pdb"):
+                        if "PATCHED" in f:
+                                continue
 
-                end_url = pdb + '.' + chain
-                oldpwd=os.getcwd()
-                os.chdir('raw')
-                web_url = "https://www.rcsb.org/fasta/chain/" + end_url + '/download'
-                name_output = pdb + '_' + chain + '.fasta'
-                subprocess.check_call("wget -O " + name_output + " " + web_url, shell=True)
-                #fasta_name = pdb + '_' + chain + '.fasta'
-                #os.rename(pdb, fasta_name)
-                os.chdir(oldpwd)
+                        end_url = pdb + '.' + chain
+                        oldpwd=os.getcwd()
+                        os.chdir('curate_PDB/raw')
+                        web_url = "https://www.rcsb.org/fasta/chain/" + end_url + '/download'
+                        name_output = pdb + '_' + chain + '.fasta'
+                        subprocess.check_call("wget -O " + name_output + " " + web_url, shell=True)
+                        os.chdir(oldpwd)
 
                 
                 #fin = "downloadFile.do?fileFormat=fastachain&compression=NO&structureId=%s&chainId=%s"%(pdb, chain)
@@ -219,82 +219,108 @@ if download_fasta:
 
 # clean and analyze downloaded structures: report on gaps and missing residues
 # note: cleaned files are not saved (pass an additional parameter to the load_and_clean function to write them out
-if not os.path.exists("gap_data.txt") or reprocess:
-        # result will contain output, 4 numbers per protein:
-        #sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count (using M.guess_chain_split())
-        result = []
-        files = np.array(glob.glob("raw/*pdb"))
-        patchstat = [] # 0 = not needed, 1 = successful, 2 = failed
+        if not os.path.exists("gap_data.txt") or reprocess:
+                # result will contain output, 4 numbers per protein:
+                #sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count (using M.guess_chain_split())
+                result = []
+                files = np.array(glob.glob("curate_PDB/raw/*pdb"))
+                patchstat = [] # 0 = not needed, 1 = successful, 2 = failed
 
-        for k, f in enumerate(files):
+                for k, f in enumerate(files):
 
-                if "PATCHED" in f:
-                    continue
+                        if "PATCHED" in f:
+                                continue
 
-                success = True
-                fout = os.path.basename(f)
-                print("\n%s: %s"%(k, fout.split(".")[0]))
+                        success = True
+                        fout = os.path.basename(f)
+                        print("\n%s: %s"%(k, fout.split(".")[0]))
 
-                # load protein and assess its structure
-                cnt, mol = analyze_protein(f)
-                print("> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt[3], cnt[0], cnt[1], cnt[2]))
+                        # load protein and assess its structure
+                        cnt, mol = analyze_protein(f)
+                        print("> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt[3], cnt[0], cnt[1], cnt[2]))
 
-                # if a small amount of geometric gaps are present (or C-N atomcount mismatch), send the structure to patching, and re-analyze result
-                if cnt[3] > 0 or cnt[3] == -1 or cnt[0] > 0:
-                        # call patching code in autopatch module
+                        # if a small amount of geometric gaps are present (or C-N atomcount mismatch), send the structure to patching, and re-analyze result
+                        if cnt[3] > 0 or cnt[3] == -1 or cnt[0] > 0:
+                                # call patching code in autopatch module
 
-                        f_patched = autopatch.autopatch(f.split(".")[0], cutoff)
-                        # test if patching has been successful (empty string returned = failure)
-                        if f_patched != "":
-                                cnt2, mol2 = analyze_protein(f_patched)
-                                print(">> PATCH: geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt2[3], cnt2[0], cnt2[1], cnt2[2]))
-                                # use data of patched molecule, save patched molecule, edit output name to indicate molecule is patched
-                                cnt = cnt2[:]
-                                mol = deepcopy(mol2)
-                                fout = "%s_patched.pdb"%fout.split(".")[0]
-                                patchstat.append(1)
+                                f_patched = autopatch(f.split(".")[0], cutoff)
+                                # test if patching has been successful (empty string returned = failure)
+                                if f_patched != "":
+                                        cnt2, mol2 = analyze_protein(f_patched)
+                                        print(">> PATCH: geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt2[3], cnt2[0], cnt2[1], cnt2[2]))
+                                        # use data of patched molecule, save patched molecule, edit output name to indicate molecule is patched
+                                        cnt = cnt2[:]
+                                        mol = deepcopy(mol2)
+                                        fout = "%s_patched.pdb"%fout.split(".")[0]
+                                        patchstat.append(1)
+                                        pdbchain = pdb + chain
+
+
+
+                                else:
+                                        print(">> PATCH: failed, keeping original results in file %s"%f)
+                                        patchstat.append(2)
+                                        success = False
+
+
+                        elif cnt[3] == 0:
+                                print(">> PATCH: not needed")
+                                patchstat.append(0) # if no gap is present
 
                         else:
-                                print(">> PATCH: failed, keeping original results in file %s"%f)
-                                patchstat.append(2)
+                                print(">> PATCH: not applicable (molecule loading failed)")
+                                patchstat.append(2) # if protein loading failed
                                 success = False
 
-
-                elif cnt[3] == 0:
-                        print(">> PATCH: not needed")
-                        patchstat.append(0) # if no gap is present
-
-                else:
-                        print(">> PATCH: not applicable (molecule loading failed)")
-                        patchstat.append(2) # if protein loading failed
-                        success = False
-
-                result.append(cnt)
+                        result.append(cnt)
 
                 # write clean PDB in "clean" folder (unless protein loading failed)
-                try:
-                        if success:
-                            print(">> SAVING PROTEIN in clean/%s"%fout)
-                            mol.write_pdb("clean/%s"%fout)
-                        else:
-                            print(">> protein not saved (patching failed)")
-                except:
-                        print(">> protein not saved (writing error)")
-                        continue
+                        try:
+                                if success:
+                                        print(">> SAVING PROTEIN in curate_PDB/clean/%s"%fout)
+                                        mol.write_pdb("curate_PDB/clean/%s"%fout)
+                                        
+                                else:
+                                        print(">> protein not saved (patching failed)")
+                        except:
+                                print(">> protein not saved (writing error)")
+                                continue
 
-        result = np.array(result)
-        patchstat = np.array(patchstat) # report on whether patching was needed and, if so, successful
-        #**********************FAILING HERE*************************
-        outdata = np.concatenate((np.array([files]).T, result), axis=1)
-        np.savetxt("gap_data.txt", outdata, fmt="%s")
-        np.savetxt("patch_data.txt", patchstat)
+                print(files)
 
-else:
-        # load precalculated gap and patch data for statistics
-        indata = np.loadtxt("gap_data.txt", dtype=str)
-        files = indata[:, 0]
-        result = indata[:, 1:].astype(int)
-        patchstat = np.loadtxt("patch_data.txt")
+
+                list_of_files = files.tolist()
+
+                for f in list_of_files:
+                        if re.search('PATCHED', f):
+                                list_of_files.remove(f)
+
+                files = np.array(list_of_files)
+                print(files)
+
+                result = np.array(result)
+                patchstat = np.array(patchstat)
+                # report on whether patching was needed and, if so, successful
+
+                print('FILES:')
+                print(files)
+
+                print('RESULT:')
+                print(result)
+                print('-----------------')
+
+                #**********************FAILING HERE*************************
+                outdata = np.concatenate((np.array([files]).T, result), axis=1)
+                #************************************************************
+                np.savetxt("gap_data.txt", outdata, fmt="%s")
+                np.savetxt("patch_data.txt", patchstat)
+
+        else:
+                # load precalculated gap and patch data for statistics
+                indata = np.loadtxt("gap_data.txt", dtype=str)
+                files = indata[:, 0]
+                result = indata[:, 1:].astype(int)
+                patchstat = np.loadtxt("patch_data.txt")
 
 
 ##############################################################################
@@ -302,41 +328,43 @@ else:
 
 ### report on pdb gaps stats, and success of patching ###
 
-print("\n")
-print("%s protein chains processed"%(len(result)))
-print("%s proteins not loadable"%(np.sum(result[:, 0] == -2)))
+        print("\n")
+        print("%s protein chains processed"%(len(result)))
+        print("%s proteins not loadable"%(np.sum(result[:, 0] == -2)))
 
-# note: we want to use as dataset all proteins having patchstat equal to 0 or 1
-print("\nPatching:")
-print("   %s not needed"%np.sum(patchstat == 0))
-print("   %s successful"%np.sum(patchstat == 1))
-print("   %s failed"%np.sum(patchstat == 2))
+        # note: we want to use as dataset all proteins having patchstat equal to 0 or 1
+        print("\nPatching:")
+        print("   %s not needed"%np.sum(patchstat == 0))
+        print("   %s successful"%np.sum(patchstat == 1))
+        print("   %s failed"%np.sum(patchstat == 2))
 
-print("\nSequence gaps count:")
-for n in np.unique(result[:, 0]):
-        if n == -2:
-                continue
-        else:
-                print("   %s proteins with %s gaps"%(np.sum(result[:, 0] == n), n))
-
-
-print("\nGeometry gaps count:")
-for n in np.unique(result[:, 3]):
-
-        if n == -2:
-                continue
-        elif n == -1:
-                print("   %s proteins C-N atoms mismatch"%(np.sum(result[:, 3] == n)))
-                continue
-        else:
-                print("   %s proteins with %s gaps"%(np.sum(result[:, 3] == n), n))
+        print("\nSequence gaps count:")
+        for n in np.unique(result[:, 0]):
+                if n == -2:
+                        continue
+                else:
+                        print("   %s proteins with %s gaps"%(np.sum(result[:, 0] == n), n))
 
 
-print("\nSequence maximal gap size:")
-for n in np.unique(result[:, 2]):
+        print("\nGeometry gaps count:")
+        for n in np.unique(result[:, 3]):
 
-        if n == -2:
-                continue
-        else:
-                print("   %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
+                if n == -2:
+                        continue
+                elif n == -1:
+                        print("   %s proteins C-N atoms mismatch"%(np.sum(result[:, 3] == n)))
+                        continue
+                else:
+                        print("   %s proteins with %s gaps"%(np.sum(result[:, 3] == n), n))
+
+
+        print("\nSequence maximal gap size:")
+        for n in np.unique(result[:, 2]):
+
+                if n == -2:
+                        continue
+                else:
+                        print("   %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
+
+        return()
 

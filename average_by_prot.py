@@ -6,9 +6,9 @@ def average_prot(all_pka_sasa_res):
     running = True
     while running == True:
         try:
-            columns = ['resid', 'chain', 'plddt', 'Uniprot Code', 'pKa', 'PDB Code', 'sasa', 'sasa stdev']
+            columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'PDB Code', 'sasa', 'sasa stdev']
             avgd_pka_sasa = pd.DataFrame(columns=columns)
-            list_of_uniprot_codes = all_pka_sasa_res['Uniprot Code']
+            list_of_uniprot_codes = all_pka_sasa_res['Uniprot Entry']
             list_of_uniprot_codes_no_dup = list()
         except Exception as e:
             print('Failed to construct dataframe')
@@ -22,15 +22,15 @@ def average_prot(all_pka_sasa_res):
                     continue
 
         except Exception as e:
-            print('Failed to obtain Uniprot Codes from dataframe')
+            print('Failed to obtain Uniprot Entries from dataframe')
             print("ERROR: %s"%e)
             running = False
 
 
         for uniprot_code in list_of_uniprot_codes_no_dup:
             try:
-                df_one_uniprot_code = all_pka_sasa_res.where(all_pka_sasa_res['Uniprot Code'] == uniprot_code)
-                df_one_uniprot_code = df_one_uniprot_code[df_one_uniprot_code['Uniprot Code'].notna()]
+                df_one_uniprot_code = all_pka_sasa_res.where(all_pka_sasa_res['Uniprot Entry'] == uniprot_code)
+                df_one_uniprot_code = df_one_uniprot_code[df_one_uniprot_code['Uniprot Entry'].notna()]
                 list_chains = df_one_uniprot_code['chain']
                 list_chains_no_dup = list()
                 

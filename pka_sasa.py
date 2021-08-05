@@ -10,19 +10,21 @@ import numpy as np
 import biobox as bb
 from biobox.measures.calculators import sasa
 
-def calculate_pKa_and_SASA(code , uniprot_code, AF_lysines_df):
+def calculate_pKa_and_SASA(code):
+    #Need to feed list of chains into here...
     try:
-        pdb_code = code + '.pdb'
-        print('Obtaining pKa data for ' + pdb_code)
-
-        process = subprocess.Popen(['python', '-m', 'propka', pdb_code],
+        code_for_df = code[:4]
+        path = 'assembled/' + code  
+        #pdb_code = code + '.pdb'
+        print('Obtaining pKa data for ' + code)
+        process = subprocess.Popen(['python', '-m', 'propka', path],
                             stdout=subprocess.PIPE, 
                             stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
 
         lys_number = list()
         pkas = list()
-        pkafile = code + '.pka'
+        pkafile = code_for_df + '_assembled.pka'
         propres = open(pkafile)
         chain = list()
 
@@ -35,7 +37,7 @@ def calculate_pKa_and_SASA(code , uniprot_code, AF_lysines_df):
                 chain.append(line[1])
                 pkas.append(line[2])
 
-        df = pd.DataFrame({'Uniprot Code': uniprot_code, 'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code})
+        df = pd.DataFrame({'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code_for_df})
         df.sort_values(by=['pKa'], inplace=True)
         convert_dict = {'pKa': float}
         df = df.astype(convert_dict)
@@ -44,23 +46,16 @@ def calculate_pKa_and_SASA(code , uniprot_code, AF_lysines_df):
         df = df.dropna()
         df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
 
-        if (len(AF_lysines_df) != 0):
-            df_merge = pd.merge(AF_lysines_df, df, how='outer', on='resid')
-            df_merge.drop('chain_y', inplace=True, axis=1)
-            df_merge.rename(columns={'chain_x': 'chain'}, inplace=True)
-            df = df_merge
-            df['plddt'] = pd.to_numeric(df['plddt'],errors='coerce')
-            df = df.where(df['plddt'] > 70)
-            df = df.dropna()
 
         if df.empty:
-            print('No lysine residues with an epsilon amino group pKa < 9 were found in ' + pdb_code + '\n')
+            print('No lysine residues with an epsilon amino group pKa < 9 were found in ' + code + '\n')
 
         else:
+            
             print('The following lysine residues have epsilon amino group pKa value(s) < 9' + '\n')
             print(df)
             M = bb.Molecule()
-            M.import_pdb(pdb_code)
+            M.import_pdb(path)
             df_2 = M.data
 
             resid_list = df['resid'].tolist()
@@ -68,7 +63,7 @@ def calculate_pKa_and_SASA(code , uniprot_code, AF_lysines_df):
 
             df.index = pd.RangeIndex(len(df.index))
             df.index = range(len(df.index))
-            print('\n Obtaining sasa data for ' + pdb_code + '\n')
+            print('\n Obtaining sasa data for ' + code + '\n')
             list_of_sasa = list()
 
             for i in range(len(resid_list)):
@@ -93,12 +88,12 @@ def calculate_pKa_and_SASA(code , uniprot_code, AF_lysines_df):
 
     except Exception as e:
         print("ERROR: %s"%e)
-        print(pdb_code, 'Failed testing')
+        print(code, 'Failed testing')
 
     return(df)
 
 if __name__ == "__main__":
     try:    
-        print(calculate_pKa_and_SASA('3bg3'))
-    except:
-        print('Error')
+        print(calculate_pKa_and_SASA('3bg3', 'A','P11498'))
+    except Exception as e:
+        print("ERROR: %s"%e)

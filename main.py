@@ -8,6 +8,8 @@ import os
 import subprocess
 import numpy as np
 import biobox as bb
+import sys
+import glob
 from biobox.measures.calculators import sasa
 from scipy.spatial.distance import _correlation_pdist_wrap
 from uniprot import get_pdbs
@@ -16,7 +18,8 @@ from search_by_technique import search_by_technique
 from alphafold_certainty import find_AF_plddt
 from data_analysis import analyse_data
 from average_by_prot import average_prot
-
+from curate_PDB.get_data import get_data
+from assemble_multimer import assemble_multimer
 
 skip = 0
 running = True
@@ -178,7 +181,7 @@ while running:
                     try:
                         AF_code = input('What is the Uniprot code?')
                         AF_code_full = 'AF-' +AF_code + '-F1-model_v1'
-                        d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'}
+                        d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
                         results_df = results_df.append(d, ignore_index=True)
                         print(results_df)
 
@@ -193,17 +196,34 @@ while running:
             skip = 1
             raise Exception
 
+        dict_uniprot = dict()
+        for i in range(len(results_df)):
+            pdb = results_df.at[i, 'PDB Code']
+            chain = results_df.at[i, 'Chains']
+            uniprot = results_df.at[i, 'Uniprot Entry']
+            dict_uniprot.update({pdb: uniprot})
+            print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
+            print(chain)
+            if len(pdb) > 5:
+                os.chdir('curate_PDB')
+                os.chdir('clean')
+                subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb", shell=True)
+                os.system('cd ..')
+                os.system('cd ..')
+                print('DONE')
+            elif len(pdb) < 5:
+                print('*******Getting data for ' + pdb + ' ' + chain + ' **********')
 
-        cwd = str(os.getcwd())
-        results_df.to_csv(cwd + '/curate_PDB/results.csv')
+                get_data(pdb, chain)
+        print(dict_uniprot)
+        print('Assembling Multimer...')
+        
+        assemble_multimer(results_df)
+        
 
-        os.chdir('curate_PDB')
-        os.system('python get_data.py')
-        print('GOOD')
+                
 
-        #Downloads files from the PDB
-
-        columns = ['Uniprot Code', 'resid', 'chain', 'pKa', 'sasa', 'PDB Code']
+        columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code']
         all_pka_sasa_res = pd.DataFrame(columns=columns)
     
         if skip == 0:
@@ -212,54 +232,76 @@ while running:
 
             results_df.index = range(len(results_df.index))
 
-            while num < len(results_df):
+            files = list((glob.glob("assembled/*pdb")))
+            for file in files:
             #while num < 30:
 
-                code = results_df.at[num, 'PDB Code']
-                uniprot_code = results_df.at[num, 'Uniprot Entry']
-                if len(code) == 4:
+                code = file[10:]
+
+
+                if code[:2] == 'AF':
                     try:
-                        subprocess.check_call("wget https://files.rcsb.org/download/" + code + ".pdb", shell=True)
-                        columns = ['resid', 'chain', 'plddt']
-                        AF_lysines_df = pd.DataFrame(columns=columns)
+                        AF_lysines_df = find_AF_plddt(code)
 
                     except Exception as e:
                         print("ERROR: %s"%e)
+                        continue
+
+                try:
+                    pka_sasa_df = calculate_pKa_and_SASA(code)
+                    all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_df)
+                    print(all_pka_sasa_res)
+
+
+                except:
+                    pass
+
+
+                if code[:2] == 'AF':
+                    df_merge = pd.merge(AF_lysines_df, all_pka_sasa_res, how='outer', on='resid')
+                    df_merge.drop('chain_y', inplace=True, axis=1)
+                    df_merge.rename(columns={'chain_x': 'chain'}, inplace=True)
+                    df = df_merge
+                    df['plddt'] = pd.to_numeric(df['plddt'],errors='coerce')
+                    df = df.where(df['plddt'] > 70)
+                    df = df.dropna()
+                    all_pka_sasa_res = df
                 else:
-                    try:
-                        subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + code + ".pdb", shell=True)
-                        AF_lysines_df = find_AF_plddt(AF_code_full)
+                    all_pka_sasa_res['plddt'] = 'N/A'
+                #NEED TO ADD UNIPROT CODE INTO ALL_PKA_SASA_RES
 
-                    except Exception as e:
-                        print("ERROR: %s"%e)
+                all_pka_sasa_res['Uniprot Entry'] = all_pka_sasa_res['PDB Code'].map(dict_uniprot)
+                all_pka_sasa_res.to_csv('results.csv')
+
 
                 num = num + 1
                 print(num)
 
 
-                #Calculates pKa and SASA of all lysines in each structure
+         
 
 
 
-                try:
-                    pka_sasa_df = calculate_pKa_and_SASA(code, uniprot_code, AF_lysines_df)
-                    all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_df)
-                    print(all_pka_sasa_res)
-                    all_pka_sasa_res.to_csv('results.csv')
 
-                except Exception as e:
-                    print("ERROR: %s"%e)
-                    continue
 
-                try:
-                    code_to_remove = code + '.pdb'
-                    os.remove(code_to_remove)
-                    code_to_remove_2 = code + '.pka'
-                    os.remove(code_to_remove_2)
-                    print('Files removed')
 
-                except Exception as e:
-                    print("ERROR: %s"%e)
+
+
+                #except Exception as e:
+                    #resid = results_df[num, 'resid']
+                    #data = ({'resid': resid, 'chain': chain, 'plddt': 'N/A'})
+                    #AF_lysines_df = AF_lysines_df.append(data, ignore_index=True)
+                    #continue
+
+                #try:
+                    #code_to_remove = code + '_' + chain + '.pdb'
+                    #os.remove(code_to_remove)
+                    #code_to_remove_2 = code + '_' + chain + '.pka'
+                    #os.remove(code_to_remove_2)
+                    #print('Files removed')
+
+                #except Exception as e:
+                    #print("ERROR: %s"%e)
 
 
 
@@ -384,7 +426,8 @@ while running:
     except KeyboardInterrupt:
         pass
 
-    except:
+    except Exception as e:
+        print("Error: %s"%e)
         if skip == 1:
             print('\n' + 'Goodbye' + '\n')
             running = False

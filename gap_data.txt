@@ -1,0 +1,4 @@
+curate_PDB/raw/4XBJ_D.pdb 0 0 0 0
+curate_PDB/raw/4XBJ_C.pdb 0 0 0 0
+curate_PDB/raw/4XBJ_B.pdb 0 0 0 0
+curate_PDB/raw/4XBJ_A.pdb 0 0 0 0

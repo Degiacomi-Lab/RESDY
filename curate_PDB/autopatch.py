@@ -12,7 +12,7 @@ from modeller import *
 from modeller.automodel import * 
 
 def autopatch(fbasename, gap_cutoff=8):
-
+    print('*****AUTOPATCHING*****')
     #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise) 
     pdb_out = ""
     try:
