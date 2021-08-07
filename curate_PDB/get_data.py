@@ -11,6 +11,7 @@ import subprocess
 import numpy as np
 import biobox as bb
 import pandas as pd
+from curate_PDB.clean import clean
 from copy import deepcopy
 # offers automatic automatic structure patching function
 from curate_PDB.autopatch import autopatch
@@ -33,12 +34,12 @@ def get_data(pdb, chain):
 
                 # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
                 # saves a cleaned temporary file called "tmp"
-
-                subprocess.check_call("./curate_PDB/clean.sh %s"%infile, shell=True)
-
-
+                #subprocess.check_call("./curate_PDB/clean.sh %s"%infile, shell=True)
+                clean(pdb, chain)
                 Mtmp = bb.Molecule()
+                print('Before')
                 Mtmp.import_pdb("tmp")
+                print('after')
 
                 if len(Mtmp.coordinates) > 1:
                         Mtmp.coordinates = Mtmp.coordinates[0:1]
@@ -151,7 +152,10 @@ def get_data(pdb, chain):
                         _, idxs = M.atomselect(chain, "*", "*", get_index=True)
                         path = "curate_PDB/raw/" + fout
                         print(path)
-                        M.write_pdb(path, index=idxs)
+                        try:
+                                M.write_pdb(path, index=idxs)
+                        except:
+                                M.write_pdb(path, index=idxs, split_struc=False)
 
                 except Exception as e:
                         print("ERROR: %s"%e)
@@ -198,15 +202,18 @@ def get_data(pdb, chain):
 # download FASTA sequences of proteins of interest in "raw" folder (not *alt files)
         if download_fasta:
                 for f in glob.glob("curate_PDB/raw/*pdb"):
+                        file_name = f[15:]
+                        file_name_no_pdb = file_name[-3:]
                         if "PATCHED" in f:
                                 continue
 
-                        end_url = pdb + '.' + chain
+                        file_name_no_pdb = file_name[:-4]
+                        file_name_url = file_name_no_pdb.replace('_', '.')
+                        file_name_fasta = file_name_no_pdb + '.fasta'
                         oldpwd=os.getcwd()
                         os.chdir('curate_PDB/raw')
-                        web_url = "https://www.rcsb.org/fasta/chain/" + end_url + '/download'
-                        name_output = pdb + '_' + chain + '.fasta'
-                        subprocess.check_call("wget -O " + name_output + " " + web_url, shell=True)
+                        web_url = "https://www.rcsb.org/fasta/chain/" + file_name_url + '/download'
+                        subprocess.check_call("wget -O " + file_name_fasta + " " + web_url, shell=True)
                         os.chdir(oldpwd)
 
                 
@@ -365,6 +372,7 @@ def get_data(pdb, chain):
                         continue
                 else:
                         print("   %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
+
 
         return()
 

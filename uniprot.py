@@ -8,7 +8,7 @@ import os
 import subprocess
 import numpy as np
 import sys
-
+from get_chains import get_chains
 
 def get_pdbs(name_of_organism, code):
 
@@ -150,21 +150,23 @@ def get_pdbs(name_of_organism, code):
 
 
                         for entry in messy_entry:
-                            words = entry.split()
-                            chain_ent_num = (len(words) - 1)
-                            chain_info = words[chain_ent_num]
-                            chain_info = chain_info[:-1]
-                            chain_info = chain_info.split('/')
-                            PDBCODE = (words[1])[:-1]
-                            method_obtained = (words[2])[:-1]
-                            resolution = (words[3])[:-1]
-                            for i in range(len(chain_info)):
-                                if len(chain_info[i]) != 1:
-                                    chain = (chain_info[i])[:1]
-                                else:
-                                    chain = chain_info[i]
-                                data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': chain})
-                                df = df.append(data, ignore_index=True)
+                            try:
+                                words = entry.split()
+                                chain_ent_num = (len(words) - 1)
+                                chain_info = words[chain_ent_num]
+                                chain_info = chain_info[:-1]
+                                chain_info = chain_info.split('/')
+                                PDBCODE = (words[1])[:-1]
+                                method_obtained = (words[2])[:-1]
+                                resolution = (words[3])[:-1]
+                                unique_values_chain = get_chains(PDBCODE)
+                                for i in range(len(unique_values_chain)):
+                                    data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                                    df = df.append(data, ignore_index=True)
+                            except Exception as e:
+                                print("Error %s"%e)
+                                continue
+                                    
 
                     if len(messy_entry) == 0:
                         AF_code = 'AF-' + protein_code_clean + 'F1-model_v1'
@@ -175,6 +177,7 @@ def get_pdbs(name_of_organism, code):
                 except Exception as e:
                     print("ERROR: %s"%e)
                     print('Failed to obtain PDB codes for ' + protein_code_clean)
+                    continue
 
                                                             
 
@@ -200,6 +203,7 @@ def get_pdbs(name_of_organism, code):
     #df = df.drop_duplicates(subset= ['PDB Code'], keep='first')
     df.to_csv('temp_res.csv')
     return df
+
 
 if __name__ == "__main__":
     try:    

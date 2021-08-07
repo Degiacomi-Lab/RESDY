@@ -12,8 +12,7 @@ from biobox.measures.calculators import sasa
 def find_AF_plddt(AF_code_full):
     try:
         #AF_code_full = AF_code_full + '.pdb'
-        cwd = str(os.getcwd())
-        f = open(cwd + '/' + AF_code_full, "r")
+        f = open('assembled/' + AF_code_full, "r")
         columns = ['resid', 'chain', 'plddt']
         AF_lysines_df = pd.DataFrame(columns=columns)
         for line in f:

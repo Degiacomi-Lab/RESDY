@@ -13,7 +13,11 @@ import glob
 from biobox.measures.calculators import sasa
 from scipy.spatial.distance import _correlation_pdist_wrap
 from uniprot import get_pdbs
-from pka_sasa import calculate_pKa_and_SASA
+from get_pdbs_given_uniprot import get_pdbs_given_uniprot_code
+from construct_single_pdb_df import construct_single_pdb_df
+from download_AF_struc import download_AF_struc
+from calculate_pka import calculate_pKa
+from calculate_sasa import calculate_sasa
 from search_by_technique import search_by_technique
 from alphafold_certainty import find_AF_plddt
 from data_analysis import analyse_data
@@ -34,29 +38,62 @@ while running:
 
         questions = [
         inquirer.List('Choice',
-                        message="Do you want to search a whole organism's proteome or input PDB Codes?",
-                        choices=['Whole Proteome', 'Input PDB Codes', 'Quit'],
+                        message="Do you want to search a organism's whole proteome or input specific PDB or Uniprot Codes?",
+                        choices=['Whole Proteome', 'Input PDB Codes', 'Input Uniprot Codes', 'Quit'],
                     ),
         ]
         answers = inquirer.prompt(questions)
 
 
         #Searches Uniprot for PDB codes
-        if answers["Choice"] == 'Whole Proteome':
+        if (answers['Choice'] == 'Whole Proteome') or (answers['Choice'] == 'Input Uniprot Codes'):
+            if answers["Choice"] == 'Whole Proteome':
 
-            name_of_organism = input('Name of organism:')
-            name_of_organism = name_of_organism.replace(' ', '+')
-            code = input('Uniprot code:')
+                name_of_organism = input('Name of organism:')
+                name_of_organism = name_of_organism.replace(' ', '+')
+                code = input('Uniprot proteome code:')
 
-            try:
-                results_df = get_pdbs(name_of_organism, code)
-                print(results_df)
-            except:
-                print('Try again')
-                skip = 1
-            if (len(results_df) == 0):
-                skip = 1
+                try:
+                    results_df = get_pdbs(name_of_organism, code)
+                    print(results_df)
+                except:
+                    print('Try again')
+                    skip = 1
+                if (len(results_df) == 0):
+                    skip = 1
+                    
+            if answers['Choice'] == 'Input Uniprot Codes':
+
+                asking_for_uniprot_codes = True
+                list_of_UNIPROT_codes = list()
+
+                while asking_for_uniprot_codes == True:
+
+                    uniprot_code = input('Uniprot code:')
+                    list_of_UNIPROT_codes.append(uniprot_code)
+
+                    question_more_uniprot_codes = [
+                    inquirer.List('Choice',
+                                    message="Are there more uniprot codes to add?",
+                                    choices=['Yes', 'No'],
+                                ),
+                    ]
+                    answer_more_uniprot_codes = inquirer.prompt(question_more_uniprot_codes)
+
+                    if answer_more_uniprot_codes['Choice'] == 'No':
+                        asking_for_uniprot_codes = False
+                    else:
+                        pass
                 
+                print('Getting data for: ')
+                print(list_of_UNIPROT_codes)
+                results_df = get_pdbs_given_uniprot_code(list_of_UNIPROT_codes)
+
+                if (len(results_df) == 0):
+                    skip = 1
+
+
+
 
             #Allows user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
 
@@ -141,46 +178,18 @@ while running:
                         PDBCODE_inpt = PDBCODE_inpt.upper()
                         print(PDBCODE_inpt)
                         UNIPROT_code_pdb = input('What is the Uniprot Code?')
-
-                        url_2 = 'https://www.uniprot.org/uniprot/' + UNIPROT_code_pdb + '.txt'
-                                                
-                        html_2 = urllib.request.urlopen(url_2)
-
-                        for line in html_2:
-                            line = str(line)
-                            messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
-
-
-                            for entry in messy_entry:
-                                words = entry.split()
-                                PDBCODE = (words[1])[:-1]
-                                if PDBCODE_inpt == PDBCODE:
-                                    
-                                    chain_ent_num = (len(words) - 1)
-                                    chain_info = words[chain_ent_num]
-                                    chain_info = chain_info[:-1]
-                                    chain_info = chain_info.split('/')
-                                    method_obtained = (words[2])[:-1]
-                                    resolution = (words[3])[:-1]
-
-                                    for i in range(len(chain_info)):
-                                        if len(chain_info[i]) != 1:
-                                            chain = (chain_info[i])[:1]
-                                        else:
-                                            chain = chain_info[i]
-                                        data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': chain})
-                                        results_df = results_df.append(data, ignore_index=True)
-                                
-
+                        results_df = construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, results_df)
                         print(results_df)
 
                     except Exception as e:
                         print("ERROR: %s"%e)
+                        print('Unable to obtain data for entry.')
+                        pass
 
                 elif answer_4['Choice'] == 'AlphaFold':
                     try:
                         AF_code = input('What is the Uniprot code?')
-                        AF_code_full = 'AF-' +AF_code + '-F1-model_v1'
+                        AF_code_full = 'AF-' + AF_code + '-F1-model_v1'
                         d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
                         results_df = results_df.append(d, ignore_index=True)
                         print(results_df)
@@ -197,27 +206,34 @@ while running:
             raise Exception
 
         dict_uniprot = dict()
-        for i in range(len(results_df)):
-            pdb = results_df.at[i, 'PDB Code']
-            chain = results_df.at[i, 'Chains']
-            uniprot = results_df.at[i, 'Uniprot Entry']
-            dict_uniprot.update({pdb: uniprot})
-            print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
-            print(chain)
-            if len(pdb) > 5:
-                os.chdir('curate_PDB')
-                os.chdir('clean')
-                subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb", shell=True)
-                os.system('cd ..')
-                os.system('cd ..')
-                print('DONE')
-            elif len(pdb) < 5:
-                print('*******Getting data for ' + pdb + ' ' + chain + ' **********')
+        if (len(results_df) != 0):
+            for i in range(len(results_df)):
+                pdb = results_df.at[i, 'PDB Code']
+                chain = results_df.at[i, 'Chains']
+                uniprot = results_df.at[i, 'Uniprot Entry']
+                dict_uniprot.update({pdb: uniprot})
+                print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
+                print(chain)
+                if pdb[:2]=='AF':
+                    try:
+                        download_AF_ystruc(pdb)
+                    except:
+                        continue
+                else:
+                    print('******* Getting data for ' + pdb + ' ' + chain + ' **********')
+                    try:
+                        get_data(pdb, chain)
+                        for f in glob.glob("curate_PDB/raw/*"):
+                            os.remove(f)
+                    except Exception as e:
+                        print('Error: %s'%e)
+                        print('FAILED FOR: ' + pdb + chain)
+                        for f in glob.glob("curate_PDB/raw/*"):
+                            os.remove(f)
+                        continue
 
-                get_data(pdb, chain)
         print(dict_uniprot)
-        print('Assembling Multimer...')
-        
+        print('Assembling Multimers...')
         assemble_multimer(results_df)
         
 
@@ -225,16 +241,17 @@ while running:
 
         columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code']
         all_pka_sasa_res = pd.DataFrame(columns=columns)
-    
-        if skip == 0:
-            num = 0
+        num = 0
+        files = list((glob.glob("assembled/*pdb")))
+
+        if (len(files) != 0):
             results_df.index = pd.RangeIndex(len(results_df.index))
 
             results_df.index = range(len(results_df.index))
 
-            files = list((glob.glob("assembled/*pdb")))
+            
+
             for file in files:
-            #while num < 30:
 
                 code = file[10:]
 
@@ -248,8 +265,9 @@ while running:
                         continue
 
                 try:
-                    pka_sasa_df = calculate_pKa_and_SASA(code)
-                    all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_df)
+                    pka_res_df = calculate_pKa(code)
+                    pka_sasa_res_df = calculate_sasa(code, pka_res_df)
+                    all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
                     print(all_pka_sasa_res)
 
 
@@ -268,40 +286,31 @@ while running:
                     all_pka_sasa_res = df
                 else:
                     all_pka_sasa_res['plddt'] = 'N/A'
-                #NEED TO ADD UNIPROT CODE INTO ALL_PKA_SASA_RES
 
                 all_pka_sasa_res['Uniprot Entry'] = all_pka_sasa_res['PDB Code'].map(dict_uniprot)
-                all_pka_sasa_res.to_csv('results.csv')
+                print(all_pka_sasa_res)
+                all_pka_sasa_res.to_csv('Output/results.csv')
 
 
                 num = num + 1
                 print(num)
 
 
-         
+                try:
+                    code = code[:-4]
+                    code_to_remove = code + '.pka'
+                    os.remove(code_to_remove)
+                    print('Files removed')
+
+                except Exception as e:
+                    print("ERROR: %s"%e)
+
+            for f in glob.glob("assembled/*"):
+                os.remove(f)
+            for f in glob.glob('curate_PDB/clean/*'):
+                os.remove(f)
 
 
-
-
-
-
-
-
-                #except Exception as e:
-                    #resid = results_df[num, 'resid']
-                    #data = ({'resid': resid, 'chain': chain, 'plddt': 'N/A'})
-                    #AF_lysines_df = AF_lysines_df.append(data, ignore_index=True)
-                    #continue
-
-                #try:
-                    #code_to_remove = code + '_' + chain + '.pdb'
-                    #os.remove(code_to_remove)
-                    #code_to_remove_2 = code + '_' + chain + '.pka'
-                    #os.remove(code_to_remove_2)
-                    #print('Files removed')
-
-                #except Exception as e:
-                    #print("ERROR: %s"%e)
 
 
 
@@ -319,12 +328,18 @@ while running:
         if answer_avgs['Choice'] == 'Yes':
             try:
                 all_pka_sasa_res = average_prot(all_pka_sasa_res)
+                print('AVERAGED DATA...')
+                print(all_pka_sasa_res)
             except Exception as e:
                     print("ERROR: %s"%e)
                     print('Failed to average data.')
         
         else:
             pass
+
+
+
+
 
 
         

@@ -6,7 +6,7 @@ def average_prot(all_pka_sasa_res):
     running = True
     while running == True:
         try:
-            columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'PDB Code', 'sasa', 'sasa stdev']
+            columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'pKa stdev', 'PDB Code', 'sasa', 'sasa stdev']
             avgd_pka_sasa = pd.DataFrame(columns=columns)
             list_of_uniprot_codes = all_pka_sasa_res['Uniprot Entry']
             list_of_uniprot_codes_no_dup = list()
@@ -96,18 +96,20 @@ def average_prot(all_pka_sasa_res):
                     try:
                         list_of_pdbs = df_one_resid['PDB Code']
                         list_of_pdbs_no_dup = list()
+                        print(list_of_pdbs)
 
                         for entry in list_of_pdbs:
                             if entry not in list_of_pdbs_no_dup:
                                 list_of_pdbs_no_dup.append(entry)
                             else:
                                 continue
+                        print(list_of_pdbs_no_dup)
 
                         PDB_codes_avgd = ''
                         for i in range(len(list_of_pdbs_no_dup)):
                             PDB_codes_avgd = PDB_codes_avgd + '/' + list_of_pdbs_no_dup[i]
         
-                        d = {'resid': residue, 'chain': chain, 'plddt': avg_plddt, 'Uniprot Code': uniprot_code, 'pKa': avg_pka, 'pKa stdev':stddev_pka, 'PDB Code': PDB_codes_avgd, 'sasa': avg_sasa, 'sasa stdev': stdev_sasa}
+                        d = {'resid': residue, 'chain': chain, 'plddt': avg_plddt, 'Uniprot Entry': uniprot_code, 'pKa': avg_pka, 'pKa stdev':stddev_pka, 'PDB Code': PDB_codes_avgd, 'sasa': avg_sasa, 'sasa stdev': stdev_sasa}
                         avgd_pka_sasa = avgd_pka_sasa.append(d, ignore_index=True)
         
                 

@@ -10,7 +10,6 @@ import numpy as np
 import biobox as bb
 from biobox.measures.calculators import sasa
 from uniprot import get_pdbs
-from pka_sasa import calculate_pKa_and_SASA
 
 def search_by_technique(list_of_techniques, results_df, wanted_res):
     skip = 0
