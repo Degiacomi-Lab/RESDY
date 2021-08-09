@@ -2,60 +2,37 @@ import biobox as bb
 import pandas as pd
 import os
 
-def assemble_multimer(results_df):
+def assemble_multimer(pdb_code, list_chains):
+    if not os.path.exists("assembled"):
+        os.mkdir("assembled")
+
     try:
-        if not os.path.exists("assembled"):
-            os.mkdir("assembled")
+        name_of_assembly = pdb_code + '_assembled.pdb'
+        Multi = bb.Multimer()
 
-        list_of_pdb_codes = results_df['PDB Code']
-        list_of_pdb_codes_no_dup = list()
-
-        for entry in list_of_pdb_codes:
-            if entry not in list_of_pdb_codes_no_dup:
-                list_of_pdb_codes_no_dup.append(entry)
-                print(list_of_pdb_codes_no_dup)
-            else:
-                continue
-        
-        for pdb_code in list_of_pdb_codes_no_dup:
-            try:
-                if pdb_code[:2] == 'AF':
-                    continue
-                else:
-                    df_one_pdb_code = results_df.where(results_df['PDB Code'] == pdb_code)
-                    df_one_pdb_code = df_one_pdb_code.dropna()
-                    name_of_assembly = pdb_code + '_assembled.pdb'
-                    for i in range(len(df_one_pdb_code)):
-                        Multi = bb.Multimer()
-                        list_of_chains = df_one_pdb_code['Chains']
-
-                        for chain in list_of_chains:
-                                name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
-                                patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
-                                M = bb.Molecule()
-                                try:
-                                    path = 'curate_PDB/clean/' + name_of_pdb_file
-                                    M.import_pdb(path)
-                                    Multi.append(M)
-                                except:
-                                    try:
-                                        path = 'curate_PDB/clean/' + patched_pdb_file
-                                        M.import_pdb(path)
-                                        Multi.append(M)
-                                    except Exception as e:
-                                        print("Error: %s"%e)
-                                        continue
-                    path = 'assembled/' + name_of_assembly
-                    Multi.write_pdb(path)
-                    print('Success assembling ' + pdb_code)
-            except Exception as e:
-                print("Error: %s"%e)
-                print('Failed to assemble ' + pdb_code)
-                continue
-
+        for chain in list_chains:
+                name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
+                patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
+                M = bb.Molecule()
+                try:
+                    path = 'curate_PDB/clean/' + name_of_pdb_file
+                    M.import_pdb(path)
+                    Multi.append(M)
+                except:
+                    try:
+                        path = 'curate_PDB/clean/' + patched_pdb_file
+                        M.import_pdb(path)
+                        Multi.append(M)
+                    except Exception as e:
+                        print("Error: %s"%e)
+                        continue
+        path = 'assembled/' + name_of_assembly
+        Multi.write_pdb(path)
+        print('Success assembling ' + pdb_code)
     except Exception as e:
         print("Error: %s"%e)
-        print('Error Assembling Multimer')
+        print('Failed to assemble ' + pdb_code)
+
     return()
 
 

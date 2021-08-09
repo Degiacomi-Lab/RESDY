@@ -46,7 +46,8 @@ def break_up_and_calculate_sasa(pdb_code):
                     if distance < 15:
                         list_close_points.append(idx[i])
                 #print(list_close_points)
-                M.write_pdb('teststruc.pdb', index=list_close_points, split_struc=False)
+                M.write_pdb('temp_struc.pdb', index=list_close_points, split_struc=False)
+
                 S = bb.Molecule()
                 S.import_pdb('temp_struc.pdb')
                 chain = list_of_chains[j]
@@ -71,6 +72,6 @@ def break_up_and_calculate_sasa(pdb_code):
     return(df)
 if __name__ == "__main__":
     try:    
-        print(break_up_and_calculate_sasa('4XBJ_assembled.pdb'))
+        print(break_up_and_calculate_sasa('6LVN_assembled.pdb'))
     except Exception as e:
         print("ERROR: %s"%e)

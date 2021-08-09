@@ -208,123 +208,148 @@ while running:
 
         dict_uniprot = dict()
         if (len(results_df) != 0):
-            for i in range(len(results_df)):
-                pdb = results_df.at[i, 'PDB Code']
-                chain = results_df.at[i, 'Chains']
-                uniprot = results_df.at[i, 'Uniprot Entry']
-                dict_uniprot.update({pdb: uniprot})
-                print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
-                print(chain)
-                if pdb[:2]=='AF':
-                    try:
-                        download_AF_struc(pdb)
-                    except:
-                        continue
+
+
+
+
+            columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code', 'Chain_Resid']
+            all_pka_sasa_res = pd.DataFrame(columns=columns)
+            num = 0
+
+
+            list_of_pdb_codes_no_dup = list()
+            list_of_pdb_codes = results_df['PDB Code']
+            for entry in list_of_pdb_codes:
+                if entry not in list_of_pdb_codes_no_dup:
+                    list_of_pdb_codes_no_dup.append(entry)
                 else:
-                    print('******* Getting data for ' + pdb + ' ' + chain + ' **********')
-                    try:
-                        get_data(pdb, chain)
-                        for f in glob.glob("curate_PDB/raw/*"):
-                            os.remove(f)
-                    except Exception as e:
-                        print('Error: %s'%e)
-                        print('FAILED FOR: ' + pdb + chain)
-                        for f in glob.glob("curate_PDB/raw/*"):
-                            os.remove(f)
-                        continue
-
-        print(dict_uniprot)
-        print('Assembling Multimers...')
-        assemble_multimer(results_df)
-        
-
-                
-
-        columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code', 'Chain_Resid']
-        all_pka_sasa_res = pd.DataFrame(columns=columns)
-        num = 0
-        files = list((glob.glob("assembled/*pdb")))
-
-        if (len(files) != 0):
-            results_df.index = pd.RangeIndex(len(results_df.index))
-
-            results_df.index = range(len(results_df.index))
-
+                    continue
             
 
-            for file in files:
-
-                code = file[10:]
-
-
-                if code[:2] == 'AF':
-                    try:
-                        AF_lysines_df = find_AF_plddt(code)
-
-                    except Exception as e:
-                        print("ERROR: %s"%e)
-                        continue
-
-                try:
-                    pka_res_df = calculate_pKa(code)
-                    print(pka_res_df)
-                    #pka_sasa_res_df = calculate_sasa(code, pka_res_df)
-                    pka_sasa_res_df = break_up_and_calculate_sasa(code)
-
-                    print(pka_sasa_res_df)
-                    try:
-                        pka_sasa_res_df = pd.merge(pka_sasa_res_df, pka_res_df, how='inner', on='Chain_Resid')
-                        print(pka_sasa_res_df)
-                        pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
-                        pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
-                        #pka_sasa_res_df.drop('chain', inplace=True, axis=1)
-                        #pka_sasa_res_df.drop('resid', inplace=True, axis=1)
-                        pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
-                        pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
-                        all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
-                        print(all_pka_sasa_res)
-                    except Exception as e:
-                        print('Error %s'%e)
+            for pdb in list_of_pdb_codes_no_dup:
+                df_one_pdb_code = results_df[results_df['PDB Code'] == pdb]
+                df_one_pdb_code = df_one_pdb_code[df_one_pdb_code['PDB Code'].notna()]
+                list_chains = df_one_pdb_code['Chains']
 
 
-                except:
+                for i in range(len(df_one_pdb_code)):
+                    chain = results_df.at[i, 'Chains']
+                    uniprot = results_df.at[i, 'Uniprot Entry']
+                    dict_uniprot.update({pdb: uniprot})
+                    print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
+                    print(chain)
+                    if pdb[:2]=='AF':
+                        try:
+                            download_AF_struc(pdb)
+                        except:
+                            continue
+                    else:
+                        print('******* Getting data for ' + pdb + ' ' + chain + ' **********')
+                        try:
+                            get_data(pdb, chain)
+                            for f in glob.glob("curate_PDB/raw/*"):
+                                os.remove(f)
+                        except Exception as e:
+                            print('Error: %s'%e)
+                            print('FAILED FOR: ' + pdb + chain)
+                            for f in glob.glob("curate_PDB/raw/*"):
+                                os.remove(f)
+                            continue
+                    print(chain)
+
+                print(dict_uniprot)
+                if pdb[:2] == 'AF':
                     pass
-
-
-                if code[:2] == 'AF':
-                    df_merge = pd.merge(AF_lysines_df, all_pka_sasa_res, how='outer', on='resid')
-                    df_merge.drop('chain_y', inplace=True, axis=1)
-                    df_merge.rename(columns={'chain_x': 'chain'}, inplace=True)
-                    df = df_merge
-                    df['plddt'] = pd.to_numeric(df['plddt'],errors='coerce')
-                    df = df.where(df['plddt'] > 70)
-                    df = df.dropna()
-                    all_pka_sasa_res = df
                 else:
-                    all_pka_sasa_res['plddt'] = 'N/A'
+                    print('Assembling Multimer...')
+                    assemble_multimer(pdb, list_chains)
+        
 
-                all_pka_sasa_res['Uniprot Entry'] = all_pka_sasa_res['PDB Code'].map(dict_uniprot)
-                print(all_pka_sasa_res)
-                all_pka_sasa_res.to_csv('Output/results.csv')
+                files = list((glob.glob("assembled/*pdb")))
+
+                if (len(files) != 0):
+                    results_df.index = pd.RangeIndex(len(results_df.index))
+
+                    results_df.index = range(len(results_df.index))
+
+                    
+
+                    for file in files:
+
+                        code = file[10:]
 
 
-                num = num + 1
-                print(num)
+                        if code[:2] == 'AF':
+                            try:
+                                AF_lysines_df = find_AF_plddt(code)
+
+                            except Exception as e:
+                                print("ERROR: %s"%e)
+                                continue
+
+                        try:
+                            pka_res_df = calculate_pKa(code)
+                            print(pka_res_df)
+                            #pka_sasa_res_df = calculate_sasa(code, pka_res_df)
+                            pka_sasa_res_df = break_up_and_calculate_sasa(code)
+
+                            print(pka_sasa_res_df)
+                            try:
+                                pka_sasa_res_df = pd.merge(pka_sasa_res_df, pka_res_df, how='inner', on='Chain_Resid')
+                                print(pka_sasa_res_df)
+                                pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
+                                pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
+                                #pka_sasa_res_df.drop('chain', inplace=True, axis=1)
+                                #pka_sasa_res_df.drop('resid', inplace=True, axis=1)
+                                pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
+                                pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
+                                all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
+                                print(all_pka_sasa_res)
+                            except Exception as e:
+                                print('Error %s'%e)
 
 
-                try:
-                    code = code[:-4]
-                    code_to_remove = code + '.pka'
-                    os.remove(code_to_remove)
-                    print('Files removed')
+                        except:
+                            pass
 
-                except Exception as e:
-                    print("ERROR: %s"%e)
 
-            for f in glob.glob("assembled/*"):
-                os.remove(f)
-            for f in glob.glob('curate_PDB/clean/*'):
-                os.remove(f)
+                        if code[:2] == 'AF':
+                            df_merge = pd.merge(AF_lysines_df, all_pka_sasa_res, how='outer', on='resid')
+                            df_merge.drop('chain_y', inplace=True, axis=1)
+                            df_merge.rename(columns={'chain_x': 'chain'}, inplace=True)
+                            df = df_merge
+                            df['plddt'] = pd.to_numeric(df['plddt'],errors='coerce')
+                            df = df.where(df['plddt'] > 70)
+                            df = df.dropna()
+                            all_pka_sasa_res = df
+                        else:
+                            all_pka_sasa_res['plddt'] = 'N/A'
+
+                        all_pka_sasa_res['Uniprot Entry'] = all_pka_sasa_res['PDB Code'].map(dict_uniprot)
+                        print(all_pka_sasa_res)
+                        all_pka_sasa_res.to_csv('Output/results.csv')
+
+
+                        num = num + 1
+                        print(num)
+
+
+                        try:
+                            code = code[:-4]
+                            code_to_remove = code + '.pka'
+                            os.remove(code_to_remove)
+                            print('Files removed')
+
+                        except Exception as e:
+                            print("ERROR: %s"%e)
+
+                    for f in glob.glob("assembled/*"):
+                        os.remove(f)
+                    for f in glob.glob('curate_PDB/clean/*'):
+                        file_name = f[17:]
+                        print(file_name)
+                        if file_name[:4] == pdb:
+                            os.remove(f)
 
 
 
