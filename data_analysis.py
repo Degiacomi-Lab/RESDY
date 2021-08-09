@@ -73,11 +73,11 @@ if __name__ == "__main__":
         #data_2 = {'Uniprot Code': 'ABC', 'resid': '4', 'chain': 'A', 'pKa': 7.4, 'sasa': 5, 'PDB Code': '6jig'}
         #all_pka_sasa_res = all_pka_sasa_res.append(data_2, ignore_index = True)
         #Problem must be that df coming in is wrong datatype...
-        all_pka_sasa_res = pd.read_csv('results.csv')
+        all_pka_sasa_res = pd.read_csv('Output/results.csv')
         all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
         print(all_pka_sasa_res)
-        carbam_pdb_list = ['4XBJ', '1DPM', '1E3U', '1BXN', '1BD0']
-        carbam_resid_list = ['122', '169', '70', '208', '129']
+        carbam_pdb_list = ['4XBJ', '1DPM', '1BXN', '1BD0', '1E3U', '1E9Y', '2OEJ', '1RQE', '7B53', '1YBQ', '3BG9', '4C6B']
+        carbam_resid_list = ['122', '169', '204', '129', '70', '219', '173', '184', '225', '162', '741', '1556']
         print(analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list))
         
     except Exception as e:

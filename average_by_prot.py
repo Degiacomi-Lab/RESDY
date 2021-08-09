@@ -26,8 +26,8 @@ def average_prot(all_pka_sasa_res):
             print("ERROR: %s"%e)
             running = False
 
-
         for uniprot_code in list_of_uniprot_codes_no_dup:
+
             try:
                 df_one_uniprot_code = all_pka_sasa_res.where(all_pka_sasa_res['Uniprot Entry'] == uniprot_code)
                 df_one_uniprot_code = df_one_uniprot_code[df_one_uniprot_code['Uniprot Entry'].notna()]
@@ -96,14 +96,12 @@ def average_prot(all_pka_sasa_res):
                     try:
                         list_of_pdbs = df_one_resid['PDB Code']
                         list_of_pdbs_no_dup = list()
-                        print(list_of_pdbs)
 
                         for entry in list_of_pdbs:
                             if entry not in list_of_pdbs_no_dup:
                                 list_of_pdbs_no_dup.append(entry)
                             else:
                                 continue
-                        print(list_of_pdbs_no_dup)
 
                         PDB_codes_avgd = ''
                         for i in range(len(list_of_pdbs_no_dup)):
@@ -122,8 +120,8 @@ def average_prot(all_pka_sasa_res):
                 avgd_pka_sasa['sasa stdev'] = avgd_pka_sasa['sasa stdev'].fillna(0)
                 avgd_pka_sasa['pKa stdev'] = avgd_pka_sasa['pKa stdev'].fillna(0)
 
-                avgd_pka_sasa.to_csv('results.csv')
-                all_pka_sasa_res = avgd_pka_sasa
+                avgd_pka_sasa.to_csv('Output/results.csv')
+                
                 print('Done')
                 running = False
 
@@ -132,7 +130,7 @@ def average_prot(all_pka_sasa_res):
                 running = False
         running = False
 
-    return(all_pka_sasa_res)
+    return(avgd_pka_sasa)
 
 
 
@@ -141,12 +139,17 @@ def average_prot(all_pka_sasa_res):
 
 if __name__ == "__main__":
     try:
-        columns = ['Uniprot Code', 'resid', 'chain', 'pKa', 'sasa', 'PDB Code']
+        columns = ['Uniprot Entry', 'resid', 'chain', 'pKa', 'sasa', 'PDB Code']
         all_pka_sasa_res = pd.DataFrame(columns=columns)
-        data = {'Uniprot Code': 'ABC', 'resid': 4, 'chain': 'A', 'pKa': 7.3, 'sasa': 4, 'PDB Code': '4jjf'}
+        data = {'Uniprot Entry': 'ABC', 'resid': 4, 'chain': 'A', 'pKa': 7.3, 'sasa': 4, 'PDB Code': '4jjf'}
         all_pka_sasa_res = all_pka_sasa_res.append(data, ignore_index=True)
-        data_2 = {'Uniprot Code': 'ABC', 'resid': 4, 'chain': 'A', 'pKa': 7.4, 'sasa': 5, 'PDB Code': '6jig'}
+        data_2 = {'Uniprot Entry': 'ABC', 'resid': 4, 'chain': 'A', 'pKa': 7.4, 'sasa': 5, 'PDB Code': '6jig'}
+        data_3 = {'Uniprot Entry': 'CBA', 'resid': 2, 'chain': 'B', 'pKa': 7.2, 'sasa': 1, 'PDB Code': '5jof'}
+        data_4 = {'Uniprot Entry': 'CBA', 'resid': 2, 'chain': 'B', 'pKa': 9.3, 'sasa': 2, 'PDB Code': '9ifr'}
         all_pka_sasa_res = all_pka_sasa_res.append(data_2, ignore_index = True)
+        all_pka_sasa_res = all_pka_sasa_res.append(data_3, ignore_index = True)
+        all_pka_sasa_res = all_pka_sasa_res.append(data_4, ignore_index = True)
+        print(all_pka_sasa_res)
         #Problem must be that df coming in is wrong datatype...
         print(average_prot(all_pka_sasa_res))
     except Exception as e:

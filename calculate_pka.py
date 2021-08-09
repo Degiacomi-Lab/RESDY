@@ -41,16 +41,20 @@ def calculate_pKa(code):
     lys_number = list()
     pkas = list()
     chain = list()
-
+    chain_resid_list = list()
+    buried_percentage = list()
     for line in propres:
         try:
             if re.search('^   LYS' , line):
-
+                print(line)
                 line = line[6:]
                 line = line.split()
+                
+                chain_resid_list.append(line[1] + line[0])
                 lys_number.append(line[0])
                 chain.append(line[1])
                 pkas.append(line[2])
+                buried_percentage.append(line[3])
         except Exception as e:
             print("Error %s"%e)
             print('Failure parsing ' + code + '.pka')
@@ -59,7 +63,7 @@ def calculate_pKa(code):
         code_for_df = code[:-4]
     elif AF_struc == False:
         code_for_df = code_for_df
-    df = pd.DataFrame({'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code_for_df})
+    df = pd.DataFrame({'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code_for_df, 'Chain_Resid': chain_resid_list})
     df.sort_values(by=['pKa'], inplace=True)
     convert_dict = {'pKa': float}
     df = df.astype(convert_dict)
@@ -78,6 +82,6 @@ def calculate_pKa(code):
 
 if __name__ == "__main__":
     try:    
-        print(calculate_pKa_and_SASA('3bg3'))
+        print(calculate_pKa('4XBJ_assembled.pdb'))
     except Exception as e:
         print("ERROR: %s"%e)

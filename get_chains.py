@@ -2,6 +2,8 @@ import biobox as bb
 import subprocess
 import os
 
+#Used in uniprot.py and construct_single_pdb_df.py
+#Gets chain info given PDB code.
 def get_chains(PDBCODE_inpt):
     try:
         subprocess.check_call("wget https://files.rcsb.org/download/" + PDBCODE_inpt + ".pdb", shell=True)

@@ -24,6 +24,7 @@ from data_analysis import analyse_data
 from average_by_prot import average_prot
 from curate_PDB.get_data import get_data
 from assemble_multimer import assemble_multimer
+from break_up_big_molecules import break_up_and_calculate_sasa
 
 skip = 0
 running = True
@@ -216,7 +217,7 @@ while running:
                 print(chain)
                 if pdb[:2]=='AF':
                     try:
-                        download_AF_ystruc(pdb)
+                        download_AF_struc(pdb)
                     except:
                         continue
                 else:
@@ -239,7 +240,7 @@ while running:
 
                 
 
-        columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code']
+        columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code', 'Chain_Resid']
         all_pka_sasa_res = pd.DataFrame(columns=columns)
         num = 0
         files = list((glob.glob("assembled/*pdb")))
@@ -266,9 +267,24 @@ while running:
 
                 try:
                     pka_res_df = calculate_pKa(code)
-                    pka_sasa_res_df = calculate_sasa(code, pka_res_df)
-                    all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
-                    print(all_pka_sasa_res)
+                    print(pka_res_df)
+                    #pka_sasa_res_df = calculate_sasa(code, pka_res_df)
+                    pka_sasa_res_df = break_up_and_calculate_sasa(code)
+
+                    print(pka_sasa_res_df)
+                    try:
+                        pka_sasa_res_df = pd.merge(pka_sasa_res_df, pka_res_df, how='inner', on='Chain_Resid')
+                        print(pka_sasa_res_df)
+                        pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
+                        pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
+                        #pka_sasa_res_df.drop('chain', inplace=True, axis=1)
+                        #pka_sasa_res_df.drop('resid', inplace=True, axis=1)
+                        pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
+                        pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
+                        all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
+                        print(all_pka_sasa_res)
+                    except Exception as e:
+                        print('Error %s'%e)
 
 
                 except:
@@ -383,14 +399,7 @@ while running:
                             list_of_pdbs_no_dup.append(entry)
                         else:
                             continue
-                
-                    list_of_resids = all_pka_sasa_res['resid']
-                    list_of_resids_no_dup = list()
-                    for entry in list_of_resids:
-                        if entry not in list_of_resids_no_dup:
-                            list_of_resids_no_dup.append(entry)
-                        else:
-                            continue
+
 
                     question_carbam_pdb = [
                     inquirer.List('Choice',
@@ -399,9 +408,17 @@ while running:
                                 ),
                     ]
                     answer_carbam_pdb = inquirer.prompt(question_carbam_pdb)
-
-                    carbam_pdb_list.append(answer_carbam_pdb['Choice'])
+                    carbam_pdb = answer_carbam_pdb['Choice']
+                    carbam_pdb_list.append(carbam_pdb)
                     
+                    df_one_pdb = all_pka_sasa_res.where(all_pka_sasa_res['PDB Code'] == carbam_pdb)
+                    list_of_resids = df_one_pdb['resid']
+                    list_of_resids_no_dup = list()
+                    for entry in list_of_resids:
+                        if entry not in list_of_resids_no_dup:
+                            list_of_resids_no_dup.append(entry)
+                        else:
+                            continue
 
 
                     question_carbam_resid = [

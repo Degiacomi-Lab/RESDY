@@ -24,12 +24,11 @@ def assemble_multimer(results_df):
                 else:
                     df_one_pdb_code = results_df.where(results_df['PDB Code'] == pdb_code)
                     df_one_pdb_code = df_one_pdb_code.dropna()
-                    print(df_one_pdb_code)
                     name_of_assembly = pdb_code + '_assembled.pdb'
                     for i in range(len(df_one_pdb_code)):
                         Multi = bb.Multimer()
                         list_of_chains = df_one_pdb_code['Chains']
-                        print(list_of_chains)
+
                         for chain in list_of_chains:
                                 name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
                                 patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
@@ -52,6 +51,7 @@ def assemble_multimer(results_df):
             except Exception as e:
                 print("Error: %s"%e)
                 print('Failed to assemble ' + pdb_code)
+                continue
 
     except Exception as e:
         print("Error: %s"%e)

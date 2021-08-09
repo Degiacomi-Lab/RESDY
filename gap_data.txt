@@ -1,1 +1,1 @@
-curate_PDB/raw/4XBJ_D.pdb 4 5 2 3
+curate_PDB/raw/1HZY_B.pdb 0 0 0 0

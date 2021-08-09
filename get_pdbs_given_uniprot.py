@@ -48,6 +48,7 @@ def get_pdbs_given_uniprot_code(list_UNIPROT_codes):
             except Exception as e:
                 print('Error %s'%e)
                 print('Failed to obtain data for Uniprot entry ' + protein_code_clean)
+    print(df)
 
     return(df)
 
