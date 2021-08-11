@@ -5,9 +5,14 @@ from matplotlib import pyplot as plt
 import matplotlib.ticker as ticker
 import inquirer
 
+#This module plots the results as a pKa vs sasa graph.
+#If lysines are input it marks them as red on the graph
+
 def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
     print(carbam_pdb_list)
     print(carbam_resid_list)
+
+    #Firstly it converts the resids to intergers.
     try:
         list_of_ids = list()
         all_pka_sasa_res = all_pka_sasa_res.astype({"resid": int})
@@ -15,7 +20,8 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
     except Exception as e:
         print("ERROR: %s"%e)
 
-    
+#Next it creates another column where the known carbamylated lysines are marked with 'True' and the others with 'False'
+
     for i in range(len(carbam_resid_list)):
 
         try:
@@ -41,17 +47,16 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
     except Exception as e:
             print("ERROR: %s"%e)
 
+#Next it plots the data.
+
     try:
         fig, ax = plt.subplots()
         colors = {True:'red', False:'black'}
         all_pka_sasa_res['sasa'] = all_pka_sasa_res['sasa'].astype(float)
-        #all_pka_sasa_res['pKa'] = all_pka_sasa_res['pKa'].astype(str)
         plt.scatter(all_pka_sasa_res['sasa'], all_pka_sasa_res['pKa'], c=all_pka_sasa_res['carbamylated'].map(colors))
         plt.title('pKa vs sasa')
         plt.xlabel('sasa')
         plt.ylabel('pKa')
-        #ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
-        #ax.set_xticks(ax.get_xticks()[::4])
         plt.show()
 
     except Exception as e:
@@ -66,13 +71,6 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
 
 if __name__ == "__main__":
     try:
-        #columns = ['Uniprot Code', 'resid', 'chain', 'pKa', 'sasa', 'PDB Code']
-        #all_pka_sasa_res = pd.DataFrame(columns=columns)
-        #data = {'Uniprot Code': 'ABC', 'resid': '4', 'chain': 'A', 'pKa': 7.3, 'sasa': 4, 'PDB Code': '4jjf'}
-        #all_pka_sasa_res = all_pka_sasa_res.append(data, ignore_index=True)
-        #data_2 = {'Uniprot Code': 'ABC', 'resid': '4', 'chain': 'A', 'pKa': 7.4, 'sasa': 5, 'PDB Code': '6jig'}
-        #all_pka_sasa_res = all_pka_sasa_res.append(data_2, ignore_index = True)
-        #Problem must be that df coming in is wrong datatype...
         all_pka_sasa_res = pd.read_csv('Output/results.csv')
         all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
         print(all_pka_sasa_res)

@@ -11,6 +11,7 @@ import subprocess
 import numpy as np
 import biobox as bb
 import pandas as pd
+import fileinput
 from curate_PDB.clean import clean
 from copy import deepcopy
 # offers automatic automatic structure patching function
@@ -34,30 +35,34 @@ def get_data(pdb, chain):
 
                 # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
                 # saves a cleaned temporary file called "tmp"
-                #subprocess.check_call("./curate_PDB/clean.sh %s"%infile, shell=True)
+
                 clean(pdb, chain)
+
                 Mtmp = bb.Molecule()
-                print('Before')
-                Mtmp.import_pdb("tmp")
-                print('after')
+                Mtmp.import_pdb("tmp", include_hetatm=True)
 
                 if len(Mtmp.coordinates) > 1:
                         Mtmp.coordinates = Mtmp.coordinates[0:1]
                         Mtmp.set_current(0)
 
-                #Mtmp.center_to_origin()
-
-                        # remove amino acids with resid < 1
+                # remove amino acids with resid < 1
                 _, idx = Mtmp.query("resid > 0", get_index=True)
                 Mtmp = Mtmp.get_subset(idx)
 
                 #extract only protein atoms (no water, ligands, DNA, ...)
                 idxs=[]
+                list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO']
                 for i, d in enumerate(Mtmp.data["resname"].values):
+                        #Change to putting the kys into list
+                        #keys = list(dict)
                         if d in Mtmp.knowledge['residue_mass'].keys():
                                 idxs.append(i)
+                        elif d in list_of_metals:
+                                idxs.append(i)
+
 
                 M = Mtmp.get_subset(idxs=idxs)
+
 
                 if outfile == "":
                         M.write_pdb(outfile)
@@ -85,7 +90,7 @@ def get_data(pdb, chain):
                         c_cnt -= 1
 
                 except:
-                        c_cnt = -1
+                        c_cnt = 1
 
 
         # check sequence split (note: we avoid residues with negative numbers)
@@ -116,11 +121,11 @@ def get_data(pdb, chain):
 ##############################################################################
 
 # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
-        if not os.path.exists("raw"):
-                os.mkdir("raw")
+        if not os.path.exists("curate_PDB/raw"):
+                os.mkdir("curate_PDB/raw")
 
-        if not os.path.exists("clean"):
-                os.mkdir("clean")
+        if not os.path.exists("curate_PDB/clean"):
+                os.mkdir("curate_PDB/clean")
 
 
 # load PDBs and save only chain of interest (pdbcode_chainname.pdb)
@@ -148,7 +153,7 @@ def get_data(pdb, chain):
 
                 try:
                         M = bb.Molecule()
-                        M.import_pdb(fin)
+                        M.import_pdb(fin, include_hetatm=True)
                         _, idxs = M.atomselect(chain, "*", "*", get_index=True)
                         path = "curate_PDB/raw/" + fout
                         print(path)
@@ -180,10 +185,11 @@ def get_data(pdb, chain):
                         for f in files:
                                 try:
                                         M = bb.Molecule()
-                                        M.import_pdb(f)
+                                        M.import_pdb(f, include_hetatm=True)
                                         l.append(len(M.points))
                                 except:
                                         l.append(-1)
+
 
                         l = np.array(l)
                         if len(np.unique(l)) > 1:

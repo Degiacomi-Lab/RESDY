@@ -1,34 +1,49 @@
 import biobox as bb
 import pandas as pd
 import os
-
+import fileinput
+#get_data.py and the autopatcher break the protein up into chains.
+#This code 'reassembles' the protein into a multimer from the chains in the clean folder given the pdb code and chains the protein consists of.
 def assemble_multimer(pdb_code, list_chains):
+    #First makes sure there is an assembled folder.
     if not os.path.exists("assembled"):
         os.mkdir("assembled")
 
+    #Next open defines the name of the assembly.
     try:
         name_of_assembly = pdb_code + '_assembled.pdb'
         Multi = bb.Multimer()
 
+    #Next opens the pdb file for each chain in turn and appends to Multi
         for chain in list_chains:
-                name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
-                patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
-                M = bb.Molecule()
+            name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
+            patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
+            M = bb.Molecule()
+            try:
+                path = 'curate_PDB/clean/' + name_of_pdb_file
+                M.import_pdb(path, include_hetatm=True)
+                Multi.append(M)
+            except:
                 try:
-                    path = 'curate_PDB/clean/' + name_of_pdb_file
-                    M.import_pdb(path)
+                    path = 'curate_PDB/clean/' + patched_pdb_file
+                    M.import_pdb(path, include_hetatm=True)
                     Multi.append(M)
-                except:
-                    try:
-                        path = 'curate_PDB/clean/' + patched_pdb_file
-                        M.import_pdb(path)
-                        Multi.append(M)
-                    except Exception as e:
-                        print("Error: %s"%e)
-                        continue
+                except Exception as e:
+                    print("Error: %s"%e)
+                    continue
+
+    #Lastly writes out Multi as a .pdb file.
+
         path = 'assembled/' + name_of_assembly
         Multi.write_pdb(path)
         print('Success assembling ' + pdb_code)
+        filename = path
+
+        with fileinput.FileInput(filename, inplace = True) as f:
+            for line in f:
+                line = line.replace("TER","")
+                print(line, end ='') 
+
     except Exception as e:
         print("Error: %s"%e)
         print('Failed to assemble ' + pdb_code)

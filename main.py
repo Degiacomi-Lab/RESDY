@@ -12,19 +12,18 @@ import sys
 import glob
 from biobox.measures.calculators import sasa
 from scipy.spatial.distance import _correlation_pdist_wrap
-from uniprot import get_pdbs
-from get_pdbs_given_uniprot import get_pdbs_given_uniprot_code
+from get_data_from_uniprot import get_pdbs
+from get_data_from_uniprot import get_pdbs_given_uniprot_code
 from construct_single_pdb_df import construct_single_pdb_df
-from download_AF_struc import download_AF_struc
-from calculate_pka import calculate_pKa
-from calculate_sasa import calculate_sasa
-from search_by_technique import search_by_technique
-from alphafold_certainty import find_AF_plddt
+from get_alphafold_data import download_AF_struc
+from get_pka_sasa import calculate_pKa
+from get_pka_sasa import break_up_and_calculate_sasa
+from get_data_from_uniprot import search_by_technique
+from get_alphafold_data import find_AF_plddt
 from data_analysis import analyse_data
 from average_by_prot import average_prot
 from curate_PDB.get_data import get_data
 from assemble_multimer import assemble_multimer
-from break_up_big_molecules import break_up_and_calculate_sasa
 
 skip = 0
 running = True
@@ -227,14 +226,19 @@ while running:
             
 
             for pdb in list_of_pdb_codes_no_dup:
+                print(list_of_pdb_codes_no_dup)
+                df_one_pdb_code = pd.DataFrame()
+
                 df_one_pdb_code = results_df[results_df['PDB Code'] == pdb]
+                df_one_pdb_code = df_one_pdb_code.reset_index(drop=True)
                 df_one_pdb_code = df_one_pdb_code[df_one_pdb_code['PDB Code'].notna()]
                 list_chains = df_one_pdb_code['Chains']
 
 
                 for i in range(len(df_one_pdb_code)):
-                    chain = results_df.at[i, 'Chains']
-                    uniprot = results_df.at[i, 'Uniprot Entry']
+                    print(df_one_pdb_code)
+                    chain = df_one_pdb_code.at[i, 'Chains']
+                    uniprot = df_one_pdb_code.at[i, 'Uniprot Entry']
                     dict_uniprot.update({pdb: uniprot})
                     print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
                     print(chain)
@@ -252,8 +256,6 @@ while running:
                         except Exception as e:
                             print('Error: %s'%e)
                             print('FAILED FOR: ' + pdb + chain)
-                            for f in glob.glob("curate_PDB/raw/*"):
-                                os.remove(f)
                             continue
                     print(chain)
 
@@ -290,7 +292,6 @@ while running:
                         try:
                             pka_res_df = calculate_pKa(code)
                             print(pka_res_df)
-                            #pka_sasa_res_df = calculate_sasa(code, pka_res_df)
                             pka_sasa_res_df = break_up_and_calculate_sasa(code)
 
                             print(pka_sasa_res_df)
@@ -299,18 +300,17 @@ while running:
                                 print(pka_sasa_res_df)
                                 pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
                                 pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
-                                #pka_sasa_res_df.drop('chain', inplace=True, axis=1)
-                                #pka_sasa_res_df.drop('resid', inplace=True, axis=1)
                                 pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
                                 pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
                                 all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
                                 print(all_pka_sasa_res)
                             except Exception as e:
                                 print('Error %s'%e)
+                                print('Failed to put data into dataframe for ' + file)
 
 
                         except:
-                            pass
+                            continue
 
 
                         if code[:2] == 'AF':
@@ -374,6 +374,7 @@ while running:
             except Exception as e:
                     print("ERROR: %s"%e)
                     print('Failed to average data.')
+                    pass
         
         else:
             pass
@@ -476,9 +477,19 @@ while running:
                 all_pka_sasa_res = analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
             except Exception as e:
                     print("ERROR: %s"%e)
+                    pass
                 
         print(all_pka_sasa_res)
 
+        try:
+            os.remove("gap_data.txt")
+        except:
+            pass
+
+        try:
+            os.remove("patch_data.txt")
+        except:
+            pass
 
     except KeyboardInterrupt:
         pass
