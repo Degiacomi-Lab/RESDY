@@ -12,11 +12,11 @@ import numpy as np
 import biobox as bb
 import pandas as pd
 import fileinput
-from curate_PDB.clean import clean
 from copy import deepcopy
 # offers automatic automatic structure patching function
 from curate_PDB.autopatch import autopatch
 import re
+import clean as cl
 ########################################
 # control flags
 
@@ -35,8 +35,7 @@ def get_data(pdb, chain):
 
                 # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
                 # saves a cleaned temporary file called "tmp"
-
-                clean(pdb, chain)
+                cl.clean(pdb, chain)
 
                 Mtmp = bb.Molecule()
                 Mtmp.import_pdb("tmp", include_hetatm=True)
@@ -52,10 +51,11 @@ def get_data(pdb, chain):
                 #extract only protein atoms (no water, ligands, DNA, ...)
                 idxs=[]
                 list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO']
+                keys = list(Mtmp.knowledge['residue_mass'])
                 for i, d in enumerate(Mtmp.data["resname"].values):
-                        #Change to putting the kys into list
+                        #Change to putting the keys into list
                         #keys = list(dict)
-                        if d in Mtmp.knowledge['residue_mass'].keys():
+                        if d in keys:
                                 idxs.append(i)
                         elif d in list_of_metals:
                                 idxs.append(i)
@@ -65,7 +65,7 @@ def get_data(pdb, chain):
 
 
                 if outfile == "":
-                        M.write_pdb(outfile)
+                        M.write_pdb(outfile, split_struc=False)
 
                 os.remove("tmp")
                 return M
@@ -157,10 +157,8 @@ def get_data(pdb, chain):
                         _, idxs = M.atomselect(chain, "*", "*", get_index=True)
                         path = "curate_PDB/raw/" + fout
                         print(path)
-                        try:
-                                M.write_pdb(path, index=idxs)
-                        except:
-                                M.write_pdb(path, index=idxs, split_struc=False)
+                        M.write_pdb(path, index=idxs, split_struc=False)
+
 
                 except Exception as e:
                         print("ERROR: %s"%e)
@@ -221,6 +219,10 @@ def get_data(pdb, chain):
                         web_url = "https://www.rcsb.org/fasta/chain/" + file_name_url + '/download'
                         subprocess.check_call("wget -O " + file_name_fasta + " " + web_url, shell=True)
                         os.chdir(oldpwd)
+                        try:
+                                cl.remove_kcx_from_fasta(pdb, chain)
+                        except:
+                                pass
 
                 
                 #fin = "downloadFile.do?fileFormat=fastachain&compression=NO&structureId=%s&chainId=%s"%(pdb, chain)
@@ -291,7 +293,7 @@ def get_data(pdb, chain):
                         try:
                                 if success:
                                         print(">> SAVING PROTEIN in curate_PDB/clean/%s"%fout)
-                                        mol.write_pdb("curate_PDB/clean/%s"%fout)
+                                        mol.write_pdb("curate_PDB/clean/%s"%fout, split_struc=False)
                                         
                                 else:
                                         print(">> protein not saved (patching failed)")

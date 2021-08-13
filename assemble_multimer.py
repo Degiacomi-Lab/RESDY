@@ -20,14 +20,16 @@ def assemble_multimer(pdb_code, list_chains):
             patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
             M = bb.Molecule()
             try:
-                path = 'curate_PDB/clean/' + name_of_pdb_file
+                path = 'curate_PDB/clean/' + patched_pdb_file
                 M.import_pdb(path, include_hetatm=True)
                 Multi.append(M)
+
             except:
                 try:
-                    path = 'curate_PDB/clean/' + patched_pdb_file
+                    path = 'curate_PDB/clean/' + name_of_pdb_file
                     M.import_pdb(path, include_hetatm=True)
                     Multi.append(M)
+
                 except Exception as e:
                     print("Error: %s"%e)
                     continue

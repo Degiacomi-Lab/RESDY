@@ -12,18 +12,12 @@ import sys
 import glob
 from biobox.measures.calculators import sasa
 from scipy.spatial.distance import _correlation_pdist_wrap
-from get_data_from_uniprot import get_pdbs
-from get_data_from_uniprot import get_pdbs_given_uniprot_code
-from construct_single_pdb_df import construct_single_pdb_df
-from get_alphafold_data import download_AF_struc
-from get_pka_sasa import calculate_pKa
-from get_pka_sasa import break_up_and_calculate_sasa
-from get_data_from_uniprot import search_by_technique
-from get_alphafold_data import find_AF_plddt
-from data_analysis import analyse_data
-from average_by_prot import average_prot
+import get_initial_data as gd
+import get_pka_sasa as ps
+import data_processing as dp
+import assemble_multimer as am
 from curate_PDB.get_data import get_data
-from assemble_multimer import assemble_multimer
+
 
 skip = 0
 running = True
@@ -39,128 +33,65 @@ while running:
         questions = [
         inquirer.List('Choice',
                         message="Do you want to search a organism's whole proteome or input specific PDB or Uniprot Codes?",
-                        choices=['Whole Proteome', 'Input PDB Codes', 'Input Uniprot Codes', 'Quit'],
+                        choices=['Whole Proteome', 'Input PDB Codes', 'Input Uniprot Codes', 'Input Codes Via .csv file', 'Quit'],
                     ),
         ]
         answers = inquirer.prompt(questions)
+        columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
+        results_df = pd.DataFrame(columns=columns)
 
 
-        #Searches Uniprot for PDB codes
-        if (answers['Choice'] == 'Whole Proteome') or (answers['Choice'] == 'Input Uniprot Codes'):
-            if answers["Choice"] == 'Whole Proteome':
+    #Searches Uniprot for PDB codes
+        if answers["Choice"] == 'Whole Proteome':
 
-                name_of_organism = input('Name of organism:')
-                name_of_organism = name_of_organism.replace(' ', '+')
-                code = input('Uniprot proteome code:')
+            name_of_organism = input('Name of organism:')
+            name_of_organism = name_of_organism.replace(' ', '+')
+            code = input('Uniprot proteome code:')
 
-                try:
-                    results_df = get_pdbs(name_of_organism, code)
-                    print(results_df)
-                except:
-                    print('Try again')
-                    skip = 1
-                if (len(results_df) == 0):
-                    skip = 1
-                    
-            if answers['Choice'] == 'Input Uniprot Codes':
-
-                asking_for_uniprot_codes = True
-                list_of_UNIPROT_codes = list()
-
-                while asking_for_uniprot_codes == True:
-
-                    uniprot_code = input('Uniprot code:')
-                    list_of_UNIPROT_codes.append(uniprot_code)
-
-                    question_more_uniprot_codes = [
-                    inquirer.List('Choice',
-                                    message="Are there more uniprot codes to add?",
-                                    choices=['Yes', 'No'],
-                                ),
-                    ]
-                    answer_more_uniprot_codes = inquirer.prompt(question_more_uniprot_codes)
-
-                    if answer_more_uniprot_codes['Choice'] == 'No':
-                        asking_for_uniprot_codes = False
-                    else:
-                        pass
-                
-                print('Getting data for: ')
-                print(list_of_UNIPROT_codes)
-                results_df = get_pdbs_given_uniprot_code(list_of_UNIPROT_codes)
-
-                if (len(results_df) == 0):
-                    skip = 1
-
-
-
-
-            #Allows user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
-
-            if skip != 1:
-                question_2 = [
-                inquirer.List('Choice',
-                                message="Do you want to select structures only obtained by certain methods?",
-                                choices=['Yes', 'No'],
-                            ),
-                ]
-                answer_2 = inquirer.prompt(question_2)
-
-                question_3 = [
-                inquirer.List('Choice',
-                                message="Do you want to select structures based on resolution?",
-                                choices=['Yes', 'No'],
-                            ),
-                ]
-                answer_3 = inquirer.prompt(question_3)
-
-                if answer_3['Choice'] == 'Yes':
-                    wanted_res = input('What maximum resolution would you like? (In Angstroms)')
+            try:
+                results_df = gd.get_pdbs(name_of_organism, code, results_df)
+                print(results_df)
+            except:
+                print('Try again')
+                skip = 1
+            if (len(results_df) == 0):
+                skip = 1
                 
 
 
-                if (answer_2['Choice'] == 'Yes') or (answer_3['Choice'] == 'Yes'):
-                    if answer_2['Choice'] == 'Yes':
-                        a = True
-                        list_of_techniques = list()
-                        while a == True:
+        if answers['Choice'] == 'Input Uniprot Codes':
 
-                            question_5 = [
-                            inquirer.List('Choice',
-                                        message="Which methods would you like your structures to have been obtained by?",
-                                        choices=['Done', 'X-ray', 'NMR', 'EM', 'Fiber', 'IR', 'MODEL', 'Neutron', 'Predicted'],
-                                    ),
-                            ]
-                            answer_5 = inquirer.prompt(question_5)
-                            ans = str(answer_5['Choice'])
+            asking_for_uniprot_codes = True
+            list_of_UNIPROT_codes = list()
 
+            while asking_for_uniprot_codes == True:
 
-                            if ans != 'Done':
-                                list_of_techniques.append(ans)
-                            if ans == 'Done':
-                                a = False
-                                
+                uniprot_code = input('Uniprot code:')
+                list_of_UNIPROT_codes.append(uniprot_code)
 
-                    elif answer_2['Choice'] == 'No':
-                        list_of_techniques = ['X-ray', 'NMR', 'EM', 'Fiber', 'IR', 'MODEL', 'Neutron', 'Predicted']
+                question_more_uniprot_codes = [
+                inquirer.List('Choice',
+                                message="Are there more uniprot codes to add?",
+                                choices=['Yes', 'No'],
+                            ),
+                ]
+                answer_more_uniprot_codes = inquirer.prompt(question_more_uniprot_codes)
 
-                    raw_res = search_by_technique(list_of_techniques, results_df, wanted_res)
-                    results_df = raw_res[0]
-                    print(results_df)
-                    skip = raw_res[1]
-
-
+                if answer_more_uniprot_codes['Choice'] == 'No':
+                    asking_for_uniprot_codes = False
                 else:
                     pass
             
+            print('Getting data for: ')
+            for uniprot_code in list_of_UNIPROT_codes:
+                results_df = gd.get_pdbs_uniprot(uniprot_code, results_df)
 
 
-        #Allows single structure to be tested (probably needs to be put in a function)
-        elif answers['Choice'] == 'Input PDB Codes':
+
+
+        if answers['Choice'] == 'Input PDB Codes':
             select_strucs = True
 
-            columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
-            results_df = pd.DataFrame(columns=columns)
 
             while select_strucs == True:
 
@@ -178,7 +109,7 @@ while running:
                         PDBCODE_inpt = PDBCODE_inpt.upper()
                         print(PDBCODE_inpt)
                         UNIPROT_code_pdb = input('What is the Uniprot Code?')
-                        results_df = construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, results_df)
+                        results_df = gd.construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, results_df)
                         print(results_df)
 
                     except Exception as e:
@@ -201,16 +132,87 @@ while running:
                     select_strucs = False
 
 
+        if answers['Choice'] == 'Input Codes Via .csv file':
+            csv_name = input('What is the name of the .csv file?')
+            if csv_name[-4:] != '.csv':
+                csv_name = csv_name + '.csv'
+            results_df = gd.from_csv_file(csv_name, results_df)
+
         elif answers ['Choice'] == 'Quit':
             skip = 1
             raise Exception
 
-        dict_uniprot = dict()
-        if (len(results_df) != 0):
 
 
 
 
+
+
+        #Allows user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
+
+
+        question_2 = [
+        inquirer.List('Choice',
+                        message="Do you want to select structures only obtained by certain methods?",
+                        choices=['Yes', 'No'],
+                    ),
+        ]
+        answer_2 = inquirer.prompt(question_2)
+
+        question_3 = [
+        inquirer.List('Choice',
+                        message="Do you want to select structures based on resolution?",
+                        choices=['Yes', 'No'],
+                    ),
+        ]
+        answer_3 = inquirer.prompt(question_3)
+
+        if answer_3['Choice'] == 'Yes':
+            wanted_res = input('What maximum resolution would you like? (In Angstroms)')
+        
+
+
+        if (answer_2['Choice'] == 'Yes') or (answer_3['Choice'] == 'Yes'):
+            if answer_2['Choice'] == 'Yes':
+                a = True
+                list_of_techniques = list()
+                while a == True:
+
+                    question_5 = [
+                    inquirer.List('Choice',
+                                message="Which methods would you like your structures to have been obtained by?",
+                                choices=['Done', 'X-ray', 'NMR', 'EM', 'Fiber', 'IR', 'MODEL', 'Neutron', 'Predicted'],
+                            ),
+                    ]
+                    answer_5 = inquirer.prompt(question_5)
+                    ans = str(answer_5['Choice'])
+
+
+                    if ans != 'Done':
+                        list_of_techniques.append(ans)
+                    if ans == 'Done':
+                        a = False
+                        
+
+            elif answer_2['Choice'] == 'No':
+                list_of_techniques = ['X-ray', 'NMR', 'EM', 'Fiber', 'IR', 'MODEL', 'Neutron', 'Predicted']
+
+            raw_res = gd.search_by_technique(list_of_techniques, results_df, wanted_res)
+            results_df = raw_res[0]
+            print(results_df)
+            skip = raw_res[1]
+
+
+        else:
+            pass
+    
+
+
+
+
+
+
+            dict_uniprot = dict()
             columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code', 'Chain_Resid']
             all_pka_sasa_res = pd.DataFrame(columns=columns)
             num = 0
@@ -244,19 +246,23 @@ while running:
                     print(chain)
                     if pdb[:2]=='AF':
                         try:
-                            download_AF_struc(pdb)
+                            gd.download_AF_struc(pdb)
                         except:
                             continue
                     else:
                         print('******* Getting data for ' + pdb + ' ' + chain + ' **********')
                         try:
                             get_data(pdb, chain)
-                            for f in glob.glob("curate_PDB/raw/*"):
-                                os.remove(f)
                         except Exception as e:
                             print('Error: %s'%e)
                             print('FAILED FOR: ' + pdb + chain)
                             continue
+                        try:
+                            for f in glob.glob("curate_PDB/raw/*"):
+                                os.remove(f)
+                        except:
+                            pass
+
                     print(chain)
 
                 print(dict_uniprot)
@@ -264,7 +270,7 @@ while running:
                     pass
                 else:
                     print('Assembling Multimer...')
-                    assemble_multimer(pdb, list_chains)
+                    am.assemble_multimer(pdb, list_chains)
         
 
                 files = list((glob.glob("assembled/*pdb")))
@@ -283,16 +289,16 @@ while running:
 
                         if code[:2] == 'AF':
                             try:
-                                AF_lysines_df = find_AF_plddt(code)
+                                AF_lysines_df = gd.find_AF_plddt(code)
 
                             except Exception as e:
                                 print("ERROR: %s"%e)
                                 continue
 
                         try:
-                            pka_res_df = calculate_pKa(code)
+                            pka_res_df = ps.calculate_pKa(code)
                             print(pka_res_df)
-                            pka_sasa_res_df = break_up_and_calculate_sasa(code)
+                            pka_sasa_res_df = ps.break_up_and_calculate_sasa(code)
 
                             print(pka_sasa_res_df)
                             try:
@@ -350,6 +356,8 @@ while running:
                         print(file_name)
                         if file_name[:4] == pdb:
                             os.remove(f)
+                    for f in glob.glob("curate_PDB/raw/*"):
+                        os.remove(f)
 
 
 
@@ -368,7 +376,7 @@ while running:
 
         if answer_avgs['Choice'] == 'Yes':
             try:
-                all_pka_sasa_res = average_prot(all_pka_sasa_res)
+                all_pka_sasa_res = dp.average_prot(all_pka_sasa_res)
                 print('AVERAGED DATA...')
                 print(all_pka_sasa_res)
             except Exception as e:
@@ -474,7 +482,7 @@ while running:
 
                 
             try:
-                all_pka_sasa_res = analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
+                all_pka_sasa_res = dp.analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
             except Exception as e:
                     print("ERROR: %s"%e)
                     pass

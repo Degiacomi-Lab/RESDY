@@ -14,12 +14,10 @@ import biobox as bb
 
 #This function obtains all the pdb codes given an organism
 #Note the name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome
-def get_pdbs(name_of_organism, code):
+def get_pdbs(name_of_organism, code, df):
 
     #Firstly a df is constructed for our results to go in
 
-    columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
-    df = pd.DataFrame(columns=columns)
 
     list_of_entries = list()
     list_of_pdbs = list()
@@ -212,56 +210,50 @@ def get_pdbs(name_of_organism, code):
             print((str((number/number_of_prot_2)*100))[0:3] + '%')
             
 
-    df.to_csv('temp_res.csv')
     return df
 
 
 
 
 #Given a list of uniprot codes thos function goes to the .txt URL and finds all corresponding .pdb files and all the relevant information.
-def get_pdbs_given_uniprot_code(list_UNIPROT_codes):
+def get_pdbs_uniprot(uniprot_code, df):
 
-    columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
-    df = pd.DataFrame(columns=columns)
+    try:
+        url_2 = 'https://www.uniprot.org/uniprot/' + uniprot_code + '.txt'
+        html_2 = urllib.request.urlopen(url_2)
+    except Exception as e:
+        print('Error %s'%e)
+        print('Failed to obtain data for Uniprot entry: ' + uniprot_code)
 
-    for protein_code_clean in list_UNIPROT_codes:
+
+    for line in html_2:
         try:
-            url_2 = 'https://www.uniprot.org/uniprot/' + protein_code_clean + '.txt'
-            html_2 = urllib.request.urlopen(url_2)
-        except Exception as e:
-            print('Error %s'%e)
-            print('Failed to obtain data for Uniprot entry: ' + protein_code_clean)
-            continue
-
-    
-        for line in html_2:
-            try:
-                line = str(line)
-                messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
+            line = str(line)
+            messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
 
 
-                for entry in messy_entry:
-                    words = entry.split()
+            for entry in messy_entry:
+                words = entry.split()
 
-                    PDBCODE = (words[1])[:-1]
-                    method_obtained = (words[2])[:-1]
-                    resolution = (words[3])[:-1]
+                PDBCODE = (words[1])[:-1]
+                method_obtained = (words[2])[:-1]
+                resolution = (words[3])[:-1]
 
-                    #As before it calls in the get_chains function to get chain info.
+                #As before it calls in the get_chains function to get chain info.
 
-                    unique_values_chain = get_chains(PDBCODE)
-                    for i in range(len(unique_values_chain)):
-                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                unique_values_chain = get_chains(PDBCODE)
+                for i in range(len(unique_values_chain)):
+                    data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                    df = df.append(data, ignore_index=True)
+
+                    if len(messy_entry) == 0:
+                        AF_code = 'AF-' + uniprot_code + 'F1-model_v1'
+                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
                         df = df.append(data, ignore_index=True)
 
-                        if len(messy_entry) == 0:
-                            AF_code = 'AF-' + protein_code_clean + 'F1-model_v1'
-                            data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-                            df = df.append(data, ignore_index=True)
-
-            except Exception as e:
-                print('Error %s'%e)
-                print('Failed to obtain data for Uniprot entry ' + protein_code_clean)
+        except Exception as e:
+            print('Error %s'%e)
+            print('Failed to obtain data for Uniprot entry ' + uniprot_code)
     print(df)
 
     return(df)
@@ -271,18 +263,11 @@ def get_pdbs_given_uniprot_code(list_UNIPROT_codes):
 #Gets chain info given PDB code.
 def get_chains(PDBCODE_inpt):
     try:
-        try:
-            #Fisrt downloads .pdb file and opens in biobox
-            subprocess.check_call("wget https://files.rcsb.org/download/" + PDBCODE_inpt + ".pdb", shell=True)
-            M = bb.Molecule()
-            M.import_pdb(PDBCODE_inpt + '.pdb')
-            df = M.data
-        except:
-            print('LARGE PROTEIN- USING .cif file')
-            subprocess.check_call("wget https://files.rcsb.org/download/" + PDBCODE_inpt + ".cif", shell=True)
-            M = bb.Molecule()
-            M.import_pqr(PDBCODE_inpt + ".cif")
-            df = M.data
+        #Fisrt downloads .pdb file and opens in biobox
+        subprocess.check_call("wget https://files.rcsb.org/download/" + PDBCODE_inpt + ".pdb", shell=True)
+        M = bb.Molecule()
+        M.import_pdb(PDBCODE_inpt + '.pdb', include_hetatm=True)
+        df = M.data
         
         #Next puts the chains in a lis and makes sure there are no duplicates.
 
@@ -358,6 +343,169 @@ def search_by_technique(list_of_techniques, results_df, wanted_res):
     
     return(results_df, skip)
 
+
+
+
+
+
+#This code parses a .csv file to find uniprot and pdb codes to pass into the pipeline.
+#If you want to just input uniprot codes put them in the first column and leave the second empty
+#If you want to input pdb codes put the uniprot code in the first column and pdb code in the second.
+
+def from_csv_file(csv_file, results_df):
+#First read .csv file.
+    try:
+        csv_df = pd.read_csv(csv_file)
+        print('.csv file successfully opened')
+    except Exception as e:
+        print('Error: %s'%e)
+        print('Failed to find .csv file.')
+#Next abstract column names
+    try:
+        column_names = list(csv_df.columns)
+        print(column_names)
+        csv_df[column_names[1]] = csv_df[column_names[1]].fillna(0)
+
+    except Exception as e:
+        print('Error: %s'%e)
+        print('Failed to get data from .csv file')
+#Lastly feed them into the functions which get the data about the protein and append it to the results_df dataframe.
+
+    for i in range(len(csv_df)):
+        try:
+            uniprot_code = csv_df.at[i, column_names[0]]
+            pdb_code = csv_df.at[i, column_names[1]]
+            if pdb_code == 0:
+                results_df = get_pdbs_uniprot(uniprot_code, results_df)
+            else:
+                results_df = construct_single_pdb_df(uniprot_code, pdb_code, results_df)
+        except Exception as e:
+            print('Error %s'%e)
+            continue
+
+    return(results_df)
+
+
+
+
+
+
+def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, results_df):
+
+#Firstly it opens the correct uniprot page.
+    try:
+        url_2 = 'https://www.uniprot.org/uniprot/' + UNIPROT_code_pdb + '.txt'
+        html_2 = urllib.request.urlopen(url_2)
+
+    except Exception as e:
+        print('Error %s'%e)
+        print('Failed to obtain uniprot entry for uniprot code: ' + UNIPROT_code_pdb)
+        return()
+
+#Next it parses and looks for PDB entries
+    for line in html_2:
+        try:
+            line = str(line)
+            messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
+            for entry in messy_entry:
+                try:
+                    words = entry.split()
+                    PDBCODE = (words[1])[:-1]
+
+#It only obtains the data from uniprot if the PDB code matches that which was input by the user.
+
+                    if PDBCODE_inpt == PDBCODE:
+                        unique_values_chain = get_chains(PDBCODE_inpt)
+                        method_obtained = (words[2])[:-1]
+                        resolution = (words[3])[:-1]
+                        for i in range(len(unique_values_chain)):
+                            try:
+                                data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': PDBCODE, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                                results_df = results_df.append(data, ignore_index=True)
+                            except Exception as e:
+                                print("Error %s"%e)
+                                print('Error constructing df')
+                                continue
+                except:
+                    continue
+
+
+        except Exception as e:
+            print("Error %s"%e)
+            return()
+
+    if (len(results_df) == 0):
+        print('FAILURE- likely due to PDB code not beloning to uniprot entry.')
+
+    
+    return(results_df)
+#This code downloads alphafold structures into the assembled folder.
+
+def download_AF_struc(pdb):
+    oldcwd = os.getcwd()
+    if not os.path.exists("assembled"):
+        os.mkdir("assembled")
+    os.chdir('assembled')
+    subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb", shell=True)
+    os.chdir(oldcwd)
+    print('PDB Structure for ' + pdb + ' downloaded')
+    return()
+
+
+
+
+#Code obtains the plddt (a measure of certainty where 100 is high and 70 low) value for each lysine in an alphafold structure.
+
+
+
+def find_AF_plddt(AF_code_full):
+    try:
+        #Opens .pdb file in assembled folder
+        columns = ['resid', 'chain', 'plddt']
+        AF_lysines_df = pd.DataFrame(columns=columns)
+
+    except Exception as e:
+        print("Error %s"%e)
+        return(AF_lysines_df)
+
+    try:
+        f = open('assembled/' + AF_code_full, "r")
+
+        #Parses though file to find plddt value.
+
+        for line in f:
+            try:
+                if re.search('CA  LYS', line):
+                    strline = str(line)
+                    data = strline.split()
+                    if len(data[4]) > 1:
+                        resid = (data[4])[1:]
+                        plddt = data[9]
+                        chain = (data[4])[0]
+                    elif len(data[4]) == 1:
+                        data = strline.split()
+                        resid = data[5]
+                        plddt = data[10]
+                        chain = data[4]
+
+                    data = ({'resid': resid, 'chain': chain, 'plddt': plddt})
+
+            except Exception as e:
+                print("Error %s"%e)
+                data = ({'resid': resid, 'chain': chain, 'plddt': '0'})
+                continue
+
+        #Appends to dataframe which is later merged into the main dataframe.
+                
+            AF_lysines_df = AF_lysines_df.append(data, ignore_index=True)
+        print(AF_lysines_df)
+
+    except Exception as e:
+        print("ERROR: %s"%e)
+        print('Failed to obtain pLDDT data for ' + AF_code_full)
+        return(AF_lysines_df)
+
+    return(AF_lysines_df)
 
 
 
