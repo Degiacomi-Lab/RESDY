@@ -71,7 +71,7 @@ def calculate_pKa(code):
         return()
 
     if AF_struc == True:
-        code_for_df = code[:-4]
+        code_for_df = code[:-14]
     elif AF_struc == False:
         code_for_df = code_for_df
 
@@ -168,9 +168,10 @@ def break_up_and_calculate_sasa(pdb_code):
 
             pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
             x = sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0.05)
-            print(x[0])
+            #print(x[0])
             chain_resid_list.append(str(chain + str(resid)))
             list_of_sasa.append(x[0])
+            print(x[0])
 
         except:
             print('Error obtaining SASA for ' + pdb_code + ' index value ' + str(j))
@@ -264,7 +265,8 @@ def identity_of_local_amino_acids(pdb_code):
 
 if __name__ == "__main__":
     try:    
-        print(break_up_and_calculate_sasa('6LVN_assembled.pdb'))
-        print(calculate_pKa('4XBJ_assembled.pdb'))
+        print(break_up_and_calculate_sasa('4P4H_assembled.pdb'))
+
+        
     except Exception as e:
         print("ERROR: %s"%e)

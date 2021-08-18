@@ -16,7 +16,7 @@ from copy import deepcopy
 # offers automatic automatic structure patching function
 from curate_PDB.autopatch import autopatch
 import re
-import clean as cl
+import remove_kcx_from_fasta as rkf
 ########################################
 # control flags
 
@@ -31,45 +31,6 @@ cutoff = 10 # autopatch cutoff (attempt adding residues to a protein if its gaps
 # if needed (outfile != ""), save the cleaned file in a new PDB. 
 def get_data(pdb, chain):
         
-        def load_and_clean(infile, outfile = ""):
-
-                # call a shell cleaning script (removes hydrogens and alternate side chain conformations)
-                # saves a cleaned temporary file called "tmp"
-                cl.clean(pdb, chain)
-
-                Mtmp = bb.Molecule()
-                Mtmp.import_pdb("tmp", include_hetatm=True)
-
-                if len(Mtmp.coordinates) > 1:
-                        Mtmp.coordinates = Mtmp.coordinates[0:1]
-                        Mtmp.set_current(0)
-
-                # remove amino acids with resid < 1
-                _, idx = Mtmp.query("resid > 0", get_index=True)
-                Mtmp = Mtmp.get_subset(idx)
-
-                #extract only protein atoms (no water, ligands, DNA, ...)
-                idxs=[]
-                list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO']
-                keys = list(Mtmp.knowledge['residue_mass'])
-                for i, d in enumerate(Mtmp.data["resname"].values):
-                        #Change to putting the keys into list
-                        #keys = list(dict)
-                        if d in keys:
-                                idxs.append(i)
-                        elif d in list_of_metals:
-                                idxs.append(i)
-
-
-                M = Mtmp.get_subset(idxs=idxs)
-
-
-                if outfile == "":
-                        M.write_pdb(outfile, split_struc=False)
-
-                os.remove("tmp")
-                return M
-
 
 # report on gaps on a given PDB file
 # returns:
@@ -79,12 +40,13 @@ def get_data(pdb, chain):
 
                 #attempt loading the protein (error: -2 if unloadable)
  
-                outfile_name = pdb + '_clean.pdb'
-                print(outfile_name)
-                M = load_and_clean(f, outfile_name)
+ 
 
         # check backbone geometric split (error:-1 if N and C atoms count mismatch)
-        #Why c_cnt value = 0 ???????- 
+                M = bb.Molecule()
+
+                M.import_pdb(f, include_hetatm=True)
+                print('after')
                 try:
                         c_cnt, _, _ = M.guess_chain_split(distance=3.5)
                         c_cnt -= 1
@@ -121,6 +83,7 @@ def get_data(pdb, chain):
 ##############################################################################
 
 # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
+
         if not os.path.exists("curate_PDB/raw"):
                 os.mkdir("curate_PDB/raw")
 
@@ -135,12 +98,14 @@ def get_data(pdb, chain):
         #NAME FAMILY GROUPS PDB CHAIN ALTERNATE_MODEL SPECIES LIGAND PDB_IDENTIFIER ALLOSTERIC_NAME ALLOSTERIC_PDB DFG AC_HELIX
         
         # download and save PDBs (chain reported in database)
-
-                
                 fin = "%s.pdb"%pdb
                 fout = "%s_%s.pdb"%(pdb, chain)
-                        
-                        
+
+                conf_file = open('curate_PDB/conformations/' + fin)
+                raw_file = open('curate_PDB/raw/' + fin, 'w')
+                for line in conf_file:
+                        raw_file.write(line)
+                raw_file.close()
 
                 # if file exists, skip
                 if os.path.exists(fout):
@@ -148,12 +113,11 @@ def get_data(pdb, chain):
                         pass
 
                 # else, download file, and get the subset out (only the chain indicated in KLIFS database)
-                print("loading %s"%fout)
-                subprocess.check_call("wget https://files.rcsb.org/download/%s"%fin, shell=True)
 
                 try:
                         M = bb.Molecule()
-                        M.import_pdb(fin, include_hetatm=True)
+                        pdb_location = 'curate_PDB/raw/' + pdb + '.pdb'
+                        M.import_pdb(pdb_location, include_hetatm=True)
                         _, idxs = M.atomselect(chain, "*", "*", get_index=True)
                         path = "curate_PDB/raw/" + fout
                         print(path)
@@ -165,70 +129,38 @@ def get_data(pdb, chain):
                         print("> issue with file %s"%fin)
 
                 # remove the downloaded PDB file (we already saved what we need)
-                os.remove(fin)
-
-
-                # select just one representative from proteins in the same crystal, i.e. that with most atoms (alternative conformations named as *.alt)
-                files = np.array(glob.glob("curate_PDB/raw/*pdb"))
-                print(files)
-                pdbs = np.array([s.split("_")[0] for s in files])
-
-                for p in np.unique(pdbs):
-                        files = np.array(glob.glob("%s*pdb"%p))
-                        if len(files) == 1:
-                                continue
-
-                        # read all chains belonging to same PDB, and get their length
-                        l = []
-                        for f in files:
-                                try:
-                                        M = bb.Molecule()
-                                        M.import_pdb(f, include_hetatm=True)
-                                        l.append(len(M.points))
-                                except:
-                                        l.append(-1)
-
-
-                        l = np.array(l)
-                        if len(np.unique(l)) > 1:
-                                print("> different length dectected, selecting largest...")
-                                print("> ", np.unique(l))
-
-                        # get files sorting by length (smallest to largest)
-                        pos = np.argsort(l)
-
-                # rename all files but the largest as "alternate"
-                        for i in pos[:-1]:
-                                os.rename(files[i], "%s.alt"%files[i])
-
+                os.remove('curate_PDB/raw/' + fin)
 
 
 # download FASTA sequences of proteins of interest in "raw" folder (not *alt files)
         if download_fasta:
                 for f in glob.glob("curate_PDB/raw/*pdb"):
-                        file_name = f[15:]
-                        file_name_no_pdb = file_name[-3:]
+                        
+                        file_name = f[15:19]
+                        print(file_name)
+                        chain = f[-5]
+                        print(f)
                         if "PATCHED" in f:
                                 continue
 
-                        file_name_no_pdb = file_name[:-4]
-                        file_name_url = file_name_no_pdb.replace('_', '.')
-                        file_name_fasta = file_name_no_pdb + '.fasta'
+                        file_name_url = file_name + '.' + chain
+                        file_name_fasta = file_name + '_' + chain + '.fasta'
                         oldpwd=os.getcwd()
                         os.chdir('curate_PDB/raw')
                         web_url = "https://www.rcsb.org/fasta/chain/" + file_name_url + '/download'
                         subprocess.check_call("wget -O " + file_name_fasta + " " + web_url, shell=True)
+                        new_name = (fin[:-4]) + '_' + chain + '.fasta'
+                        print(file_name_fasta)
+                        print(new_name)
+                        os.rename(file_name_fasta, new_name)
+
                         os.chdir(oldpwd)
                         try:
-                                cl.remove_kcx_from_fasta(pdb, chain)
+                                rkf.remove_kcx_from_fasta(pdb, chain)
                         except:
                                 pass
 
                 
-                #fin = "downloadFile.do?fileFormat=fastachain&compression=NO&structureId=%s&chainId=%s"%(pdb, chain)
-                #fout = "%s_%s.fasta"%(pdb, chain)
-                #print("> getting %s"%f)
-                #subprocess.check_call("wget \"https://www.rcsb.org/pdb/download/%s\" -O raw/%s"%(fin, fout), shell=True)
 
         
 
@@ -324,9 +256,9 @@ def get_data(pdb, chain):
                 print(result)
                 print('-----------------')
 
-                #**********************FAILING HERE*************************
+
                 outdata = np.concatenate((np.array([files]).T, result), axis=1)
-                #************************************************************
+
                 np.savetxt("gap_data.txt", outdata, fmt="%s")
                 np.savetxt("patch_data.txt", patchstat)
 

@@ -139,7 +139,27 @@ while running:
             results_df = gd.from_csv_file(csv_name, results_df)
 
         elif answers ['Choice'] == 'Quit':
-            skip = 1
+            skip = 1            
+            for f in glob.glob('curate_PDB/clean/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob('curate_PDB/conformations/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob('curate_PDB/raw/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob('assembled/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
             raise Exception
 
 
@@ -242,7 +262,7 @@ while running:
                     chain = df_one_pdb_code.at[i, 'Chains']
                     uniprot = df_one_pdb_code.at[i, 'Uniprot Entry']
                     dict_uniprot.update({pdb: uniprot})
-                    print('*****************GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
+                    print('***************** GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
                     print(chain)
                     if pdb[:2]=='AF':
                         try:
@@ -250,7 +270,6 @@ while running:
                         except:
                             continue
                     else:
-                        print('******* Getting data for ' + pdb + ' ' + chain + ' **********')
                         try:
                             get_data(pdb, chain)
                         except Exception as e:
@@ -353,10 +372,11 @@ while running:
                         os.remove(f)
                     for f in glob.glob('curate_PDB/clean/*'):
                         file_name = f[17:]
-                        print(file_name)
                         if file_name[:4] == pdb:
                             os.remove(f)
                     for f in glob.glob("curate_PDB/raw/*"):
+                        os.remove(f)
+                    for f in glob.glob("curate_PDB/conformations/*")
                         os.remove(f)
 
 
@@ -364,26 +384,39 @@ while running:
 
 
         #Averages the pKa/sasa values for a specific residue for the PDB structures for a particular protein
-
+        for f in glob.glob("curate_PDB/conformations/*"):
+            os.remove(f)
+        percentage_passed = dp.report_on_results(results_df, all_pka_sasa_res)
+        print('Percentage passed = ' + str(percentage_passed) + '%')
 
         question_avgs = [
         inquirer.List('Choice',
-            message="Do you want to average the data obtained from each of the PDB structures of a protein?",
-                choices=['Yes', 'No'],
+            message="How would you like the data to be processed?",
+                choices=['Average by resid', 'Take most likely for each resid', 'Keep data raw'],
                     ),
         ]
         answer_avgs = inquirer.prompt(question_avgs)
 
-        if answer_avgs['Choice'] == 'Yes':
+        if answer_avgs['Choice'] == 'Average by resid':
             try:
-                all_pka_sasa_res = dp.average_prot(all_pka_sasa_res)
                 print('AVERAGED DATA...')
+                all_pka_sasa_res = dp.average_prot(all_pka_sasa_res)
                 print(all_pka_sasa_res)
             except Exception as e:
                     print("ERROR: %s"%e)
                     print('Failed to average data.')
                     pass
-        
+
+        if answer_avgs['Choice'] == 'Take most likely for each resid':
+
+            try:
+                print('TAKING MOST LIKELY FOR EACH RESID')
+                all_pka_sasa_res = dp.get_most_likely_value(all_pka_sasa_res)
+                print(all_pka_sasa_res)
+            except Exception as e:
+                print("ERROR: %s"%e)
+                print('Failed to take most likely for each resid.')
+                pass
         else:
             pass
 
@@ -506,4 +539,24 @@ while running:
         print("Error: %s"%e)
         if skip == 1:
             print('\n' + 'Goodbye' + '\n')
+            for f in glob.glob('curate_PDB/clean/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob('curate_PDB/conformations/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob('curate_PDB/raw/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob('assembled/*'):
+                try:
+                    os.remove(f)
+                except:
+                    continue
             running = False

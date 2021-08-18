@@ -1,1 +1,0 @@
-curate_PDB/raw/2RJG_A.pdb 0 0 0 0
