@@ -6,9 +6,10 @@ import matplotlib.ticker as ticker
 import inquirer
 import os
 
-#This code calculates the mean and standard deviation for the sasa and pKa values from all the structures of a given protein.
+#This code is called at the end to give an idea of how many of the pdb files that passed the initial extraction passed the rest of the process.
 def report_on_results(results_df, all_pka_sasa_res):
     try:
+#Firstly it puts each pdb code from results_df in a list then gets rid of duplicates.
         start_pdb_codes_no_dup = []
         start_pdb_codes = results_df['PDB Code'].tolist()
 
@@ -17,7 +18,7 @@ def report_on_results(results_df, all_pka_sasa_res):
                 start_pdb_codes_no_dup.append(code)
             else:
                 continue
-
+#Next it does the same for all_pka_sasa_res
         end_pdb_code_no_dup = []
         end_pdb_codes = all_pka_sasa_res['PDB Code'].tolist()
         for code in end_pdb_codes:
@@ -25,6 +26,7 @@ def report_on_results(results_df, all_pka_sasa_res):
                 end_pdb_code_no_dup.append(code)
             else:
                 continue
+#Lastly it gives a percentage pass rate by working out the number of entries in all_pka_sasa_res compared to results_df
 
         percentage = (len(end_pdb_code_no_dup) / len(start_pdb_codes_no_dup))*100
 
@@ -170,8 +172,7 @@ def average_prot(all_pka_sasa_res):
 
             if not os.path.exists("Output"):
                 os.mkdir("Output")
-
-            avgd_pka_sasa.to_csv('Output/results.csv')
+            avgd_pka_sasa.to_csv('Output/results_avg.csv')
             
             print('Done')
 
@@ -240,6 +241,7 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
         fig, ax = plt.subplots()
         colors = {True:'red', False:'black'}
         all_pka_sasa_res['sasa'] = all_pka_sasa_res['sasa'].astype(float)
+        all_pka_sasa_res['pKa'] = all_pka_sasa_res['pKa'].astype(float)
         plt.scatter(all_pka_sasa_res['sasa'], all_pka_sasa_res['pKa'], c=all_pka_sasa_res['carbamylated'].map(colors))
         plt.title('pKa vs sasa')
         plt.xlabel('sasa')
@@ -252,6 +254,11 @@ def analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list):
 
     return(all_pka_sasa_res)
 
+
+
+
+
+#This returns a df where for each residue the most result that it most likely to be carbamylated is given.
 
 def get_most_likely_value(all_pka_sasa_res):
 
@@ -386,9 +393,7 @@ def get_most_likely_value(all_pka_sasa_res):
     #Lastly appends into df and saves as Output/results.csv
 
 
-
-            if not os.path.exists("Output"):
-                os.mkdir("Output")
+                low_pka_sasa.to_csv('Output/results_likely.csv')
 
             #low_pka_sasa.to_csv('Output/results.csv')
             
@@ -408,11 +413,52 @@ if __name__ == "__main__":
 
 
     try:
-        all_pka_sasa_res = pd.read_csv('Output/results.csv')
-        all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
-        carbam_pdb_list = []
-        carbam_resid_list = []
-        get_most_likely_value(all_pka_sasa_res)
+        question = [
+        inquirer.List('Choice',
+                        message="How would you like the data to be processed?",
+                        choices=['Average for each resid', 'Most likely to form carbamate for each resid', 'No processing needed', 'Plot input csv file'],
+                    ),
+        ]
+        answer = inquirer.prompt(question)
+
+        if answer['Choice'] == 'Average for each resid':
+            all_pka_sasa_res = pd.read_csv('Output/results.csv')
+            all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
+            carbam_pdb_list = []
+            carbam_resid_list = []
+            average_prot(all_pka_sasa_res)
+            all_pka_sasa_res = pd.read_csv('Output/results_avg.csv')
+            all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
+            analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
+
+        if answer['Choice'] == 'Most likely to form carbamate for each resid':
+            all_pka_sasa_res = pd.read_csv('Output/results.csv')
+            all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
+            carbam_pdb_list = []
+            carbam_resid_list = []
+            average_prot(all_pka_sasa_res)
+            all_pka_sasa_res = pd.read_csv('Output/results_likely.csv')
+            all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
+            analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
+        
+        if answer['Choice'] == 'No processing needed':
+            all_pka_sasa_res = pd.read_csv('Output/results.csv')
+            all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
+            carbam_pdb_list = []
+            carbam_resid_list = []
+            analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
+        
+        if answer['Choice'] == 'Plot input csv file':
+            name = input['Name of csv file:']
+            if name[-4:] == '.csv':
+                name = name + '.csv'
+            file_name = 'Output/' + name
+            all_pka_sasa_res = pd.read_csv(file_name)
+            all_pka_sasa_res = all_pka_sasa_res.drop(['Unnamed: 0'], axis=1)
+            carbam_pdb_list = []
+            carbam_resid_list = []
+            analyse_data(all_pka_sasa_res, carbam_pdb_list, carbam_resid_list)
+
         
     except Exception as e:
         print("ERROR: %s"%e)

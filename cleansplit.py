@@ -5,6 +5,7 @@ import numpy as np
 import glob
 import fileinput
 import biobox as bb
+import pandas as pd
 #OVERALL STRUCTURE...
 #First downloads file into conformations folder
 #Next cleans (i.e. removes heteroatoms that aren't metal ions)
@@ -38,7 +39,7 @@ def clean_and_split_alt_conformations(pdb):
 
     #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
 
-        list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO']
+        list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
 
         read_file_path = 'curate_PDB/conformations/' + pdb + '.pdb'
 
@@ -266,8 +267,10 @@ def clean_and_split_alt_conformations(pdb):
             B = A.get_subset(idxs=idx)
             pos, idx = B.atomignore('*', 'KCX', 'OQ2', get_index=True, use_resname=True)
             C = B.get_subset(idxs=idx)
-
-            C.write_pdb(path, split_struc=False)
+            try:
+                C.write_pdb(path, split_struc=True)
+            except:
+                C.write_pdb(path, split_struc=False)
 
 
 #For each it then replaces any atoms beloning to KCX with LYS and HETATM with ATOM.
@@ -289,6 +292,40 @@ def clean_and_split_alt_conformations(pdb):
             except:
                 return
 
+
+
+#This script removes any hydrogens from the files in curate_PDB/conformations
+    def remove_hydrogens(pdb):
+        print('REMOVING HYDROGENS......')
+#Firstly it puts each file name that belongs to the pdb of interest into a list
+        files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+        list_of_files = []
+        for file in files:
+            file_name = file[25:]
+            if file_name[:4] == pdb:
+                list_of_files.append(file_name)
+#Next it opens them in biobx and gets the index of each non-hydrogen atom
+        for file in list_of_files:
+            path = 'curate_PDB/conformations/' + file
+            M = bb.Molecule()
+            M.import_pdb(path)
+            df = M.data
+            list_of_names = df['name'].to_list()
+            clean_names = list()
+
+            for name in list_of_names:
+                if name[0] != 'H':
+                    clean_names.append(name)
+            pts, idx = M.atomselect('*', '*', clean_names, get_index=True)
+#Next it writes a new pdb including all the atoms except the hydrogens.
+            try:
+                M.write_pdb(path, index=idx, split_struc=True),
+            except:
+                M.write_pdb(path, index=idx, split_struc=False)
+
+        return
+
+
         return
 
 
@@ -303,6 +340,7 @@ def clean_and_split_alt_conformations(pdb):
         split_struc_NMR(pdb)
         split_struc_alt_aa(pdb)
         remove_kcx(pdb)
+        remove_hydrogens(pdb)
 
     except Exception as e:
         print('Error %s'%e)

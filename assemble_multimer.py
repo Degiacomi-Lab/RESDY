@@ -2,6 +2,8 @@ import biobox as bb
 import pandas as pd
 import os
 import fileinput
+import numpy as np
+import glob
 #get_data.py and the autopatcher break the protein up into chains.
 #This code 'reassembles' the protein into a multimer from the chains in the clean folder given the pdb code and chains the protein consists of.
 def assemble_multimer(pdb_code, list_chains):
@@ -41,6 +43,7 @@ def assemble_multimer(pdb_code, list_chains):
         print('Success assembling ' + pdb_code)
         filename = path
 
+
         with fileinput.FileInput(filename, inplace = True) as f:
             for line in f:
                 line = line.replace("TER","")
@@ -51,7 +54,6 @@ def assemble_multimer(pdb_code, list_chains):
         print('Failed to assemble ' + pdb_code)
 
     return()
-
 
 
 

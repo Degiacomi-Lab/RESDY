@@ -17,6 +17,29 @@ import get_pka_sasa as ps
 import data_processing as dp
 import assemble_multimer as am
 from curate_PDB.get_data import get_data
+import correctresid as cd
+
+
+#This is the main file from which all the different functions are called.
+#The general structure is as follows:
+
+#The user gives their input (either uniprot codes, pdb codes or organism information).
+#get_initial_data is then called.
+#get_initial data identifies all relevant pdb entries, then puts them through the clean_split module, which cleans them and splits them up into the various alternate conformations.
+#This returns a df called results_df, which contains every relevant pdb file, their resolution, the method obtained and the chains present.
+#The files are saved in curate_PDB/conformations
+
+#Next they go through get_data and the autopatcher which patches where needed and returns clean files for each chain in curate_PDB/clean.
+#Each pdbs full structure is then reassembled by the assemble_multimer module.
+
+#The pKa of every lysine in the multimer is then calculated.
+#The sasa of every lysine in the multimer is then also calculated, using a method where only the atoms close to each lysine are considered.
+#These results are then placed in the df 'all_pka_sasa_res'.
+
+#Next the data is processed for all the different structures of a protein (either the most likely to form a carbamate value for each resid is taken or an average).
+#Lastly the data is plotted on a graph.
+
+
 
 
 skip = 0
@@ -272,6 +295,7 @@ while running:
                     else:
                         try:
                             get_data(pdb, chain)
+                            cd.correct_resid(pdb, chain)
                         except Exception as e:
                             print('Error: %s'%e)
                             print('FAILED FOR: ' + pdb + chain)
@@ -375,8 +399,6 @@ while running:
                         if file_name[:4] == pdb:
                             os.remove(f)
                     for f in glob.glob("curate_PDB/raw/*"):
-                        os.remove(f)
-                    for f in glob.glob("curate_PDB/conformations/*")
                         os.remove(f)
 
 
