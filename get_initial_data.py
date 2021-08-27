@@ -161,6 +161,20 @@ def get_pdbs(name_of_organism, code, df):
                                             
                     html_2 = urllib.request.urlopen(url_2)
 
+                except Exception as e:
+                    print('Error %s'%e)
+                    continue
+                try:
+                    AF_code = 'AF-' + protein_code_clean + '-F1-model_v1'
+                    data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
+                    df = df.append(data, ignore_index=True)
+
+#Lastly it searches for available PDB structures
+
+                except Exception as e:
+                    print('Error %s'%e)
+
+                try:
                     for line in html_2:
                         line = str(line)
                         messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
@@ -182,24 +196,22 @@ def get_pdbs(name_of_organism, code, df):
                                 for f in files:
                                     conf = f[25:-4]
                                     if conf[:4] == PDBCODE:
-
-
-#Here the code calls the get_chains function which gets chain information for the protein from the PDB.
-
                                         unique_values_chain = get_chains(f)
                                         for i in range(len(unique_values_chain)):
                                             data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': conf, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
                                             df = df.append(data, ignore_index=True)
                             except Exception as e:
-                                print("Error %s"%e)
+                                print('Error %s'%e)
                                 continue
+                                        
+                except Exception as e:
+                    print('Error %s'%e)
+                    continue
 
-    #If for any uniprot code there are no entries it instead appends the alphafold code- if there isn't an alphafold entry it is picked up later but for now it always assumes there is one.
+#Here the code calls the get_chains function which gets chain information for the protein from the PDB.
 
-                    if len(messy_entry) == 0:
-                        AF_code = 'AF-' + protein_code_clean + 'F1-model_v1'
-                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-                        df = df.append(data, ignore_index=True)
+
+
 
 
                 except Exception as e:
@@ -225,15 +237,28 @@ def get_pdbs(name_of_organism, code, df):
 
 
 #Given a list of uniprot codes this function goes to the .txt URL and finds all corresponding .pdb files and all the relevant information.
+
 def get_pdbs_uniprot(uniprot_code, df):
 
+#Firstly it checks if there is uniprot information available for the protein
     try:
         url_2 = 'https://www.uniprot.org/uniprot/' + uniprot_code + '.txt'
         html_2 = urllib.request.urlopen(url_2)
+
     except Exception as e:
         print('Error %s'%e)
         print('Failed to obtain data for Uniprot entry: ' + uniprot_code)
+        return
+#It then automatically appends the AF structure to the df (if this isn't present it will be removed later).
+    try:
+        AF_code = 'AF-' + uniprot_code + '-F1-model_v1'
+        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
+        df = df.append(data, ignore_index=True)
 
+#Lastly it searches for available PDB structures
+
+    except Exception as e:
+        print('Error %s'%e)
 
     for line in html_2:
         try:
@@ -248,7 +273,7 @@ def get_pdbs_uniprot(uniprot_code, df):
                 method_obtained = (words[2])[:-1]
                 resolution = (words[3])[:-1]
 
-                #As before it calls in the get_chains function to get chain info.
+#Clean and split is called to prepare the structures
 
                 cs.clean_and_split_alt_conformations(PDBCODE)
                 files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
@@ -257,20 +282,25 @@ def get_pdbs_uniprot(uniprot_code, df):
                     conf = f[25:-4]
                     if conf[:4] == PDBCODE:
 
+#Get chains obtains relevant chain information.
+
                         unique_values_chain = get_chains(f)
+
+#Lastly the data is appended to the df
 
                         for i in range(len(unique_values_chain)):
                             data = ({'Uniprot Entry': uniprot_code, 'PDB Code': conf, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
                             df = df.append(data, ignore_index=True)
 
-                            if len(messy_entry) == 0:
-                                AF_code = 'AF-' + uniprot_code + 'F1-model_v1'
-                                data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-                                df = df.append(data, ignore_index=True)
+                            #if len(messy_entry) == 0:
+                                #AF_code = 'AF-' + uniprot_code + 'F1-model_v1'
+                                #data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
+                                #df = df.append(data, ignore_index=True)
 
         except Exception as e:
             print('Error %s'%e)
-            print('Failed to obtain data for Uniprot entry ' + uniprot_code)
+            continue
+
     print(df)
 
     return(df)
@@ -392,6 +422,14 @@ def from_csv_file(csv_file, results_df):
             pdb_code = csv_df.at[i, column_names[1]]
             if pdb_code == 0:
                 results_df = get_pdbs_uniprot(uniprot_code, results_df)
+
+            if pdb_code == 'AF':
+                pdb_code = 'AF-' + uniprot_code + '-F1-model_v1'
+                d = {'Uniprot Entry': uniprot_code, 'PDB Code': pdb_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
+                results_df = results_df.append(d, ignore_index=True)
+                print('AF Structure Added')
+
+                
             else:
                 results_df = construct_single_pdb_df(uniprot_code, pdb_code, results_df)
         except Exception as e:
@@ -468,11 +506,18 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, results_df):
 
 def download_AF_struc(pdb):
     oldcwd = os.getcwd()
+    print(oldcwd)
     if not os.path.exists("assembled"):
         os.mkdir("assembled")
     os.chdir('assembled')
-    subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb", shell=True)
+    try:
+        subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb", shell=True)
+    except Exception as e:
+        print('AF structure not found for ' + pdb)
+        pass
     os.chdir(oldcwd)
+    newcwd = os.getcwd
+    print(newcwd)
     print('PDB Structure for ' + pdb + ' downloaded')
     return()
 
@@ -484,12 +529,14 @@ def download_AF_struc(pdb):
 
 
 def find_AF_plddt(AF_code_full):
+    print('Finding plddt')
     #Opens .pdb file in assembled folder
     columns = ['resid', 'chain', 'plddt']
-    AF_lysines_df = pd.DataFrame(columns=columns)
+    dict_plddt = dict()
 
     try:
         f = open('assembled/' + AF_code_full, "r")
+        
 
         #Parses though file to find plddt value.
 
@@ -507,25 +554,23 @@ def find_AF_plddt(AF_code_full):
                         resid = data[5]
                         plddt = data[10]
                         chain = data[4]
+                        chain_resid = chain + resid
+                    dict_plddt.update({chain_resid: plddt})
 
-                    data = ({'resid': resid, 'chain': chain, 'plddt': plddt})
 
             except Exception as e:
                 print("Error %s"%e)
-                data = ({'resid': resid, 'chain': chain, 'plddt': '0'})
                 continue
 
         #Appends to dataframe which is later merged into the main dataframe.
                 
-            AF_lysines_df = AF_lysines_df.append(data, ignore_index=True)
-        print(AF_lysines_df)
 
     except Exception as e:
         print("ERROR: %s"%e)
         print('Failed to obtain pLDDT data for ' + AF_code_full)
-        return(AF_lysines_df)
+        return(dict_plddt)
 
-    return(AF_lysines_df)
+    return(dict_plddt)
 
 
 

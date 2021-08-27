@@ -160,6 +160,7 @@ while running:
             if csv_name[-4:] != '.csv':
                 csv_name = csv_name + '.csv'
             results_df = gd.from_csv_file(csv_name, results_df)
+            print(results_df)
 
         elif answers ['Choice'] == 'Quit':
             skip = 1            
@@ -284,7 +285,11 @@ while running:
                     print(df_one_pdb_code)
                     chain = df_one_pdb_code.at[i, 'Chains']
                     uniprot = df_one_pdb_code.at[i, 'Uniprot Entry']
-                    dict_uniprot.update({pdb: uniprot})
+                    if pdb[:2] != 'AF':
+                        pdb_for_dict = pdb + '_assembled'
+                        dict_uniprot.update({pdb_for_dict: uniprot})
+                    else:
+                        dict_uniprot.update({pdb: uniprot})
                     print('***************** GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
                     print(chain)
                     if pdb[:2]=='AF':
@@ -332,7 +337,7 @@ while running:
 
                         if code[:2] == 'AF':
                             try:
-                                AF_lysines_df = gd.find_AF_plddt(code)
+                                dict_plddt = gd.find_AF_plddt(code)
 
                             except Exception as e:
                                 print("ERROR: %s"%e)
@@ -351,32 +356,44 @@ while running:
                                 pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
                                 pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
                                 pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
+
+                                if code[:2] == 'AF':
+
+                                    pka_sasa_res_df['plddt'] = pka_sasa_res_df['Chain_Resid'].map(dict_plddt)
+                                    pka_sasa_res_df['plddt'] = pka_sasa_res_df['plddt'].fillna(0)
+                                    pka_sasa_res_df['plddt'] = pd.to_numeric(pka_sasa_res_df['plddt'],errors='coerce')
+                                    pka_sasa_res_df = pka_sasa_res_df.where(pka_sasa_res_df['plddt'] > 70)
+                                    pka_sasa_res_df = pka_sasa_res_df[pka_sasa_res_df['plddt'].notna()]
+                                    print('good')
+                                else:
+                                    pka_sasa_res_df['plddt'] = '0'
+
                                 all_pka_sasa_res = all_pka_sasa_res.append(pka_sasa_res_df)
-                                print(all_pka_sasa_res)
+                                
+
                             except Exception as e:
                                 print('Error %s'%e)
                                 print('Failed to put data into dataframe for ' + file)
+                                continue
 
 
                         except:
                             continue
-
-
-                        if code[:2] == 'AF':
-                            df_merge = pd.merge(AF_lysines_df, all_pka_sasa_res, how='outer', on='resid')
-                            df_merge.drop('chain_y', inplace=True, axis=1)
-                            df_merge.rename(columns={'chain_x': 'chain'}, inplace=True)
-                            df = df_merge
-                            df['plddt'] = pd.to_numeric(df['plddt'],errors='coerce')
-                            df = df.where(df['plddt'] > 70)
-                            df = df.dropna()
-                            all_pka_sasa_res = df
-                        else:
-                            all_pka_sasa_res['plddt'] = 'N/A'
+                        #Need to add a try and if not succeed add in something else...
 
                         all_pka_sasa_res['Uniprot Entry'] = all_pka_sasa_res['PDB Code'].map(dict_uniprot)
-                        print(all_pka_sasa_res)
                         all_pka_sasa_res.to_csv('Output/results.csv')
+                        print(all_pka_sasa_res)
+
+
+
+
+
+
+
+
+
+
 
 
                         num = num + 1

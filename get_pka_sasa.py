@@ -18,11 +18,18 @@ def calculate_pKa(code):
 
     try:
         code_for_df = code[:4]
-        path = 'assembled/' + code  
+        path = 'assembled/' + code
         print('Obtaining pKa data for ' + code)
+        
+        if os.path.exists('propkaoutput/propkafile.txt'):
+            f = open('propkaoutput/propkafile.txt', 'a')
+        else:
+            f = open('propkaoutput/propkafile.txt', 'w')
+        f.write('\n' + '--------------')
+        f.write(code)
         process = subprocess.Popen(['python', '-m', 'propka', path],
-                            stdout=subprocess.PIPE, 
-                            stderr=subprocess.PIPE)
+                            stdout=f, 
+                            stderr=f)
         stdout, stderr = process.communicate()
     except Exception as e:
         print('Failed to obtain pKa data for ' + code)
@@ -71,7 +78,7 @@ def calculate_pKa(code):
         return()
 
     if AF_struc == True:
-        code_for_df = code[:-14]
+        code_for_df = code[:-4]
     elif AF_struc == False:
         code_for_df = code_for_df
 
@@ -166,8 +173,8 @@ def break_up_and_calculate_sasa(pdb_code):
 
 #sasa is calculated for that lysine in the small molecule.
 
-            pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
-            x = sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0.05)
+            pts_2, indx_2 = S.atomselect(chain, [resid], ["NZ"],  use_resname=False, get_index=True)
+            x = sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
             #print(x[0])
             chain_resid_list.append(str(chain + str(resid)))
             list_of_sasa.append(x[0])
@@ -209,6 +216,9 @@ def identity_of_local_amino_acids(pdb_code):
     list_of_resid = list()
     columns = ['PDB Code', 'Lysine Index', 'Local Amino Acid', 'Distance']
     local_aa_df = pd.DataFrame(columns=columns)
+
+    columns_2 = ['PDB Code', 'Lysine Index', 'Score']
+    score_df = pd.DataFrame(columns=columns_2)
     print('BREAKING UP MOLECULE')
     print(pdb_code)
 
@@ -217,9 +227,8 @@ def identity_of_local_amino_acids(pdb_code):
     print(path)
     M.import_pdb(path, include_hetatm=True)
     df = M.data
-    df.to_csv('1dpm_info.csv')
-    print(df)
-    lys_coords, lys_idx = M.atomselect('*','LYS', 'NZ', use_resname=True, get_index=True)
+
+    lys_coords, lys_idx = M.atomselect('*','LYS', 'CA', use_resname=True, get_index=True)
 
 
     for entry in lys_idx:
@@ -234,6 +243,7 @@ def identity_of_local_amino_acids(pdb_code):
 
 
     for j in range(len(lys_coords)):
+        score = 0
         try:
             list_close_points = list()
             
@@ -242,8 +252,11 @@ def identity_of_local_amino_acids(pdb_code):
                 y_dist = (((lys_coords[j])[1] - (all_coords[i])[1])**2)
                 z_dist = (((lys_coords[j])[2] - (all_coords[i])[2])**2)
                 distance = math.sqrt(x_dist + y_dist + z_dist)
-                if distance < 10:
+                if distance < 7:
                     index_of_aa = idx[i]
+                    atom_name = df.at[index_of_aa, 'name']
+                    if atom_name[0] == 'O':
+                        score = score + 1
                     aa_resid = df.at[index_of_aa, 'resid']
                     lys_resid = list_of_resid[j]
 
@@ -256,8 +269,11 @@ def identity_of_local_amino_acids(pdb_code):
                     #print(local_aa_df)
         except Exception as e:
             print('Error %s'%e)
-    local_aa_df.to_csv('local_aa_near_lysine.csv')
-    return(local_aa_df)
+        data = ({'PDB Code': pdb_code, 'Lysine Index': lys_idx[j], 'Score': score})
+        score_df = score_df.append(data, ignore_index=True)
+
+    score_df.to_csv('score_df.csv')
+    return(score_df)
 
 
 
@@ -265,7 +281,7 @@ def identity_of_local_amino_acids(pdb_code):
 
 if __name__ == "__main__":
     try:    
-        print(break_up_and_calculate_sasa('4P4H_assembled.pdb'))
+        print(identity_of_local_amino_acids('4XBJ-alt1A_assembled.pdb'))
 
         
     except Exception as e:
