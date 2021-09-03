@@ -1,0 +1,123 @@
+Unexpected number (5) of atoms in residue GLU  18 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  19 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  20 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  21 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  22 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  23 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  24 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  25 E   in conformation 1A
+Unexpected number (5) of atoms in residue LEU  26 E   in conformation 1A
+Unexpected number (5) of atoms in residue VAL  27 E   in conformation 1A
+Unexpected number (5) of atoms in residue LEU 453 J   in conformation 1A
+Unexpected number (5) of atoms in residue TYR  78 L   in conformation 1A
+Unexpected number (5) of atoms in residue GLN  31 M   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  18 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  19 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  20 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  21 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  22 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  23 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  24 P   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  25 P   in conformation 1A
+Unexpected number (5) of atoms in residue LEU  26 P   in conformation 1A
+Unexpected number (5) of atoms in residue VAL  27 P   in conformation 1A
+Missing atoms or failed protonation for ARG  40 A (ARG) -- please check the structure
+Group (ARG) for   321-  CZ    40-ARG (A) [ 251.235  260.549  257.933] C
+Expected 8 interaction atoms for acids, found:
+               320-  NE    40-ARG (A) [ 251.236  259.269  257.588] N
+               322- NH1    40-ARG (A) [ 250.094  261.216  257.998] N
+               323- NH2    40-ARG (A) [ 252.373  261.158  258.219] N
+                 0-  HE    40-ARG (A) [ 250.348  258.827  257.396] H
+                 0-HH11    40-ARG (A) [ 249.224  260.751  257.782] H
+                 0-HH12    40-ARG (A) [ 250.093  262.190  258.264] H
+                 0- HH2    40-ARG (A) [ 252.562  260.936  259.186] H
+Expected 3 interaction atoms for bases, found:
+               320-  NE    40-ARG (A) [ 251.236  259.269  257.588] N
+               322- NH1    40-ARG (A) [ 250.094  261.216  257.998] N
+               323- NH2    40-ARG (A) [ 252.373  261.158  258.219] N
+Missing atoms or failed protonation for MET   1 B (BBN) -- please check the structure
+Group (BBN) for   695-   N     1-MET (B) [ 251.617  304.925  323.622] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1     1-MET (B) [ 251.627  305.441  324.490] H
+                 0-  H2     1-MET (B) [ 250.797  305.179  323.089] H
+               695-   N     1-MET (B) [ 251.617  304.925  323.622] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1     1-MET (B) [ 251.627  305.441  324.490] H
+                 0-  H2     1-MET (B) [ 250.797  305.179  323.089] H
+               695-   N     1-MET (B) [ 251.617  304.925  323.622] N
+Missing atoms or failed protonation for SER  79 C (BBN) -- please check the structure
+Group (BBN) for  1108-   N    79-SER (C) [ 252.555  268.990  291.240] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    79-SER (C) [ 252.570  267.980  291.255] H
+                 0-  H2    79-SER (C) [ 252.317  269.336  292.158] H
+              1108-   N    79-SER (C) [ 252.555  268.990  291.240] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    79-SER (C) [ 252.570  267.980  291.255] H
+                 0-  H2    79-SER (C) [ 252.317  269.336  292.158] H
+              1108-   N    79-SER (C) [ 252.555  268.990  291.240] N
+Missing atoms or failed protonation for SER  85 H (BBN) -- please check the structure
+Group (BBN) for  5064-   N    85-SER (H) [ 232.420  261.082  203.998] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    85-SER (H) [ 232.456  261.659  204.826] H
+                 0-  H2    85-SER (H) [ 231.609  261.331  203.450] H
+              5064-   N    85-SER (H) [ 232.420  261.082  203.998] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    85-SER (H) [ 232.456  261.659  204.826] H
+                 0-  H2    85-SER (H) [ 231.609  261.331  203.450] H
+              5064-   N    85-SER (H) [ 232.420  261.082  203.998] N
+Missing atoms or failed protonation for VAL 450 J (BBN) -- please check the structure
+Group (BBN) for 13127-   N   450-VAL (J) [ 229.414  279.461  323.777] N
+Expected 2 interaction atoms for acids, found:
+             13127-   N   450-VAL (J) [ 229.414  279.461  323.777] N
+Expected 2 interaction atoms for bases, found:
+             13127-   N   450-VAL (J) [ 229.414  279.461  323.777] N
+Missing atoms or failed protonation for MET   1 M (BBN) -- please check the structure
+Group (BBN) for 17296-   N     1-MET (M) [ 198.325  266.172  318.172] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1     1-MET (M) [ 198.464  265.748  319.078] H
+                 0-  H2     1-MET (M) [ 199.196  266.165  317.660] H
+             17296-   N     1-MET (M) [ 198.325  266.172  318.172] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1     1-MET (M) [ 198.464  265.748  319.078] H
+                 0-  H2     1-MET (M) [ 199.196  266.165  317.660] H
+             17296-   N     1-MET (M) [ 198.325  266.172  318.172] N
+Missing atoms or failed protonation for SER  79 N (BBN) -- please check the structure
+Group (BBN) for 17705-   N    79-SER (N) [ 197.452  307.439  293.700] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    79-SER (N) [ 197.625  308.099  294.445] H
+                 0-  H2    79-SER (N) [ 196.686  307.768  293.130] H
+             17705-   N    79-SER (N) [ 197.452  307.439  293.700] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    79-SER (N) [ 197.625  308.099  294.445] H
+                 0-  H2    79-SER (N) [ 196.686  307.768  293.130] H
+             17705-   N    79-SER (N) [ 197.452  307.439  293.700] N
+Missing atoms or failed protonation for SER  85 S (BBN) -- please check the structure
+Group (BBN) for 21661-   N    85-SER (S) [ 222.313  338.416  214.135] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    85-SER (S) [ 222.335  337.427  214.338] H
+                 0-  H2    85-SER (S) [ 223.076  338.650  213.516] H
+             21661-   N    85-SER (S) [ 222.313  338.416  214.135] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    85-SER (S) [ 222.335  337.427  214.338] H
+                 0-  H2    85-SER (S) [ 223.076  338.650  213.516] H
+             21661-   N    85-SER (S) [ 222.313  338.416  214.135] N
+Missing atoms or failed protonation for TRP 296 V (TRP) -- please check the structure
+Group (TRP) for 31781- NE1   296-TRP (V) [ 177.255  285.752  288.561] N
+Expected 2 interaction atoms for acids, found:
+             31781- NE1   296-TRP (V) [ 177.255  285.752  288.561] N
+Expected 1 interaction atoms for bases, found:
+             31781- NE1   296-TRP (V) [ 177.255  285.752  288.561] N
+Missing atoms or failed protonation for ARG 415 V (ARG) -- please check the structure
+Group (ARG) for 32672-  CZ   415-ARG (V) [ 181.926  282.541  293.854] C
+Expected 8 interaction atoms for acids, found:
+             32673- NH1   415-ARG (V) [ 182.281  283.500  294.696] N
+             32674- NH2   415-ARG (V) [ 182.399  281.313  294.013] N
+             32671-  NE   415-ARG (V) [ 181.096  282.812  292.855] N
+                 0- HH1   415-ARG (V) [ 182.975  284.138  294.332] H
+                 0-HH21   415-ARG (V) [ 183.030  281.110  294.775] H
+                 0-HH22   415-ARG (V) [ 182.128  280.581  293.372] H
+                 0-  HE   415-ARG (V) [ 180.841  282.060  292.231] H
+Expected 3 interaction atoms for bases, found:
+             32673- NH1   415-ARG (V) [ 182.281  283.500  294.696] N
+             32674- NH2   415-ARG (V) [ 182.399  281.313  294.013] N
+             32671-  NE   415-ARG (V) [ 181.096  282.812  292.855] N

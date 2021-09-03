@@ -1,0 +1,10 @@
+Missing atoms or failed protonation for GLY  28 B (BBN) -- please check the structure
+Group (BBN) for   143-   N    28-GLY (B) [  41.115    5.607   41.971] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    28-GLY (B) [  41.234    4.606   42.030] H
+                 0-  H2    28-GLY (B) [  41.135    6.003   42.900] H
+               143-   N    28-GLY (B) [  41.115    5.607   41.971] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    28-GLY (B) [  41.234    4.606   42.030] H
+                 0-  H2    28-GLY (B) [  41.135    6.003   42.900] H
+               143-   N    28-GLY (B) [  41.115    5.607   41.971] N

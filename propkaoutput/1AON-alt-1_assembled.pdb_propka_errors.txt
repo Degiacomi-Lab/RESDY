@@ -1,0 +1,101 @@
+Unexpected number (5) of atoms in residue ARG 197 A   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 A   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 A   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 A   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 197 B   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 B   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 B   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 B   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 197 C   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 C   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 C   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 C   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 C   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 C   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 C   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 C   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 C   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 C   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 C   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 197 D   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 D   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 D   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 D   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 D   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 D   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 D   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 D   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 197 E   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 E   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 E   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 E   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 E   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 E   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 E   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 E   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 E   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 E   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 197 F   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 F   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 F   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 F   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 F   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 F   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 F   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 F   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 F   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 F   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 F   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 197 G   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 204 G   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 225 G   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 226 G   in conformation 1A
+Unexpected number (5) of atoms in residue SER 228 G   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 229 G   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 230 G   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 231 G   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 232 G   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 238 G   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 G   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 H   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 I   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 J   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 K   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 L   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 M   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 268 N   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 O   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 P   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 Q   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 R   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 S   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 T   in conformation 1A
+Unexpected number (5) of atoms in residue MET   1 U   in conformation 1A
+Missing atoms or failed protonation for MET   1 O (BBN) -- please check the structure
+Group (BBN) for 53600-   N     1-MET (O) [  75.493  -11.508  -99.850] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1     1-MET (O) [  75.551  -11.664  -98.854] H
+                 0-  H2     1-MET (O) [  74.536  -11.306 -100.104] H
+             53600-   N     1-MET (O) [  75.493  -11.508  -99.850] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1     1-MET (O) [  75.551  -11.664  -98.854] H
+                 0-  H2     1-MET (O) [  74.536  -11.306 -100.104] H
+             53600-   N     1-MET (O) [  75.493  -11.508  -99.850] N

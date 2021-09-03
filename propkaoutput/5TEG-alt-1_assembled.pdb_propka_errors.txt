@@ -1,0 +1,10 @@
+Missing atoms or failed protonation for LYS 195 B (BBN) -- please check the structure
+Group (BBN) for  1279-   N   195-LYS (B) [ -37.304   -6.204   22.808] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   195-LYS (B) [ -37.670   -5.921   23.706] H
+                 0-  H2   195-LYS (B) [ -38.021   -6.692   22.291] H
+              1279-   N   195-LYS (B) [ -37.304   -6.204   22.808] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   195-LYS (B) [ -37.670   -5.921   23.706] H
+                 0-  H2   195-LYS (B) [ -38.021   -6.692   22.291] H
+              1279-   N   195-LYS (B) [ -37.304   -6.204   22.808] N

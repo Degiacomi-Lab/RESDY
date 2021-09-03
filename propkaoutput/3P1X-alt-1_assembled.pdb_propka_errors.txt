@@ -1,0 +1,12 @@
+Unexpected number (5) of atoms in residue LYS 526 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 537 A   in conformation 1A
+Unexpected number (4) of atoms in residue LYS 540 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 542 A   in conformation 1A
+Unexpected number (4) of atoms in residue SER 550 A   in conformation 1A
+Unexpected number (4) of atoms in residue HIS 551 A   in conformation 1A
+Unexpected number (4) of atoms in residue ASP 552 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 553 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 537 B   in conformation 1A
+Unexpected number (4) of atoms in residue HIS 551 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 554 B   in conformation 1A
+Unexpected number (5) of atoms in residue PRO 590 B   in conformation 1A

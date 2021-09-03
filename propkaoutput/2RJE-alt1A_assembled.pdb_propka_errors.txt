@@ -1,0 +1,20 @@
+Missing atoms or failed protonation for GLY 265 C (BBN) -- please check the structure
+Group (BBN) for  5564-   N   265-GLY (C) [ 112.854   24.702   34.832] N
+Expected 2 interaction atoms for acids, found:
+              5564-   N   265-GLY (C) [ 112.854   24.702   34.832] N
+Expected 2 interaction atoms for bases, found:
+              5564-   N   265-GLY (C) [ 112.854   24.702   34.832] N
+Missing atoms or failed protonation for ARG 324 C (ARG) -- please check the structure
+Group (ARG) for  6071-  CZ   324-ARG (C) [ 126.268   45.091   24.391] C
+Expected 8 interaction atoms for acids, found:
+              6070-  NE   324-ARG (C) [ 126.998   43.964   24.635] N
+              6073- NH2   324-ARG (C) [ 125.012   45.216   24.917] N
+              6072- NH1   324-ARG (C) [ 126.792   46.100   23.636] N
+                 0-  HE   324-ARG (C) [ 126.611   43.235   25.217] H
+                 0-HH21   324-ARG (C) [ 124.624   44.473   25.480] H
+                 0-HH22   324-ARG (C) [ 124.472   46.052   24.742] H
+                 0- HH1   324-ARG (C) [ 126.327   46.908   23.247] H
+Expected 3 interaction atoms for bases, found:
+              6070-  NE   324-ARG (C) [ 126.998   43.964   24.635] N
+              6073- NH2   324-ARG (C) [ 125.012   45.216   24.917] N
+              6072- NH1   324-ARG (C) [ 126.792   46.100   23.636] N

@@ -1,0 +1,3 @@
+Unexpected number (7) of atoms in residue LYS   5 B   in conformation 1A
+Unexpected number (6) of atoms in residue GLN  46 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS  19 C   in conformation 1A

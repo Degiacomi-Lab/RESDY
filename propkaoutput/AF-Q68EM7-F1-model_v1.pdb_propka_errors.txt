@@ -1,0 +1,25 @@
+His group does not seem to contain a ring Group (HIS) for   538-  CG    66-HIS (A) [ -22.129    3.447    0.157] C
+Missing atoms or failed protonation for HIS  66 A (HIS) -- please check the structure
+Group (HIS) for   538-  CG    66-HIS (A) [ -22.129    3.447    0.157] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+His group does not seem to contain a ring Group (HIS) for  2061-  CG   257-HIS (A) [  15.964    3.058  -23.007] C
+Missing atoms or failed protonation for HIS 257 A (HIS) -- please check the structure
+Group (HIS) for  2061-  CG   257-HIS (A) [  15.964    3.058  -23.007] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Side chain interaction failed for HIS  66 A and ASP  61 A
+Side chain interaction failed for HIS  66 A and GLU  63 A
+Side chain interaction failed for LYS  67 A and HIS  66 A
+Side chain interaction failed for GLN  76 A and HIS  66 A
+Side chain interaction failed for ASN 102 A and HIS  66 A
+Side chain interaction failed for GLN 103 A and HIS  66 A
+Side chain interaction failed for GLN 110 A and HIS  66 A
+Side chain interaction failed for HIS 257 A and GLU 255 A
+Side chain interaction failed for HIS 257 A and GLU 256 A
+Side chain interaction failed for ARG 260 A and HIS 257 A
+Side chain interaction failed for ARG 263 A and HIS 257 A
+Side chain interaction failed for ASP 304 A and HIS 257 A
+Side chain interaction failed for TYR 327 A and HIS 257 A
+Side chain interaction failed for GLN 370 A and HIS 257 A
+Side chain interaction failed for ASN 374 A and HIS 257 A

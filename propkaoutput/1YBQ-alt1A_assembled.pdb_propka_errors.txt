@@ -1,0 +1,13 @@
+Missing atoms or failed protonation for ARG 121 A (ARG) -- please check the structure
+Group (ARG) for   874-  CZ   121-ARG (A) [  38.926   15.692   38.488] C
+Expected 8 interaction atoms for acids, found:
+               873-  NE   121-ARG (A) [  38.413   16.880   38.177] N
+               875- NH1   121-ARG (A) [  39.910   15.558   39.390] N
+               876- NH2   121-ARG (A) [  38.433   14.600   37.913] N
+                 0-  HE   121-ARG (A) [  37.675   16.918   37.489] H
+                 0-HH21   121-ARG (A) [  37.684   14.678   37.239] H
+                 0-HH22   121-ARG (A) [  38.807   13.692   38.150] H
+Expected 3 interaction atoms for bases, found:
+               873-  NE   121-ARG (A) [  38.413   16.880   38.177] N
+               875- NH1   121-ARG (A) [  39.910   15.558   39.390] N
+               876- NH2   121-ARG (A) [  38.433   14.600   37.913] N

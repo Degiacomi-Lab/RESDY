@@ -1,0 +1,14 @@
+Missing atoms or failed protonation for ARG 467 C (ARG) -- please check the structure
+Group (ARG) for 11403-  CZ   467-ARG (C) [  17.200   -1.208  -45.254] C
+Expected 8 interaction atoms for acids, found:
+             11402-  NE   467-ARG (C) [  18.517   -1.214  -45.329] N
+             11405- NH2   467-ARG (C) [  16.443   -1.959  -46.025] N
+             11404- NH1   467-ARG (C) [  16.638   -0.426  -44.369] N
+                 0-  HE   467-ARG (C) [  18.960   -1.794  -46.027] H
+                 0-HH21   467-ARG (C) [  16.867   -2.569  -46.710] H
+                 0-HH22   467-ARG (C) [  15.438   -1.926  -45.932] H
+                 0- HH1   467-ARG (C) [  17.266    0.288  -44.029] H
+Expected 3 interaction atoms for bases, found:
+             11402-  NE   467-ARG (C) [  18.517   -1.214  -45.329] N
+             11405- NH2   467-ARG (C) [  16.443   -1.959  -46.025] N
+             11404- NH1   467-ARG (C) [  16.638   -0.426  -44.369] N

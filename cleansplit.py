@@ -6,6 +6,7 @@ import glob
 import fileinput
 import biobox as bb
 import pandas as pd
+
 #OVERALL STRUCTURE...
 #First downloads file into conformations folder
 #Next cleans (i.e. removes heteroatoms that aren't metal ions)
@@ -17,7 +18,84 @@ import pandas as pd
 
 #This script downloads the file and removes all the hetereoatoms that aren't metal ions.
 #The results is saved into a file with the structure *PDB code*-clean.pdb.
-def clean_and_split_alt_conformations(pdb):
+def clean_and_split_alt_conformations(pdb, done_pdbs):
+
+    def checks(pdb, done_pdbs):
+        print('Checking')
+        keep = True
+
+#Firstly it checks whether they are in the log_file (the file saying what has already been done). If they are then the structure is not included.
+
+        for entry in done_pdbs:
+
+            if re.search(pdb, entry):
+                keep = False
+                print('\n')
+                print('**********************************************************************')
+                print(pdb + ' is in the log_file therefore will not be further investigated.')
+                print('**********************************************************************')
+                print('\n')
+                if not os.path.exists('log_file.csv'):
+                    f = open('log_file.csv', 'w')
+                    f.write('PDB Code,Result')
+                    f.write('\n')
+                    f.write(pdb + ',Failed as pdb file is already in log_file- remove to continue.')
+                    f.close()
+
+                elif os.path.exists('log_file.csv'):
+                    f = open('log_file.csv', 'a')
+                    f.write('\n')
+                    f.write(pdb + ',Failed as pdb file is already in log_file- remove to continue.')
+                    f.close()
+                break
+
+
+#Next it downloads the relevant pdb file.
+
+        subprocess.check_call("wget https://files.rcsb.org/download/" + pdb + '.pdb', shell=True)
+        f = open(pdb + '.pdb', 'r')
+        list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
+
+#Here it cleans the file by only including lines if they include protein atoms or metal ions.
+#Note- if you want to discard any files with non-metal ligands make keepp untrue and uncomment out the next ~18 lines
+
+        for line in f:
+                if line[:6] == 'HETATM':
+                    words = line.split()
+                    if words[3] in list_of_metals:
+                        continue
+                    elif words[2] == 'HOH':
+                        continue
+                    else:
+                        keep = True
+                        
+                        #print('\n')
+                        #print('****************************************************')
+                        #print('NON-METAL HETATM FOUND- will not continue with this pdb file')
+                        #print('****************************************************')
+                        #print('\n')
+
+                        #if not os.path.exists('log_file.csv'):
+                            #f = open('log_file.csv', 'w')
+                            #f.write('PDB Code,Result')
+                            #f.write('\n')
+                            #f.write(pdb + ',Failed due to presence of Hetatm-replace Hetatm with ATOM in .pdb file to include.')
+                            #f.close()
+
+                        #elif os.path.exists('log_file.csv'):
+                            #f = open('log_file.csv', 'a')
+                            #f.write('\n')
+                            #f.write(pdb + ',Failed due to presence of Hetatm-replace Hetatm with ATOM in .pdb file to include.')
+                            #f.close()
+                            #break
+        os.remove(pdb + '.pdb')
+                    
+        return keep
+
+    
+
+
+
     def clean(pdb):
 
         print('CLEANING')
@@ -27,16 +105,31 @@ def clean_and_split_alt_conformations(pdb):
             print(cwd)
 
             os.chdir('curate_PDB/conformations')
-            subprocess.check_call("wget https://files.rcsb.org/download/" + pdb + '.pdb', shell=True)
-
+            try:
+                subprocess.check_call("wget https://files.rcsb.org/download/" + pdb + '.pdb', shell=True)
+            except Exception as e:
+                print('Error %s'%e)
+                os.chdir(cwd)
             #Next it returns to the carbamylation folder.
 
             os.chdir(cwd)
+            try:
+                rename_chains(pdb)
+            except Exception as e:
+                print('Error %s'%e)
+                print('Failure renaming chains')
+                return('FAIL')
+
+            
         except Exception as e:
             print('Error %s'%e)
             print('Print failure opening file.')
             return
 
+        try:
+            replace_mse(pdb)
+        except:
+            pass
     #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
 
         list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
@@ -49,18 +142,22 @@ def clean_and_split_alt_conformations(pdb):
         write_file = open(write_file_path, 'w')
 
     #Next it writes the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
-
+        unknown_hetatm = False
         for line in read_file:
             if line[:6] == 'HETATM':
                 words = line.split()
                 if words[3] in list_of_metals:
                     write_file.write(line)
-                continue
+                    continue
+
+                    
+
             if line[:4] == 'ATOM':
                 words = line.split()
                 if words[2] != 'H':
                     write_file.write(line)
                     continue
+
             if line[:3] == 'TER':
                 write_file.write(line)
                 continue
@@ -74,9 +171,37 @@ def clean_and_split_alt_conformations(pdb):
         os.remove(read_file_path)
         print('Clean ' + pdb)
 
+        return(pdb)
+
+    def replace_mse(pdb):
+        print('Replacing MSE')
+        files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+        list_of_files = []
+        for file in files:
+            file_name = file[25:]
+            if file_name[:4] == pdb:
+                list_of_files.append(file_name)
+        
+#For each it then replaces any atoms beloning to KCX with LYS and HETATM with ATOM.
+
+        for f in list_of_files:
+
+            try:
+                path = 'curate_PDB/conformations/' + f
+
+                with fileinput.FileInput(path, inplace = True) as f:
+                    for line in f:
+                        if("MSE" in line):
+                            line = line.replace("HETATM","ATOM  ")
+                            line = line.replace('MSE', 'MET')
+                            line = line.replace('SE', ' S')
+                            print(line, end ='') 
+                        else:
+                            print(line, end ='') 
+
+            except:
+                return
         return
-
-
 
 
 
@@ -326,7 +451,9 @@ def clean_and_split_alt_conformations(pdb):
         return
 
 
-        return
+
+
+    
 
 
 
@@ -336,17 +463,184 @@ def clean_and_split_alt_conformations(pdb):
 
 
     try:
-        clean(pdb)
-        split_struc_NMR(pdb)
-        split_struc_alt_aa(pdb)
-        remove_kcx(pdb)
-        remove_hydrogens(pdb)
+
+        #Fistly it checks if the pdb is in the log file and does ligand check (if enabled).
+        keep = checks(pdb, done_pdbs)
+        if keep == True:
+            try:
+        #Next it cleans the structure and splits into all alternative conformations.
+                clean(pdb)
+                if pdb == 'FAIL':
+                    print('Error cleaning ' + pdb)
+                    f = open('log_file.csv', 'a')
+                    f.write('\n')
+                    f.write(pdb + ', Failed cleaning process')
+                    pass
+                else:
+                    split_struc_NMR(pdb)
+                    split_struc_alt_aa(pdb)
+                    remove_kcx(pdb)
+                    remove_hydrogens(pdb)
+            except Exception as e:
+                print('Error cleaning ' + pdb)
+                f = open('log_file.csv', 'a')
+                f.write('\n')
+                f.write(pdb + ', Failed cleaning process')
+        else:
+            pass
 
     except Exception as e:
         print('Error %s'%e)
+        pass
 
 
-    return()
+    return keep
+
+
+
+
+
+#This module renames the protein's chains durin the cleaning process so that they match the chain names given in the fasta file.
+#This is required as pdb files name their chains using the 'auth' name and fasta with the normal chain name.
+#Therefore to avoid confusion we rename them all to what is used in the fasta file.
+
+def rename_chains(pdb_code):
+
+    def get_chain_replacement(pdb_code):
+        #Fistly the fasta file is downloaded
+        try:
+            web_url = "https://www.rcsb.org/fasta/entry/" + pdb_code + '/download'
+
+            name = pdb_code + '.fasta'
+
+            subprocess.check_call("wget -O " + name + " " + web_url, shell=True)
+
+        except Exception as e:
+            print('Error %s'%e)
+            print('Error downloading FASTA sequence for chain name comparison.')
+            return {}
+
+        try:
+            #Next it is opened and all the chain information is appended into the chains_raw list
+
+            f = open(name, 'r')
+            list_of_chains = []
+            chains_raw =[]
+            replacement = []
+            need_replacing = []
+            replacement_dict = dict()
+            for line in f:
+                m = re.findall('Chain[ a-z , A-Z \[\]]*|', line)
+                for entry in m:
+                    if (len(entry) > 0):
+                        chains_raw.append(entry)
+
+            #The fasta file is then removed
+
+            os.remove(name)
+        except Exception as e:
+            print('Error %s'%e)
+            print('Error parsing through fasta file.')
+            os.remove(name)
+            return {}
+
+        
+#If a chain has two different names (i.e. an auth name and the name given by the RCSB) the chain name will have the following format in the fasta file:
+#Chains K[auth M], L[auth N]
+#Therefore the code here puts the auth name and name given by RCSB into a dictionary which is later used to replace the auth names.
+#e.g. the two examples here would be appended into the dictionary as {M:K, N:L}
+#If the auth name and RCSB name are the same nothing is appended to the dictionary.
+
+        for entry in chains_raw:
+            try:
+                chains_raw_2 = entry.split(',')
+                for entry in chains_raw_2:
+                    if re.search('auth', entry):
+                        chains_wrong = entry.split('auth')
+                        for entry in chains_wrong:
+                            select = entry.split(' ')
+                            for entry in select:
+                                if entry[-1:] == '[':
+                                    replacement = entry[:-1]
+                                    
+                                if entry[-1:] == ']':
+                                    need_replacing = entry[:-1]
+                        replacement_dict[need_replacing] = replacement
+                        
+                    else:
+                        chain = entry.split(' ')
+                        for entry in chain:
+                            if 'Chain' not in entry and (len(entry) > 0):
+                                list_of_chains.append(entry)
+            except Exception as e:
+                print('Error %s'%e)
+                print('Failure renaming chains.')
+                continue
+            
+#This dictionary is then fed onto the next function (replace_chains) where it is used to replace the auth chain names with the RCSB chain names for files in curate_PDB/conformations.
+
+        return replacement_dict
+
+
+
+
+    def replace_chains(pdb_code, replacement_dict):
+
+#Firstly, the auth chain names are put in a list.
+
+        auth_list = list(replacement_dict.keys())
+
+        path = 'curate_PDB/conformations/' + pdb_code + '.pdb'
+
+#The relevant file in conformations is then opened and rewritten.
+
+        try:
+            with fileinput.FileInput(path, inplace = True) as f:
+                for line in f:
+                    try:
+#On lines with 'ATOM', 'TER' or 'HETATM' if the chain is in the auth_list the auth chain name is replaced with the RCSB chain name.
+
+                        if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
+                                chain_name = line[21]
+                                if chain_name in auth_list:
+                                    replacement_chain_name = replacement_dict.get(chain_name)
+                                    line = line[:21] + replacement_chain_name + line[22:]
+                                    print(line, end ='')
+                                else:
+                                    print(line, end = '')
+
+                        else:
+                            print(line, end='')
+                    except:
+                        print(line, end='')
+
+#If the protein fails the replacement process it is removed from the conformations folder.
+
+        except Exception as e:
+            print('Error %s'%e)
+            print('Error renaming chains')
+            os.remove(path)
+            pass
+        
+        return
+
+
+#The both functions are called within a larger function (rename_chains)
+#Here, if there are no chains to be replaced the replace_chains function won't be called.
+
+    replacement_dict = get_chain_replacement(pdb_code)
+    if len(replacement_dict) == 0:
+        return
+    else:
+        replace_chains(pdb_code, replacement_dict)
+
+    return
+
+
+
+
+
+
 
         
 
@@ -358,8 +652,9 @@ def clean_and_split_alt_conformations(pdb):
 if __name__ == "__main__":
 
     try:
-        pdb = '4XBJ'
-        clean_and_split_alt_conformations(pdb)
+        pdb = '1ci4'
+        done_pdbs = []
+        clean_and_split_alt_conformations(pdb, done_pdbs)
         
     except Exception as e:
         print("ERROR: %s"%e)

@@ -1,0 +1,68 @@
+Missing atoms or failed protonation for ARG  53 A (ARG) -- please check the structure
+Group (ARG) for   137-  CZ    53-ARG (A) [  51.996  -33.826  -56.587] C
+Expected 8 interaction atoms for acids, found:
+               136-  NE    53-ARG (A) [  50.820  -33.285  -56.400] N
+               138- NH1    53-ARG (A) [  52.642  -34.184  -55.498] N
+               139- NH2    53-ARG (A) [  52.520  -34.007  -57.779] N
+                 0-  HE    53-ARG (A) [  50.247  -33.006  -57.184] H
+                 0- HH1    53-ARG (A) [  52.207  -34.605  -54.690] H
+                 0-HH21    53-ARG (A) [  52.009  -33.724  -58.603] H
+                 0-HH22    53-ARG (A) [  53.433  -34.429  -57.871] H
+Expected 3 interaction atoms for bases, found:
+               136-  NE    53-ARG (A) [  50.820  -33.285  -56.400] N
+               138- NH1    53-ARG (A) [  52.642  -34.184  -55.498] N
+               139- NH2    53-ARG (A) [  52.520  -34.007  -57.779] N
+Missing atoms or failed protonation for ASN  25 B (BBN) -- please check the structure
+Group (BBN) for   802-   N    25-ASN (B) [  43.927   -3.737  -48.728] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    25-ASN (B) [  43.705   -3.153  -47.934] H
+                 0-  H2    25-ASN (B) [  43.097   -3.875  -49.287] H
+               802-   N    25-ASN (B) [  43.927   -3.737  -48.728] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    25-ASN (B) [  43.705   -3.153  -47.934] H
+                 0-  H2    25-ASN (B) [  43.097   -3.875  -49.287] H
+               802-   N    25-ASN (B) [  43.927   -3.737  -48.728] N
+Missing atoms or failed protonation for SER  32 D (BBN) -- please check the structure
+Group (BBN) for  2256-   N    32-SER (D) [ -12.583  -21.331  -21.975] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (D) [ -12.890  -22.179  -21.519] H
+                 0-  H2    32-SER (D) [ -13.388  -20.790  -22.256] H
+              2256-   N    32-SER (D) [ -12.583  -21.331  -21.975] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (D) [ -12.890  -22.179  -21.519] H
+                 0-  H2    32-SER (D) [ -13.388  -20.790  -22.256] H
+              2256-   N    32-SER (D) [ -12.583  -21.331  -21.975] N
+Missing atoms or failed protonation for LYS  15 G (BBN) -- please check the structure
+Group (BBN) for  4456-   N    15-LYS (G) [  30.275  -44.083   -5.562] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    15-LYS (G) [  30.732  -44.542   -4.787] H
+                 0-  H2    15-LYS (G) [  30.965  -43.607   -6.126] H
+              4456-   N    15-LYS (G) [  30.275  -44.083   -5.562] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    15-LYS (G) [  30.732  -44.542   -4.787] H
+                 0-  H2    15-LYS (G) [  30.965  -43.607   -6.126] H
+              4456-   N    15-LYS (G) [  30.275  -44.083   -5.562] N
+Missing atoms or failed protonation for ARG  77 G (ARG) -- please check the structure
+Group (ARG) for  4940-  CZ    77-ARG (G) [  44.921  -37.889  -31.303] C
+Expected 8 interaction atoms for acids, found:
+              4939-  NE    77-ARG (G) [  46.225  -37.818  -31.055] N
+              4941- NH1    77-ARG (G) [  44.266  -39.034  -31.143] N
+              4942- NH2    77-ARG (G) [  44.255  -36.795  -31.639] N
+                 0-  HE    77-ARG (G) [  46.675  -36.920  -31.161] H
+                 0-HH11    77-ARG (G) [  44.764  -39.865  -30.859] H
+                 0-HH12    77-ARG (G) [  43.270  -39.073  -31.306] H
+                 0- HH2    77-ARG (G) [  44.036  -36.080  -30.960] H
+Expected 3 interaction atoms for bases, found:
+              4939-  NE    77-ARG (G) [  46.225  -37.818  -31.055] N
+              4941- NH1    77-ARG (G) [  44.266  -39.034  -31.143] N
+              4942- NH2    77-ARG (G) [  44.255  -36.795  -31.639] N
+Missing atoms or failed protonation for ARG  33 H (BBN) -- please check the structure
+Group (BBN) for  5261-   N    33-ARG (H) [  39.115  -24.245  -12.588] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (H) [  38.998  -23.991  -11.618] H
+                 0-  H2    33-ARG (H) [  40.095  -24.399  -12.780] H
+              5261-   N    33-ARG (H) [  39.115  -24.245  -12.588] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (H) [  38.998  -23.991  -11.618] H
+                 0-  H2    33-ARG (H) [  40.095  -24.399  -12.780] H
+              5261-   N    33-ARG (H) [  39.115  -24.245  -12.588] N

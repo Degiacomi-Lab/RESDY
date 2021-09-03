@@ -1,0 +1,54 @@
+Missing atoms or failed protonation for ARG  63 A (ARG) -- please check the structure
+Group (ARG) for   224-  CZ    63-ARG (A) [  37.526   16.744  233.031] C
+Expected 8 interaction atoms for acids, found:
+               223-  NE    63-ARG (A) [  36.638   16.627  234.002] N
+               225- NH1    63-ARG (A) [  38.028   15.680  232.389] N
+               226- NH2    63-ARG (A) [  37.896   17.957  232.715] N
+                 0-  HE    63-ARG (A) [  36.309   17.488  234.415] H
+                 0- HH1    63-ARG (A) [  38.674   15.064  232.862] H
+                 0-HH21    63-ARG (A) [  37.507   18.748  233.207] H
+                 0-HH22    63-ARG (A) [  38.571   18.103  231.978] H
+Expected 3 interaction atoms for bases, found:
+               223-  NE    63-ARG (A) [  36.638   16.627  234.002] N
+               225- NH1    63-ARG (A) [  38.028   15.680  232.389] N
+               226- NH2    63-ARG (A) [  37.896   17.957  232.715] N
+Missing atoms or failed protonation for ARG  23 B (BBN) -- please check the structure
+Group (BBN) for   831-   N    23-ARG (B) [  31.533   -0.843  237.375] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    23-ARG (B) [  31.602   -0.965  238.375] H
+                 0-  H2    23-ARG (B) [  32.460   -0.806  236.976] H
+               831-   N    23-ARG (B) [  31.533   -0.843  237.375] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    23-ARG (B) [  31.602   -0.965  238.375] H
+                 0-  H2    23-ARG (B) [  32.460   -0.806  236.976] H
+               831-   N    23-ARG (B) [  31.533   -0.843  237.375] N
+Missing atoms or failed protonation for ALA  12 C (BBN) -- please check the structure
+Group (BBN) for  1460-   N    12-ALA (C) [   0.537   -6.106  172.268] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    12-ALA (C) [   0.576   -6.847  171.583] H
+                 0-  H2    12-ALA (C) [   1.368   -5.536  172.195] H
+              1460-   N    12-ALA (C) [   0.537   -6.106  172.268] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    12-ALA (C) [   0.576   -6.847  171.583] H
+                 0-  H2    12-ALA (C) [   1.368   -5.536  172.195] H
+              1460-   N    12-ALA (C) [   0.537   -6.106  172.268] N
+Missing atoms or failed protonation for SER  32 D (BBN) -- please check the structure
+Group (BBN) for  2275-   N    32-SER (D) [ -11.610   22.403  185.526] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (D) [ -11.495   22.628  186.504] H
+                 0-  H2    32-SER (D) [ -12.174   23.114  185.082] H
+              2275-   N    32-SER (D) [ -11.610   22.403  185.526] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (D) [ -11.495   22.628  186.504] H
+                 0-  H2    32-SER (D) [ -12.174   23.114  185.082] H
+              2275-   N    32-SER (D) [ -11.610   22.403  185.526] N
+Missing atoms or failed protonation for ARG  33 H (BBN) -- please check the structure
+Group (BBN) for  5309-   N    33-ARG (H) [  37.152   22.963  196.493] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (H) [  37.250   23.333  197.428] H
+                 0-  H2    33-ARG (H) [  36.435   23.477  196.001] H
+              5309-   N    33-ARG (H) [  37.152   22.963  196.493] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (H) [  37.250   23.333  197.428] H
+                 0-  H2    33-ARG (H) [  36.435   23.477  196.001] H
+              5309-   N    33-ARG (H) [  37.152   22.963  196.493] N

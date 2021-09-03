@@ -1,0 +1,10 @@
+His group does not seem to contain a ring Group (HIS) for  4856-  CG   624-HIS (A) [  10.586  -24.691  -13.606] C
+Missing atoms or failed protonation for HIS 624 A (HIS) -- please check the structure
+Group (HIS) for  4856-  CG   624-HIS (A) [  10.586  -24.691  -13.606] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Side chain interaction failed for HIS 624 A and GLU 621 A
+Side chain interaction failed for HIS 624 A and CYS 622 A
+Side chain interaction failed for LYS 625 A and HIS 624 A
+Side chain interaction failed for CYS 630 A and HIS 624 A
+Side chain interaction failed for ARG 979 A and HIS 624 A

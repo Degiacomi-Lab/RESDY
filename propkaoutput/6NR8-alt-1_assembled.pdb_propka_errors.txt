@@ -1,0 +1,70 @@
+Missing atoms or failed protonation for ALA  16 H (BBN) -- please check the structure
+Group (BBN) for  9439-   N    16-ALA (H) [ 188.045  205.232  174.799] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-ALA (H) [ 187.906  204.242  174.940] H
+                 0-  H2    16-ALA (H) [ 187.176  205.655  174.505] H
+              9439-   N    16-ALA (H) [ 188.045  205.232  174.799] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-ALA (H) [ 187.906  204.242  174.940] H
+                 0-  H2    16-ALA (H) [ 187.176  205.655  174.505] H
+              9439-   N    16-ALA (H) [ 188.045  205.232  174.799] N
+Missing atoms or failed protonation for ASP  26 J (BBN) -- please check the structure
+Group (BBN) for 17224-   N    26-ASP (J) [ 214.713  220.358  160.141] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    26-ASP (J) [ 214.224  220.084  160.982] H
+                 0-  H2    26-ASP (J) [ 214.933  219.536  159.597] H
+             17224-   N    26-ASP (J) [ 214.713  220.358  160.141] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    26-ASP (J) [ 214.224  220.084  160.982] H
+                 0-  H2    26-ASP (J) [ 214.933  219.536  159.597] H
+             17224-   N    26-ASP (J) [ 214.713  220.358  160.141] N
+Missing atoms or failed protonation for LYS  25 K (BBN) -- please check the structure
+Group (BBN) for 21056-   N    25-LYS (K) [ 176.582  212.847  195.964] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    25-LYS (K) [ 176.837  211.923  196.284] H
+                 0-  H2    25-LYS (K) [ 176.124  213.347  196.712] H
+             21056-   N    25-LYS (K) [ 176.582  212.847  195.964] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    25-LYS (K) [ 176.837  211.923  196.284] H
+                 0-  H2    25-LYS (K) [ 176.124  213.347  196.712] H
+             21056-   N    25-LYS (K) [ 176.582  212.847  195.964] N
+Missing atoms or failed protonation for MET  14 N (BBN) -- please check the structure
+Group (BBN) for 32911-   N    14-MET (N) [ 196.271  219.131  233.240] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    14-MET (N) [ 195.934  218.372  232.665] H
+                 0-  H2    14-MET (N) [ 196.914  219.698  232.706] H
+             32911-   N    14-MET (N) [ 196.271  219.131  233.240] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    14-MET (N) [ 195.934  218.372  232.665] H
+                 0-  H2    14-MET (N) [ 196.914  219.698  232.706] H
+             32911-   N    14-MET (N) [ 196.271  219.131  233.240] N
+Missing atoms or failed protonation for MET   1 O (BBN) -- please check the structure
+Group (BBN) for 36803-   N     1-MET (O) [ 177.858  241.646  199.456] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1     1-MET (O) [ 177.897  240.638  199.512] H
+                 0-  H2     1-MET (O) [ 177.441  242.014  200.299] H
+             36803-   N     1-MET (O) [ 177.858  241.646  199.456] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1     1-MET (O) [ 177.897  240.638  199.512] H
+                 0-  H2     1-MET (O) [ 177.441  242.014  200.299] H
+             36803-   N     1-MET (O) [ 177.858  241.646  199.456] N
+Missing atoms or failed protonation for ASN  13 Q (BBN) -- please check the structure
+Group (BBN) for 44682-   N    13-ASN (Q) [ 170.680  255.349  208.666] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    13-ASN (Q) [ 170.472  254.648  209.363] H
+                 0-  H2    13-ASN (Q) [ 169.864  255.925  208.515] H
+             44682-   N    13-ASN (Q) [ 170.680  255.349  208.666] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    13-ASN (Q) [ 170.472  254.648  209.363] H
+                 0-  H2    13-ASN (Q) [ 169.864  255.925  208.515] H
+             44682-   N    13-ASN (Q) [ 170.680  255.349  208.666] N
+Missing atoms or failed protonation for GLY  12 U (BBN) -- please check the structure
+Group (BBN) for 60454-   N    12-GLY (U) [ 226.184  258.387  218.338] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    12-GLY (U) [ 225.663  258.919  219.021] H
+                 0-  H2    12-GLY (U) [ 225.543  257.863  217.760] H
+             60454-   N    12-GLY (U) [ 226.184  258.387  218.338] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    12-GLY (U) [ 225.663  258.919  219.021] H
+                 0-  H2    12-GLY (U) [ 225.543  257.863  217.760] H
+             60454-   N    12-GLY (U) [ 226.184  258.387  218.338] N

@@ -1,0 +1,30 @@
+Missing atoms or failed protonation for VAL  35 B (BBN) -- please check the structure
+Group (BBN) for  1904-   N    35-VAL (B) [  -2.611   10.076   -7.762] N
+Expected 2 interaction atoms for acids, found:
+              1904-   N    35-VAL (B) [  -2.611   10.076   -7.762] N
+Expected 2 interaction atoms for bases, found:
+              1904-   N    35-VAL (B) [  -2.611   10.076   -7.762] N
+Missing atoms or failed protonation for ASP 117 B (BBN) -- please check the structure
+Group (BBN) for  2554-   N   117-ASP (B) [  26.563   20.506   -9.686] N
+Expected 2 interaction atoms for acids, found:
+              2554-   N   117-ASP (B) [  26.563   20.506   -9.686] N
+Expected 2 interaction atoms for bases, found:
+              2554-   N   117-ASP (B) [  26.563   20.506   -9.686] N
+Missing atoms or failed protonation for ASP 116 C (BBN) -- please check the structure
+Group (BBN) for  4184-   N   116-ASP (C) [ -21.288  -14.989   33.117] N
+Expected 2 interaction atoms for acids, found:
+              4184-   N   116-ASP (C) [ -21.288  -14.989   33.117] N
+Expected 2 interaction atoms for bases, found:
+              4184-   N   116-ASP (C) [ -21.288  -14.989   33.117] N
+Missing atoms or failed protonation for VAL  35 D (BBN) -- please check the structure
+Group (BBN) for  5180-   N    35-VAL (D) [  36.722  -41.216   30.734] N
+Expected 2 interaction atoms for acids, found:
+              5180-   N    35-VAL (D) [  36.722  -41.216   30.734] N
+Expected 2 interaction atoms for bases, found:
+              5180-   N    35-VAL (D) [  36.722  -41.216   30.734] N
+Missing atoms or failed protonation for GLU  36 D (BBN) -- please check the structure
+Group (BBN) for  5187-   N    36-GLU (D) [  38.361  -42.766   31.926] N
+Expected 2 interaction atoms for acids, found:
+              5187-   N    36-GLU (D) [  38.361  -42.766   31.926] N
+Expected 2 interaction atoms for bases, found:
+              5187-   N    36-GLU (D) [  38.361  -42.766   31.926] N

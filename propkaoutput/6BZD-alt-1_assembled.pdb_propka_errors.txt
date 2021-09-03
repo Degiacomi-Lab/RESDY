@@ -1,0 +1,51 @@
+Missing atoms or failed protonation for ARG  19 C (ARG) -- please check the structure
+Group (ARG) for  3981-  CZ    19-ARG (C) [  44.632    7.596   33.245] C
+Expected 8 interaction atoms for acids, found:
+              3980-  NE    19-ARG (C) [  43.775    7.506   34.256] N
+              3982- NH1    19-ARG (C) [  44.209    7.983   32.051] N
+              6180- NH1    56-ARG (D) [  44.681    8.915   32.348] N
+              3983- NH2    19-ARG (C) [  45.913    7.311   33.431] N
+                 0-  HE    19-ARG (C) [  44.134    7.220   35.156] H
+                 0- HH1    19-ARG (C) [  43.703    7.604   31.263] H
+                 0-HH21    19-ARG (C) [  46.239    7.020   34.342] H
+                 0-HH22    19-ARG (C) [  46.563    7.385   32.662] H
+Expected 3 interaction atoms for bases, found:
+              3980-  NE    19-ARG (C) [  43.775    7.506   34.256] N
+              3982- NH1    19-ARG (C) [  44.209    7.983   32.051] N
+              6180- NH1    56-ARG (D) [  44.681    8.915   32.348] N
+              3983- NH2    19-ARG (C) [  45.913    7.311   33.431] N
+Missing atoms or failed protonation for GLN  16 D (AMD) -- please check the structure
+Group (AMD) for  5867-  CD    16-GLN (D) [  42.688   -9.213   24.034] C
+Expected 3 interaction atoms for acids, found:
+              5869- NE2    16-GLN (D) [  42.611   -9.885   25.215] N
+Expected 1 interaction atoms for bases, found:
+              5868- OE1    16-GLN (D) [  42.831   -9.790   22.957] O
+Missing atoms or failed protonation for ARG  56 D (ARG) -- please check the structure
+Group (ARG) for  6179-  CZ    56-ARG (D) [  45.512    9.989   32.485] C
+Expected 8 interaction atoms for acids, found:
+              6178-  NE    56-ARG (D) [  45.208   11.167   31.869] N
+              6180- NH1    56-ARG (D) [  44.681    8.915   32.348] N
+              6181- NH2    56-ARG (D) [  46.636    9.891   33.254] N
+                 0-  HE    56-ARG (D) [  45.842   11.950   31.936] H
+                 0-HH21    56-ARG (D) [  47.246   10.689   33.361] H
+                 0-HH22    56-ARG (D) [  46.858    9.021   33.716] H
+Expected 3 interaction atoms for bases, found:
+              6178-  NE    56-ARG (D) [  45.208   11.167   31.869] N
+              6180- NH1    56-ARG (D) [  44.681    8.915   32.348] N
+              6181- NH2    56-ARG (D) [  46.636    9.891   33.254] N
+Missing atoms or failed protonation for ARG 227 D (ARG) -- please check the structure
+Group (ARG) for  7564-  CZ   227-ARG (D) [  16.003    5.537    9.778] C
+Expected 8 interaction atoms for acids, found:
+              7563-  NE   227-ARG (D) [  16.558    6.397   10.682] N
+              7566- NH2   227-ARG (D) [  14.655    5.526    9.571] N
+              3661-  NZ   217-LYS (B) [  14.565    6.716   10.501] N
+              7565- NH1   227-ARG (D) [  16.807    4.677    9.087] N
+                 0-  HE   227-ARG (D) [  15.983    7.068   11.170] H
+                 0-  HZ   217-LYS (B) [  13.918    7.030   11.210] H
+                 0-HH11   227-ARG (D) [  17.805    4.683    9.243] H
+                 0-HH12   227-ARG (D) [  16.404    4.035    8.420] H
+Expected 3 interaction atoms for bases, found:
+              7563-  NE   227-ARG (D) [  16.558    6.397   10.682] N
+              7566- NH2   227-ARG (D) [  14.655    5.526    9.571] N
+              3661-  NZ   217-LYS (B) [  14.565    6.716   10.501] N
+              7565- NH1   227-ARG (D) [  16.807    4.677    9.087] N

@@ -1,0 +1,49 @@
+Unexpected number (5) of atoms in residue ARG 134 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  12 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 122 C   in conformation 1A
+Unexpected number (5) of atoms in residue ASN 523 D   in conformation 1A
+Unexpected number (5) of atoms in residue GLN 594 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 620 D   in conformation 1A
+Unexpected number (5) of atoms in residue SER 623 D   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 624 D   in conformation 1A
+Unexpected number (5) of atoms in residue THR 625 D   in conformation 1A
+Unexpected number (5) of atoms in residue LEU 626 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 627 D   in conformation 1A
+Unexpected number (5) of atoms in residue THR 628 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 629 D   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 630 D   in conformation 1A
+Unexpected number (5) of atoms in residue LEU 632 D   in conformation 1A
+Unexpected number (5) of atoms in residue GLN 640 D   in conformation 1A
+Unexpected number (7) of atoms in residue ARG 646 D   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 647 D   in conformation 1A
+Unexpected number (5) of atoms in residue SER 669 D   in conformation 1A
+Missing atoms or failed protonation for LYS  12 B (BBN) -- please check the structure
+Group (BBN) for   623-   N    12-LYS (B) [ 142.707  -47.247  119.102] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    12-LYS (B) [ 142.471  -47.129  120.077] H
+                 0-  H2    12-LYS (B) [ 142.005  -47.817  118.653] H
+               623-   N    12-LYS (B) [ 142.707  -47.247  119.102] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    12-LYS (B) [ 142.471  -47.129  120.077] H
+                 0-  H2    12-LYS (B) [ 142.005  -47.817  118.653] H
+               623-   N    12-LYS (B) [ 142.707  -47.247  119.102] N
+Missing atoms or failed protonation for ASP  68 C (BBN) -- please check the structure
+Group (BBN) for  1335-   N    68-ASP (C) [ 135.975  -37.415   73.799] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    68-ASP (C) [ 136.069  -38.109   73.072] H
+                 0-  H2    68-ASP (C) [ 136.804  -36.838   73.823] H
+              1335-   N    68-ASP (C) [ 135.975  -37.415   73.799] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    68-ASP (C) [ 136.069  -38.109   73.072] H
+                 0-  H2    68-ASP (C) [ 136.804  -36.838   73.823] H
+              1335-   N    68-ASP (C) [ 135.975  -37.415   73.799] N
+Missing atoms or failed protonation for LYS 521 D (BBN) -- please check the structure
+Group (BBN) for  1780-   N   521-LYS (D) [ 114.781  -53.493   89.653] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   521-LYS (D) [ 114.776  -53.510   90.663] H
+                 0-  H2   521-LYS (D) [ 115.452  -54.165   89.309] H
+              1780-   N   521-LYS (D) [ 114.781  -53.493   89.653] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   521-LYS (D) [ 114.776  -53.510   90.663] H
+                 0-  H2   521-LYS (D) [ 115.452  -54.165   89.309] H
+              1780-   N   521-LYS (D) [ 114.781  -53.493   89.653] N

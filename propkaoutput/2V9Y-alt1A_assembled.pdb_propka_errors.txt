@@ -1,0 +1,14 @@
+Missing atoms or failed protonation for ARG 751 A (ARG) -- please check the structure
+Group (ARG) for  2065-  CZ   751-ARG (A) [  27.457  -16.452   24.407] C
+Expected 8 interaction atoms for acids, found:
+              2064-  NE   751-ARG (A) [  27.698  -17.303   23.366] N
+              2067- NH2   751-ARG (A) [  28.347  -15.460   24.701] N
+              2066- NH1   751-ARG (A) [  26.325  -16.587   25.155] N
+                 0-  HE   751-ARG (A) [  28.513  -17.167   22.784] H
+                 0-HH21   751-ARG (A) [  29.186  -15.355   24.149] H
+                 0-HH22   751-ARG (A) [  28.167  -14.831   25.470] H
+                 0- HH1   751-ARG (A) [  25.830  -17.432   24.907] H
+Expected 3 interaction atoms for bases, found:
+              2064-  NE   751-ARG (A) [  27.698  -17.303   23.366] N
+              2067- NH2   751-ARG (A) [  28.347  -15.460   24.701] N
+              2066- NH1   751-ARG (A) [  26.325  -16.587   25.155] N

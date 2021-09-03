@@ -1,0 +1,33 @@
+Missing atoms or failed protonation for ARG  18 A (ARG) -- please check the structure
+Group (ARG) for   141-  CZ    18-ARG (A) [ -31.241    7.555  -18.041] C
+Expected 8 interaction atoms for acids, found:
+               142- NH1    18-ARG (A) [ -32.050    7.539  -19.141] N
+               140-  NE    18-ARG (A) [ -30.583    6.420  -17.665] N
+               143- NH2    18-ARG (A) [ -31.094    8.703  -17.316] N
+                 0-HH11    18-ARG (A) [ -32.159    6.689  -19.675] H
+                 0-HH12    18-ARG (A) [ -32.539    8.377  -19.420] H
+                 0-  HE    18-ARG (A) [ -29.995    6.427  -16.844] H
+Expected 3 interaction atoms for bases, found:
+               142- NH1    18-ARG (A) [ -32.050    7.539  -19.141] N
+               140-  NE    18-ARG (A) [ -30.583    6.420  -17.665] N
+               143- NH2    18-ARG (A) [ -31.094    8.703  -17.316] N
+Missing atoms or failed protonation for GLY 417 C (BBN) -- please check the structure
+Group (BBN) for  3686-   N   417-GLY (C) [ -17.842    5.011    8.353] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   417-GLY (C) [ -18.267    4.102    8.466] H
+                 0-  H2   417-GLY (C) [ -18.326    5.521    7.628] H
+              3686-   N   417-GLY (C) [ -17.842    5.011    8.353] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   417-GLY (C) [ -18.267    4.102    8.466] H
+                 0-  H2   417-GLY (C) [ -18.326    5.521    7.628] H
+              3686-   N   417-GLY (C) [ -17.842    5.011    8.353] N
+Missing atoms or failed protonation for GLY 421 D (BBN) -- please check the structure
+Group (BBN) for  3781-   N   421-GLY (D) [ -30.088  -22.750  -24.839] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   421-GLY (D) [ -29.858  -23.589  -24.326] H
+                 0-  H2   421-GLY (D) [ -29.305  -22.485  -25.420] H
+              3781-   N   421-GLY (D) [ -30.088  -22.750  -24.839] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   421-GLY (D) [ -29.858  -23.589  -24.326] H
+                 0-  H2   421-GLY (D) [ -29.305  -22.485  -25.420] H
+              3781-   N   421-GLY (D) [ -30.088  -22.750  -24.839] N

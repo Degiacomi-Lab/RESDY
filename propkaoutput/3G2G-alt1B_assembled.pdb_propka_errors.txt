@@ -1,0 +1,725 @@
+Unexpected number (18) of atoms in residue GLN  14 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  15 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN  16 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN  17 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU  18 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS  19 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  20 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  21 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET  22 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  23 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP  24 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  25 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE  26 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU  27 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU  28 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS  29 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET  30 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS  31 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG  32 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU  33 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP  34 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  35 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP  36 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER  37 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO  38 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO  39 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  40 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  41 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  42 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG  43 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN  44 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  45 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY  46 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  47 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  48 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS  49 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  50 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  51 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY  52 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO  53 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  54 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER  55 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG  56 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER  57 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL  58 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU  59 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  60 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU  61 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS  62 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU  63 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET  64 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  65 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS  66 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER  67 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY  68 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET  69 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN  70 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL  71 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  72 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG  73 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU  74 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN  75 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE  76 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER  77 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS  78 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY  79 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  80 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS  81 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU  82 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR  83 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS  84 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  85 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU  86 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  87 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE  88 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS  89 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN  90 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL  91 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG  92 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  93 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  94 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR  95 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU  96 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER  97 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE  98 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA  99 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 100 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 101 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 102 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 103 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 104 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 105 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 106 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 107 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 108 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 109 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 110 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 111 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 112 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 113 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 114 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 115 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 116 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 117 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 118 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 119 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 120 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 121 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 122 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 123 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 124 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 125 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 126 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 127 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 128 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 129 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 130 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 131 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 132 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 133 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 134 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 135 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 136 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 137 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 138 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 139 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 140 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 141 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 142 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 143 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 144 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 145 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 146 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 147 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 148 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 149 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 150 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 151 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 152 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 153 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 154 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 155 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 156 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 157 D   in conformation 1A
+Unexpected number (28) of atoms in residue TRP 158 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 159 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 160 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 161 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 162 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 163 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 164 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 165 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 166 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 167 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 168 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 169 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 170 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 171 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 172 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 173 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 174 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 175 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 176 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 177 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 178 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 179 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 180 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 181 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 182 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 183 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 184 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 185 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 186 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 187 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 188 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 189 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 190 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 191 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 192 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 193 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 194 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 195 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 196 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 197 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 198 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 199 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 200 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 201 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 202 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 203 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 204 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 205 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 206 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 207 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 208 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 209 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 210 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 211 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 212 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 213 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 214 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 215 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 216 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 217 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 218 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 219 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 220 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 221 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 222 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 223 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 224 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 225 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 226 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 227 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 228 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 229 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 230 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 231 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 232 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 233 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 234 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 235 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 236 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 237 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 238 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 239 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 240 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 241 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 242 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 243 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 244 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 245 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 246 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 247 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 248 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 249 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 250 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 251 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS 252 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 253 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 254 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 255 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 256 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 257 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 258 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 259 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 260 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 261 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 262 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 263 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 264 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 265 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 266 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 267 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 268 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 269 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 270 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 271 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 272 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 273 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS 274 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 275 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 276 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 277 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 278 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 279 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 280 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 281 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 282 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 283 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 284 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 285 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 286 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 287 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 288 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 289 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 290 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 291 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 292 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 293 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 294 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 295 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 296 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 297 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 298 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 299 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 300 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 301 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 302 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 303 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 304 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 305 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 306 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 307 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 308 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 309 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 310 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 311 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 312 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 313 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 314 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 315 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 316 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 317 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 318 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 319 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 320 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 321 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 322 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 323 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 324 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 325 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 326 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 327 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 328 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 329 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 330 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 331 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 332 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 333 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 334 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 335 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 336 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 337 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 338 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 339 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 340 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 341 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 342 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 343 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 344 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 345 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 346 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 347 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 348 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 349 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 350 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 351 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 352 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 353 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 354 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 355 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 356 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 357 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 358 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 359 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 360 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 361 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 362 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 363 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 364 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 365 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 366 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 367 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 368 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 369 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 370 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 371 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 372 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 373 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 374 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 375 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 376 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 377 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 378 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS 379 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 380 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 381 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 382 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 383 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 384 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 385 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 386 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 387 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 388 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 389 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 390 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS 391 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 392 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 393 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 394 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 395 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 396 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 397 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 398 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 399 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 400 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 401 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 402 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 403 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 404 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 405 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 406 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 407 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 408 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 409 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 410 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 411 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 412 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 413 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 414 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 415 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 416 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 417 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 418 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 419 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 420 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 421 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 422 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 423 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 424 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 425 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 426 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 427 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 428 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 429 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 430 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 431 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 432 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 433 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 434 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 435 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 436 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 437 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 438 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS 439 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 440 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 441 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 442 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 443 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 444 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 445 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 446 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 447 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 448 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 449 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 450 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 451 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 452 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 453 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 454 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 455 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 456 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 457 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 458 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 459 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 460 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 461 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 462 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 463 D   in conformation 1A
+Unexpected number (20) of atoms in residue HIS 464 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 465 D   in conformation 1A
+Unexpected number (24) of atoms in residue TYR 466 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 467 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 468 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 469 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 470 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 471 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 472 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 473 D   in conformation 1A
+Unexpected number (12) of atoms in residue CYS 474 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 475 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 476 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 477 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 478 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLN 479 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 480 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 481 D   in conformation 1A
+Unexpected number (28) of atoms in residue TRP 482 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 483 D   in conformation 1A
+Unexpected number (18) of atoms in residue GLU 484 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 485 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 486 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 487 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 488 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 489 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 490 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 491 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 492 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 493 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 494 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 495 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 496 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 497 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 498 D   in conformation 1A
+Unexpected number (10) of atoms in residue ALA 499 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 500 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 501 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 502 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 503 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 504 D   in conformation 1A
+Unexpected number (18) of atoms in residue LYS 505 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 506 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASP 507 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 508 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 509 D   in conformation 1A
+Unexpected number (16) of atoms in residue ILE 510 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 511 D   in conformation 1A
+Unexpected number (16) of atoms in residue LEU 512 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 513 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 514 D   in conformation 1A
+Unexpected number (28) of atoms in residue TRP 515 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 516 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 517 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 518 D   in conformation 1A
+Unexpected number (12) of atoms in residue SER 519 D   in conformation 1A
+Unexpected number (8) of atoms in residue GLY 520 D   in conformation 1A
+Unexpected number (22) of atoms in residue PHE 521 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 522 D   in conformation 1A
+Unexpected number (16) of atoms in residue ASN 523 D   in conformation 1A
+Unexpected number (14) of atoms in residue THR 524 D   in conformation 1A
+Unexpected number (16) of atoms in residue MET 525 D   in conformation 1A
+Unexpected number (22) of atoms in residue ARG 526 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 527 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 528 D   in conformation 1A
+Unexpected number (14) of atoms in residue PRO 529 D   in conformation 1A
+Unexpected number (14) of atoms in residue VAL 530 D   in conformation 1A
+Unexpected number (16) of atoms in residue PRO 531 D   in conformation 1A
+Missing atoms or failed protonation for THR 522 C (BBN) -- please check the structure
+Group (BBN) for  3895-   N   522-THR (C) [  19.773   17.237   50.224] N
+Expected 2 interaction atoms for acids, found:
+              3895-   N   522-THR (C) [  19.773   17.237   50.224] N
+Expected 2 interaction atoms for bases, found:
+              3895-   N   522-THR (C) [  19.773   17.237   50.224] N
+Missing atoms or failed protonation for VAL 527 C (BBN) -- please check the structure
+Group (BBN) for  3936-   N   527-VAL (C) [  15.965   24.585   37.033] N
+Expected 2 interaction atoms for acids, found:
+              3936-   N   527-VAL (C) [  15.965   24.585   37.033] N
+Expected 2 interaction atoms for bases, found:
+              3936-   N   527-VAL (C) [  15.965   24.585   37.033] N
+His group does not seem to contain a ring Group (HIS) for  5965-  CG   274-HIS (D) [  -9.936   -8.516   52.507] C
+Missing atoms or failed protonation for HIS 274 D (HIS) -- please check the structure
+Group (HIS) for  5965-  CG   274-HIS (D) [  -9.936   -8.516   52.507] C
+Expected 4 interaction atoms for acids, found:
+              5964- ND1   274-HIS (D) [  -8.789   -9.229   52.244] N
+Expected 2 interaction atoms for bases, found:
+              5964- ND1   274-HIS (D) [  -8.789   -9.229   52.244] N
+Missing atoms or failed protonation for GLU 304 D (COO) -- please check the structure
+Group (COO) for  6194-  CD   304-GLU (D) [ -13.083    4.613   52.842] C
+Expected 2 interaction atoms for acids, found:
+              6195- OE1   304-GLU (D) [ -14.175    4.048   53.119] O
+             10770- OE2   384-GLU (D) [ -12.682    4.591   53.262] O
+              6196- OE2   304-GLU (D) [ -12.048    4.527   53.554] O
+Expected 2 interaction atoms for bases, found:
+              6195- OE1   304-GLU (D) [ -14.175    4.048   53.119] O
+             10770- OE2   384-GLU (D) [ -12.682    4.591   53.262] O
+              6196- OE2   304-GLU (D) [ -12.048    4.527   53.554] O
+Missing atoms or failed protonation for ALA 309 D (BBN) -- please check the structure
+Group (BBN) for  6234-   N   309-ALA (D) [ -12.411   -2.763   43.895] N
+Expected 2 interaction atoms for acids, found:
+              6234-   N   309-ALA (D) [ -12.411   -2.763   43.895] N
+Expected 2 interaction atoms for bases, found:
+              6234-   N   309-ALA (D) [ -12.411   -2.763   43.895] N
+Missing atoms or failed protonation for MET 312 D (BBN) -- please check the structure
+Group (BBN) for  6257-   N   312-MET (D) [ -11.610   -4.041   39.369] N
+Expected 2 interaction atoms for acids, found:
+              6257-   N   312-MET (D) [ -11.610   -4.041   39.369] N
+Expected 2 interaction atoms for bases, found:
+              6257-   N   312-MET (D) [ -11.610   -4.041   39.369] N
+Missing atoms or failed protonation for MET 313 D (BBN) -- please check the structure
+Group (BBN) for  6265-   N   313-MET (D) [ -12.595   -6.648   39.419] N
+Expected 2 interaction atoms for acids, found:
+              6265-   N   313-MET (D) [ -12.595   -6.648   39.419] N
+Expected 2 interaction atoms for bases, found:
+              6265-   N   313-MET (D) [ -12.595   -6.648   39.419] N
+Missing atoms or failed protonation for GLY 315 D (BBN) -- please check the structure
+Group (BBN) for  6281-   N   315-GLY (D) [ -12.787   -6.066   35.170] N
+Expected 2 interaction atoms for acids, found:
+              6281-   N   315-GLY (D) [ -12.787   -6.066   35.170] N
+Expected 2 interaction atoms for bases, found:
+              6281-   N   315-GLY (D) [ -12.787   -6.066   35.170] N
+Missing atoms or failed protonation for ARG 316 D (BBN) -- please check the structure
+Group (BBN) for  6285-   N   316-ARG (D) [ -11.151   -8.321   35.131] N
+Expected 2 interaction atoms for acids, found:
+              6285-   N   316-ARG (D) [ -11.151   -8.321   35.131] N
+Expected 2 interaction atoms for bases, found:
+              6285-   N   316-ARG (D) [ -11.151   -8.321   35.131] N
+Missing atoms or failed protonation for ARG 316 D (ARG) -- please check the structure
+Group (ARG) for  6291-  CZ   316-ARG (D) [  -6.670   -9.843   39.846] C
+Expected 8 interaction atoms for acids, found:
+              6290-  NE   316-ARG (D) [  -7.335   -9.504   38.704] N
+              6292- NH1   316-ARG (D) [  -7.080  -10.919   40.579] N
+              6293- NH2   316-ARG (D) [  -5.593   -9.109   40.253] N
+                 0-HH11   316-ARG (D) [  -7.876  -11.462   40.277] H
+                 0-HH12   316-ARG (D) [  -6.587  -11.172   41.423] H
+                 0- HH2   316-ARG (D) [  -5.421   -9.139   41.248] H
+Expected 3 interaction atoms for bases, found:
+              6290-  NE   316-ARG (D) [  -7.335   -9.504   38.704] N
+              6292- NH1   316-ARG (D) [  -7.080  -10.919   40.579] N
+              6293- NH2   316-ARG (D) [  -5.593   -9.109   40.253] N
+Missing atoms or failed protonation for GLN 329 D (AMD) -- please check the structure
+Group (AMD) for  6383-  CD   329-GLN (D) [ -26.465    0.825   49.234] C
+Expected 3 interaction atoms for acids, found:
+              6385- NE2   329-GLN (D) [ -26.726    0.461   50.518] N
+Expected 1 interaction atoms for bases, found:
+              6384- OE1   329-GLN (D) [ -25.554    1.596   48.938] O
+Missing atoms or failed protonation for ASN 350 D (AMD) -- please check the structure
+Group (AMD) for  6543-  CG   350-ASN (D) [ -19.448    5.799   36.316] C
+Expected 3 interaction atoms for acids, found:
+              6545- ND2   350-ASN (D) [ -19.867    6.475   37.420] N
+                 0- HD2   350-ASN (D) [ -20.773    6.806   37.121] H
+Expected 1 interaction atoms for bases, found:
+              6544- OD1   350-ASN (D) [ -19.037    6.373   35.309] O
+Missing atoms or failed protonation for CYS  31 D (BBN) -- please check the structure
+Group (BBN) for  8079-   N    31-CYS (D) [ -10.915   -5.696   39.136] N
+Expected 2 interaction atoms for acids, found:
+              8079-   N    31-CYS (D) [ -10.915   -5.696   39.136] N
+Expected 2 interaction atoms for bases, found:
+              8079-   N    31-CYS (D) [ -10.915   -5.696   39.136] N
+Missing atoms or failed protonation for ARG  32 D (BBN) -- please check the structure
+Group (BBN) for  8085-   N    32-ARG (D) [  -9.029   -6.379   40.943] N
+Expected 2 interaction atoms for acids, found:
+              8085-   N    32-ARG (D) [  -9.029   -6.379   40.943] N
+Expected 2 interaction atoms for bases, found:
+              8085-   N    32-ARG (D) [  -9.029   -6.379   40.943] N
+Missing atoms or failed protonation for ARG  32 D (ARG) -- please check the structure
+Group (ARG) for  8091-  CZ    32-ARG (D) [  -3.042   -8.143   38.722] C
+Expected 8 interaction atoms for acids, found:
+              8090-  NE    32-ARG (D) [  -4.301   -7.989   39.229] N
+              8093- NH2    32-ARG (D) [  -2.717   -9.281   38.041] N
+              8092- NH1    32-ARG (D) [  -2.107   -7.167   38.905] N
+                 0-HH21    32-ARG (D) [  -3.408  -10.005   37.909] H
+                 0-HH22    32-ARG (D) [  -1.785   -9.398   37.669] H
+                 0-HH11    32-ARG (D) [  -2.346   -6.327   39.412] H
+                 0-HH12    32-ARG (D) [  -1.175   -7.284   38.533] H
+Expected 3 interaction atoms for bases, found:
+              8090-  NE    32-ARG (D) [  -4.301   -7.989   39.229] N
+              8093- NH2    32-ARG (D) [  -2.717   -9.281   38.041] N
+              8092- NH1    32-ARG (D) [  -2.107   -7.167   38.905] N
+Missing atoms or failed protonation for ASP  36 D (BBN) -- please check the structure
+Group (BBN) for  8120-   N    36-ASP (D) [  -9.762   -5.330   51.759] N
+Expected 2 interaction atoms for acids, found:
+              8120-   N    36-ASP (D) [  -9.762   -5.330   51.759] N
+Expected 2 interaction atoms for bases, found:
+              8120-   N    36-ASP (D) [  -9.762   -5.330   51.759] N
+Missing atoms or failed protonation for SER  37 D (BBN) -- please check the structure
+Group (BBN) for  8128-   N    37-SER (D) [  -7.302   -3.999   51.574] N
+Expected 2 interaction atoms for acids, found:
+              8128-   N    37-SER (D) [  -7.302   -3.999   51.574] N
+Expected 2 interaction atoms for bases, found:
+              8128-   N    37-SER (D) [  -7.302   -3.999   51.574] N
+Missing atoms or failed protonation for ARG 319 D (ARG) -- please check the structure
+Group (ARG) for 10287-  CZ   319-ARG (D) [ -10.297   17.157   26.127] C
+Expected 8 interaction atoms for acids, found:
+             10286-  NE   319-ARG (D) [  -9.374   17.223   27.131] N
+             10288- NH1   319-ARG (D) [ -11.509   16.572   26.355] N
+             10289- NH2   319-ARG (D) [ -10.012   17.680   24.899] N
+                 0-  HE   319-ARG (D) [  -8.473   17.650   26.968] H
+                 0- HH1   319-ARG (D) [ -11.944   16.273   27.216] H
+                 0-HH21   319-ARG (D) [  -9.116   18.115   24.731] H
+                 0-HH22   319-ARG (D) [ -10.697   17.632   24.158] H
+Expected 3 interaction atoms for bases, found:
+             10286-  NE   319-ARG (D) [  -9.374   17.223   27.131] N
+             10288- NH1   319-ARG (D) [ -11.509   16.572   26.355] N
+             10289- NH2   319-ARG (D) [ -10.012   17.680   24.899] N
+Missing atoms or failed protonation for ARG 339 D (ARG) -- please check the structure
+Group (ARG) for 10437-  CZ   339-ARG (D) [ -23.628    3.061   61.861] C
+Expected 8 interaction atoms for acids, found:
+             10436-  NE   339-ARG (D) [ -23.507    3.903   60.793] N
+             10438- NH1   339-ARG (D) [ -24.703    2.225   61.966] N
+             10439- NH2   339-ARG (D) [ -22.668    3.059   62.831] N
+                 0-  HE   339-ARG (D) [ -22.718    4.532   60.746] H
+                 0- HH1   339-ARG (D) [ -24.849    1.459   62.608] H
+                 0- HH2   339-ARG (D) [ -22.298    3.969   63.064] H
+Expected 3 interaction atoms for bases, found:
+             10436-  NE   339-ARG (D) [ -23.507    3.903   60.793] N
+             10438- NH1   339-ARG (D) [ -24.703    2.225   61.966] N
+             10439- NH2   339-ARG (D) [ -22.668    3.059   62.831] N
+Missing atoms or failed protonation for ARG 342 D (ARG) -- please check the structure
+Group (ARG) for 10462-  CZ   342-ARG (D) [ -25.111    0.811   53.093] C
+Expected 8 interaction atoms for acids, found:
+             10461-  NE   342-ARG (D) [ -24.984    1.080   51.761] N
+             10463- NH1   342-ARG (D) [ -25.470   -0.439   53.507] N
+             10464- NH2   342-ARG (D) [ -24.888    1.800   54.007] N
+                 0-  HE   342-ARG (D) [ -24.729    2.008   51.455] H
+                 0- HH1   342-ARG (D) [ -25.835   -1.124   52.861] H
+                 0-HH21   342-ARG (D) [ -24.626    2.725   53.697] H
+                 0-HH22   342-ARG (D) [ -24.985    1.607   54.994] H
+Expected 3 interaction atoms for bases, found:
+             10461-  NE   342-ARG (D) [ -24.984    1.080   51.761] N
+             10463- NH1   342-ARG (D) [ -25.470   -0.439   53.507] N
+             10464- NH2   342-ARG (D) [ -24.888    1.800   54.007] N
+Missing atoms or failed protonation for ASN 350 D (AMD) -- please check the structure
+Group (AMD) for 10514-  CG   350-ASN (D) [ -18.609    7.465   39.640] C
+Expected 3 interaction atoms for acids, found:
+             10516- ND2   350-ASN (D) [ -19.783    7.119   39.050] N
+                 0- HD2   350-ASN (D) [ -20.641    7.237   39.570] H
+Expected 1 interaction atoms for bases, found:
+             10515- OD1   350-ASN (D) [ -17.572    7.652   39.005] O
+Missing atoms or failed protonation for GLU 384 D (COO) -- please check the structure
+Group (COO) for 10768-  CD   384-GLU (D) [ -11.607    4.356   52.651] C
+Expected 2 interaction atoms for acids, found:
+              6196- OE2   304-GLU (D) [ -12.048    4.527   53.554] O
+             10769- OE1   384-GLU (D) [ -10.509    4.914   52.917] O
+             10770- OE2   384-GLU (D) [ -12.682    4.591   53.262] O
+Expected 2 interaction atoms for bases, found:
+              6196- OE2   304-GLU (D) [ -12.048    4.527   53.554] O
+             10769- OE1   384-GLU (D) [ -10.509    4.914   52.917] O
+             10770- OE2   384-GLU (D) [ -12.682    4.591   53.262] O
+Missing atoms or failed protonation for ASN 523 D (AMD) -- please check the structure
+Group (AMD) for 11847-  CG   523-ASN (D) [  13.737   25.874   36.918] C
+Expected 3 interaction atoms for acids, found:
+             11849- ND2   523-ASN (D) [  14.295   26.764   36.053] N
+Expected 1 interaction atoms for bases, found:
+             11848- OD1   523-ASN (D) [  12.541   25.891   37.203] O
+Missing atoms or failed protonation for THR 524 D (BBN) -- please check the structure
+Group (BBN) for 11852-   N   524-THR (D) [  14.862   23.168   40.832] N
+Expected 2 interaction atoms for acids, found:
+             11852-   N   524-THR (D) [  14.862   23.168   40.832] N
+Expected 2 interaction atoms for bases, found:
+             11852-   N   524-THR (D) [  14.862   23.168   40.832] N
+Missing atoms or failed protonation for ARG 526 D (ARG) -- please check the structure
+Group (ARG) for 11873-  CZ   526-ARG (D) [  19.632   18.459   49.021] C
+Expected 8 interaction atoms for acids, found:
+             11875- NH2   526-ARG (D) [  20.719   17.657   49.223] N
+             11872-  NE   526-ARG (D) [  19.098   18.583   47.771] N
+             11874- NH1   526-ARG (D) [  19.068   19.121   50.073] N
+              3895-   N   522-THR (C) [  19.773   17.237   50.224] N
+                 0-HH11   526-ARG (D) [  18.659   18.601   50.836] H
+                 0-HH12   526-ARG (D) [  19.060   20.131   50.088] H
+Expected 3 interaction atoms for bases, found:
+             11875- NH2   526-ARG (D) [  20.719   17.657   49.223] N
+             11872-  NE   526-ARG (D) [  19.098   18.583   47.771] N
+             11874- NH1   526-ARG (D) [  19.068   19.121   50.073] N
+              3895-   N   522-THR (C) [  19.773   17.237   50.224] N

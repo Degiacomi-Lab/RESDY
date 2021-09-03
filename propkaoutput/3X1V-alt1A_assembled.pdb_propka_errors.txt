@@ -1,0 +1,20 @@
+Missing atoms or failed protonation for ARG  27 F (BBN) -- please check the structure
+Group (BBN) for  8234-   N    27-ARG (F) [ -25.667  -32.102  -15.762] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    27-ARG (F) [ -25.691  -32.259  -14.765] H
+                 0-  H2    27-ARG (F) [ -24.915  -32.640  -16.169] H
+              8234-   N    27-ARG (F) [ -25.667  -32.102  -15.762] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    27-ARG (F) [ -25.691  -32.259  -14.765] H
+                 0-  H2    27-ARG (F) [ -24.915  -32.640  -16.169] H
+              8234-   N    27-ARG (F) [ -25.667  -32.102  -15.762] N
+Missing atoms or failed protonation for CYS  32 J (BBN) -- please check the structure
+Group (BBN) for 11388-   N    32-CYS (J) [  38.827  -18.081   -9.971] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-CYS (J) [  38.935  -18.997   -9.558] H
+                 0-  H2    32-CYS (J) [  38.102  -17.575   -9.482] H
+             11388-   N    32-CYS (J) [  38.827  -18.081   -9.971] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-CYS (J) [  38.935  -18.997   -9.558] H
+                 0-  H2    32-CYS (J) [  38.102  -17.575   -9.482] H
+             11388-   N    32-CYS (J) [  38.827  -18.081   -9.971] N

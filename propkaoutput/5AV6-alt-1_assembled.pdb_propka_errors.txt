@@ -1,0 +1,50 @@
+Missing atoms or failed protonation for VAL  21 B (BBN) -- please check the structure
+Group (BBN) for   816-   N    21-VAL (B) [  53.822  108.765   60.130] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    21-VAL (B) [  53.992  107.772   60.057] H
+                 0-  H2    21-VAL (B) [  54.522  109.183   60.726] H
+               816-   N    21-VAL (B) [  53.822  108.765   60.130] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    21-VAL (B) [  53.992  107.772   60.057] H
+                 0-  H2    21-VAL (B) [  54.522  109.183   60.726] H
+               816-   N    21-VAL (B) [  53.822  108.765   60.130] N
+Missing atoms or failed protonation for LYS  13 C (BBN) -- please check the structure
+Group (BBN) for  1468-   N    13-LYS (C) [  -1.281  101.384   10.713] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    13-LYS (C) [  -0.891  100.685   11.330] H
+                 0-  H2    13-LYS (C) [  -0.549  101.765   10.131] H
+              1468-   N    13-LYS (C) [  -1.281  101.384   10.713] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    13-LYS (C) [  -0.891  100.685   11.330] H
+                 0-  H2    13-LYS (C) [  -0.549  101.765   10.131] H
+              1468-   N    13-LYS (C) [  -1.281  101.384   10.713] N
+Missing atoms or failed protonation for ARG  29 D (BBN) -- please check the structure
+Group (BBN) for  2287-   N    29-ARG (D) [ -15.627  135.084   18.220] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    29-ARG (D) [ -16.070  135.172   19.123] H
+                 0-  H2    29-ARG (D) [ -16.058  134.329   17.706] H
+              2287-   N    29-ARG (D) [ -15.627  135.084   18.220] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    29-ARG (D) [ -16.070  135.172   19.123] H
+                 0-  H2    29-ARG (D) [ -16.058  134.329   17.706] H
+              2287-   N    29-ARG (D) [ -15.627  135.084   18.220] N
+Missing atoms or failed protonation for ARG  17 F (BBN) -- please check the structure
+Group (BBN) for  3868-   N    17-ARG (F) [ -15.104  160.359   37.948] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    17-ARG (F) [ -15.221  159.472   37.479] H
+                 0-  H2    17-ARG (F) [ -14.367  160.882   37.498] H
+              3868-   N    17-ARG (F) [ -15.104  160.359   37.948] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    17-ARG (F) [ -15.221  159.472   37.479] H
+                 0-  H2    17-ARG (F) [ -14.367  160.882   37.498] H
+              3868-   N    17-ARG (F) [ -15.104  160.359   37.948] N
+Missing atoms or failed protonation for ARG  31 H (BBN) -- please check the structure
+Group (BBN) for  5372-   N    31-ARG (H) [  46.780  125.095   16.111] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    31-ARG (H) [  46.871  124.105   15.932] H
+                 0-  H2    31-ARG (H) [  47.696  125.520   16.127] H
+              5372-   N    31-ARG (H) [  46.780  125.095   16.111] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    31-ARG (H) [  46.871  124.105   15.932] H
+                 0-  H2    31-ARG (H) [  47.696  125.520   16.127] H
+              5372-   N    31-ARG (H) [  46.780  125.095   16.111] N

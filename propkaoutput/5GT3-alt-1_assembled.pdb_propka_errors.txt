@@ -1,0 +1,34 @@
+Missing atoms or failed protonation for ARG  31 D (BBN) -- please check the structure
+Group (BBN) for  2271-   N    31-ARG (D) [  12.208   21.359  -22.387] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    31-ARG (D) [  12.413   22.089  -21.720] H
+                 0-  H2    31-ARG (D) [  11.430   21.641  -22.966] H
+              2271-   N    31-ARG (D) [  12.208   21.359  -22.387] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    31-ARG (D) [  12.413   22.089  -21.720] H
+                 0-  H2    31-ARG (D) [  11.430   21.641  -22.966] H
+              2271-   N    31-ARG (D) [  12.208   21.359  -22.387] N
+Missing atoms or failed protonation for ARG 131 E (ARG) -- please check the structure
+Group (ARG) for  3803-  CZ   131-ARG (E) [ -14.270   23.848  -55.925] C
+Expected 8 interaction atoms for acids, found:
+              3804- NH1   131-ARG (E) [ -14.480   22.904  -56.797] N
+              3805- NH2   131-ARG (E) [ -13.118   23.910  -55.315] N
+              3802-  NE   131-ARG (E) [ -15.206   24.736  -55.651] N
+                 0- HH1   131-ARG (E) [ -13.506   22.733  -57.001] H
+                 0-HH21   131-ARG (E) [ -12.400   23.231  -55.522] H
+                 0-HH22   131-ARG (E) [ -12.945   24.637  -54.636] H
+                 0-  HE   131-ARG (E) [ -14.979   25.456  -54.980] H
+Expected 3 interaction atoms for bases, found:
+              3804- NH1   131-ARG (E) [ -14.480   22.904  -56.797] N
+              3805- NH2   131-ARG (E) [ -13.118   23.910  -55.315] N
+              3802-  NE   131-ARG (E) [ -15.206   24.736  -55.651] N
+Missing atoms or failed protonation for LYS  34 H (BBN) -- please check the structure
+Group (BBN) for  5313-   N    34-LYS (H) [ -41.622   21.761  -20.369] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    34-LYS (H) [ -41.994   20.863  -20.096] H
+                 0-  H2    34-LYS (H) [ -42.327   22.278  -20.875] H
+              5313-   N    34-LYS (H) [ -41.622   21.761  -20.369] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    34-LYS (H) [ -41.994   20.863  -20.096] H
+                 0-  H2    34-LYS (H) [ -42.327   22.278  -20.875] H
+              5313-   N    34-LYS (H) [ -41.622   21.761  -20.369] N

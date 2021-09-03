@@ -1,0 +1,52 @@
+Missing atoms or failed protonation for LEU 175 A (BBN) -- please check the structure
+Group (BBN) for  1224-   N   175-LEU (A) [  24.765    1.364   71.888] N
+Expected 2 interaction atoms for acids, found:
+              1224-   N   175-LEU (A) [  24.765    1.364   71.888] N
+Expected 2 interaction atoms for bases, found:
+              1224-   N   175-LEU (A) [  24.765    1.364   71.888] N
+His group does not seem to contain a ring Group (HIS) for  2444-  CG    87-HIS (B) [  27.189   -1.863   71.369] C
+Missing atoms or failed protonation for HIS  87 B (HIS) -- please check the structure
+Group (HIS) for  2444-  CG    87-HIS (B) [  27.189   -1.863   71.369] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for ARG 104 B (ARG) -- please check the structure
+Group (ARG) for  2600-  CZ   104-ARG (B) [  13.220  -14.785   70.866] C
+Expected 8 interaction atoms for acids, found:
+              2601- NH1   104-ARG (B) [  13.010  -13.588   71.483] N
+              2602- NH2   104-ARG (B) [  12.160  -15.515   70.409] N
+              2599-  NE   104-ARG (B) [  14.492  -15.253   70.706] N
+                 0-HH21   104-ARG (B) [  11.219  -15.168   70.528] H
+                 0-HH22   104-ARG (B) [  12.317  -16.402   69.952] H
+                 0-  HE   104-ARG (B) [  14.648  -16.146   70.261] H
+Expected 3 interaction atoms for bases, found:
+              2601- NH1   104-ARG (B) [  13.010  -13.588   71.483] N
+              2602- NH2   104-ARG (B) [  12.160  -15.515   70.409] N
+              2599-  NE   104-ARG (B) [  14.492  -15.253   70.706] N
+Missing atoms or failed protonation for LEU 106 B (BBN) -- please check the structure
+Group (BBN) for  2613-   N   106-LEU (B) [  21.448  -13.070   71.771] N
+Expected 2 interaction atoms for acids, found:
+              2613-   N   106-LEU (B) [  21.448  -13.070   71.771] N
+Expected 2 interaction atoms for bases, found:
+              2613-   N   106-LEU (B) [  21.448  -13.070   71.771] N
+Missing atoms or failed protonation for THR 107 B (BBN) -- please check the structure
+Group (BBN) for  2621-   N   107-THR (B) [  21.457   -9.933   73.462] N
+Expected 2 interaction atoms for acids, found:
+              2621-   N   107-THR (B) [  21.457   -9.933   73.462] N
+Expected 2 interaction atoms for bases, found:
+              2621-   N   107-THR (B) [  21.457   -9.933   73.462] N
+Missing atoms or failed protonation for GLY 110 B (BBN) -- please check the structure
+Group (BBN) for  2647-   N   110-GLY (B) [  18.910   -8.441   76.492] N
+Expected 2 interaction atoms for acids, found:
+              2647-   N   110-GLY (B) [  18.910   -8.441   76.492] N
+Expected 2 interaction atoms for bases, found:
+              2647-   N   110-GLY (B) [  18.910   -8.441   76.492] N
+Side chain interaction failed for HIS  87 B and GLU 171 A
+Side chain interaction failed for HIS  87 B and TYR 174 A
+Side chain interaction failed for HIS  87 B and ASN 176 A
+Side chain interaction failed for HIS  87 B and LYS 177 A
+Side chain interaction failed for HIS  87 B and LYS 182 A
+Side chain interaction failed for HIS  87 B and GLN 185 A
+Side chain interaction failed for HIS  87 B and LYS 189 A
+Side chain interaction failed for HIS  87 B and ASN  85 B
+Side chain interaction failed for HIS  87 B and GLU  86 B
+Side chain interaction failed for GLU 190 B and HIS  87 B

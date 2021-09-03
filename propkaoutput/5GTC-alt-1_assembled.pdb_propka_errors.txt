@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/__main__.py", line 8, in <module>
+    main()
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/run.py", line 42, in main
+    my_molecule = read_molecule_file(pdbfile, my_molecule)
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/input.py", line 103, in read_molecule_file
+    raise ValueError(str_)
+ValueError: Error: The pdb file does not seem to contain any molecular conformations

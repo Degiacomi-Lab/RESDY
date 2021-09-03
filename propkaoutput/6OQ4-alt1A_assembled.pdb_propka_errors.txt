@@ -1,0 +1,21 @@
+Missing atoms or failed protonation for ARG 452 A (ARG) -- please check the structure
+Group (ARG) for   296-  CZ   452-ARG (A) [  38.837    6.803   22.058] C
+Expected 8 interaction atoms for acids, found:
+               295-  NE   452-ARG (A) [  40.167    6.649   22.322] N
+               298- NH2   452-ARG (A) [  38.437    7.457   20.928] N
+               297- NH1   452-ARG (A) [  37.908    6.304   22.925] N
+                 0-  HE   452-ARG (A) [  40.857    6.990   21.668] H
+                 0-HH21   452-ARG (A) [  39.125    7.826   20.288] H
+                 0-HH22   452-ARG (A) [  37.453    7.572   20.732] H
+                 0- HH1   452-ARG (A) [  37.958    5.315   22.724] H
+Expected 3 interaction atoms for bases, found:
+               295-  NE   452-ARG (A) [  40.167    6.649   22.322] N
+               298- NH2   452-ARG (A) [  38.437    7.457   20.928] N
+               297- NH1   452-ARG (A) [  37.908    6.304   22.925] N
+Missing atoms or failed protonation for GLN  25 B (AMD) -- please check the structure
+Group (AMD) for  2752-  CD    25-GLN (B) [  36.714   12.676   22.168] C
+Expected 3 interaction atoms for acids, found:
+              2754- NE2    25-GLN (B) [  37.449   13.504   22.958] N
+                 0- HE2    25-GLN (B) [  37.873   13.190   23.819] H
+Expected 1 interaction atoms for bases, found:
+              2753- OE1    25-GLN (B) [  36.991   11.488   22.016] O

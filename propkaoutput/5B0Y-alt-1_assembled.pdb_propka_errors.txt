@@ -1,0 +1,30 @@
+Missing atoms or failed protonation for SER  32 C (BBN) -- please check the structure
+Group (BBN) for  1430-   N    32-SER (C) [ -13.141  -23.630  -21.230] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (C) [ -13.341  -24.607  -21.069] H
+                 0-  H2    32-SER (C) [ -13.951  -23.183  -21.636] H
+              1430-   N    32-SER (C) [ -13.141  -23.630  -21.230] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (C) [ -13.341  -24.607  -21.069] H
+                 0-  H2    32-SER (C) [ -13.951  -23.183  -21.636] H
+              1430-   N    32-SER (C) [ -13.141  -23.630  -21.230] N
+Missing atoms or failed protonation for ARG  19 D (BBN) -- please check the structure
+Group (BBN) for  2155-   N    19-ARG (D) [ -11.139  -48.829  -42.648] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    19-ARG (D) [ -11.035  -49.809  -42.868] H
+                 0-  H2    19-ARG (D) [ -12.117  -48.617  -42.510] H
+              2155-   N    19-ARG (D) [ -11.139  -48.829  -42.648] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    19-ARG (D) [ -11.035  -49.809  -42.868] H
+                 0-  H2    19-ARG (D) [ -12.117  -48.617  -42.510] H
+              2155-   N    19-ARG (D) [ -11.139  -48.829  -42.648] N
+Missing atoms or failed protonation for ARG  33 F (BBN) -- please check the structure
+Group (BBN) for  3633-   N    33-ARG (F) [  36.566  -23.116  -10.150] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (F) [  36.619  -23.031   -9.145] H
+                 0-  H2    33-ARG (F) [  36.995  -23.984  -10.437] H
+              3633-   N    33-ARG (F) [  36.566  -23.116  -10.150] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (F) [  36.619  -23.031   -9.145] H
+                 0-  H2    33-ARG (F) [  36.995  -23.984  -10.437] H
+              3633-   N    33-ARG (F) [  36.566  -23.116  -10.150] N

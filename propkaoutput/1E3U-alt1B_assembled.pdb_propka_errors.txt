@@ -1,0 +1,292 @@
+Unexpected number (5) of atoms in residue GLU 214 A   in conformation 1A
+His group does not seem to contain a ring Group (HIS) for   496-  CG    87-HIS (A) [   0.614   22.281   35.006] C
+Missing atoms or failed protonation for HIS  87 A (HIS) -- please check the structure
+Group (HIS) for   496-  CG    87-HIS (A) [   0.614   22.281   35.006] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for ARG 109 A (ARG) -- please check the structure
+Group (ARG) for   694-  CZ   109-ARG (A) [   4.565   12.092   42.281] C
+Expected 8 interaction atoms for acids, found:
+               693-  NE   109-ARG (A) [   3.915   12.368   41.157] N
+               695- NH1   109-ARG (A) [   5.432   12.951   42.795] N
+               696- NH2   109-ARG (A) [   4.319   10.943   42.901] N
+                 0- HH2   109-ARG (A) [   4.482   10.146   43.500] H
+Expected 3 interaction atoms for bases, found:
+               693-  NE   109-ARG (A) [   3.915   12.368   41.157] N
+               695- NH1   109-ARG (A) [   5.432   12.951   42.795] N
+               696- NH2   109-ARG (A) [   4.319   10.943   42.901] N
+Missing atoms or failed protonation for ALA 111 A (BBN) -- please check the structure
+Group (BBN) for   701-   N   111-ALA (A) [   6.807   11.159   33.834] N
+Expected 2 interaction atoms for acids, found:
+               701-   N   111-ALA (A) [   6.807   11.159   33.834] N
+Expected 2 interaction atoms for bases, found:
+               701-   N   111-ALA (A) [   6.807   11.159   33.834] N
+Missing atoms or failed protonation for GLN 113 A (AMD) -- please check the structure
+Group (AMD) for   720-  CD   113-GLN (A) [   7.312    9.789   41.213] C
+Expected 3 interaction atoms for acids, found:
+               722- NE2   113-GLN (A) [   7.759   10.822   41.924] N
+                 0- HE2   113-GLN (A) [   7.460   11.702   42.319] H
+Expected 1 interaction atoms for bases, found:
+               721- OE1   113-GLN (A) [   7.171    8.668   41.706] O
+              5248- OE1   199-GLU (C) [   7.772    7.968   41.454] O
+Missing atoms or failed protonation for GLU 190 A (BBN) -- please check the structure
+Group (BBN) for  1335-   N   190-GLU (A) [   8.548   18.699   43.669] N
+Expected 2 interaction atoms for acids, found:
+              1335-   N   190-GLU (A) [   8.548   18.699   43.669] N
+Expected 2 interaction atoms for bases, found:
+              1335-   N   190-GLU (A) [   8.548   18.699   43.669] N
+Missing atoms or failed protonation for VAL 193 A (BBN) -- please check the structure
+Group (BBN) for  1357-   N   193-VAL (A) [   8.328   13.653   44.864] N
+Expected 2 interaction atoms for acids, found:
+              1357-   N   193-VAL (A) [   8.328   13.653   44.864] N
+Expected 2 interaction atoms for bases, found:
+              1357-   N   193-VAL (A) [   8.328   13.653   44.864] N
+Missing atoms or failed protonation for THR 194 A (BBN) -- please check the structure
+Group (BBN) for  1364-   N   194-THR (A) [   7.584   10.719   46.628] N
+Expected 2 interaction atoms for acids, found:
+              1364-   N   194-THR (A) [   7.584   10.719   46.628] N
+Expected 2 interaction atoms for bases, found:
+              1364-   N   194-THR (A) [   7.584   10.719   46.628] N
+Missing atoms or failed protonation for ALA 197 A (BBN) -- please check the structure
+Group (BBN) for  1385-   N   197-ALA (A) [   2.843   11.882   54.044] N
+Expected 2 interaction atoms for acids, found:
+              1385-   N   197-ALA (A) [   2.843   11.882   54.044] N
+Expected 2 interaction atoms for bases, found:
+              1385-   N   197-ALA (A) [   2.843   11.882   54.044] N
+Missing atoms or failed protonation for VAL 202 A (BBN) -- please check the structure
+Group (BBN) for  1426-   N   202-VAL (A) [   8.734   11.856   51.696] N
+Expected 2 interaction atoms for acids, found:
+              1426-   N   202-VAL (A) [   8.734   11.856   51.696] N
+Expected 2 interaction atoms for bases, found:
+              1426-   N   202-VAL (A) [   8.734   11.856   51.696] N
+Missing atoms or failed protonation for HIS 203 A (BBN) -- please check the structure
+Group (BBN) for  1433-   N   203-HIS (A) [  11.141   12.373   49.232] N
+Expected 2 interaction atoms for acids, found:
+              1433-   N   203-HIS (A) [  11.141   12.373   49.232] N
+Expected 2 interaction atoms for bases, found:
+              1433-   N   203-HIS (A) [  11.141   12.373   49.232] N
+Missing atoms or failed protonation for HIS 203 A (HIS) -- please check the structure
+Group (HIS) for  1438-  CG   203-HIS (A) [  11.098   15.175   48.013] C
+Expected 4 interaction atoms for acids, found:
+                 0- HD1   203-HIS (A) [  10.811   16.053   46.092] H
+              1442- NE2   203-HIS (A) [   9.762   16.637   48.976] N
+              1439- ND1   203-HIS (A) [  10.602   16.062   47.080] N
+Expected 2 interaction atoms for bases, found:
+              1442- NE2   203-HIS (A) [   9.762   16.637   48.976] N
+              1439- ND1   203-HIS (A) [  10.602   16.062   47.080] N
+Missing atoms or failed protonation for SER 204 A (BBN) -- please check the structure
+Group (BBN) for  1443-   N   204-SER (A) [  12.355   10.962   46.293] N
+Expected 2 interaction atoms for acids, found:
+              1443-   N   204-SER (A) [  12.355   10.962   46.293] N
+Expected 2 interaction atoms for bases, found:
+              1443-   N   204-SER (A) [  12.355   10.962   46.293] N
+Missing atoms or failed protonation for HIS  87 B (HIS) -- please check the structure
+Group (HIS) for  2417-  CG    87-HIS (B) [  -2.013    4.974  -16.278] C
+Expected 4 interaction atoms for acids, found:
+                 0- HD1    87-HIS (B) [  -2.265    6.863  -15.325] H
+              2421- NE2    87-HIS (B) [  -1.859    3.927  -14.358] N
+              2418- ND1    87-HIS (B) [  -2.133    5.866  -15.233] N
+Expected 2 interaction atoms for bases, found:
+              2421- NE2    87-HIS (B) [  -1.859    3.927  -14.358] N
+              2418- ND1    87-HIS (B) [  -2.133    5.866  -15.233] N
+Missing atoms or failed protonation for ARG 109 B (ARG) -- please check the structure
+Group (ARG) for  2615-  CZ   109-ARG (B) [  -7.129   15.319  -10.027] C
+Expected 8 interaction atoms for acids, found:
+              2614-  NE   109-ARG (B) [  -7.725   14.154  -10.243] N
+              2617- NH2   109-ARG (B) [  -7.581   16.136   -9.084] N
+              2616- NH1   109-ARG (B) [  -6.072   15.679  -10.745] N
+                 0-  HE   109-ARG (B) [  -8.516   13.918   -9.661] H
+                 0- HH2   109-ARG (B) [  -8.207   16.696   -9.645] H
+                 0-HH11   109-ARG (B) [  -5.717   15.065  -11.464] H
+                 0-HH12   109-ARG (B) [  -5.623   16.567  -10.572] H
+Expected 3 interaction atoms for bases, found:
+              2614-  NE   109-ARG (B) [  -7.725   14.154  -10.243] N
+              2617- NH2   109-ARG (B) [  -7.581   16.136   -9.084] N
+              2616- NH1   109-ARG (B) [  -6.072   15.679  -10.745] N
+Missing atoms or failed protonation for LEU 175 B (BBN) -- please check the structure
+Group (BBN) for  3139-   N   175-LEU (B) [ -21.094    3.622   -5.174] N
+Expected 2 interaction atoms for acids, found:
+              3139-   N   175-LEU (B) [ -21.094    3.622   -5.174] N
+Expected 2 interaction atoms for bases, found:
+              3139-   N   175-LEU (B) [ -21.094    3.622   -5.174] N
+Missing atoms or failed protonation for THR 230 B (BBN) -- please check the structure
+Group (BBN) for  3562-   N   230-THR (B) [ -16.470    8.884    8.663] N
+Expected 2 interaction atoms for acids, found:
+              3562-   N   230-THR (B) [ -16.470    8.884    8.663] N
+Expected 2 interaction atoms for bases, found:
+              3562-   N   230-THR (B) [ -16.470    8.884    8.663] N
+Missing atoms or failed protonation for GLU 195 C (BBN) -- please check the structure
+Group (BBN) for  5217-   N   195-GLU (C) [   4.110   14.314   53.903] N
+Expected 2 interaction atoms for acids, found:
+              5217-   N   195-GLU (C) [   4.110   14.314   53.903] N
+Expected 2 interaction atoms for bases, found:
+              5217-   N   195-GLU (C) [   4.110   14.314   53.903] N
+Missing atoms or failed protonation for GLU 195 C (COO) -- please check the structure
+Group (COO) for  5221-  CD   195-GLU (C) [   1.759   10.576   53.187] C
+Expected 2 interaction atoms for acids, found:
+              1383-   O   196-ALA (A) [   1.646   10.420   52.853] O
+              5223- OE2   195-GLU (C) [   1.614    9.407   53.635] O
+              5222- OE1   195-GLU (C) [   1.155   11.022   52.175] O
+Expected 2 interaction atoms for bases, found:
+              1383-   O   196-ALA (A) [   1.646   10.420   52.853] O
+              5223- OE2   195-GLU (C) [   1.614    9.407   53.635] O
+              5222- OE1   195-GLU (C) [   1.155   11.022   52.175] O
+Missing atoms or failed protonation for ALA 196 C (BBN) -- please check the structure
+Group (BBN) for  5226-   N   196-ALA (C) [   6.934   12.480   52.715] N
+Expected 2 interaction atoms for acids, found:
+              5226-   N   196-ALA (C) [   6.934   12.480   52.715] N
+Expected 2 interaction atoms for bases, found:
+              5226-   N   196-ALA (C) [   6.934   12.480   52.715] N
+Missing atoms or failed protonation for ALA 197 C (BBN) -- please check the structure
+Group (BBN) for  5231-   N   197-ALA (C) [   9.036   11.448   50.066] N
+Expected 2 interaction atoms for acids, found:
+              5231-   N   197-ALA (C) [   9.036   11.448   50.066] N
+Expected 2 interaction atoms for bases, found:
+              5231-   N   197-ALA (C) [   9.036   11.448   50.066] N
+Missing atoms or failed protonation for GLU 199 C (BBN) -- please check the structure
+Group (BBN) for  5243-   N   199-GLU (C) [  10.564   10.609   45.122] N
+Expected 2 interaction atoms for acids, found:
+              5243-   N   199-GLU (C) [  10.564   10.609   45.122] N
+Expected 2 interaction atoms for bases, found:
+              5243-   N   199-GLU (C) [  10.564   10.609   45.122] N
+Missing atoms or failed protonation for GLU 199 C (COO) -- please check the structure
+Group (COO) for  5247-  CD   199-GLU (C) [   8.523    8.872   41.005] C
+Expected 2 interaction atoms for acids, found:
+              5248- OE1   199-GLU (C) [   7.772    7.968   41.454] O
+               721- OE1   113-GLN (A) [   7.171    8.668   41.706] O
+              5249- OE2   199-GLU (C) [   9.153    8.790   39.916] O
+Expected 2 interaction atoms for bases, found:
+              5248- OE1   199-GLU (C) [   7.772    7.968   41.454] O
+               721- OE1   113-GLN (A) [   7.171    8.668   41.706] O
+              5249- OE2   199-GLU (C) [   9.153    8.790   39.916] O
+Missing atoms or failed protonation for TYR 200 C (BBN) -- please check the structure
+Group (BBN) for  5252-   N   200-TYR (C) [   7.932   11.381   45.716] N
+Expected 2 interaction atoms for acids, found:
+              5252-   N   200-TYR (C) [   7.932   11.381   45.716] N
+Expected 2 interaction atoms for bases, found:
+              5252-   N   200-TYR (C) [   7.932   11.381   45.716] N
+Missing atoms or failed protonation for LEU 201 C (BBN) -- please check the structure
+Group (BBN) for  5264-   N   201-LEU (C) [   6.061   13.937   47.190] N
+Expected 2 interaction atoms for acids, found:
+              5264-   N   201-LEU (C) [   6.061   13.937   47.190] N
+Expected 2 interaction atoms for bases, found:
+              5264-   N   201-LEU (C) [   6.061   13.937   47.190] N
+Missing atoms or failed protonation for LYS 228 C (BBN) -- please check the structure
+Group (BBN) for  5469-   N   228-LYS (C) [   4.218   14.235   42.389] N
+Expected 2 interaction atoms for acids, found:
+              5469-   N   228-LYS (C) [   4.218   14.235   42.389] N
+Expected 2 interaction atoms for bases, found:
+              5469-   N   228-LYS (C) [   4.218   14.235   42.389] N
+Missing atoms or failed protonation for GLU 229 C (BBN) -- please check the structure
+Group (BBN) for  5478-   N   229-GLU (C) [   6.793   12.591   40.980] N
+Expected 2 interaction atoms for acids, found:
+              5478-   N   229-GLU (C) [   6.793   12.591   40.980] N
+Expected 2 interaction atoms for bases, found:
+              5478-   N   229-GLU (C) [   6.793   12.591   40.980] N
+Missing atoms or failed protonation for GLU 229 C (COO) -- please check the structure
+Group (COO) for  5482-  CD   229-GLU (C) [   7.076   11.059   36.344] C
+Expected 2 interaction atoms for acids, found:
+               689-   O   109-ARG (A) [   6.990   11.755   37.138] O
+              5484- OE2   229-GLU (C) [   6.974   11.566   35.194] O
+              5483- OE1   229-GLU (C) [   6.539    9.972   36.684] O
+Expected 2 interaction atoms for bases, found:
+               689-   O   109-ARG (A) [   6.990   11.755   37.138] O
+              5484- OE2   229-GLU (C) [   6.974   11.566   35.194] O
+              5483- OE1   229-GLU (C) [   6.539    9.972   36.684] O
+Missing atoms or failed protonation for THR 230 C (BBN) -- please check the structure
+Group (BBN) for  5487-   N   230-THR (C) [   7.658   14.511   38.204] N
+Expected 2 interaction atoms for acids, found:
+              5487-   N   230-THR (C) [   7.658   14.511   38.204] N
+Expected 2 interaction atoms for bases, found:
+              5487-   N   230-THR (C) [   7.658   14.511   38.204] N
+Missing atoms or failed protonation for GLU 231 C (BBN) -- please check the structure
+Group (BBN) for  5494-   N   231-GLU (C) [   5.268   15.862   37.938] N
+Expected 2 interaction atoms for acids, found:
+              5494-   N   231-GLU (C) [   5.268   15.862   37.938] N
+Expected 2 interaction atoms for bases, found:
+              5494-   N   231-GLU (C) [   5.268   15.862   37.938] N
+His group does not seem to contain a ring Group (HIS) for  6274-  CG    87-HIS (D) [ -20.941    2.969   -1.924] C
+Missing atoms or failed protonation for HIS  87 D (HIS) -- please check the structure
+Group (HIS) for  6274-  CG    87-HIS (D) [ -20.941    2.969   -1.924] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for ARG 104 D (ARG) -- please check the structure
+Group (ARG) for  6429-  CZ   104-ARG (D) [ -11.968   11.884   12.256] C
+Expected 8 interaction atoms for acids, found:
+              6431- NH2   104-ARG (D) [ -10.908   11.040   12.086] N
+              6428-  NE   104-ARG (D) [ -12.784   11.750   13.343] N
+              6430- NH1   104-ARG (D) [ -12.215   12.861   11.337] N
+                 0-  HE   104-ARG (D) [ -12.596   11.029   14.025] H
+                 0-HH11   104-ARG (D) [ -11.771   12.825   10.430] H
+                 0-HH12   104-ARG (D) [ -12.842   13.620   11.563] H
+Expected 3 interaction atoms for bases, found:
+              6431- NH2   104-ARG (D) [ -10.908   11.040   12.086] N
+              6428-  NE   104-ARG (D) [ -12.784   11.750   13.343] N
+              6430- NH1   104-ARG (D) [ -12.215   12.861   11.337] N
+Missing atoms or failed protonation for LEU 106 D (BBN) -- please check the structure
+Group (BBN) for  6442-   N   106-LEU (D) [ -16.600    7.009    9.739] N
+Expected 2 interaction atoms for acids, found:
+              6442-   N   106-LEU (D) [ -16.600    7.009    9.739] N
+Expected 2 interaction atoms for bases, found:
+              6442-   N   106-LEU (D) [ -16.600    7.009    9.739] N
+Missing atoms or failed protonation for ARG 109 D (ARG) -- please check the structure
+Group (ARG) for  6471-  CZ   109-ARG (D) [ -10.198   12.026    0.162] C
+Expected 8 interaction atoms for acids, found:
+              6473- NH2   109-ARG (D) [ -10.268   13.228    0.803] N
+              6470-  NE   109-ARG (D) [ -11.287   11.205    0.133] N
+              6472- NH1   109-ARG (D) [  -9.035   11.640   -0.440] N
+                 0-HH21   109-ARG (D) [ -10.270   13.263    1.812] H
+                 0-HH22   109-ARG (D) [ -10.318   14.083    0.268] H
+                 0- HH1   109-ARG (D) [  -8.138   11.183   -0.357] H
+Expected 3 interaction atoms for bases, found:
+              6473- NH2   109-ARG (D) [ -10.268   13.228    0.803] N
+              6470-  NE   109-ARG (D) [ -11.287   11.205    0.133] N
+              6472- NH1   109-ARG (D) [  -9.035   11.640   -0.440] N
+Missing atoms or failed protonation for HIS 203 D (HIS) -- please check the structure
+Group (HIS) for  7215-  CG   203-HIS (D) [  -3.403    8.544   -6.497] C
+Expected 4 interaction atoms for acids, found:
+                 0- HD1   203-HIS (D) [  -2.572    9.746   -8.063] H
+              7217- NE2   203-HIS (D) [  -5.356    8.258   -7.589] N
+              7214- ND1   203-HIS (D) [  -3.349    9.210   -7.704] N
+Expected 2 interaction atoms for bases, found:
+              7217- NE2   203-HIS (D) [  -5.356    8.258   -7.589] N
+              7214- ND1   203-HIS (D) [  -3.349    9.210   -7.704] N
+Missing atoms or failed protonation for SER 209 D (BBN) -- please check the structure
+Group (BBN) for  7259-   N   209-SER (D) [   5.524    5.616   12.651] N
+Expected 2 interaction atoms for acids, found:
+              7259-   N   209-SER (D) [   5.524    5.616   12.651] N
+Expected 2 interaction atoms for bases, found:
+              7259-   N   209-SER (D) [   5.524    5.616   12.651] N
+Missing atoms or failed protonation for GLY 210 D (BBN) -- please check the structure
+Group (BBN) for  7265-   N   210-GLY (D) [   5.834    6.560   15.174] N
+Expected 2 interaction atoms for acids, found:
+              7265-   N   210-GLY (D) [   5.834    6.560   15.174] N
+Expected 2 interaction atoms for bases, found:
+              7265-   N   210-GLY (D) [   5.834    6.560   15.174] N
+Missing atoms or failed protonation for VAL 211 D (BBN) -- please check the structure
+Group (BBN) for  7269-   N   211-VAL (D) [   7.463    8.697   17.557] N
+Expected 2 interaction atoms for acids, found:
+              7269-   N   211-VAL (D) [   7.463    8.697   17.557] N
+Expected 2 interaction atoms for bases, found:
+              7269-   N   211-VAL (D) [   7.463    8.697   17.557] N
+Side chain interaction failed for HIS  87 A and LYS  84 A
+Side chain interaction failed for HIS  87 A and ASN  85 A
+Side chain interaction failed for HIS  87 A and GLU  86 A
+Side chain interaction failed for GLU 190 A and HIS  87 A
+Side chain interaction failed for LYS  45 C and HIS  87 A
+Side chain interaction failed for LYS  49 C and HIS  87 A
+Side chain interaction failed for GLU 171 C and HIS  87 A
+Side chain interaction failed for TYR 174 C and HIS  87 A
+Side chain interaction failed for GLU 231 C and HIS  87 A
+Side chain interaction failed for TYR 233 C and HIS  87 A
+Side chain interaction failed for HIS  87 D and GLU 171 B
+Side chain interaction failed for HIS  87 D and TYR 174 B
+Side chain interaction failed for HIS  87 D and ASN 176 B
+Side chain interaction failed for HIS  87 D and LYS 177 B
+Side chain interaction failed for HIS  87 D and LYS 182 B
+Side chain interaction failed for HIS  87 D and GLN 185 B
+Side chain interaction failed for HIS  87 D and LYS 189 B
+Side chain interaction failed for HIS  87 D and GLU 227 B
+Side chain interaction failed for HIS  87 D and LYS  84 D
+Side chain interaction failed for HIS  87 D and ASN  85 D
+Side chain interaction failed for HIS  87 D and GLU  86 D

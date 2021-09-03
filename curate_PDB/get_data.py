@@ -16,7 +16,7 @@ from copy import deepcopy
 # offers automatic automatic structure patching function
 from curate_PDB.autopatch import autopatch
 import re
-import remove_kcx_from_fasta as rkf
+import cleanfasta as cf
 ########################################
 # control flags
 
@@ -156,7 +156,7 @@ def get_data(pdb, chain):
 
                         os.chdir(oldpwd)
                         try:
-                                rkf.remove_kcx_from_fasta(pdb, chain)
+                                cf.clean_fasta(new_name)
                         except:
                                 pass
 
@@ -249,13 +249,6 @@ def get_data(pdb, chain):
                 patchstat = np.array(patchstat)
                 # report on whether patching was needed and, if so, successful
 
-                print('FILES:')
-                print(files)
-
-                print('RESULT:')
-                print(result)
-                print('-----------------')
-
 
                 outdata = np.concatenate((np.array([files]).T, result), axis=1)
 
@@ -313,6 +306,6 @@ def get_data(pdb, chain):
                 else:
                         print("   %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
 
-
-        return()
+        print(n)
+        return n
 

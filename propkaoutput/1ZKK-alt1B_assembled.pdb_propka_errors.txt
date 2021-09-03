@@ -1,0 +1,66 @@
+Unexpected number (5) of atoms in residue ARG 192 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 192 D   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  16 E   in conformation 1A
+Unexpected number (4) of atoms in residue LYS  16 F   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  16 G   in conformation 1A
+Unexpected number (4) of atoms in residue LYS  16 H   in conformation 1A
+Missing atoms or failed protonation for ARG 192 B (BBN) -- please check the structure
+Group (BBN) for  1279-   N   192-ARG (B) [ -23.236   14.937   41.692] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   192-ARG (B) [ -23.065   13.988   41.992] H
+                 0-  H2   192-ARG (B) [ -23.789   15.416   42.389] H
+              1279-   N   192-ARG (B) [ -23.236   14.937   41.692] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   192-ARG (B) [ -23.065   13.988   41.992] H
+                 0-  H2   192-ARG (B) [ -23.789   15.416   42.389] H
+              1279-   N   192-ARG (B) [ -23.236   14.937   41.692] N
+Missing atoms or failed protonation for ARG 192 D (BBN) -- please check the structure
+Group (BBN) for  3840-   N   192-ARG (D) [  29.566    0.567  -63.530] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   192-ARG (D) [  30.086    0.308  -62.704] H
+                 0-  H2   192-ARG (D) [  30.109    1.219  -64.078] H
+              3840-   N   192-ARG (D) [  29.566    0.567  -63.530] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   192-ARG (D) [  30.086    0.308  -62.704] H
+                 0-  H2   192-ARG (D) [  30.109    1.219  -64.078] H
+              3840-   N   192-ARG (D) [  29.566    0.567  -63.530] N
+Missing atoms or failed protonation for LYS  16 E (BBN) -- please check the structure
+Group (BBN) for  5123-   N    16-LYS (E) [  -9.033   11.690   -6.812] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-LYS (E) [  -8.939   10.813   -6.320] H
+                 0-  H2    16-LYS (E) [  -9.797   12.218   -6.416] H
+              5123-   N    16-LYS (E) [  -9.033   11.690   -6.812] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-LYS (E) [  -8.939   10.813   -6.320] H
+                 0-  H2    16-LYS (E) [  -9.797   12.218   -6.416] H
+              5123-   N    16-LYS (E) [  -9.033   11.690   -6.812] N
+Missing atoms or failed protonation for LYS  16 F (BBN) -- please check the structure
+Group (BBN) for  5195-   N    16-LYS (F) [   8.276  -13.534    5.213] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-LYS (F) [   8.727  -13.369    6.101] H
+                 0-  H2    16-LYS (F) [   8.236  -12.671    4.691] H
+              5195-   N    16-LYS (F) [   8.276  -13.534    5.213] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-LYS (F) [   8.727  -13.369    6.101] H
+                 0-  H2    16-LYS (F) [   8.236  -12.671    4.691] H
+              5195-   N    16-LYS (F) [   8.276  -13.534    5.213] N
+Missing atoms or failed protonation for LYS  16 G (BBN) -- please check the structure
+Group (BBN) for  5274-   N    16-LYS (G) [   5.664    9.522  -42.373] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-LYS (G) [   6.018    8.735  -42.898] H
+                 0-  H2    16-LYS (G) [   6.437   10.083  -42.045] H
+              5274-   N    16-LYS (G) [   5.664    9.522  -42.373] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-LYS (G) [   6.018    8.735  -42.898] H
+                 0-  H2    16-LYS (G) [   6.437   10.083  -42.045] H
+              5274-   N    16-LYS (G) [   5.664    9.522  -42.373] N
+Missing atoms or failed protonation for LYS  16 H (BBN) -- please check the structure
+Group (BBN) for  5354-   N    16-LYS (H) [ -14.400   34.420  -55.608] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-LYS (H) [ -14.429   35.032  -54.805] H
+                 0-  H2    16-LYS (H) [ -15.232   34.555  -56.164] H
+              5354-   N    16-LYS (H) [ -14.400   34.420  -55.608] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-LYS (H) [ -14.429   35.032  -54.805] H
+                 0-  H2    16-LYS (H) [ -15.232   34.555  -56.164] H
+              5354-   N    16-LYS (H) [ -14.400   34.420  -55.608] N

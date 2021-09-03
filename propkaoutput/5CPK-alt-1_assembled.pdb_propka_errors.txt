@@ -1,0 +1,42 @@
+Unexpected number (10) of atoms in residue ARG 134 A   in conformation 1A
+Unexpected number (8) of atoms in residue LYS 118 G   in conformation 1A
+Missing atoms or failed protonation for ASP  24 B (BBN) -- please check the structure
+Group (BBN) for   801-   N    24-ASP (B) [  44.277    1.335   49.282] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    24-ASP (B) [  44.225    0.435   49.738] H
+                 0-  H2    24-ASP (B) [  45.105    1.373   48.705] H
+               801-   N    24-ASP (B) [  44.277    1.335   49.282] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    24-ASP (B) [  44.225    0.435   49.738] H
+                 0-  H2    24-ASP (B) [  45.105    1.373   48.705] H
+               801-   N    24-ASP (B) [  44.277    1.335   49.282] N
+Missing atoms or failed protonation for SER  32 D (BBN) -- please check the structure
+Group (BBN) for  2247-   N    32-SER (D) [ -11.817   21.707   20.886] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (D) [ -11.915   21.759   21.890] H
+                 0-  H2    32-SER (D) [ -12.590   21.184   20.499] H
+              2247-   N    32-SER (D) [ -11.817   21.707   20.886] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (D) [ -11.915   21.759   21.890] H
+                 0-  H2    32-SER (D) [ -12.590   21.184   20.499] H
+              2247-   N    32-SER (D) [ -11.817   21.707   20.886] N
+Missing atoms or failed protonation for LYS  15 G (BBN) -- please check the structure
+Group (BBN) for  4442-   N    15-LYS (G) [  28.120   43.102    3.697] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    15-LYS (G) [  28.132   42.095    3.621] H
+                 0-  H2    15-LYS (G) [  29.005   43.474    3.382] H
+              4442-   N    15-LYS (G) [  28.120   43.102    3.697] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    15-LYS (G) [  28.132   42.095    3.621] H
+                 0-  H2    15-LYS (G) [  29.005   43.474    3.382] H
+              4442-   N    15-LYS (G) [  28.120   43.102    3.697] N
+Missing atoms or failed protonation for LYS  34 H (BBN) -- please check the structure
+Group (BBN) for  5246-   N    34-LYS (H) [  36.785   23.036   16.631] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    34-LYS (H) [  36.931   23.242   17.609] H
+                 0-  H2    34-LYS (H) [  37.142   22.114   16.425] H
+              5246-   N    34-LYS (H) [  36.785   23.036   16.631] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    34-LYS (H) [  36.931   23.242   17.609] H
+                 0-  H2    34-LYS (H) [  37.142   22.114   16.425] H
+              5246-   N    34-LYS (H) [  36.785   23.036   16.631] N

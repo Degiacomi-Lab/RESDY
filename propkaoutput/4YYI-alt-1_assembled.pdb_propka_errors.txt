@@ -1,0 +1,20 @@
+Missing atoms or failed protonation for SER  22 C (BBN) -- please check the structure
+Group (BBN) for  1631-   N    22-SER (C) [  68.698  -45.889   20.220] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    22-SER (C) [  69.186  -46.191   21.051] H
+                 0-  H2    22-SER (C) [  69.302  -45.293   19.673] H
+              1631-   N    22-SER (C) [  68.698  -45.889   20.220] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    22-SER (C) [  69.186  -46.191   21.051] H
+                 0-  H2    22-SER (C) [  69.302  -45.293   19.673] H
+              1631-   N    22-SER (C) [  68.698  -45.889   20.220] N
+Missing atoms or failed protonation for SER  22 D (BBN) -- please check the structure
+Group (BBN) for  2452-   N    22-SER (D) [  68.868    9.112   82.479] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    22-SER (D) [  69.287    8.287   82.884] H
+                 0-  H2    22-SER (D) [  68.435    9.661   83.208] H
+              2452-   N    22-SER (D) [  68.868    9.112   82.479] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    22-SER (D) [  69.287    8.287   82.884] H
+                 0-  H2    22-SER (D) [  68.435    9.661   83.208] H
+              2452-   N    22-SER (D) [  68.868    9.112   82.479] N

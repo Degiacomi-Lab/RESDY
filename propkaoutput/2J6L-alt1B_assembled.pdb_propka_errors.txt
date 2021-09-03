@@ -1,0 +1,30 @@
+Unexpected number (8) of atoms in residue ARG  54 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLN 250 A   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 325 A   in conformation 1A
+Unexpected number (7) of atoms in residue LYS  66 B   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 329 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 215 C   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 325 C   in conformation 1A
+Unexpected number (5) of atoms in residue GLN 329 C   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 349 C   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 363 C   in conformation 1A
+Unexpected number (6) of atoms in residue GLU  96 D   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 313 D   in conformation 1A
+Unexpected number (6) of atoms in residue ARG 331 D   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 349 D   in conformation 1A
+Unexpected number (6) of atoms in residue LYS 363 D   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 373 D   in conformation 1A
+Unexpected number (8) of atoms in residue ARG  54 E   in conformation 1A
+Unexpected number (6) of atoms in residue GLU  96 E   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 325 E   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 349 E   in conformation 1A
+Unexpected number (6) of atoms in residue GLU 415 E   in conformation 1A
+Unexpected number (6) of atoms in residue GLU  96 F   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 215 F   in conformation 1A
+Unexpected number (6) of atoms in residue ARG 331 F   in conformation 1A
+Unexpected number (8) of atoms in residue ARG  54 G   in conformation 1A
+Unexpected number (6) of atoms in residue LYS 325 G   in conformation 1A
+Unexpected number (7) of atoms in residue GLN 329 G   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 349 H   in conformation 1A
+Missing N or O atom: Group (AMD) for 25142-  CD   329-GLN (G) [  49.406  133.836   -5.800] C
+Side chain interaction failed for TYR 370 G and GLN 329 G

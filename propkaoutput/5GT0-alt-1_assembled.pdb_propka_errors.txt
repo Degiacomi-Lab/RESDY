@@ -1,0 +1,21 @@
+Unexpected number (5) of atoms in residue ASP  24 C   in conformation 1A
+Missing atoms or failed protonation for LYS  13 F (BBN) -- please check the structure
+Group (BBN) for  3765-   N    13-LYS (F) [  29.211   40.031    1.245] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    13-LYS (F) [  29.238   39.655    2.182] H
+                 0-  H2    13-LYS (F) [  30.056   39.775    0.755] H
+              3765-   N    13-LYS (F) [  29.211   40.031    1.245] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    13-LYS (F) [  29.238   39.655    2.182] H
+                 0-  H2    13-LYS (F) [  30.056   39.775    0.755] H
+              3765-   N    13-LYS (F) [  29.211   40.031    1.245] N
+Missing atoms or failed protonation for LYS  28 G (BBN) -- please check the structure
+Group (BBN) for  4579-   N    28-LYS (G) [ -21.466   27.670   16.430] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    28-LYS (G) [ -21.504   26.661   16.445] H
+                 0-  H2    28-LYS (G) [ -22.192   28.025   15.824] H
+              4579-   N    28-LYS (G) [ -21.466   27.670   16.430] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    28-LYS (G) [ -21.504   26.661   16.445] H
+                 0-  H2    28-LYS (G) [ -22.192   28.025   15.824] H
+              4579-   N    28-LYS (G) [ -21.466   27.670   16.430] N

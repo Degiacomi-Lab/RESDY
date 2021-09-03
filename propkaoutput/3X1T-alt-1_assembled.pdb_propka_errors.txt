@@ -1,0 +1,20 @@
+Missing atoms or failed protonation for ARG  33 F (BBN) -- please check the structure
+Group (BBN) for  8243-   N    33-ARG (F) [   7.671   18.171  -24.125] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (F) [   8.211   18.608  -23.392] H
+                 0-  H2    33-ARG (F) [   7.240   18.884  -24.696] H
+              8243-   N    33-ARG (F) [   7.671   18.171  -24.125] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (F) [   8.211   18.608  -23.392] H
+                 0-  H2    33-ARG (F) [   7.240   18.884  -24.696] H
+              8243-   N    33-ARG (F) [   7.671   18.171  -24.125] N
+Missing atoms or failed protonation for ARG  33 J (BBN) -- please check the structure
+Group (BBN) for 11305-   N    33-ARG (J) [ -42.875   18.841  -18.883] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (J) [ -42.917   18.626  -17.897] H
+                 0-  H2    33-ARG (J) [ -42.139   18.300  -19.314] H
+             11305-   N    33-ARG (J) [ -42.875   18.841  -18.883] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (J) [ -42.917   18.626  -17.897] H
+                 0-  H2    33-ARG (J) [ -42.139   18.300  -19.314] H
+             11305-   N    33-ARG (J) [ -42.875   18.841  -18.883] N

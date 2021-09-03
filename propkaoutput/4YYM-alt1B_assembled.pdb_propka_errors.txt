@@ -1,0 +1,6 @@
+Missing atoms or failed protonation for TRP1526 B (TRP) -- please check the structure
+Group (TRP) for  1289- NE1  1526-TRP (B) [  -4.362   35.948   -4.398] N
+Expected 2 interaction atoms for acids, found:
+              1289- NE1  1526-TRP (B) [  -4.362   35.948   -4.398] N
+Expected 1 interaction atoms for bases, found:
+              1289- NE1  1526-TRP (B) [  -4.362   35.948   -4.398] N

@@ -1,0 +1,40 @@
+Missing atoms or failed protonation for ASN  25 B (BBN) -- please check the structure
+Group (BBN) for   802-   N    25-ASN (B) [ -43.136   -2.457   56.756] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    25-ASN (B) [ -42.771   -3.012   57.517] H
+                 0-  H2    25-ASN (B) [ -43.888   -1.874   57.095] H
+               802-   N    25-ASN (B) [ -43.136   -2.457   56.756] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    25-ASN (B) [ -42.771   -3.012   57.517] H
+                 0-  H2    25-ASN (B) [ -43.888   -1.874   57.095] H
+               802-   N    25-ASN (B) [ -43.136   -2.457   56.756] N
+Missing atoms or failed protonation for LYS  30 D (BBN) -- please check the structure
+Group (BBN) for  2256-   N    30-LYS (D) [  11.282  -21.152   18.676] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    30-LYS (D) [  10.945  -21.943   18.145] H
+                 0-  H2    30-LYS (D) [  11.891  -20.592   18.096] H
+              2256-   N    30-LYS (D) [  11.282  -21.152   18.676] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    30-LYS (D) [  10.945  -21.943   18.145] H
+                 0-  H2    30-LYS (D) [  11.891  -20.592   18.096] H
+              2256-   N    30-LYS (D) [  11.282  -21.152   18.676] N
+Missing atoms or failed protonation for LYS  37 E (BBN) -- please check the structure
+Group (BBN) for  3001-   N    37-LYS (E) [  14.969  -22.537   90.934] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    37-LYS (E) [  15.077  -22.621   91.935] H
+                 0-  H2    37-LYS (E) [  15.811  -22.147   90.536] H
+              3001-   N    37-LYS (E) [  14.969  -22.537   90.934] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    37-LYS (E) [  15.077  -22.621   91.935] H
+                 0-  H2    37-LYS (E) [  15.811  -22.147   90.536] H
+              3001-   N    37-LYS (E) [  14.969  -22.537   90.934] N
+Missing atoms or failed protonation for SER  32 H (BBN) -- please check the structure
+Group (BBN) for  5300-   N    32-SER (H) [ -45.746  -17.375   19.049] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (H) [ -45.815  -17.350   20.056] H
+                 0-  H2    32-SER (H) [ -46.446  -18.002   18.679] H
+              5300-   N    32-SER (H) [ -45.746  -17.375   19.049] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (H) [ -45.815  -17.350   20.056] H
+                 0-  H2    32-SER (H) [ -46.446  -18.002   18.679] H
+              5300-   N    32-SER (H) [ -45.746  -17.375   19.049] N

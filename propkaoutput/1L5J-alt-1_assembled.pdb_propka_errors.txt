@@ -1,0 +1,14 @@
+Missing atoms or failed protonation for ARG 577 B (ARG) -- please check the structure
+Group (ARG) for 10915-  CZ   577-ARG (B) [ -14.573  -36.530   50.804] C
+Expected 8 interaction atoms for acids, found:
+             10914-  NE   577-ARG (B) [ -13.264  -36.608   50.641] N
+             10916- NH1   577-ARG (B) [ -15.125  -35.399   51.213] N
+             10917- NH2   577-ARG (B) [ -15.335  -37.580   50.560] N
+                 0-  HE   577-ARG (B) [ -12.877  -37.492   50.342] H
+                 0- HH1   577-ARG (B) [ -14.335  -34.816   50.974] H
+                 0-HH21   577-ARG (B) [ -14.918  -38.445   50.248] H
+                 0-HH22   577-ARG (B) [ -16.335  -37.518   50.685] H
+Expected 3 interaction atoms for bases, found:
+             10914-  NE   577-ARG (B) [ -13.264  -36.608   50.641] N
+             10916- NH1   577-ARG (B) [ -15.125  -35.399   51.213] N
+             10917- NH2   577-ARG (B) [ -15.335  -37.580   50.560] N

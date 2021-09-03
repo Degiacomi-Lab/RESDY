@@ -1,0 +1,60 @@
+Missing atoms or failed protonation for ARG  18 A (ARG) -- please check the structure
+Group (ARG) for   141-  CZ    18-ARG (A) [ -30.702    7.753  -16.648] C
+Expected 8 interaction atoms for acids, found:
+               143- NH2    18-ARG (A) [ -30.938    8.531  -15.550] N
+               140-  NE    18-ARG (A) [ -31.286    6.521  -16.738] N
+               142- NH1    18-ARG (A) [ -29.901    8.219  -17.649] N
+                 0-  HE    18-ARG (A) [ -31.873    6.199  -15.982] H
+Expected 3 interaction atoms for bases, found:
+               143- NH2    18-ARG (A) [ -30.938    8.531  -15.550] N
+               140-  NE    18-ARG (A) [ -31.286    6.521  -16.738] N
+               142- NH1    18-ARG (A) [ -29.901    8.219  -17.649] N
+Missing atoms or failed protonation for GLN  77 B (AMD) -- please check the structure
+Group (AMD) for  2446-  CD    77-GLN (B) [ -41.456   18.365  -12.878] C
+Expected 3 interaction atoms for acids, found:
+              2448- NE2    77-GLN (B) [ -41.709   18.192  -14.178] N
+              2472- NH2    80-ARG (B) [ -42.792   17.448  -12.465] N
+                 0-HE21    77-GLN (B) [ -41.020   18.458  -14.866] H
+                 0-HE22    77-GLN (B) [ -42.590   17.795  -14.473] H
+Expected 1 interaction atoms for bases, found:
+              2447- OE1    77-GLN (B) [ -42.334   18.280  -12.004] O
+Missing atoms or failed protonation for ARG  80 B (ARG) -- please check the structure
+Group (ARG) for  2470-  CZ    80-ARG (B) [ -43.155   16.206  -12.276] C
+Expected 8 interaction atoms for acids, found:
+              2471- NH1    80-ARG (B) [ -43.205   15.711  -11.006] N
+              2472- NH2    80-ARG (B) [ -42.792   17.448  -12.465] N
+              2469-  NE    80-ARG (B) [ -43.419   15.479  -13.368] N
+                 0-HH11    80-ARG (B) [ -42.979   16.307  -10.223] H
+                 0-HH12    80-ARG (B) [ -43.468   14.749  -10.849] H
+                 0-  HE    80-ARG (B) [ -43.311   15.916  -14.272] H
+Expected 3 interaction atoms for bases, found:
+              2471- NH1    80-ARG (B) [ -43.205   15.711  -11.006] N
+              2472- NH2    80-ARG (B) [ -42.792   17.448  -12.465] N
+              2469-  NE    80-ARG (B) [ -43.419   15.479  -13.368] N
+Missing atoms or failed protonation for GLY 417 C (BBN) -- please check the structure
+Group (BBN) for  3686-   N   417-GLY (C) [ -17.842    5.011    8.353] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   417-GLY (C) [ -18.267    4.102    8.466] H
+                 0-  H2   417-GLY (C) [ -18.326    5.521    7.628] H
+              3686-   N   417-GLY (C) [ -17.842    5.011    8.353] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   417-GLY (C) [ -18.267    4.102    8.466] H
+                 0-  H2   417-GLY (C) [ -18.326    5.521    7.628] H
+              3686-   N   417-GLY (C) [ -17.842    5.011    8.353] N
+His group does not seem to contain a ring Group (HIS) for  3695-  CG   418-HIS (C) [ -17.554    2.610    3.551] C
+Missing atoms or failed protonation for HIS 418 C (HIS) -- please check the structure
+Group (HIS) for  3695-  CG   418-HIS (C) [ -17.554    2.610    3.551] C
+Expected 4 interaction atoms for acids, found:
+              1693-  NZ   212-LYS (A) [ -17.559    2.017    3.592] N
+Expected 2 interaction atoms for bases, found:
+              1693-  NZ   212-LYS (A) [ -17.559    2.017    3.592] N
+Missing atoms or failed protonation for GLY 421 D (BBN) -- please check the structure
+Group (BBN) for  3781-   N   421-GLY (D) [ -30.088  -22.750  -24.839] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   421-GLY (D) [ -29.858  -23.589  -24.326] H
+                 0-  H2   421-GLY (D) [ -29.305  -22.485  -25.420] H
+              3781-   N   421-GLY (D) [ -30.088  -22.750  -24.839] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   421-GLY (D) [ -29.858  -23.589  -24.326] H
+                 0-  H2   421-GLY (D) [ -29.305  -22.485  -25.420] H
+              3781-   N   421-GLY (D) [ -30.088  -22.750  -24.839] N

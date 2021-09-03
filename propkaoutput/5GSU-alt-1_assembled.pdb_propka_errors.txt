@@ -1,0 +1,21 @@
+Unexpected number (5) of atoms in residue ASP  24 C   in conformation 1A
+Missing atoms or failed protonation for SER  16 F (BBN) -- please check the structure
+Group (BBN) for  3765-   N    16-SER (F) [ -34.374  -39.277    6.135] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-SER (F) [ -34.114  -38.922    7.044] H
+                 0-  H2    16-SER (F) [ -34.873  -38.562    5.625] H
+              3765-   N    16-SER (F) [ -34.374  -39.277    6.135] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-SER (F) [ -34.114  -38.922    7.044] H
+                 0-  H2    16-SER (F) [ -34.873  -38.562    5.625] H
+              3765-   N    16-SER (F) [ -34.374  -39.277    6.135] N
+Missing atoms or failed protonation for ARG  27 G (BBN) -- please check the structure
+Group (BBN) for  4570-   N    27-ARG (G) [  14.857  -23.575   22.860] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    27-ARG (G) [  14.853  -24.583   22.926] H
+                 0-  H2    27-ARG (G) [  14.004  -23.208   23.258] H
+              4570-   N    27-ARG (G) [  14.857  -23.575   22.860] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    27-ARG (G) [  14.853  -24.583   22.926] H
+                 0-  H2    27-ARG (G) [  14.004  -23.208   23.258] H
+              4570-   N    27-ARG (G) [  14.857  -23.575   22.860] N

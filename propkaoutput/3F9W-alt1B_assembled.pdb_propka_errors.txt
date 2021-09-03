@@ -1,0 +1,5 @@
+Unexpected number (5) of atoms in residue ARG 192 D   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  16 E   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  16 F   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  16 G   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  16 H   in conformation 1A

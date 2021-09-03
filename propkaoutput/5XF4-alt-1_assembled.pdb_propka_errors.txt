@@ -1,0 +1,32 @@
+Unexpected number (7) of atoms in residue ARG 134 A   in conformation 1A
+Unexpected number (7) of atoms in residue ARG 134 E   in conformation 1A
+Missing atoms or failed protonation for ARG  28 D (BBN) -- please check the structure
+Group (BBN) for  2276-   N    28-ARG (D) [  12.511   23.994  -24.204] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    28-ARG (D) [  12.346   24.616  -23.425] H
+                 0-  H2    28-ARG (D) [  11.675   23.930  -24.766] H
+              2276-   N    28-ARG (D) [  12.511   23.994  -24.204] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    28-ARG (D) [  12.346   24.616  -23.425] H
+                 0-  H2    28-ARG (D) [  11.675   23.930  -24.766] H
+              2276-   N    28-ARG (D) [  12.511   23.994  -24.204] N
+Missing atoms or failed protonation for LYS  16 F (BBN) -- please check the structure
+Group (BBN) for  3819-   N    16-LYS (F) [  13.553   51.661  -33.932] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-LYS (F) [  13.547   50.930  -33.235] H
+                 0-  H2    16-LYS (F) [  12.727   52.233  -33.827] H
+              3819-   N    16-LYS (F) [  13.553   51.661  -33.932] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-LYS (F) [  13.547   50.930  -33.235] H
+                 0-  H2    16-LYS (F) [  12.727   52.233  -33.827] H
+              3819-   N    16-LYS (F) [  13.553   51.661  -33.932] N
+Missing atoms or failed protonation for ARG  28 H (BBN) -- please check the structure
+Group (BBN) for  5341-   N    28-ARG (H) [ -44.631   17.542  -14.016] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    28-ARG (H) [ -44.581   16.578  -13.718] H
+                 0-  H2    28-ARG (H) [ -43.908   17.721  -14.699] H
+              5341-   N    28-ARG (H) [ -44.631   17.542  -14.016] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    28-ARG (H) [ -44.581   16.578  -13.718] H
+                 0-  H2    28-ARG (H) [ -43.908   17.721  -14.699] H
+              5341-   N    28-ARG (H) [ -44.631   17.542  -14.016] N

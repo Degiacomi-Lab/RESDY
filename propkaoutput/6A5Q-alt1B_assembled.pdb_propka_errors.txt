@@ -1,0 +1,11 @@
+Unexpected number (5) of atoms in residue HIS  36 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  37 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  70 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG  73 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  75 B   in conformation 1A
+Missing atoms or failed protonation for GLY 137 C (BBN) -- please check the structure
+Group (BBN) for  4811-   N   137-GLY (C) [  32.054  -34.725    7.551] N
+Expected 2 interaction atoms for acids, found:
+              4811-   N   137-GLY (C) [  32.054  -34.725    7.551] N
+Expected 2 interaction atoms for bases, found:
+              4811-   N   137-GLY (C) [  32.054  -34.725    7.551] N

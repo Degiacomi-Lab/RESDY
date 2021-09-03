@@ -1,0 +1,30 @@
+Missing atoms or failed protonation for ASN  25 B (BBN) -- please check the structure
+Group (BBN) for   798-   N    25-ASN (B) [  43.000    2.498   55.942] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    25-ASN (B) [  43.070    1.579   55.529] H
+                 0-  H2    25-ASN (B) [  42.091    2.607   56.368] H
+               798-   N    25-ASN (B) [  43.000    2.498   55.942] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    25-ASN (B) [  43.070    1.579   55.529] H
+                 0-  H2    25-ASN (B) [  42.091    2.607   56.368] H
+               798-   N    25-ASN (B) [  43.000    2.498   55.942] N
+Missing atoms or failed protonation for ARG  33 D (BBN) -- please check the structure
+Group (BBN) for  2211-   N    33-ARG (D) [  -6.912   14.681   22.926] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (D) [  -7.114   14.346   23.857] H
+                 0-  H2    33-ARG (D) [  -6.365   13.991   22.431] H
+              2211-   N    33-ARG (D) [  -6.912   14.681   22.926] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (D) [  -7.114   14.346   23.857] H
+                 0-  H2    33-ARG (D) [  -6.365   13.991   22.431] H
+              2211-   N    33-ARG (D) [  -6.912   14.681   22.926] N
+Missing atoms or failed protonation for ARG  33 H (BBN) -- please check the structure
+Group (BBN) for  5195-   N    33-ARG (H) [  42.590   21.584   18.971] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    33-ARG (H) [  42.790   21.748   19.947] H
+                 0-  H2    33-ARG (H) [  42.355   22.459   18.524] H
+              5195-   N    33-ARG (H) [  42.590   21.584   18.971] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    33-ARG (H) [  42.790   21.748   19.947] H
+                 0-  H2    33-ARG (H) [  42.355   22.459   18.524] H
+              5195-   N    33-ARG (H) [  42.590   21.584   18.971] N

@@ -1,0 +1,144 @@
+Unexpected number (5) of atoms in residue GLN  16 B   in conformation 1A
+Unexpected number (5) of atoms in residue LEU  18 B   in conformation 1A
+Unexpected number (5) of atoms in residue ASP  24 B   in conformation 1A
+Unexpected number (6) of atoms in residue GLU  28 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG  32 B   in conformation 1A
+Unexpected number (5) of atoms in residue ILE  40 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  59 B   in conformation 1A
+Unexpected number (5) of atoms in residue ILE  65 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  82 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  86 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS  89 B   in conformation 1A
+Unexpected number (5) of atoms in residue SER 100 B   in conformation 1A
+Unexpected number (7) of atoms in residue ARG 106 B   in conformation 1A
+Unexpected number (8) of atoms in residue LYS 125 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 135 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 136 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 141 B   in conformation 1A
+Unexpected number (7) of atoms in residue ILE 142 B   in conformation 1A
+Unexpected number (6) of atoms in residue LEU 144 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 151 B   in conformation 1A
+Unexpected number (7) of atoms in residue ILE 156 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 162 B   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 164 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 166 B   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 167 B   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 168 B   in conformation 1A
+Unexpected number (6) of atoms in residue GLU 169 B   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 170 B   in conformation 1A
+Unexpected number (6) of atoms in residue LYS 173 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLN 184 B   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 185 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 186 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLN 187 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 188 B   in conformation 1A
+Unexpected number (5) of atoms in residue PHE 192 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 196 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 198 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 206 B   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 216 B   in conformation 1A
+Unexpected number (5) of atoms in residue VAL 221 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 223 B   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 227 B   in conformation 1A
+Unexpected number (6) of atoms in residue LYS 230 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 234 B   in conformation 1A
+Unexpected number (7) of atoms in residue ARG 246 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 247 B   in conformation 1A
+Unexpected number (6) of atoms in residue GLU 253 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 256 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 261 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 263 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 266 B   in conformation 1A
+Unexpected number (7) of atoms in residue GLU 275 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 285 B   in conformation 1A
+Unexpected number (6) of atoms in residue LYS 336 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 337 B   in conformation 1A
+Unexpected number (6) of atoms in residue ARG 339 B   in conformation 1A
+Unexpected number (7) of atoms in residue LYS 367 B   in conformation 1A
+Unexpected number (6) of atoms in residue LEU 392 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 396 B   in conformation 1A
+Unexpected number (7) of atoms in residue ARG 400 B   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 404 B   in conformation 1A
+Unexpected number (5) of atoms in residue SER 406 B   in conformation 1A
+Unexpected number (6) of atoms in residue LYS 433 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 436 B   in conformation 1A
+Unexpected number (6) of atoms in residue PHE 470 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 475 B   in conformation 1A
+Unexpected number (5) of atoms in residue ASP 476 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 480 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 484 B   in conformation 1A
+Unexpected number (6) of atoms in residue LEU 488 B   in conformation 1A
+Unexpected number (8) of atoms in residue LYS 498 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 504 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 505 B   in conformation 1A
+Missing atoms or failed protonation for THR 129 A (BBN) -- please check the structure
+Group (BBN) for   876-   N   129-THR (A) [ -13.724   47.118   18.061] N
+Expected 2 interaction atoms for acids, found:
+               876-   N   129-THR (A) [ -13.724   47.118   18.061] N
+Expected 2 interaction atoms for bases, found:
+               876-   N   129-THR (A) [ -13.724   47.118   18.061] N
+Missing atoms or failed protonation for ALA 130 A (BBN) -- please check the structure
+Group (BBN) for   883-   N   130-ALA (A) [ -16.355   48.284   17.634] N
+Expected 2 interaction atoms for acids, found:
+               883-   N   130-ALA (A) [ -16.355   48.284   17.634] N
+Expected 2 interaction atoms for bases, found:
+               883-   N   130-ALA (A) [ -16.355   48.284   17.634] N
+Missing atoms or failed protonation for SER 249 B (BBN) -- please check the structure
+Group (BBN) for  5594-   N   249-SER (B) [ -12.438   50.721   15.960] N
+Expected 2 interaction atoms for acids, found:
+              5594-   N   249-SER (B) [ -12.438   50.721   15.960] N
+Expected 2 interaction atoms for bases, found:
+              5594-   N   249-SER (B) [ -12.438   50.721   15.960] N
+Missing atoms or failed protonation for VAL 251 B (BBN) -- please check the structure
+Group (BBN) for  5608-   N   251-VAL (B) [ -14.848   49.196   19.204] N
+Expected 2 interaction atoms for acids, found:
+              5608-   N   251-VAL (B) [ -14.848   49.196   19.204] N
+Expected 2 interaction atoms for bases, found:
+              5608-   N   251-VAL (B) [ -14.848   49.196   19.204] N
+Missing atoms or failed protonation for HIS 252 B (BBN) -- please check the structure
+Group (BBN) for  5615-   N   252-HIS (B) [ -16.251   48.029   17.139] N
+Expected 2 interaction atoms for acids, found:
+              5615-   N   252-HIS (B) [ -16.251   48.029   17.139] N
+Expected 2 interaction atoms for bases, found:
+              5615-   N   252-HIS (B) [ -16.251   48.029   17.139] N
+Missing atoms or failed protonation for HIS 252 B (HIS) -- please check the structure
+Group (HIS) for  5620-  CG   252-HIS (B) [ -16.347   48.749   14.258] C
+Expected 4 interaction atoms for acids, found:
+                 0- HE2   252-HIS (B) [ -17.752   51.528   13.663] H
+              5621- ND1   252-HIS (B) [ -15.464   49.423   13.443] N
+              5624- NE2   252-HIS (B) [ -17.143   50.724   13.724] N
+Expected 2 interaction atoms for bases, found:
+              5621- ND1   252-HIS (B) [ -15.464   49.423   13.443] N
+              5624- NE2   252-HIS (B) [ -17.143   50.724   13.724] N
+Missing atoms or failed protonation for GLU 253 B (BBN) -- please check the structure
+Group (BBN) for  5625-   N   253-GLU (B) [ -15.379   45.378   17.228] N
+Expected 2 interaction atoms for acids, found:
+              5625-   N   253-GLU (B) [ -15.379   45.378   17.228] N
+Expected 2 interaction atoms for bases, found:
+              5625-   N   253-GLU (B) [ -15.379   45.378   17.228] N
+Missing atoms or failed protonation for ARG 255 B (ARG) -- please check the structure
+Group (ARG) for  5646-  CZ   255-ARG (B) [ -22.927   49.125   17.926] C
+Expected 8 interaction atoms for acids, found:
+              5645-  NE   255-ARG (B) [ -22.364   48.225   17.128] N
+              5647- NH1   255-ARG (B) [ -23.957   48.783   18.689] N
+              5648- NH2   255-ARG (B) [ -22.463   50.367   17.959] N
+                 0-HH11   255-ARG (B) [ -24.312   47.838   18.664] H
+                 0-HH12   255-ARG (B) [ -24.386   49.468   19.295] H
+                 0-HH21   255-ARG (B) [ -21.680   50.629   17.378] H
+                 0-HH22   255-ARG (B) [ -22.893   51.051   18.565] H
+Expected 3 interaction atoms for bases, found:
+              5645-  NE   255-ARG (B) [ -22.364   48.225   17.128] N
+              5647- NH1   255-ARG (B) [ -23.957   48.783   18.689] N
+              5648- NH2   255-ARG (B) [ -22.463   50.367   17.959] N
+Missing atoms or failed protonation for GLU 275 B (COO) -- please check the structure
+Group (COO) for  5791-  CD   275-GLU (B) [  -5.018   54.317   20.637] C
+Expected 2 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Side chain interaction failed for GLU 275 B and LYS 125 A
+Side chain interaction failed for GLU 275 B and SER 249 B
+Side chain interaction failed for GLU 275 B and ASP 250 B
+Side chain interaction failed for GLU 275 B and ASN 273 B
+Side chain interaction failed for GLU 275 B and HIS 274 B
+Side chain interaction failed for ARG 278 B and GLU 275 B
+Side chain interaction failed for ARG 279 B and GLU 275 B
+Side chain interaction failed for GLU 282 B and GLU 275 B

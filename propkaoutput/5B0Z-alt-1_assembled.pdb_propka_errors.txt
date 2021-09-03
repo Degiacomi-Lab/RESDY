@@ -1,0 +1,50 @@
+Missing atoms or failed protonation for ASN  25 B (BBN) -- please check the structure
+Group (BBN) for   791-   N    25-ASN (B) [ -43.908   -4.066   46.602] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    25-ASN (B) [ -43.998   -4.243   47.592] H
+                 0-  H2    25-ASN (B) [ -44.400   -3.216   46.366] H
+               791-   N    25-ASN (B) [ -43.908   -4.066   46.602] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    25-ASN (B) [ -43.998   -4.243   47.592] H
+                 0-  H2    25-ASN (B) [ -44.400   -3.216   46.366] H
+               791-   N    25-ASN (B) [ -43.908   -4.066   46.602] N
+Missing atoms or failed protonation for ARG  31 D (BBN) -- please check the structure
+Group (BBN) for  2245-   N    31-ARG (D) [  14.779  -21.760   22.773] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    31-ARG (D) [  14.761  -22.702   23.138] H
+                 0-  H2    31-ARG (D) [  13.939  -21.274   23.054] H
+              2245-   N    31-ARG (D) [  14.779  -21.760   22.773] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    31-ARG (D) [  14.761  -22.702   23.138] H
+                 0-  H2    31-ARG (D) [  13.939  -21.274   23.054] H
+              2245-   N    31-ARG (D) [  14.779  -21.760   22.773] N
+Missing atoms or failed protonation for LYS  37 E (BBN) -- please check the structure
+Group (BBN) for  2981-   N    37-LYS (E) [   5.109  -21.883   89.455] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    37-LYS (E) [   5.009  -21.955   90.457] H
+                 0-  H2    37-LYS (E) [   5.238  -22.805   89.063] H
+              2981-   N    37-LYS (E) [   5.109  -21.883   89.455] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    37-LYS (E) [   5.009  -21.955   90.457] H
+                 0-  H2    37-LYS (E) [   5.238  -22.805   89.063] H
+              2981-   N    37-LYS (E) [   5.109  -21.883   89.455] N
+Missing atoms or failed protonation for LYS  20 F (BBN) -- please check the structure
+Group (BBN) for  3791-   N    20-LYS (F) [  11.099  -47.315   44.413] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    20-LYS (F) [  11.490  -47.993   43.774] H
+                 0-  H2    20-LYS (F) [  11.839  -46.736   44.784] H
+              3791-   N    20-LYS (F) [  11.099  -47.315   44.413] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    20-LYS (F) [  11.490  -47.993   43.774] H
+                 0-  H2    20-LYS (F) [  11.839  -46.736   44.784] H
+              3791-   N    20-LYS (F) [  11.099  -47.315   44.413] N
+Missing atoms or failed protonation for LYS  34 H (BBN) -- please check the structure
+Group (BBN) for  5258-   N    34-LYS (H) [ -37.662  -23.216   14.077] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    34-LYS (H) [ -37.833  -23.101   15.066] H
+                 0-  H2    34-LYS (H) [ -38.452  -23.679   13.650] H
+              5258-   N    34-LYS (H) [ -37.662  -23.216   14.077] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    34-LYS (H) [ -37.833  -23.101   15.066] H
+                 0-  H2    34-LYS (H) [ -38.452  -23.679   13.650] H
+              5258-   N    34-LYS (H) [ -37.662  -23.216   14.077] N

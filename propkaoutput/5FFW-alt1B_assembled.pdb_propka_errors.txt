@@ -1,0 +1,10 @@
+Missing atoms or failed protonation for GLN 629 B (BBN) -- please check the structure
+Group (BBN) for   918-   N   629-GLN (B) [  12.017   24.972   51.934] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   629-GLN (B) [  12.213   23.989   52.059] H
+                 0-  H2   629-GLN (B) [  11.901   25.409   52.837] H
+               918-   N   629-GLN (B) [  12.017   24.972   51.934] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   629-GLN (B) [  12.213   23.989   52.059] H
+                 0-  H2   629-GLN (B) [  11.901   25.409   52.837] H
+               918-   N   629-GLN (B) [  12.017   24.972   51.934] N

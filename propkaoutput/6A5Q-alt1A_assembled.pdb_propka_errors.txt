@@ -1,0 +1,18 @@
+Unexpected number (5) of atoms in residue HIS  36 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  37 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  70 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG  73 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLU  75 B   in conformation 1A
+Missing atoms or failed protonation for GLN  78 C (AMD) -- please check the structure
+Group (AMD) for  4325-  CD    78-GLN (C) [  37.454  -28.800  -13.848] C
+Expected 3 interaction atoms for acids, found:
+              4327- NE2    78-GLN (C) [  37.602  -27.488  -14.169] N
+                 0- HE2    78-GLN (C) [  38.064  -26.971  -14.903] H
+Expected 1 interaction atoms for bases, found:
+              4326- OE1    78-GLN (C) [  36.350  -29.320  -13.688] O
+Missing atoms or failed protonation for GLY 137 C (BBN) -- please check the structure
+Group (BBN) for  4811-   N   137-GLY (C) [  32.103  -34.538    7.495] N
+Expected 2 interaction atoms for acids, found:
+              4811-   N   137-GLY (C) [  32.103  -34.538    7.495] N
+Expected 2 interaction atoms for bases, found:
+              4811-   N   137-GLY (C) [  32.103  -34.538    7.495] N

@@ -1,0 +1,2 @@
+Unexpected number (22) of atoms in residue GLN  39 A   in conformation 1A
+Unexpected number (22) of atoms in residue GLN  39 B   in conformation 1A

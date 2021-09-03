@@ -1,0 +1,30 @@
+Missing atoms or failed protonation for ASN  25 D (BBN) -- please check the structure
+Group (BBN) for  6782-   N    25-ASN (D) [  42.740   52.429   38.794] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    25-ASN (D) [  42.607   53.250   39.367] H
+                 0-  H2    25-ASN (D) [  41.927   52.290   38.211] H
+              6782-   N    25-ASN (D) [  42.740   52.429   38.794] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    25-ASN (D) [  42.607   53.250   39.367] H
+                 0-  H2    25-ASN (D) [  41.927   52.290   38.211] H
+              6782-   N    25-ASN (D) [  42.740   52.429   38.794] N
+Missing atoms or failed protonation for LYS  27 F (BBN) -- please check the structure
+Group (BBN) for  8236-   N    27-LYS (F) [ -15.228   28.296   67.668] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    27-LYS (F) [ -14.817   27.494   68.125] H
+                 0-  H2    27-LYS (F) [ -15.725   28.853   68.348] H
+              8236-   N    27-LYS (F) [ -15.228   28.296   67.668] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    27-LYS (F) [ -14.817   27.494   68.125] H
+                 0-  H2    27-LYS (F) [ -15.725   28.853   68.348] H
+              8236-   N    27-LYS (F) [ -15.228   28.296   67.668] N
+Missing atoms or failed protonation for ARG  28 J (BBN) -- please check the structure
+Group (BBN) for 11294-   N    28-ARG (J) [  40.354   29.806   77.258] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    28-ARG (J) [  40.398   29.613   78.248] H
+                 0-  H2    28-ARG (J) [  41.248   29.600   76.835] H
+             11294-   N    28-ARG (J) [  40.354   29.806   77.258] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    28-ARG (J) [  40.398   29.613   78.248] H
+                 0-  H2    28-ARG (J) [  41.248   29.600   76.835] H
+             11294-   N    28-ARG (J) [  40.354   29.806   77.258] N

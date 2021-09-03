@@ -1,0 +1,30 @@
+Missing atoms or failed protonation for LEU  22 B (BBN) -- please check the structure
+Group (BBN) for   806-   N    22-LEU (B) [ -51.555    0.960   58.666] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    22-LEU (B) [ -51.902    0.851   59.608] H
+                 0-  H2    22-LEU (B) [ -51.617    0.077   58.180] H
+               806-   N    22-LEU (B) [ -51.555    0.960   58.666] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    22-LEU (B) [ -51.902    0.851   59.608] H
+                 0-  H2    22-LEU (B) [ -51.617    0.077   58.180] H
+               806-   N    22-LEU (B) [ -51.555    0.960   58.666] N
+Missing atoms or failed protonation for ARG  31 D (BBN) -- please check the structure
+Group (BBN) for  2262-   N    31-ARG (D) [  10.364  -20.917   19.086] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    31-ARG (D) [  10.467  -21.896   19.314] H
+                 0-  H2    31-ARG (D) [  10.892  -20.709   18.251] H
+              2262-   N    31-ARG (D) [  10.364  -20.917   19.086] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    31-ARG (D) [  10.467  -21.896   19.314] H
+                 0-  H2    31-ARG (D) [  10.892  -20.709   18.251] H
+              2262-   N    31-ARG (D) [  10.364  -20.917   19.086] N
+Missing atoms or failed protonation for SER  32 H (BBN) -- please check the structure
+Group (BBN) for  5287-   N    32-SER (H) [ -40.371  -21.632   15.662] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (H) [ -40.513  -22.477   16.197] H
+                 0-  H2    32-SER (H) [ -39.552  -21.736   15.080] H
+              5287-   N    32-SER (H) [ -40.371  -21.632   15.662] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (H) [ -40.513  -22.477   16.197] H
+                 0-  H2    32-SER (H) [ -39.552  -21.736   15.080] H
+              5287-   N    32-SER (H) [ -40.371  -21.632   15.662] N

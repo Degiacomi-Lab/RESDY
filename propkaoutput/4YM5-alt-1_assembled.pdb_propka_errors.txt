@@ -1,0 +1,30 @@
+Missing atoms or failed protonation for SER  32 D (BBN) -- please check the structure
+Group (BBN) for  2245-   N    32-SER (D) [  12.768   21.633  -22.710] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    32-SER (D) [  13.134   20.709  -22.888] H
+                 0-  H2    32-SER (D) [  13.399   22.133  -22.100] H
+              2245-   N    32-SER (D) [  12.768   21.633  -22.710] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    32-SER (D) [  13.134   20.709  -22.888] H
+                 0-  H2    32-SER (D) [  13.399   22.133  -22.100] H
+              2245-   N    32-SER (D) [  12.768   21.633  -22.710] N
+Missing atoms or failed protonation for LYS  16 F (BBN) -- please check the structure
+Group (BBN) for  3771-   N    16-LYS (F) [  12.476   50.734  -33.955] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    16-LYS (F) [  12.314   50.547  -32.976] H
+                 0-  H2    16-LYS (F) [  12.852   49.907  -34.397] H
+              3771-   N    16-LYS (F) [  12.476   50.734  -33.955] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    16-LYS (F) [  12.314   50.547  -32.976] H
+                 0-  H2    16-LYS (F) [  12.852   49.907  -34.397] H
+              3771-   N    16-LYS (F) [  12.476   50.734  -33.955] N
+Missing atoms or failed protonation for ARG  29 H (BBN) -- please check the structure
+Group (BBN) for  5270-   N    29-ARG (H) [ -53.213   19.014  -10.898] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    29-ARG (H) [ -53.208   19.010   -9.888] H
+                 0-  H2    29-ARG (H) [ -54.081   18.621  -11.232] H
+              5270-   N    29-ARG (H) [ -53.213   19.014  -10.898] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    29-ARG (H) [ -53.208   19.010   -9.888] H
+                 0-  H2    29-ARG (H) [ -54.081   18.621  -11.232] H
+              5270-   N    29-ARG (H) [ -53.213   19.014  -10.898] N

@@ -1,0 +1,6 @@
+Missing atoms or failed protonation for LYS 193 B (BBN) -- please check the structure
+Group (BBN) for  1302-   N   193-LYS (B) [  34.391    2.576   19.541] N
+Expected 2 interaction atoms for acids, found:
+              1302-   N   193-LYS (B) [  34.391    2.576   19.541] N
+Expected 2 interaction atoms for bases, found:
+              1302-   N   193-LYS (B) [  34.391    2.576   19.541] N

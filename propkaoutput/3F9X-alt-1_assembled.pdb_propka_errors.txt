@@ -1,0 +1,1 @@
+Unexpected number (5) of atoms in residue ARG 192 D   in conformation 1A

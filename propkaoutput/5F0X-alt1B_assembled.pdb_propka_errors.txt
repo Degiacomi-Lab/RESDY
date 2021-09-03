@@ -1,0 +1,65 @@
+Missing atoms or failed protonation for GLY  48 A (BBN) -- please check the structure
+Group (BBN) for   157-   N    48-GLY (A) [  22.653   -7.972  -23.094] N
+Expected 2 interaction atoms for acids, found:
+               157-   N    48-GLY (A) [  22.653   -7.972  -23.094] N
+Expected 2 interaction atoms for bases, found:
+               157-   N    48-GLY (A) [  22.653   -7.972  -23.094] N
+Missing atoms or failed protonation for ARG 214 A (ARG) -- please check the structure
+Group (ARG) for  1442-  CZ   214-ARG (A) [   5.679   -1.954  -19.801] C
+Expected 8 interaction atoms for acids, found:
+              1441-  NE   214-ARG (A) [   4.518   -1.366  -19.483] N
+              1444- NH2   214-ARG (A) [   6.088   -3.015  -19.117] N
+              1443- NH1   214-ARG (A) [   6.422   -1.506  -20.810] N
+                 0- HH1   214-ARG (A) [   6.805   -0.813  -21.437] H
+Expected 3 interaction atoms for bases, found:
+              1441-  NE   214-ARG (A) [   4.518   -1.366  -19.483] N
+              1444- NH2   214-ARG (A) [   6.088   -3.015  -19.117] N
+              1443- NH1   214-ARG (A) [   6.422   -1.506  -20.810] N
+Missing atoms or failed protonation for GLU 215 A (BBN) -- please check the structure
+Group (BBN) for  1445-   N   215-GLU (A) [   2.969    4.113  -22.892] N
+Expected 2 interaction atoms for acids, found:
+              1445-   N   215-GLU (A) [   2.969    4.113  -22.892] N
+Expected 2 interaction atoms for bases, found:
+              1445-   N   215-GLU (A) [   2.969    4.113  -22.892] N
+Missing atoms or failed protonation for GLY 387 A (BBN) -- please check the structure
+Group (BBN) for  2828-   N   387-GLY (A) [   7.451   -8.979   -7.925] N
+Expected 2 interaction atoms for acids, found:
+              2828-   N   387-GLY (A) [   7.451   -8.979   -7.925] N
+Expected 2 interaction atoms for bases, found:
+              2828-   N   387-GLY (A) [   7.451   -8.979   -7.925] N
+Missing atoms or failed protonation for ILE 388 A (BBN) -- please check the structure
+Group (BBN) for  2832-   N   388-ILE (A) [   9.930   -8.554   -9.025] N
+Expected 2 interaction atoms for acids, found:
+              2832-   N   388-ILE (A) [   9.930   -8.554   -9.025] N
+Expected 2 interaction atoms for bases, found:
+              2832-   N   388-ILE (A) [   9.930   -8.554   -9.025] N
+Missing atoms or failed protonation for ARG 214 B (ARG) -- please check the structure
+Group (ARG) for  4404-  CZ   214-ARG (B) [   9.781   -4.014  -10.806] C
+Expected 8 interaction atoms for acids, found:
+              4403-  NE   214-ARG (B) [   8.911   -4.909  -10.254] N
+              4405- NH1   214-ARG (B) [   9.325   -3.065  -11.675] N
+              4406- NH2   214-ARG (B) [  11.108   -4.075  -10.491] N
+                 0-HH21   214-ARG (B) [  11.561   -4.971  -10.384] H
+                 0-HH22   214-ARG (B) [  11.637   -3.224  -10.365] H
+Expected 3 interaction atoms for bases, found:
+              4403-  NE   214-ARG (B) [   8.911   -4.909  -10.254] N
+              4405- NH1   214-ARG (B) [   9.325   -3.065  -11.675] N
+              4406- NH2   214-ARG (B) [  11.108   -4.075  -10.491] N
+Missing atoms or failed protonation for GLU 215 B (BBN) -- please check the structure
+Group (BBN) for  4409-   N   215-GLU (B) [   9.266   -8.833   -9.131] N
+Expected 2 interaction atoms for acids, found:
+              4409-   N   215-GLU (B) [   9.266   -8.833   -9.131] N
+Expected 2 interaction atoms for bases, found:
+              4409-   N   215-GLU (B) [   9.266   -8.833   -9.131] N
+Missing atoms or failed protonation for GLY 387 B (BBN) -- please check the structure
+Group (BBN) for  5792-   N   387-GLY (B) [   0.076    3.203  -22.801] N
+Expected 2 interaction atoms for acids, found:
+              5792-   N   387-GLY (B) [   0.076    3.203  -22.801] N
+Expected 2 interaction atoms for bases, found:
+              5792-   N   387-GLY (B) [   0.076    3.203  -22.801] N
+Missing atoms or failed protonation for VAL 404 B (BBN) -- please check the structure
+Group (BBN) for  5904-   N   404-VAL (B) [  20.206   -6.741  -24.861] N
+Expected 2 interaction atoms for acids, found:
+              5904-   N   404-VAL (B) [  20.206   -6.741  -24.861] N
+Expected 2 interaction atoms for bases, found:
+              5904-   N   404-VAL (B) [  20.206   -6.741  -24.861] N

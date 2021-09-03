@@ -1,0 +1,38 @@
+Unexpected number (5) of atoms in residue ARG 134 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG  17 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  79 B   in conformation 1A
+Unexpected number (5) of atoms in residue ASP  98 C   in conformation 1A
+Unexpected number (5) of atoms in residue ASP  99 C   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 104 C   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 111 C   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 122 C   in conformation 1A
+Missing atoms or failed protonation for ARG  17 B (BBN) -- please check the structure
+Group (BBN) for   617-   N    17-ARG (B) [ -49.268   -8.959  -39.404] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    17-ARG (B) [ -49.754   -8.601  -38.594] H
+                 0-  H2    17-ARG (B) [ -49.902   -9.517  -39.958] H
+               617-   N    17-ARG (B) [ -49.268   -8.959  -39.404] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    17-ARG (B) [ -49.754   -8.601  -38.594] H
+                 0-  H2    17-ARG (B) [ -49.902   -9.517  -39.958] H
+               617-   N    17-ARG (B) [ -49.268   -8.959  -39.404] N
+Missing atoms or failed protonation for ASP  68 C (BBN) -- please check the structure
+Group (BBN) for  1300-   N    68-ASP (C) [ -54.048   33.985  -32.780] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    68-ASP (C) [ -54.004   33.882  -31.776] H
+                 0-  H2    68-ASP (C) [ -55.007   34.134  -33.061] H
+              1300-   N    68-ASP (C) [ -54.048   33.985  -32.780] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    68-ASP (C) [ -54.004   33.882  -31.776] H
+                 0-  H2    68-ASP (C) [ -55.007   34.134  -33.061] H
+              1300-   N    68-ASP (C) [ -54.048   33.985  -32.780] N
+Missing atoms or failed protonation for MET   1 D (BBN) -- please check the structure
+Group (BBN) for  1731-   N     1-MET (D) [ -31.018   37.254    9.276] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1     1-MET (D) [ -30.972   36.246    9.324] H
+                 0-  H2     1-MET (D) [ -31.300   37.621   10.174] H
+              1731-   N     1-MET (D) [ -31.018   37.254    9.276] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1     1-MET (D) [ -30.972   36.246    9.324] H
+                 0-  H2     1-MET (D) [ -31.300   37.621   10.174] H
+              1731-   N     1-MET (D) [ -31.018   37.254    9.276] N

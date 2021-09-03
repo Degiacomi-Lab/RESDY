@@ -1,0 +1,2 @@
+Unexpected number (6) of atoms in residue GLN  59 A   in conformation 1A
+Unexpected number (8) of atoms in residue LYS 141 A   in conformation 1A

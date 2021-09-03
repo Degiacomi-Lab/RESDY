@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/__main__.py", line 8, in <module>
+    main()
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/run.py", line 43, in main
+    my_molecule.calculate_pka()
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/molecular_container.py", line 87, in calculate_pka
+    self.conformations[name].calculate_pka(
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/conformation_container.py", line 198, in calculate_pka
+    version.calculate_desolvation(group)
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/version.py", line 52, in calculate_desolvation
+    return self.desolvation_model(self.parameters, group)
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/energy.py", line 37, in radial_volume_desolvation
+    all_atoms = group.atom.conformation_container.get_non_hydrogen_atoms()
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/conformation_container.py", line 546, in get_non_hydrogen_atoms
+    return [atom for atom in self.atoms if atom.element != 'H']
+  File "/Users/charliebrown/opt/anaconda3/lib/python3.8/site-packages/propka/conformation_container.py", line 546, in <listcomp>
+    return [atom for atom in self.atoms if atom.element != 'H']
+KeyboardInterrupt

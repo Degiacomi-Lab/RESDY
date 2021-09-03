@@ -1,0 +1,4 @@
+Unexpected number (6) of atoms in residue GLU  28 A   in conformation 1A
+Unexpected number (6) of atoms in residue LYS  32 A   in conformation 1A
+Unexpected number (8) of atoms in residue ARG  37 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  32 B   in conformation 1A

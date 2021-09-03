@@ -1,0 +1,32 @@
+Unexpected number (5) of atoms in residue LYS  37 A   in conformation 1A
+Unexpected number (5) of atoms in residue PRO  38 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 115 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 134 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  20 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG  23 B   in conformation 1A
+Unexpected number (5) of atoms in residue GLN  27 B   in conformation 1A
+Unexpected number (5) of atoms in residue LYS  79 B   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 182 C   in conformation 1A
+Unexpected number (6) of atoms in residue ARG 185 C   in conformation 1A
+Unexpected number (8) of atoms in residue ARG 260 C   in conformation 1A
+Unexpected number (6) of atoms in residue ARG 270 C   in conformation 1A
+Missing atoms or failed protonation for LYS  20 B (BBN) -- please check the structure
+Group (BBN) for   795-   N    20-LYS (B) [  10.160  -39.759   48.500] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    20-LYS (B) [  10.680  -40.419   49.061] H
+                 0-  H2    20-LYS (B) [   9.593  -39.179   49.102] H
+               795-   N    20-LYS (B) [  10.160  -39.759   48.500] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    20-LYS (B) [  10.680  -40.419   49.061] H
+                 0-  H2    20-LYS (B) [   9.593  -39.179   49.102] H
+               795-   N    20-LYS (B) [  10.160  -39.759   48.500] N
+Missing atoms or failed protonation for ARG 182 C (BBN) -- please check the structure
+Group (BBN) for  1438-   N   182-ARG (C) [  35.020   -8.886   -2.897] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   182-ARG (C) [  35.021   -8.950   -1.889] H
+                 0-  H2   182-ARG (C) [  34.184   -8.409   -3.203] H
+              1438-   N   182-ARG (C) [  35.020   -8.886   -2.897] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   182-ARG (C) [  35.021   -8.950   -1.889] H
+                 0-  H2   182-ARG (C) [  34.184   -8.409   -3.203] H
+              1438-   N   182-ARG (C) [  35.020   -8.886   -2.897] N

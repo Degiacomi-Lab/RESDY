@@ -1,0 +1,34 @@
+Missing atoms or failed protonation for LEU 922 A (BBN) -- please check the structure
+Group (BBN) for   787-   N   922-LEU (A) [  -9.210   -5.060   37.678] N
+Expected 2 interaction atoms for acids, found:
+               787-   N   922-LEU (A) [  -9.210   -5.060   37.678] N
+Expected 2 interaction atoms for bases, found:
+               787-   N   922-LEU (A) [  -9.210   -5.060   37.678] N
+Missing atoms or failed protonation for ALA 923 A (BBN) -- please check the structure
+Group (BBN) for   795-   N   923-ALA (A) [ -11.577   -3.680   36.504] N
+Expected 2 interaction atoms for acids, found:
+               795-   N   923-ALA (A) [ -11.577   -3.680   36.504] N
+Expected 2 interaction atoms for bases, found:
+               795-   N   923-ALA (A) [ -11.577   -3.680   36.504] N
+Missing atoms or failed protonation for GLU 985 A (COO) -- please check the structure
+Group (COO) for  1316-  CD   985-GLU (A) [ -19.501  -11.669   34.260] C
+Expected 2 interaction atoms for acids, found:
+              1317- OE1   985-GLU (A) [ -19.461  -10.856   33.314] O
+              2339-   O   929-PRO (B) [ -19.792  -11.613   33.192] O
+              1318- OE2   985-GLU (A) [ -18.905  -12.765   34.244] O
+Expected 2 interaction atoms for bases, found:
+              1317- OE1   985-GLU (A) [ -19.461  -10.856   33.314] O
+              2339-   O   929-PRO (B) [ -19.792  -11.613   33.192] O
+              1318- OE2   985-GLU (A) [ -18.905  -12.765   34.244] O
+Missing atoms or failed protonation for THR 931 B (BBN) -- please check the structure
+Group (BBN) for  2348-   N   931-THR (B) [ -20.809  -11.678   36.252] N
+Expected 2 interaction atoms for acids, found:
+              2348-   N   931-THR (B) [ -20.809  -11.678   36.252] N
+Expected 2 interaction atoms for bases, found:
+              2348-   N   931-THR (B) [ -20.809  -11.678   36.252] N
+Missing atoms or failed protonation for VAL 932 B (BBN) -- please check the structure
+Group (BBN) for  2355-   N   932-VAL (B) [ -18.364  -12.913   35.829] N
+Expected 2 interaction atoms for acids, found:
+              2355-   N   932-VAL (B) [ -18.364  -12.913   35.829] N
+Expected 2 interaction atoms for bases, found:
+              2355-   N   932-VAL (B) [ -18.364  -12.913   35.829] N

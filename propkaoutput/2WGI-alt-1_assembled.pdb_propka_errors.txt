@@ -1,0 +1,14 @@
+Missing atoms or failed protonation for ARG 104 A (ARG) -- please check the structure
+Group (ARG) for   656-  CZ   104-ARG (A) [   5.393   -8.801   44.222] C
+Expected 8 interaction atoms for acids, found:
+               657- NH1   104-ARG (A) [   5.734   -8.083   43.112] N
+               655-  NE   104-ARG (A) [   5.037  -10.115   44.105] N
+               658- NH2   104-ARG (A) [   5.399   -8.205   45.451] N
+                 0- HH1   104-ARG (A) [   6.625   -7.651   43.311] H
+                 0-  HE   104-ARG (A) [   4.774  -10.638   44.928] H
+                 0-HH21   104-ARG (A) [   5.659   -7.233   45.540] H
+                 0-HH22   104-ARG (A) [   5.143   -8.736   46.271] H
+Expected 3 interaction atoms for bases, found:
+               657- NH1   104-ARG (A) [   5.734   -8.083   43.112] N
+               655-  NE   104-ARG (A) [   5.037  -10.115   44.105] N
+               658- NH2   104-ARG (A) [   5.399   -8.205   45.451] N

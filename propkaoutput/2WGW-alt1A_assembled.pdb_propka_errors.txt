@@ -1,0 +1,29 @@
+Missing atoms or failed protonation for ASN  85 A (AMD) -- please check the structure
+Group (AMD) for   495-  CG    85-ASN (A) [  21.101   -7.965   47.090] C
+Expected 3 interaction atoms for acids, found:
+               497- ND2    85-ASN (A) [  21.532   -7.582   45.858] N
+                 0- HD2    85-ASN (A) [  20.985   -7.523   45.011] H
+Expected 1 interaction atoms for bases, found:
+               496- OD1    85-ASN (A) [  19.992   -8.464   47.274] O
+Missing atoms or failed protonation for HIS  87 A (HIS) -- please check the structure
+Group (HIS) for   512-  CG    87-HIS (A) [  18.695   -4.594   45.507] C
+Expected 4 interaction atoms for acids, found:
+                 0- HD1    87-HIS (A) [  20.744   -5.053   45.919] H
+               511- ND1    87-HIS (A) [  20.041   -4.365   45.688] N
+               514- NE2    87-HIS (A) [  19.120   -2.400   45.207] N
+Expected 2 interaction atoms for bases, found:
+               511- ND1    87-HIS (A) [  20.041   -4.365   45.688] N
+               514- NE2    87-HIS (A) [  19.120   -2.400   45.207] N
+Missing atoms or failed protonation for ARG 104 A (ARG) -- please check the structure
+Group (ARG) for   668-  CZ   104-ARG (A) [   2.301   -8.055   51.928] C
+Expected 8 interaction atoms for acids, found:
+               667-  NE   104-ARG (A) [   2.477   -9.319   51.443] N
+               669- NH1   104-ARG (A) [   1.956   -7.041   51.083] N
+               670- NH2   104-ARG (A) [   2.466   -7.807   53.259] N
+                 0-  HE   104-ARG (A) [   2.768  -10.058   52.068] H
+                 0-HH21   104-ARG (A) [   2.720   -8.558   53.885] H
+                 0-HH22   104-ARG (A) [   2.334   -6.872   53.619] H
+Expected 3 interaction atoms for bases, found:
+               667-  NE   104-ARG (A) [   2.477   -9.319   51.443] N
+               669- NH1   104-ARG (A) [   1.956   -7.041   51.083] N
+               670- NH2   104-ARG (A) [   2.466   -7.807   53.259] N

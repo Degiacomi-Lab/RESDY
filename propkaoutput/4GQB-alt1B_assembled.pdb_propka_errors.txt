@@ -1,0 +1,59 @@
+Unexpected number (5) of atoms in residue ARG  13 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLN  56 A   in conformation 1A
+Unexpected number (5) of atoms in residue HIS 146 A   in conformation 1A
+Unexpected number (5) of atoms in residue HIS 147 A   in conformation 1A
+Unexpected number (5) of atoms in residue SER 148 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 240 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 241 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLU 274 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 275 A   in conformation 1A
+Unexpected number (5) of atoms in residue LEU 299 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 302 A   in conformation 1A
+Unexpected number (5) of atoms in residue LYS 329 A   in conformation 1A
+Unexpected number (5) of atoms in residue ARG 526 A   in conformation 1A
+Unexpected number (5) of atoms in residue ASP 527 A   in conformation 1A
+Unexpected number (5) of atoms in residue MET 529 A   in conformation 1A
+Unexpected number (5) of atoms in residue ILE 530 A   in conformation 1A
+Missing atoms or failed protonation for ARG  62 A (ARG) -- please check the structure
+Group (ARG) for   387-  CZ    62-ARG (A) [ -29.860 -108.914  -19.934] C
+Expected 8 interaction atoms for acids, found:
+               386-  NE    62-ARG (A) [ -29.364 -109.896  -19.195] N
+               389- NH2    62-ARG (A) [ -30.452 -109.181  -21.083] N
+               388- NH1    62-ARG (A) [ -29.801 -107.658  -19.510] N
+                 0-HH11    62-ARG (A) [ -29.363 -107.444  -18.625] H
+                 0-HH12    62-ARG (A) [ -30.194 -106.916  -20.072] H
+Expected 3 interaction atoms for bases, found:
+               386-  NE    62-ARG (A) [ -29.364 -109.896  -19.195] N
+               389- NH2    62-ARG (A) [ -30.452 -109.181  -21.083] N
+               388- NH1    62-ARG (A) [ -29.801 -107.658  -19.510] N
+Missing atoms or failed protonation for ARG  68 A (ARG) -- please check the structure
+Group (ARG) for   432-  CZ    68-ARG (A) [ -16.824  -99.403  -16.194] C
+Expected 8 interaction atoms for acids, found:
+               431-  NE    68-ARG (A) [ -16.955  -99.717  -14.920] N
+               433- NH1    68-ARG (A) [ -15.842  -99.921  -16.906] N
+               434- NH2    68-ARG (A) [ -17.654  -98.535  -16.759] N
+                 0-  HE    68-ARG (A) [ -16.255 -100.318  -14.509] H
+                 0- HH1    68-ARG (A) [ -15.575  -99.193  -17.553] H
+Expected 3 interaction atoms for bases, found:
+               431-  NE    68-ARG (A) [ -16.955  -99.717  -14.920] N
+               433- NH1    68-ARG (A) [ -15.842  -99.921  -16.906] N
+               434- NH2    68-ARG (A) [ -17.654  -98.535  -16.759] N
+Missing atoms or failed protonation for GLU 169 A (BBN) -- please check the structure
+Group (BBN) for  1227-   N   169-GLU (A) [ -29.752  -92.340  -54.318] N
+Expected 2 interaction atoms for acids, found:
+              1227-   N   169-GLU (A) [ -29.752  -92.340  -54.318] N
+Expected 2 interaction atoms for bases, found:
+              1227-   N   169-GLU (A) [ -29.752  -92.340  -54.318] N
+Missing atoms or failed protonation for TRP  54 B (BBN) -- please check the structure
+Group (BBN) for  5238-   N    54-TRP (B) [ -14.833 -101.195  -17.250] N
+Expected 2 interaction atoms for acids, found:
+              5238-   N    54-TRP (B) [ -14.833 -101.195  -17.250] N
+Expected 2 interaction atoms for bases, found:
+              5238-   N    54-TRP (B) [ -14.833 -101.195  -17.250] N
+Missing atoms or failed protonation for GLN 256 B (AMD) -- please check the structure
+Group (AMD) for  6757-  CD   256-GLN (B) [ -37.972 -108.467  -23.609] C
+Expected 3 interaction atoms for acids, found:
+              6759- NE2   256-GLN (B) [ -37.935 -107.280  -22.948] N
+Expected 1 interaction atoms for bases, found:
+               315- OE1    53-GLU (A) [ -37.950 -107.736  -22.816] O
+              6758- OE1   256-GLN (B) [ -37.276 -109.429  -23.282] O

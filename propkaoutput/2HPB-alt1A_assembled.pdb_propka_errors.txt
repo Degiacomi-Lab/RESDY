@@ -1,0 +1,10 @@
+Missing atoms or failed protonation for MET  19 B (BBN) -- please check the structure
+Group (BBN) for  1923-   N    19-MET (B) [  16.013    2.418   98.478] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    19-MET (B) [  16.332    2.180   99.406] H
+                 0-  H2    19-MET (B) [  16.750    2.898   97.982] H
+              1923-   N    19-MET (B) [  16.013    2.418   98.478] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    19-MET (B) [  16.332    2.180   99.406] H
+                 0-  H2    19-MET (B) [  16.750    2.898   97.982] H
+              1923-   N    19-MET (B) [  16.013    2.418   98.478] N

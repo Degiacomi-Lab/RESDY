@@ -19,18 +19,17 @@ def calculate_pKa(code):
     try:
         code_for_df = code[:4]
         path = 'assembled/' + code
-        print('Obtaining pKa data for ' + code)
-        
-        if os.path.exists('propkaoutput/propkafile.txt'):
-            f = open('propkaoutput/propkafile.txt', 'a')
-        else:
-            f = open('propkaoutput/propkafile.txt', 'w')
-        f.write('\n' + '--------------')
-        f.write(code)
+        no_pdb = code[:-4]
+        print('Obtaining pKa data for ' + no_pdb)
+        error_file_name = 'propkaoutput/' + code + '_propka_errors.txt'
+        f = open(error_file_name, 'w')
+
         process = subprocess.Popen(['python', '-m', 'propka', path],
                             stdout=f, 
                             stderr=f)
         stdout, stderr = process.communicate()
+
+        propka_lys_fails = parse_propka_errors(error_file_name)
     except Exception as e:
         print('Failed to obtain pKa data for ' + code)
         return()
@@ -61,7 +60,7 @@ def calculate_pKa(code):
         for line in propres:
             if re.search('^   LYS' , line):
                 try:
-                    print(line)
+
                     line = line[6:]
                     line = line.split()
                     
@@ -96,7 +95,13 @@ def calculate_pKa(code):
         print("Error %s"%e)
         print('Failed to construct pKa dataframe')
         return()
-    return(df)
+
+    finally:
+        try:
+            os.remove(pkafile)
+        except:
+            pass
+    return(df, propka_lys_fails)
 
 
 
@@ -173,7 +178,7 @@ def break_up_and_calculate_sasa(pdb_code):
 
 #sasa is calculated for that lysine in the small molecule.
 
-            pts_2, indx_2 = S.atomselect(chain, [resid], ["NZ"],  use_resname=False, get_index=True)
+            pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
             x = sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
             #print(x[0])
             chain_resid_list.append(str(chain + str(resid)))
@@ -211,78 +216,37 @@ def break_up_and_calculate_sasa(pdb_code):
 
 
 
-def identity_of_local_amino_acids(pdb_code):
-    list_of_chains = list()
-    list_of_resid = list()
-    columns = ['PDB Code', 'Lysine Index', 'Local Amino Acid', 'Distance']
-    local_aa_df = pd.DataFrame(columns=columns)
+#This function parses the propka output file and appends the chain_resid of any lysines mentionned into list_remove.
+#This list is returned to main and later the residues in it are removed from the df.
 
-    columns_2 = ['PDB Code', 'Lysine Index', 'Score']
-    score_df = pd.DataFrame(columns=columns_2)
-    print('BREAKING UP MOLECULE')
-    print(pdb_code)
+def parse_propka_errors(path):
+    print('Checking for errors in propka')
+    f = open(path, 'r')
+    list_remove = list()
+    for line in f:
+        lys_raw = re.findall('LYS [\d]*[\s][\w]*', line)
 
-    M = bb.Molecule()
-    path = 'assembled/' + pdb_code
-    print(path)
-    M.import_pdb(path, include_hetatm=True)
-    df = M.data
+        for line in lys_raw:
+            words = line.split(' ')
+            resid = words[1]
+            chain = words[2]
+            chain_resid = chain + resid
+            list_remove.append(chain_resid)
 
-    lys_coords, lys_idx = M.atomselect('*','LYS', 'CA', use_resname=True, get_index=True)
+        lys_raw_2 = re.findall('[\d]*-LYS \(\w\)', line)
 
+        for line in lys_raw_2:
+            words = line.split(' ')
+            chain = (words[1])[1:-1]
+            words_2 = line.split('-')
+            resid = words_2[0]
+            chain_resid = chain + resid
+            list_remove.append(chain_resid)
 
-    for entry in lys_idx:
-        chain = df.at[entry, 'chain']
-        list_of_chains.append(chain)
-
-    for entry in lys_idx:
-        resid = df.at[entry, 'resid']
-        list_of_resid.append(resid)
-
-    all_coords, idx = M.atomselect('*','*','*', get_index=True)
-
-
-    for j in range(len(lys_coords)):
-        score = 0
-        try:
-            list_close_points = list()
-            
-            for i in range(len(all_coords)):
-                x_dist = (((lys_coords[j])[0] - (all_coords[i])[0])**2)
-                y_dist = (((lys_coords[j])[1] - (all_coords[i])[1])**2)
-                z_dist = (((lys_coords[j])[2] - (all_coords[i])[2])**2)
-                distance = math.sqrt(x_dist + y_dist + z_dist)
-                if distance < 7:
-                    index_of_aa = idx[i]
-                    atom_name = df.at[index_of_aa, 'name']
-                    if atom_name[0] == 'O':
-                        score = score + 1
-                    aa_resid = df.at[index_of_aa, 'resid']
-                    lys_resid = list_of_resid[j]
-
-                    if aa_resid == lys_resid:
-                        continue
-                    else:
-                        identity = df.at[index_of_aa, 'resname']
-                        d = ({'PDB Code': pdb_code, 'Lysine Index': lys_idx[j], 'Local Amino Acid': identity, 'Distance':distance})
-                        local_aa_df = local_aa_df.append(d, ignore_index=True)
-                    #print(local_aa_df)
-        except Exception as e:
-            print('Error %s'%e)
-        data = ({'PDB Code': pdb_code, 'Lysine Index': lys_idx[j], 'Score': score})
-        score_df = score_df.append(data, ignore_index=True)
-
-    score_df.to_csv('score_df.csv')
-    return(score_df)
+    
+    return list_remove
 
 
 
 
-
-if __name__ == "__main__":
-    try:    
-        print(identity_of_local_amino_acids('4XBJ-alt1A_assembled.pdb'))
-
-        
-    except Exception as e:
-        print("ERROR: %s"%e)
+#if __name__ == "__main__":

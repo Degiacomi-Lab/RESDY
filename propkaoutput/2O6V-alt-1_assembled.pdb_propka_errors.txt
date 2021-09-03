@@ -1,0 +1,89 @@
+Unexpected number (5) of atoms in residue ASP  32 A   in conformation 1A
+Unexpected number (6) of atoms in residue ASP  39 A   in conformation 1A
+Unexpected number (6) of atoms in residue GLN 202 B   in conformation 1A
+Unexpected number (7) of atoms in residue GLU 324 C   in conformation 1A
+Unexpected number (6) of atoms in residue LEU 373 C   in conformation 1A
+Unexpected number (7) of atoms in residue GLU 416 D   in conformation 1A
+Unexpected number (5) of atoms in residue SER 720 F   in conformation 1A
+Missing atoms or failed protonation for ASP  39 A (COO) -- please check the structure
+Group (COO) for   297-  CG    39-ASP (A) [  27.721   10.249   61.756] C
+Expected 2 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for MET 201 B (BBN) -- please check the structure
+Group (BBN) for   593-   N   201-MET (B) [  23.245   32.684   34.693] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   201-MET (B) [  23.245   31.678   34.605] H
+                 0-  H2   201-MET (B) [  24.073   33.060   34.253] H
+               593-   N   201-MET (B) [  23.245   32.684   34.693] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   201-MET (B) [  23.245   31.678   34.605] H
+                 0-  H2   201-MET (B) [  24.073   33.060   34.253] H
+               593-   N   201-MET (B) [  23.245   32.684   34.693] N
+Missing atoms or failed protonation for MET 301 C (BBN) -- please check the structure
+Group (BBN) for  1191-   N   301-MET (C) [  16.406   18.072   79.165] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   301-MET (C) [  16.407   18.073   80.175] H
+                 0-  H2   301-MET (C) [  16.463   17.121   78.830] H
+              1191-   N   301-MET (C) [  16.406   18.072   79.165] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   301-MET (C) [  16.407   18.073   80.175] H
+                 0-  H2   301-MET (C) [  16.463   17.121   78.830] H
+              1191-   N   301-MET (C) [  16.406   18.072   79.165] N
+Missing atoms or failed protonation for GLU 324 C (COO) -- please check the structure
+Group (COO) for  1375-  CD   324-GLU (C) [   4.684   10.405   65.991] C
+Expected 2 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for MET 401 D (BBN) -- please check the structure
+Group (BBN) for  1792-   N   401-MET (D) [  20.688  -23.351   35.722] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   401-MET (D) [  20.384  -24.037   36.399] H
+                 0-  H2   401-MET (D) [  19.904  -22.773   35.454] H
+              1792-   N   401-MET (D) [  20.688  -23.351   35.722] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   401-MET (D) [  20.384  -24.037   36.399] H
+                 0-  H2   401-MET (D) [  19.904  -22.773   35.454] H
+              1792-   N   401-MET (D) [  20.688  -23.351   35.722] N
+Missing atoms or failed protonation for GLU 416 D (COO) -- please check the structure
+Group (COO) for  1915-  CD   416-GLU (D) [  24.010  -20.915   36.051] C
+Expected 2 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for MET 601 E (BBN) -- please check the structure
+Group (BBN) for  2387-   N   601-MET (E) [  49.884   -2.881   22.149] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   601-MET (E) [  50.208   -3.487   22.890] H
+                 0-  H2   601-MET (E) [  50.668   -2.599   21.578] H
+              2387-   N   601-MET (E) [  49.884   -2.881   22.149] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   601-MET (E) [  50.208   -3.487   22.890] H
+                 0-  H2   601-MET (E) [  50.668   -2.599   21.578] H
+              2387-   N   601-MET (E) [  49.884   -2.881   22.149] N
+Missing atoms or failed protonation for GLN 702 F (BBN) -- please check the structure
+Group (BBN) for  2988-   N   702-GLN (F) [  11.032   18.519   28.855] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1   702-GLN (F) [  10.569   18.375   29.741] H
+                 0-  H2   702-GLN (F) [  11.033   17.655   28.332] H
+              2988-   N   702-GLN (F) [  11.032   18.519   28.855] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1   702-GLN (F) [  10.569   18.375   29.741] H
+                 0-  H2   702-GLN (F) [  11.033   17.655   28.332] H
+              2988-   N   702-GLN (F) [  11.032   18.519   28.855] N
+Side chain interaction failed for ASP  39 A and LYS  27 A
+Side chain interaction failed for ASP  39 A and GLN  31 A
+Side chain interaction failed for GLN  40 A and ASP  39 A
+Side chain interaction failed for GLN  41 A and ASP  39 A
+Side chain interaction failed for ARG  42 A and ASP  39 A
+Side chain interaction failed for ASP  52 A and ASP  39 A
+Side chain interaction failed for ARG  72 A and ASP  39 A
+Side chain interaction failed for ARG  74 A and ASP  39 A
+Side chain interaction failed for GLU 324 C and THR 322 C
+Side chain interaction failed for ASN 325 C and GLU 324 C
+Side chain interaction failed for LYS 327 C and GLU 324 C
+Side chain interaction failed for ARG 348 C and ASP  39 A
+Side chain interaction failed for ASP 352 C and GLU 324 C
+Side chain interaction failed for ASN 360 C and ASP  39 A
+Side chain interaction failed for GLU 416 D and GLN 402 D
+Side chain interaction failed for GLU 416 D and THR 414 D
+Side chain interaction failed for GLU 418 D and GLU 416 D
+Side chain interaction failed for ASP 421 D and GLU 416 D
+Side chain interaction failed for LYS 429 D and GLU 416 D
+Side chain interaction failed for LYS 433 D and GLU 416 D

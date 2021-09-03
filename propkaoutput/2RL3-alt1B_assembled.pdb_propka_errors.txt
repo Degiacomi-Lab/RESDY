@@ -1,0 +1,49 @@
+Missing atoms or failed protonation for ARG 109 A (ARG) -- please check the structure
+Group (ARG) for   710-  CZ   109-ARG (A) [  20.607   41.888   76.356] C
+Expected 8 interaction atoms for acids, found:
+               711- NH1   109-ARG (A) [  20.948   40.845   77.168] N
+               712- NH2   109-ARG (A) [  21.581   42.645   75.771] N
+               709-  NE   109-ARG (A) [  19.291   42.174   76.131] N
+                 0-  HE   109-ARG (A) [  19.037   42.949   75.535] H
+Expected 3 interaction atoms for bases, found:
+               711- NH1   109-ARG (A) [  20.948   40.845   77.168] N
+               712- NH2   109-ARG (A) [  21.581   42.645   75.771] N
+               709-  NE   109-ARG (A) [  19.291   42.174   76.131] N
+Missing atoms or failed protonation for GLU 190 A (COO) -- please check the structure
+Group (COO) for  1353-  CD   190-GLU (A) [  12.534   44.678   78.944] C
+Expected 2 interaction atoms for acids, found:
+              1354- OE1   190-GLU (A) [  11.295   44.447   78.923] O
+              1355- OE2   190-GLU (A) [  13.226   44.709   79.996] O
+              3576- OE2   227-GLU (B) [  13.382   45.616   80.212] O
+Expected 2 interaction atoms for bases, found:
+              1354- OE1   190-GLU (A) [  11.295   44.447   78.923] O
+              1355- OE2   190-GLU (A) [  13.226   44.709   79.996] O
+              3576- OE2   227-GLU (B) [  13.382   45.616   80.212] O
+Missing atoms or failed protonation for GLU 195 A (BBN) -- please check the structure
+Group (BBN) for  1385-   N   195-GLU (A) [  21.878   48.377   72.557] N
+Expected 2 interaction atoms for acids, found:
+              1385-   N   195-GLU (A) [  21.878   48.377   72.557] N
+Expected 2 interaction atoms for bases, found:
+              1385-   N   195-GLU (A) [  21.878   48.377   72.557] N
+Missing atoms or failed protonation for ALA 196 A (BBN) -- please check the structure
+Group (BBN) for  1394-   N   196-ALA (A) [  22.421   50.932   74.943] N
+Expected 2 interaction atoms for acids, found:
+              1394-   N   196-ALA (A) [  22.421   50.932   74.943] N
+Expected 2 interaction atoms for bases, found:
+              1394-   N   196-ALA (A) [  22.421   50.932   74.943] N
+Missing atoms or failed protonation for GLU 199 B (BBN) -- please check the structure
+Group (BBN) for  3351-   N   199-GLU (B) [  22.630   42.667   76.572] N
+Expected 2 interaction atoms for acids, found:
+              3351-   N   199-GLU (B) [  22.630   42.667   76.572] N
+Expected 2 interaction atoms for bases, found:
+              3351-   N   199-GLU (B) [  22.630   42.667   76.572] N
+Missing atoms or failed protonation for GLU 227 B (COO) -- please check the structure
+Group (COO) for  3574-  CD   227-GLU (B) [  12.926   45.473   81.368] C
+Expected 2 interaction atoms for acids, found:
+              3575- OE1   227-GLU (B) [  11.756   45.824   81.693] O
+              1355- OE2   190-GLU (A) [  13.226   44.709   79.996] O
+              3576- OE2   227-GLU (B) [  13.382   45.616   80.212] O
+Expected 2 interaction atoms for bases, found:
+              3575- OE1   227-GLU (B) [  11.756   45.824   81.693] O
+              1355- OE2   190-GLU (A) [  13.226   44.709   79.996] O
+              3576- OE2   227-GLU (B) [  13.382   45.616   80.212] O
