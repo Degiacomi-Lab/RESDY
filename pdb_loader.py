@@ -1,11 +1,13 @@
 import os
 import subprocess
 import re
+import sys
 import numpy as np
 import glob
 import fileinput
-import biobox as bb
+
 import pandas as pd
+import biobox as bb
 
 #OVERALL STRUCTURE...
 #First downloads file into conformations folder
@@ -14,11 +16,15 @@ import pandas as pd
 #Next writes file for alt AA confs
 
 
-
-
 #This script downloads the file and removes all the hetereoatoms that aren't metal ions.
 #The results is saved into a file with the structure *PDB code*-clean.pdb.
 def clean_and_split_alt_conformations(pdb, done_pdbs):
+
+    if not os.path.exists("curate_PDB"):
+        os.mkdir("curate_PDB")
+
+    if not os.path.exists("curate_PDB%sconformations"%os.sep):
+        os.mkdir("curate_PDB%sconformations"%os.sep)
 
     def checks(pdb, done_pdbs):
         print('Checking')
@@ -52,7 +58,13 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
 #Next it downloads the relevant pdb file.
 
-        subprocess.check_call("wget https://files.rcsb.org/download/" + pdb + '.pdb', shell=True)
+        if sys.platform == "win32":
+            line = "curl -o %s.pdb https://files.rcsb.org/download/%s.pdb"%(pdb, pdb)
+        else:
+            line = "wget https://files.rcsb.org/download/" + pdb + '.pdb'
+        subprocess.check_call(line, shell=True)
+        
+        
         f = open(pdb + '.pdb', 'r')
         list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
 
@@ -88,12 +100,11 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                             #f.write(pdb + ',Failed due to presence of Hetatm-replace Hetatm with ATOM in .pdb file to include.')
                             #f.close()
                             #break
+                            
+        f.close()
         os.remove(pdb + '.pdb')
                     
         return keep
-
-    
-
 
 
     def clean(pdb):
@@ -102,11 +113,19 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         try:
             #Firstly it goes into curate_PDB/conformations and downloads the .pdb file.
             cwd = os.getcwd()
-            print(cwd)
+            #print(cwd)
 
-            os.chdir('curate_PDB/conformations')
+            os.chdir("curate_PDB%sconformations"%os.sep)
             try:
-                subprocess.check_call("wget https://files.rcsb.org/download/" + pdb + '.pdb', shell=True)
+                
+                if sys.platform == "win32":
+                    line = "curl -o %s.pdb https://files.rcsb.org/download/%s.pdb"%(pdb, pdb)
+                else:
+                    line = "wget https://files.rcsb.org/download/" + pdb + '.pdb'
+                
+                subprocess.check_call(line, shell=True)
+                          
+                
             except Exception as e:
                 print('Error %s'%e)
                 os.chdir(cwd)
@@ -134,11 +153,10 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
         list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
 
-        read_file_path = 'curate_PDB/conformations/' + pdb + '.pdb'
+        read_file_path = "curate_PDB%sconformations%s%s.pdb"%(os.sep, os.sep, pdb)
 
         read_file = open(read_file_path)
-
-        write_file_path = 'curate_PDB/conformations/' + pdb + '-clean.pdb'
+        write_file_path = "curate_PDB%sconformations%s%s-clean.pdb"%(os.sep, os.sep, pdb)
         write_file = open(write_file_path, 'w')
 
     #Next it writes the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
@@ -149,8 +167,6 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                 if words[3] in list_of_metals:
                     write_file.write(line)
                     continue
-
-                    
 
             if line[:4] == 'ATOM':
                 words = line.split()
@@ -168,14 +184,15 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
     #Lastly it removes the original pdb file as it is not needed anymore.
 
+        read_file.close()
         os.remove(read_file_path)
         print('Clean ' + pdb)
 
-        return(pdb)
+        return pdb
 
     def replace_mse(pdb):
         print('Replacing MSE')
-        files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+        files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
         list_of_files = []
         for file in files:
             file_name = file[25:]
@@ -187,7 +204,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         for f in list_of_files:
 
             try:
-                path = 'curate_PDB/conformations/' + f
+                path = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, f)
 
                 with fileinput.FileInput(path, inplace = True) as f:
                     for line in f:
@@ -204,8 +221,6 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         return
 
 
-
-
     #This writes a new file for each alternate NMR structure.
 
     def split_struc_NMR(pdb):
@@ -214,25 +229,24 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
         number = 1
         name = pdb + '-alt-' + str(number) + '.pdb'
-        path = 'curate_PDB/conformations/' + pdb + '-clean.pdb'
+        path = "curate_PDB%sconformations%s%s-clean.pdb"%(os.sep, os.sep, pdb)
 
-    #Next it opens the file produced from teh cleaning script and opens a new file to write in.
+    #Next it opens the file produced from the cleaning script and opens a new file to write in.
 
         f = open(path)
 
         endmdls = list()
 
     #Next it searches to see if there are any 'ENDMDL' statements in the folder (i.e. if there are multiple models).
-
-
         for line in f:
             if re.search('ENDMDL', line):
                 endmdls.append(line)
 
+        f.close()
     #If there are no 'ENDMDL' statements the clean file is renamed to suit the new format.
 
         if len(endmdls) == 0:
-            path_rename = 'curate_PDB/conformations/' + name
+            path_rename = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, name)
             os.rename(path, path_rename)
             print('NO ALTERNATE WHOLE STRUCTURES FOUND FOR ' + pdb)
 
@@ -246,19 +260,19 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
     #First it opens the clean file in the conformations folder and opens a new folder to write in
 
             f = open(path)
-            path_rename = 'curate_PDB/conformations/' + name
+            path_rename = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, name)
             f_write = open(path_rename, 'w')
 
     #Next it writes the new file.
     #It includes every line until it gets to 'ENDMDL', where it opens a new file to write in.
     #The process stops when it gets to 'MASTER'
-
             for line in f:
                 try:
                     line = str(line)
 
                     if re.search('END ', line):
-                        print(path)
+                        f.close()
+                        f_write.close()
                         os.remove(path)
                         os.remove(path_rename)
                         break
@@ -270,7 +284,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                             f_write.close()
                             number = number + 1
                             name = pdb + '-alt-' + str(number) + '.pdb'
-                            path_rename = 'curate_PDB/conformations/' + name
+                            path_rename = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, name)
                             f_write = open(path_rename, 'w')
 
                         else:
@@ -278,8 +292,9 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                 except:
                     continue
         
-        
-        return()
+            f_write.close()
+            f.close()
+        return
 
 
 
@@ -290,7 +305,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
 #Firstly it gets a list of all the .pdb files present in curate_PDB/conformations and selects those that belong to the pdb we are interested in.
 
-        files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+        files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%s(os.sep, os.sep)))
         list_of_files = []
         for file in files:
             file_name = file[25:]
@@ -305,7 +320,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 #Next it checks if there are any alternate amino acid conformations present (i.e. if line[16 == A, B or C]).
 
                 for i in range(len(ABC_list)):
-                    path = 'curate_PDB/conformations/' + f
+                    path = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, f)
                     read_file = open(path)
 
                     for line in read_file:
@@ -329,7 +344,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                         if ABC_dict.get(ABC_list[i]) == 1:
                             name = f[:-6] + f[-5] + ABC_list[i] + '.pdb'
 
-                            write_path = 'curate_PDB/conformations/' + name
+                            write_path = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, name)
                             f_write = open(write_path, 'w')
 
                             target_letter = ABC_list[i]
@@ -357,11 +372,12 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
                     except Exception as e:
                         print("Error %s"%e)
+                        
 #The original is then removed if it has been replaced.
+                read_file.close()
                 os.remove(path)
-        return()
-
-
+                
+        return
 
 
 
@@ -371,7 +387,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
 
 #Firstly it gets a list of files in curate_PDB/conformations that belong to the pdb of interest.
 
-        files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+        files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
         list_of_files = []
         for file in files:
             file_name = file[25:]
@@ -379,7 +395,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                 list_of_files.append(file_name)
         
         for file in list_of_files:
-            path = 'curate_PDB/conformations/' + file
+            path = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, file)
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
 
@@ -403,7 +419,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         for f in list_of_files:
 
             try:
-                path = 'curate_PDB/conformations/' + f
+                path = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, f)
 
                 with fileinput.FileInput(path, inplace = True) as f:
                     for line in f:
@@ -418,12 +434,11 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                 return
 
 
-
 #This script removes any hydrogens from the files in curate_PDB/conformations
     def remove_hydrogens(pdb):
         print('REMOVING HYDROGENS......')
 #Firstly it puts each file name that belongs to the pdb of interest into a list
-        files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+        files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
         list_of_files = []
         for file in files:
             file_name = file[25:]
@@ -431,7 +446,8 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                 list_of_files.append(file_name)
 #Next it opens them in biobx and gets the index of each non-hydrogen atom
         for file in list_of_files:
-            path = 'curate_PDB/conformations/' + file
+            
+            path = "curate_PDB%sconformations%s%s"%(os.sep, os.sep, file)
             M = bb.Molecule()
             M.import_pdb(path)
             df = M.data
@@ -444,28 +460,18 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
             pts, idx = M.atomselect('*', '*', clean_names, get_index=True)
 #Next it writes a new pdb including all the atoms except the hydrogens.
             try:
-                M.write_pdb(path, index=idx, split_struc=True),
+                M.write_pdb(path, index=idx, split_struc=True)
             except:
                 M.write_pdb(path, index=idx, split_struc=False)
 
         return
 
-
-
-
-    
-
-
-
-
 #This script cleans every file (i.e. makes sure it can be read by biobox and makes sure the N and C count are the same).
 
-
-
+    #Fistly it checks if the pdb is in the log file and does ligand check (if enabled).
+    keep = checks(pdb, done_pdbs)
     try:
 
-        #Fistly it checks if the pdb is in the log file and does ligand check (if enabled).
-        keep = checks(pdb, done_pdbs)
         if keep == True:
             try:
         #Next it cleans the structure and splits into all alternative conformations.
@@ -486,18 +492,12 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
                 f = open('log_file.csv', 'a')
                 f.write('\n')
                 f.write(pdb + ', Failed cleaning process')
-        else:
-            pass
+
 
     except Exception as e:
-        print('Error %s'%e)
-        pass
-
+        raise Exception('Error %s'%e)
 
     return keep
-
-
-
 
 
 #This module renames the protein's chains durin the cleaning process so that they match the chain names given in the fasta file.
@@ -513,7 +513,12 @@ def rename_chains(pdb_code):
 
             name = pdb_code + '.fasta'
 
-            subprocess.check_call("wget -O " + name + " " + web_url, shell=True)
+            if sys.platform == "win32":
+                line = "curl -o " + name + " " + web_url
+            else:
+                line = "wget -O " + name + " " + web_url
+                
+            subprocess.check_call(line, shell=True)
 
         except Exception as e:
             print('Error %s'%e)
@@ -536,11 +541,13 @@ def rename_chains(pdb_code):
                         chains_raw.append(entry)
 
             #The fasta file is then removed
-
+            f.close()
             os.remove(name)
+            
         except Exception as e:
             print('Error %s'%e)
             print('Error parsing through fasta file.')
+            f.close()
             os.remove(name)
             return {}
 
@@ -590,7 +597,8 @@ def rename_chains(pdb_code):
 
         auth_list = list(replacement_dict.keys())
 
-        path = 'curate_PDB/conformations/' + pdb_code + '.pdb'
+        path = "curate_PDB%sconformations%s%s.pdb"%(os.sep, os.sep, pdb_code)
+        
 
 #The relevant file in conformations is then opened and rewritten.
 
@@ -637,24 +645,12 @@ def rename_chains(pdb_code):
     return
 
 
-
-
-
-
-
-        
-
-
-
-
-
-
 if __name__ == "__main__":
 
-    try:
-        pdb = '1ci4'
-        done_pdbs = []
-        clean_and_split_alt_conformations(pdb, done_pdbs)
+    #try:
+    pdb = '1ci4'
+    done_pdbs = []
+    clean_and_split_alt_conformations(pdb, done_pdbs)
         
-    except Exception as e:
-        print("ERROR: %s"%e)
+    #except Exception as e:
+    #    print("ERROR: %s"%e)

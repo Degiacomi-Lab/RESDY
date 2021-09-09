@@ -1,16 +1,15 @@
-import inquirer
-import urllib.request, urllib.parse, urllib.error
+#import inquirer
+#import urllib.request, urllib.parse, urllib.error
+#from bs4 import BeautifulSoup
+#import csv
+#from biobox.measures.calculators import sasa
+#import math
 import re
-from bs4 import BeautifulSoup
-import csv
 import pandas as pd
 import os
 import subprocess
 import numpy as np
 import biobox as bb
-from biobox.measures.calculators import sasa
-import math
-
 
 #This function calls propka to calculate the pKa of all groups in the assembled/*.pdb file and then parses the .pka file for the pka of lysine side chains in the protein.
 
@@ -18,10 +17,10 @@ def calculate_pKa(code):
 
     try:
         code_for_df = code[:4]
-        path = 'assembled/' + code
+        path = "assembled%s%s"%(os.sep, code)
         no_pdb = code[:-4]
         print('Obtaining pKa data for ' + no_pdb)
-        error_file_name = 'propkaoutput/' + code + '_propka_errors.txt'
+        error_file_name = "propkaoutput%s%s_propka_errors.txt"%(os.sep, os.sep)
         f = open(error_file_name, 'w')
 
         process = subprocess.Popen(['python', '-m', 'propka', path],
@@ -106,8 +105,6 @@ def calculate_pKa(code):
 
 
 
-
-
 #Forms small structures which include just the atoms surrounding the lysine of interest and computes SASA from that.
 
 def break_up_and_calculate_sasa(pdb_code):
@@ -123,7 +120,7 @@ def break_up_and_calculate_sasa(pdb_code):
 
 #Accesses .pdb file from assembled/
         M = bb.Molecule()
-        path = 'assembled/' + pdb_code
+        path = "assembled%s%s"%(os.sep, pdb_code)
         print(path)
         M.import_pdb(path, include_hetatm=True)
         df = M.data
@@ -161,7 +158,7 @@ def break_up_and_calculate_sasa(pdb_code):
                 x_dist = (((lys_coords[j])[0] - (all_coords[i])[0])**2)
                 y_dist = (((lys_coords[j])[1] - (all_coords[i])[1])**2)
                 z_dist = (((lys_coords[j])[2] - (all_coords[i])[2])**2)
-                distance = math.sqrt(x_dist + y_dist + z_dist)
+                distance = np.sqrt(x_dist + y_dist + z_dist)
                 if distance < 15:
                     list_close_points.append(idx[i])
             except:
@@ -179,7 +176,7 @@ def break_up_and_calculate_sasa(pdb_code):
 #sasa is calculated for that lysine in the small molecule.
 
             pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
-            x = sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
+            x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
             #print(x[0])
             chain_resid_list.append(str(chain + str(resid)))
             list_of_sasa.append(x[0])
@@ -207,18 +204,11 @@ def break_up_and_calculate_sasa(pdb_code):
         print('Failed to remove temporary pdb structure for ' + pdb_code)
         pass
         
-
     return(df)
 
 
-
-
-
-
-
-#This function parses the propka output file and appends the chain_resid of any lysines mentionned into list_remove.
+#This function parses the propka output file and appends the chain_resid of any lysines mentioned into list_remove.
 #This list is returned to main and later the residues in it are removed from the df.
-
 def parse_propka_errors(path):
     print('Checking for errors in propka')
     f = open(path, 'r')
@@ -242,11 +232,8 @@ def parse_propka_errors(path):
             resid = words_2[0]
             chain_resid = chain + resid
             list_remove.append(chain_resid)
-
     
     return list_remove
-
-
 
 
 #if __name__ == "__main__":

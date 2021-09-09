@@ -1,0 +1,8 @@
+,resid,chain,pKa,sasa,PDB Code,Chain_Resid,Assembled Index,plddt,Uniprot Entry,carbamylated
+0,6,A,10.37,60.646024533213804,1UBQ-alt-1_assembled,A6,51.0,0,P0CG48,False
+1,11,A,11.02,51.502648189405036,1UBQ-alt-1_assembled,A11,86.0,0,P0CG48,False
+2,27,A,10.53,20.823392405850445,1UBQ-alt-1_assembled,A27,210.0,0,P0CG48,False
+3,29,A,10.4,31.72913677847614,1UBQ-alt-1_assembled,A29,224.0,0,P0CG48,False
+4,33,A,10.27,39.088873893209296,1UBQ-alt-1_assembled,A33,258.0,0,P0CG48,False
+5,48,A,10.31,54.29814205232436,1UBQ-alt-1_assembled,A48,375.0,0,P0CG48,False
+6,63,A,10.66,68.37401521180996,1UBQ-alt-1_assembled,A63,499.0,0,P0CG48,False

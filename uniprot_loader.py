@@ -1,24 +1,25 @@
+import glob
+import re
+import os
+import sys
+import csv
+import subprocess
+
 import inquirer
 import urllib.request, urllib.parse, urllib.error
-import re
 from bs4 import BeautifulSoup
-import csv
-import pandas as pd
-import os
-import subprocess
-import numpy as np
-import sys
-import biobox as bb
-import glob
-import cleansplit as cs
 
+import pandas as pd
+import numpy as np
+import biobox as bb
+
+import pdb_loader as cs
 
 #This function obtains all the pdb codes given an organism
 #Note the name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome
 def get_pdbs(name_of_organism, code, df, done_pdbs):
 
     #Firstly a df is constructed for our results to go in
-
 
     list_of_entries = list()
     list_of_pdbs = list()
@@ -192,7 +193,7 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                                 resolution = (words[3])[:-1]
                                 keep = cs.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
                                 if keep == True:
-                                    files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+                                    files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
 
                                     for f in files:
                                         conf = f[25:-4]
@@ -211,7 +212,6 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                     continue
 
 #Here the code calls the get_chains function which gets chain information for the protein from the PDB.
-
 
                 except Exception as e:
                     print("ERROR: %s"%e)
@@ -281,7 +281,7 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
 
                 keep = cs.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
                 if keep == True:
-                    files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+                    files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
 
                     for f in files:
                         conf = f[25:-4]
@@ -297,8 +297,6 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
                                 data = ({'Uniprot Entry': uniprot_code, 'PDB Code': conf, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
                                 df = df.append(data, ignore_index=True)
 
-          
-
                 elif keep == False:
                     return(df)
 
@@ -306,7 +304,7 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
             print('Error %s'%e)
             continue
 
-    print(df)
+    #print(df)
 
     return(df)
 
@@ -394,14 +392,9 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
     return(pdb_codes_df, skip)
 
 
-
-
-
-
 #This code parses a .csv file to find uniprot and pdb codes to pass into the pipeline.
 #If you want to just input uniprot codes put them in the first column and leave the second empty
 #If you want to input pdb codes put the uniprot code in the first column and pdb code in the second.
-
 def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
 #First read .csv file.
     try:
@@ -452,9 +445,7 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
 
 
 
-
-
-def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs):
+def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs=[]):
 
 #Firstly it opens the correct uniprot page.
     try:
@@ -483,7 +474,7 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
 
                         keep = cs.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
                         if keep == True:
-                            files = np.array(glob.glob("curate_PDB/conformations/*pdb"))
+                            files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
                             print(files)
                             for f in files:
                                 pdb = f[25:29]
@@ -501,12 +492,9 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
                                                 print("Error %s"%e)
                                                 print('Error constructing df')
                                                 continue
-                        
-                   
                             continue
                 except:
                     continue
-
 
         except Exception as e:
             print("Error %s"%e)
@@ -517,102 +505,11 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
     
 
 
-
-
-
-
-
-
-
-
-
-#This code downloads alphafold structures into the assembled folder.
-
-def download_AF_struc(pdb):
-    print('Hello')
-    oldcwd = os.getcwd()
-    print(oldcwd)
-    if not os.path.exists("assembled"):
-        os.mkdir("assembled")
-    os.chdir('assembled')
-    try:
-        subprocess.check_call("wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb", shell=True)
-    except Exception as e:
-        print('AF structure not found for ' + pdb)
-        pass
-    os.chdir(oldcwd)
-    newcwd = os.getcwd
-    print(newcwd)
-    print('PDB Structure for ' + pdb + ' downloaded')
-    return()
-
-
-
-
-#Code obtains the plddt (a measure of certainty where 100 is high and 70 low) value for each lysine in an alphafold structure.
-
-
-
-def find_AF_plddt(AF_code_full):
-    print('Finding plddt')
-    #Opens .pdb file in assembled folder
-    columns = ['resid', 'chain', 'plddt']
-    dict_plddt = dict()
-
-    try:
-        f = open('assembled/' + AF_code_full, "r")
-        
-
-        #Parses though file to find plddt value.
-
-        for line in f:
-            try:
-                if re.search('CA  LYS', line):
-                    strline = str(line)
-                    data = strline.split()
-                    if len(data[4]) > 1:
-                        resid = (data[4])[1:]
-                        plddt = data[9]
-                        chain = (data[4])[0]
-                    elif len(data[4]) == 1:
-                        data = strline.split()
-                        resid = data[5]
-                        plddt = data[10]
-                        chain = data[4]
-                        chain_resid = chain + resid
-                    dict_plddt.update({chain_resid: plddt})
-
-
-            except Exception as e:
-                print("Error %s"%e)
-                continue
-
-        #Appends to dataframe which is later merged into the main dataframe.
-                
-
-    except Exception as e:
-        print("ERROR: %s"%e)
-        print('Failed to obtain pLDDT data for ' + AF_code_full)
-        return(dict_plddt)
-
-    return(dict_plddt)
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
 
     try:
         #print(get_pdbs('Oryctolagus+cuniculus+(Rabbit)', 'UP000001811'))
-        print(get_chains('6YAM'))
+        #print(get_chains('6YAM'))
         #columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution']
         #df = pd.DataFrame(columns=columns)
         #uniprot_code = 'P3892'
@@ -633,7 +530,12 @@ if __name__ == "__main__":
         #list_UNIPROT_codes = ['P50897']
         #print(get_pdbs_given_uniprot_code(list_UNIPROT_codes))
         
+        columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
+        pdb_codes_df = pd.DataFrame(columns=columns)
+        pdb_codes_df = construct_single_pdb_df("P09167", "1PRE", pdb_codes_df)
+        print(pdb_codes_df)
+        
     except Exception as e:
-                print("ERROR: %s"%e)
+        print("ERROR: %s"%e)
 
 

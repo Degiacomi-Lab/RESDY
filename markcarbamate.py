@@ -1,5 +1,4 @@
 import pandas as pd
-
 from numpy import true_divide
 
 avg_df = pd.read_csv('Output/results_0109_hetatm_2/results_likely.csv')
