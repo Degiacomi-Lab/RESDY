@@ -1,3 +1,22 @@
+#This is the main file from which all the different functions are called.
+#The general structure is as follows:
+#
+#The user gives their input (either uniprot codes, pdb codes or organism information).
+#get_initial_data is then called.
+#get_initial data identifies all relevant pdb entries, then puts them through the clean_split module, which cleans them and splits them up into the various alternate conformations.
+#This returns a df called pdb_codes_df, which contains every relevant pdb file, their resolution, the method obtained and the chains present.
+#The files are saved in curate_PDB/conformations
+#
+#Next they go through get_data and the autopatcher which patches where needed and returns clean files for each chain in curate_PDB/clean.
+#Each pdbs full structure is then reassembled by the assemble_multimer module.
+#
+#The pKa of every lysine in the multimer is then calculated.
+#The sasa of every lysine in the multimer is then also calculated, using a method where only the atoms close to each lysine are considered.
+#These results are then placed in the df 'pka_sasa_results'.
+#
+#Next the data is processed for all the different structures of a protein (either the most likely to form a carbamate value for each resid is taken or an average).
+#Lastly the data is plotted on a graph.
+
 import re
 import os
 import glob
@@ -15,25 +34,6 @@ import patcher
 import measure
 import postprocessing
 
-
-#This is the main file from which all the different functions are called.
-#The general structure is as follows:
-
-#The user gives their input (either uniprot codes, pdb codes or organism information).
-#get_initial_data is then called.
-#get_initial data identifies all relevant pdb entries, then puts them through the clean_split module, which cleans them and splits them up into the various alternate conformations.
-#This returns a df called pdb_codes_df, which contains every relevant pdb file, their resolution, the method obtained and the chains present.
-#The files are saved in curate_PDB/conformations
-
-#Next they go through get_data and the autopatcher which patches where needed and returns clean files for each chain in curate_PDB/clean.
-#Each pdbs full structure is then reassembled by the assemble_multimer module.
-
-#The pKa of every lysine in the multimer is then calculated.
-#The sasa of every lysine in the multimer is then also calculated, using a method where only the atoms close to each lysine are considered.
-#These results are then placed in the df 'pka_sasa_results'.
-
-#Next the data is processed for all the different structures of a protein (either the most likely to form a carbamate value for each resid is taken or an average).
-#Lastly the data is plotted on a graph.
 skip = 0
 running = True
 list_of_techniques = list()
@@ -79,7 +79,6 @@ while running:
             
 
 #If there isn't already a log file it writes a new one and writes the column headers.
-
                 try:
 
                     if not os.path.exists('log_file.csv'):
@@ -265,22 +264,23 @@ while running:
 
         elif answers ['Choice'] == 'Quit':
             skip = 1            
-            for f in glob.glob("curate_PDB%sclean%s*"%(os.sep, os.sep)):
+            
+            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
                 try:
                     os.remove(f)
                 except:
                     continue
-            for f in glob.glob("curate_PDB%sconformations%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
                 try:
                     os.remove(f)
                 except:
                     continue
-            for f in glob.glob("curate_PDB%sraw%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
                 try:
                     os.remove(f)
                 except:
                     continue
-            for f in glob.glob("assembled%s*"%os.sep):
+            for f in glob.glob(os.path.join("assembled", "*")):
                 try:
                     os.remove(f)
                 except:
@@ -388,9 +388,8 @@ while running:
                         except:
                             continue
 
-        #If it is a pdb code it is fed through get_data (and the autopatcher), which takes the file from curate_PDB/conformations, patches it, splits it into chains and saves it to curate_PDB/clean.
-        #Note the output from get_data (gap) is used to exclude points which could potentially be in contact with a loop that is patched by the autopatcher.
-
+                    #If it is a pdb code it is fed through get_data (and the autopatcher), which takes the file from curate_PDB/conformations, patches it, splits it into chains and saves it to curate_PDB/clean.
+                    #Note the output from get_data (gap) is used to exclude points which could potentially be in contact with a loop that is patched by the autopatcher.
                     else:
                         try:
         
@@ -399,34 +398,32 @@ while running:
                             print('****************')
                             print(gap_dict)
 
-        #The function correct_resid corrects the resid values in the clean files so that they are all in the correct position (as sometimes autopatcher produces some which are shifted).
-                            
+                            #The function correct_resid corrects the resid values in the clean files so that they are all in the correct position (as sometimes autopatcher produces some which are shifted).
                             patcher.correct_resid(pdb, chain)
 
                         except Exception as e:
                             print('Error: %s'%e)
                             print('FAILED FOR: ' + pdb + chain)
                             continue
+                        
                         try:
-                            for f in glob.glob("curate_PDB%sraw%s*"%(os.sep, os.sep)):
+                            for f in glob.glob(os.path.join("curate_PDB", "raw", "*")):
                                 os.remove(f)
                         except:
                             pass
 
-                    print(chain)
-
-                print(dict_uniprot)
 
                 if pdb[:2] == 'AF':
                     pass
+                
                 else:
-        #Next the multimer is assembled by taking all the individual chain's pdbs in curate_PDB/clean and assembling them into one protein (using biobox).
+                    
+                    #Next the multimer is assembled by taking all the individual chain's pdbs in curate_PDB/clean and assembling them into one protein (using biobox).
                     print('Assembling Multimer...')
                     chain_resid_near_failed_chain = patcher.assemble_multimer(gap_dict, pdb, list_chains)
-        
-#The code next cycles through the files in the assembled folder.
-
-                files = list((glob.glob("assembled%s*pdb"%(os.sep))))
+      
+                #The code next cycles through the files in the assembled folder.
+                files = list((glob.glob(os.path.join("assembled", "*"))))
 
                 if (len(files) != 0):
                     pdb_codes_df.index = pd.RangeIndex(len(pdb_codes_df.index))
@@ -434,13 +431,11 @@ while running:
                     pdb_codes_df.index = range(len(pdb_codes_df.index))
 
                     
-
                     for file in files:
 
                         code = file[10:]
 
-#If the structure is an alphafold structure it finds the plddt value (a measure of each residue's error in the structures prediction) and puts it in a dictionary.
-
+                        #If the structure is an alphafold structure it finds the plddt value (a measure of each residue's error in the structures prediction) and puts it in a dictionary.
                         if code[:2] == 'AF':
                             try:
                                 dict_plddt = af.find_AF_plddt(code)
@@ -449,12 +444,11 @@ while running:
                                 print("ERROR: %s"%e)
                                 continue
 
-#The functions calculate_pKa and break_up_and_calculate_sasa are then used to calculate the pKa and sasa respectively.
-#Each function produces a dataframe- these are later merged together to form one results df for the structure (pKa_sasa_res_df)
-
+                        #The functions calculate_pKa and break_up_and_calculate_sasa are then used to calculate the pKa and sasa respectively.
+                        #Each function produces a dataframe- these are later merged together to form one results df for the structure (pKa_sasa_res_df)
                         try:
 
-#The calculate_pKa function also produces propka_lys_fails- a list of chain_resids (chain + resid e.g. A12) to be removed as they appear in the propka output file.
+                            #The calculate_pKa function also produces propka_lys_fails- a list of chain_resids (chain + resid e.g. A12) to be removed as they appear in the propka output file.
                             print('Obtaining data...')
                             pka_results_df, propka_lys_fails = measure.calculate_pKa(code)
                             print('Obtaining sasa data...')
@@ -502,10 +496,8 @@ while running:
 
                             try:
 
-#This function removes any problematic entries from pka_sasa_res_df and returns the updated df.
-
+                                #This function removes any problematic entries from pka_sasa_res_df and returns the updated df.
                                 pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
-
 
                             except Exception as e:
                                 print('Error %s'%e)
@@ -519,14 +511,12 @@ while running:
                         except:
                             continue
 
-#Next the uniprot code is mapped against the pdb code into the df from dict uniprot.
-
+                        #Next the uniprot code is mapped against the pdb code into the df from dict uniprot.
                         pka_sasa_results['Uniprot Entry'] = pka_sasa_results['PDB Code'].map(dict_uniprot)
-                        pka_sasa_results.to_csv('Output%sresults.csv'%os.sep)
+                        pka_sasa_results.to_csv(os.path.join('Output', "results.csv"))
                         print(pka_sasa_results)
 
-#Next it is reported in the log_file that the structure passed.
-
+                        #Next it is reported in the log_file that the structure passed.
                         if not os.path.exists('log_file.csv'):
                             f = open('log_file.csv', 'w')
                             f.write('PDB Code,Result')
@@ -541,8 +531,7 @@ while running:
                         
                         print('done')
 
-
-#If the process fails, it is noted in the log_file
+            #If the process fails, it is noted in the log_file
             except Exception as e:
                 print(pdb + ' Failed')
                 print('Error %s'%e)
@@ -560,8 +549,7 @@ while running:
 
                 continue
 
-#Next removes .pka file and those in assembled, clean and raw 
-
+            #Next removes .pka file and those in assembled, clean and raw 
             finally:
                 try:
                     code = code[:-4]
@@ -573,22 +561,20 @@ while running:
                     pass
 
 
-            for f in glob.glob("assembled%s*"%os.sep):
+            for f in glob.glob(os.path.join("assembled", "*")):
                 os.remove(f)
-            for f in glob.glob("curate_PDB%sclean%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
                 file_name = f[17:]
                 if file_name[:4] == pdb:
                     os.remove(f)
-            for f in glob.glob("curate_PDB%sraw%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
                 os.remove(f)
 
-#Once it has done gone through all the files it removes everything from the conformations file.
-
-        for f in glob.glob("curate_PDB%sconformations%s*"%(os.sep, os.sep)):
+        #Once it has done gone through all the files it removes everything from the conformations file.
+        for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
             os.remove(f)
 
-#This reports what percentage of files pass the process and gives a percentage pass rate.
-
+        #This reports what percentage of files pass the process and gives a percentage pass rate.
         percentage_passed = postprocessing.report_on_results(pdb_codes_df, pka_sasa_results)
         print('Percentage passed = ' + str(percentage_passed) + '%')
 
@@ -632,7 +618,6 @@ while running:
         else:
             pass
 
-        
         #The next section plots pKa vs sasa on scatter plot.
         #Also allows any known carbamates to be marked (they will appear as a different colour on the plot).
         carbam_pdb_list = list()
@@ -642,7 +627,7 @@ while running:
 
         question_data_analysis = [
         inquirer.List('Choice',
-            message="Would you like the data to be anaylsed?",
+            message="Would you like the data to be analysed?",
                 choices=['Yes', 'No'],
                     ),
         ]
@@ -720,7 +705,6 @@ while running:
 #Next, the results are plotted.
 #A scatter plot is drawn of sasa (x) vs pKa (y) with each entry as a point.
 #Ideally the carbamates should have a high sasa and low pKa.
-
             try:
                 pka_sasa_results = postprocessing.analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list)
             except Exception as e:
@@ -729,7 +713,7 @@ while running:
                 
         print(pka_sasa_results)
 
-#Lastly all leftover files are removed.
+        #Lastly all leftover files are removed.
         try:
             os.remove("gap_data.txt")
         except:
@@ -747,22 +731,22 @@ while running:
         print("Error: %s"%e)
         if skip == 1:
             print('\n' + 'Goodbye' + '\n')
-            for f in glob.glob("curate_PDB%sclean%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
                 try:
                     os.remove(f)
                 except:
                     continue
-            for f in glob.glob("curate_PDB%sconformations%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
                 try:
                     os.remove(f)
                 except:
                     continue
-            for f in glob.glob("curate_PDB%sraw%s*"%(os.sep, os.sep)):
+            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
                 try:
                     os.remove(f)
                 except:
                     continue
-            for f in glob.glob("assembled%s*"%os.sep):
+            for f in glob.glob(os.path.join("assembled", "*")):
                 try:
                     os.remove(f)
                 except:

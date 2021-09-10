@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 
-import pdb_loader as cs
+import pdb_loader as pl
 
 #This function obtains all the pdb codes given an organism
 #Note the name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome
@@ -191,9 +191,9 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                                 PDBCODE = (words[1])[:-1]
                                 method_obtained = (words[2])[:-1]
                                 resolution = (words[3])[:-1]
-                                keep = cs.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
+                                keep = pl.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
                                 if keep == True:
-                                    files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
+                                    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*pdb")))
 
                                     for f in files:
                                         conf = f[25:-4]
@@ -279,9 +279,9 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
 
 #Clean and split is called to prepare the structures
 
-                keep = cs.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
+                keep = pl.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
                 if keep == True:
-                    files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
+                    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*pdb")))
 
                     for f in files:
                         conf = f[25:-4]
@@ -455,9 +455,9 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
     except Exception as e:
         print('Error %s'%e)
         print('Failed to obtain uniprot entry for uniprot code: ' + UNIPROT_code_pdb)
-        return()
+        return
 
-#Next it parses and looks for PDB entries
+    #Next it parses and looks for PDB entries
     for line in html_2:
         try:
             line = str(line)
@@ -468,13 +468,13 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
                     PDBCODE = (words[1])[:-1]
                     method_obtained = (words[2])[:-1]
                     resolution = (words[3])[:-1]
+                    
 #It only obtains the data from uniprot if the PDB code matches that which was input by the user.
-
                     if PDBCODE_inpt == PDBCODE:
 
-                        keep = cs.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
+                        keep = pl.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
                         if keep == True:
-                            files = np.array(glob.glob("curate_PDB%sconformations%s*pdb"%(os.sep, os.sep)))
+                            files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*pdb")))
                             print(files)
                             for f in files:
                                 pdb = f[25:29]
@@ -498,7 +498,7 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
 
         except Exception as e:
             print("Error %s"%e)
-            return()
+            return
 
 
     return(pdb_codes_df)
@@ -516,7 +516,6 @@ if __name__ == "__main__":
         #PDB_entries = '2jfi'
         #technique = 'X-ray'
         #resolution = '2.9'
-
 
         #data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDB_entries, 'Method Structure Obtained by': technique, 'Resolution':resolution})
         #df = df.append(data, ignore_index=True)

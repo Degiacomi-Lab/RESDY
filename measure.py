@@ -1,9 +1,3 @@
-#import inquirer
-#import urllib.request, urllib.parse, urllib.error
-#from bs4 import BeautifulSoup
-#import csv
-#from biobox.measures.calculators import sasa
-#import math
 import re
 import pandas as pd
 import os
@@ -11,16 +5,19 @@ import subprocess
 import numpy as np
 import biobox as bb
 
-#This function calls propka to calculate the pKa of all groups in the assembled/*.pdb file and then parses the .pka file for the pka of lysine side chains in the protein.
-
+#call propka to calculate the pKa of all groups in the assembled/*.pdb file
+#and then parse the .pka file for the pka of lysine side chains in the protein.
 def calculate_pKa(code):
 
     try:
         code_for_df = code[:4]
-        path = "assembled%s%s"%(os.sep, code)
+        path = os.path.join("assembled", code)
+        #path = "assembled%s%s"%(os.sep, code)
         no_pdb = code[:-4]
         print('Obtaining pKa data for ' + no_pdb)
-        error_file_name = "propkaoutput%s%s_propka_errors.txt"%(os.sep, os.sep)
+        
+        error_file_name = os.path.join("propkaoutput", "propka_errors.txt")
+        #error_file_name = "propkaoutput%s%s_propka_errors.txt"%(os.sep, os.sep)
         f = open(error_file_name, 'w')
 
         process = subprocess.Popen(['python', '-m', 'propka', path],
@@ -31,9 +28,8 @@ def calculate_pKa(code):
         propka_lys_fails = parse_propka_errors(error_file_name)
     except Exception as e:
         print('Failed to obtain pKa data for ' + code)
-        return()
+        return
 
-    
     try:
         pkafile = code_for_df + '_assembled.pka'
         propres = open(pkafile)
@@ -70,6 +66,7 @@ def calculate_pKa(code):
                 except Exception as e:
                     print("Error %s"%e)
                     continue
+
     except Exception as e:
         print("Error %s"%e)
         print('Failure parsing ' + code + '.pka')
@@ -79,7 +76,6 @@ def calculate_pKa(code):
         code_for_df = code[:-4]
     elif AF_struc == False:
         code_for_df = code_for_df
-
 
     try:
         df = pd.DataFrame({'resid':lys_number, 'chain':chain, 'pKa':pkas, 'PDB Code':code_for_df, 'Chain_Resid': chain_resid_list})
@@ -103,10 +99,8 @@ def calculate_pKa(code):
     return(df, propka_lys_fails)
 
 
-
-
-#Forms small structures which include just the atoms surrounding the lysine of interest and computes SASA from that.
-
+#Forms small structures which include just the atoms surrounding the lysine of interest
+#and computes SASA from that.
 def break_up_and_calculate_sasa(pdb_code):
 
     try:
@@ -118,20 +112,20 @@ def break_up_and_calculate_sasa(pdb_code):
         list_of_chains = list()
         chain_resid_list = list()
 
-#Accesses .pdb file from assembled/
+        #Accesses .pdb file from assembled/
         M = bb.Molecule()
-        path = "assembled%s%s"%(os.sep, pdb_code)
-        print(path)
+        path = os.path.join("assembled", pdb_code)
+        #path = "assembled%s%s"%(os.sep, pdb_code)
+        #print(path)
         M.import_pdb(path, include_hetatm=True)
         df = M.data
 
-#Finds the coordinates and index of all lysine residues in the protein.
-
+        #Finds the coordinates and index of all lysine residues in the protein.
         lys_coords, lys_idx = M.atomselect('*',['LYS', 'BLYS'], 'NZ', use_resname=True, get_index=True)
         df = M.data
-#Use get_subset...
-#Finds the chain and resid of each lysine.
 
+        #Use get_subset...
+        #Finds the chain and resid of each lysine.
         for entry in lys_idx:
             chain = df.at[entry, 'chain']
             list_of_chains.append(chain)
