@@ -1,0 +1,11 @@
+- create a working directory named upon user's preference
+  all tmp and final output should be dumped in there
+
+- call PDB loader from carbamylation.py, and not from uniprot_loader
+  i.e. uniprot loader only helps creating the database of codes
+
+- patching of PDB files should be carried out when files are downloaded and curated
+
+- error reporting should all be handled in main (all exceptions raised to the top)
+
+- bug in autopatch, existing files don't seem to be found

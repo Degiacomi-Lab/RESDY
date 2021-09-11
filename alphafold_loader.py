@@ -9,7 +9,8 @@ def download_AF_struc(pdb):
         os.mkdir("assembled")
     os.chdir('assembled')
     
-    try:    
+    print("> Downloading AlphaFold structure")
+    try:
         if sys.platform == "win32":
            line = "curl -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb"%(pdb, pdb)
         else:
@@ -20,16 +21,18 @@ def download_AF_struc(pdb):
     except Exception as e:
         print('AF structure not found for ' + pdb)
         pass
+    
     os.chdir(oldcwd)
     newcwd = os.getcwd
-    #print(newcwd)
-    print('PDB Structure for ' + pdb + ' downloaded')
+
     return
 
 #Code obtains the plddt (a measure of certainty where 100 is high and 70 low) value
 #for each lysine in an alphafold structure.
 def find_AF_plddt(AF_code_full):
-    print('Finding plddt')
+    
+    print('> Finding plddt')
+    
     #Opens .pdb file in assembled folder
     columns = ['resid', 'chain', 'plddt']
     dict_plddt = dict()
@@ -65,6 +68,8 @@ def find_AF_plddt(AF_code_full):
     except Exception as e:
         print("ERROR: %s"%e)
         print('Failed to obtain pLDDT data for ' + AF_code_full)
-        return(dict_plddt)
+        f.close()
+        return dict_plddt
 
+    f.close()
     return dict_plddt

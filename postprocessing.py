@@ -92,7 +92,7 @@ def average_prot(pka_sasa_results):
             list_of_pdbs = df_one_uniprot_code['PDB']
             list_of_pdbs_no_dup = list()
 
-#Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
+            #Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
             for entry in list_of_pdbs:
                 if entry not in list_of_pdbs_no_dup:
                     list_of_pdbs_no_dup.append(entry)
@@ -103,9 +103,8 @@ def average_prot(pka_sasa_results):
             print("ERROR: %s"%e)
             continue
 
-#For each element in the list a new df is created with just information beloning to that pdb.
+        #For each element in the list a new df is created with just information beloning to that pdb.
         for entry in list_of_pdbs_no_dup:
-            print('pdb')
             df_one_pdb = df_one_uniprot_code.where(df_one_uniprot_code['PDB'] == entry)
             df_one_pdb = df_one_pdb[df_one_pdb['PDB'].notna()]
             
@@ -120,24 +119,24 @@ def average_prot(pka_sasa_results):
                 list_of_homomers = [list_of_chains_no_dup]
             else:
                 list_of_homomers = check_chain_match(entry)
-                print(list_of_homomers)
+                #print(list_of_homomers)
 
 
 #For each group of equivalent chains it then creates a df.
             for entry in list_of_homomers:
-                print('homomers')
+                #print('homomers')
                 try:
-                    print(entry)
+                    #print(entry)
                     boolean_series = df_one_pdb.chain.isin(entry)
                     df_only_homomers = df_one_pdb[boolean_series]
                     
                     if len(df_only_homomers) == 0:
-                        print(df_only_homomers)
+                        #print(df_only_homomers)
                         continue
                     
                     try:
 
-#Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
+                        #Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
                         list_of_resids = df_only_homomers['resid']
                         list_of_resids_no_dup = list()
                         for entry in list_of_resids:
@@ -150,9 +149,9 @@ def average_prot(pka_sasa_results):
                         print("ERROR: %s"%e)
                         continue
 
-#Next makes a new df for each residue in the df_only_homomers
+                    #Next makes a new df for each residue in the df_only_homomers
                     for residue in list_of_resids_no_dup:
-                        print(residue)
+                        #print(residue)
                         try:
                             df_one_resid = df_only_homomers.where(df_only_homomers['resid'] == residue)
                             df_one_resid = df_one_resid[df_one_resid['resid'].notna()]
@@ -163,7 +162,6 @@ def average_prot(pka_sasa_results):
 
                         try:
                             df_one_resid["sasa"] = pd.to_numeric(df_one_resid["sasa"], downcast="float")
-
 
                             avg_pka = df_one_resid['pKa'].mean()
                             avg_sasa = df_one_resid['sasa'].mean()
@@ -215,12 +213,13 @@ def average_prot(pka_sasa_results):
                             print('Failed to construct final dataframe for residue ' + str(residue))
                             print("ERROR: %s"%e)
                             continue
+                        
                 except Exception as e:
                     print('Error %s'%e)
                     print('Failed to average data for residue ' + str(residue))
                     continue
             
-    #Lastly appends into df and saves as Output/results_avg.csv
+        #Lastly appends into df and saves as Output/results_avg.csv
         try:
             avgd_pka_sasa['sasa stdev'] = avgd_pka_sasa['sasa stdev'].fillna(0)
             avgd_pka_sasa['pKa stdev'] = avgd_pka_sasa['pKa stdev'].fillna(0)
@@ -229,8 +228,6 @@ def average_prot(pka_sasa_results):
                 os.mkdir("Output")
                 
             avgd_pka_sasa.to_csv(os.path.join("Output", "results_avg.csv"))
-            
-            print('Done')
 
         except Exception as e:
             print("ERROR: %s"%e)
@@ -240,11 +237,11 @@ def average_prot(pka_sasa_results):
     return avgd_pka_sasa
 
 
-#This module plots the results as a pKa vs sasa graph.
+#This function plots the results as a pKa vs SASA graph.
 #If lysines are input it marks them as red on the graph
 def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
-    print(carbam_pdb_list)
-    print(carbam_resid_list)
+    #print(carbam_pdb_list)
+    #print(carbam_resid_list)
 
     #Firstly it converts the resids to intergers.
     try:
@@ -254,7 +251,7 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
     except Exception as e:
         print("ERROR: %s"%e)
 
-#Next it creates another column where the known carbamylated lysines are marked with 'True' and the others with 'False'
+    #Next it creates another column where the known carbamylated lysines are marked with 'True' and the others with 'False'
     for i in range(len(carbam_resid_list)):
 
         try:
@@ -265,7 +262,7 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
             carbam_res = carbam_res.where(carbam_res['PDB Code'] == carbam_pdb_list[i])
 
             carbam_res_df = carbam_res[carbam_res['resid'].notna()]
-            print(carbam_res_df)
+            #print(carbam_res_df)
             #THIS ISN"T WORKING- HAVE TO RESET INDEX
 
             list_ids = carbam_res_df.index.tolist()
@@ -282,11 +279,12 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
     try:
         pka_sasa_results['carbamylated'] = pka_sasa_results.index.isin(list_of_ids)
         pka_sasa_results.to_csv(os.path.join('Output','results_carbamates_marked.csv'))
-        print(pka_sasa_results)
+        #print(pka_sasa_results)
+        
     except Exception as e:
             print("ERROR: %s"%e)
 
-#Next it plots the data.
+    #Next it plots the data.
     try:
         fig, ax = plt.subplots()
         colors = {True:'#68246D', False:'black'}
@@ -299,7 +297,7 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
         plt.ylabel('pKa')
         plt.show()
         pka_sasa_results.to_csv('RESULTS_marked.csv')
-        print('done')
+        #print('done')
 
     except Exception as e:
             print("ERROR: %s"%e)

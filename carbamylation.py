@@ -3,11 +3,13 @@
 #
 #The user gives their input (either uniprot codes, pdb codes or organism information).
 #get_initial_data is then called.
-#get_initial data identifies all relevant pdb entries, then puts them through the clean_split module, which cleans them and splits them up into the various alternate conformations.
+#get_initial data identifies all relevant pdb entries, then puts them through the clean_split module,
+# which cleans them and splits them up into the various alternate conformations.
 #This returns a df called pdb_codes_df, which contains every relevant pdb file, their resolution, the method obtained and the chains present.
 #The files are saved in curate_PDB/conformations
 #
-#Next they go through get_data and the autopatcher which patches where needed and returns clean files for each chain in curate_PDB/clean.
+#Next they go through patcher.patch_structure and the autopatcher
+#which patches where needed and returns clean files for each chain in curate_PDB/clean.
 #Each pdbs full structure is then reassembled by the assemble_multimer module.
 #
 #The pKa of every lysine in the multimer is then calculated.
@@ -41,96 +43,107 @@ list_of_techniques = list()
 while running:
     try:
         list_of_pdbs = list()
-        print('\n' + '------------------------------------------------------------')
-        print('\n' + '  Hello, press Ctrl + C at anytime to return to the start' + '\n')
-        print('------------------------------------------------------------' + '\n')
+        print('\n------------------------------------------------------------')
+        print('\n  Hello, press Ctrl + C anytime to return to the start \n')
+        print('------------------------------------------------------------\n')
 
-        #Firstly it lets the user chose how they want to input data.
-
+        #let the user chose how they want to input data.
         questions = [
         inquirer.List('Choice',
                         message="Do you want to search a organism's whole proteome or input specific PDB or Uniprot Codes?",
                         choices=['Whole Proteome', 'Input PDB Codes', 'Input Uniprot Codes', 'Input Codes Via .csv file', 'Quit'],
-                    ),
-        ]
+                    ),]
         answers = inquirer.prompt(questions)
+        
+        #If the user selects Quit, wipe everything and kill main loop.
+        if answers['Choice'] == 'Quit':
+            
+            skip = 1            
+            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            for f in glob.glob(os.path.join("assembled", "*")):
+                try:
+                    os.remove(f)
+                except:
+                    continue
+            raise Exception("Goodbye!")
+
+        # initialise PDB code DataFrame
         columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
         pdb_codes_df = pd.DataFrame(columns=columns)
 
-        if answers['Choice'] != 'Quit':
+        #ask the user if they want to wipe the log file (i.e. do you want to continue where the last left off or not).
+        question_log_file = [
+        inquirer.List('Choice',
+                        message="Do you want to wipe the previous log file?",
+                        choices=['Yes', 'No'],),]
+        answer_log_file = inquirer.prompt(question_log_file)
 
-#It then asks the user if they want to wipe the log file (i.e. do you want to continue where the last left off or not).
-            question_log_file = [
+        if answer_log_file['Choice'] == 'Yes':
+            try:
+                if os.path.exists('log_file.csv'):
+                    os.remove('log_file.csv')
+                else:
+                    print('No log file found to remove')
+            except Exception as e:
+                print('Failed to wipe log file')
+        
+            #If there isn't already a log file it writes a new one and writes the column headers.
+            try:
+                if not os.path.exists('log_file.csv'):
+                    f = open('log_file.csv', 'w')
+                    f.write('PDB Code,Result')
+                    f.close()
+                log_file_df = pd.read_csv('log_file.csv')
+                done_pdbs = log_file_df['PDB Code'].to_list()
+
+            except Exception as e:
+                print('Error parsing log_file.csv')
+                done_pdbs = []
+                pass
+
+            #Allow user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
+            #e.g. the user may want to only look at structures obtained by X-ray diffraction and with a resolution less than 3 angstroms
+
+            #It first asks the user for their preferences.
+            question_2 = [
             inquirer.List('Choice',
-                            message="Do you want to wipe the previous log file?",
-                            choices=['Yes', 'No'],
-                        ),
-            ]
-            answer_log_file = inquirer.prompt(question_log_file)
+                            message="Do you want to select structures only obtained by certain methods?",
+                            choices=['Yes', 'No'],),]
+            answer_2 = inquirer.prompt(question_2)
 
-            if answer_log_file['Choice'] == 'Yes':
-                try:
-                    if os.path.exists('log_file.csv'):
-                        os.remove('log_file.csv')
-                    else:
-                        print('No log file found to remove')
-                except Exception as e:
-                    print('Failed to wipe log file')
-            
+            question_3 = [
+            inquirer.List('Choice',
+                            message="Do you want to select structures based on resolution?",
+                            choices=['Yes', 'No'],),]
+            answer_3 = inquirer.prompt(question_3)
 
-#If there isn't already a log file it writes a new one and writes the column headers.
-                try:
+            if answer_3['Choice'] == 'Yes':
+                wanted_res = input('What maximum resolution would you like? (In Angstroms)')
 
-                    if not os.path.exists('log_file.csv'):
-                        f = open('log_file.csv', 'w')
-                        f.write('PDB Code,Result')
-                        f.close()
-                    log_file_df = pd.read_csv('log_file.csv')
-                    done_pdbs = log_file_df['PDB Code'].to_list()
-
-                except Exception as e:
-                    print('Error parsing log_file.csv')
-                    done_pdbs = []
-                    pass
-
-
-
-        #Allows user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
-        #e.g. the user may want to only look at structures obtained by X-ray diffraction and with a resolution less than 3 angstroms
-
-        #It first asks the user for their preferences.
-
-                question_2 = [
-                inquirer.List('Choice',
-                                message="Do you want to select structures only obtained by certain methods?",
-                                choices=['Yes', 'No'],
-                            ),
-                ]
-                answer_2 = inquirer.prompt(question_2)
-
-                question_3 = [
-                inquirer.List('Choice',
-                                message="Do you want to select structures based on resolution?",
-                                choices=['Yes', 'No'],
-                            ),
-                ]
-                answer_3 = inquirer.prompt(question_3)
-
-                if answer_3['Choice'] == 'Yes':
-                    wanted_res = input('What maximum resolution would you like? (In Angstroms)')
-
-
-
-    #Searches Uniprot for PDB codes
-    #Firstly asks for the name of the organismn (note it has to be exactly how it is written on the uniprot page).
-    #It then asks for the uniprot code (the code in the url on the proteome page - e.g. for homo sapiens the code it is UP000005640 from the URL https://www.uniprot.org/proteomes/UP000005640)
+        #Searches Uniprot for PDB codes
+        #Firstly asks for the name of the organismn (note it has to be exactly how it is written on the uniprot page).
+        #It then asks for the uniprot code (the code in the url on the proteome page - e.g. for homo sapiens the code it is UP000005640 from the URL https://www.uniprot.org/proteomes/UP000005640)
         if answers["Choice"] == 'Whole Proteome':
 
             name_of_organism = input('Name of organism:')
             name_of_organism = name_of_organism.replace(' ', '+')
             code = input('Uniprot proteome code:')
 
-    #It then goes into get_pdbs and gets all the information for that organism
+            #It then goes into get_pdbs and gets all the information for that organism
             try:
                 pdb_codes_df = ul.get_pdbs(name_of_organism, code, pdb_codes_df, done_pdbs)
                 print(pdb_codes_df)
@@ -140,10 +153,10 @@ while running:
             if (len(pdb_codes_df) == 0):
                 skip = 1
                 
-#If the user inputs the uniprot code alone it gets all the corresponding pdb codes and the AF code.
-
+        #If the user inputs the uniprot code alone it gets all the corresponding pdb codes and the AF code.
         if answers['Choice'] == 'Input Uniprot Codes':
-#Firstly it makes a list of the uniprot codes from the user.
+            
+            #Firstly it makes a list of the uniprot codes from the user.
             asking_for_uniprot_codes = True
             list_of_UNIPROT_codes = list()
 
@@ -155,9 +168,7 @@ while running:
                 question_more_uniprot_codes = [
                 inquirer.List('Choice',
                                 message="Are there more uniprot codes to add?",
-                                choices=['Yes', 'No'],
-                            ),
-                ]
+                                choices=['Yes', 'No'],),]
                 answer_more_uniprot_codes = inquirer.prompt(question_more_uniprot_codes)
 
                 if answer_more_uniprot_codes['Choice'] == 'No':
@@ -165,22 +176,17 @@ while running:
                 else:
                     pass
             
-            
-#Next it goes into get_data and gets relevant information/ downloads and clean all the pdb codes belonging to the uniprot codes given.
-
+            #go into get_data and gets relevant information/ downloads
+            #and clean all the pdb codes belonging to the uniprot codes given.
             for uniprot_code in list_of_UNIPROT_codes:
                 print('Getting data for: ' + uniprot_code)
                 pdb_codes_df = ul.get_pdbs_uniprot(uniprot_code, pdb_codes_df, done_pdbs)
 
-
-
-#If the user selects input PDB codes it goes here.
-
+        #If the user selects input PDB codes it goes here.
         if answers['Choice'] == 'Input PDB Codes':
             select_strucs = True
 
-#While select_strucs if true the user can input pdb codes
-
+            #While select_strucs if true the user can input pdb codes
             while select_strucs == True:
 
                 question_4 = [
@@ -191,18 +197,16 @@ while running:
                 ]
                 answer_4 = inquirer.prompt(question_4)
 
-#It asks for the pdb code and uniprot code if PDB codes are being put in or just the alphafold code if alphafold structures are being put in.
-#For each pdb code it downloads and cleans the structure and constructs a df consisting of the pdb code, uniprot code, method obtained and resolution.
-
+                #It asks for the pdb code and uniprot code if PDB codes are being put in or just the alphafold code if alphafold structures are being put in.
+                #For each pdb code it downloads and cleans the structure and constructs a df consisting of the pdb code, uniprot code, method obtained and resolution.
                 if answer_4["Choice"] == 'PDB':
                     try:
                         PDBCODE_inpt = input('What is the PDB code?')
                         PDBCODE_inpt = PDBCODE_inpt.upper()
-                        print(PDBCODE_inpt)
+                        #print(PDBCODE_inpt)
                         UNIPROT_code_pdb = input('What is the Uniprot Code?')
                         pdb_codes_df = ul.construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs)
-                        print(pdb_codes_df)
-
+                        #print(pdb_codes_df)
 
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -226,31 +230,25 @@ while running:
 
                     except Exception as e:
                         print("ERROR: %s"%e)
-                
-#It then asks if there are more to add, if there are it asks for another code, if there aren't it moves on.
 
+                #It then asks if there are more to add, if there are it asks for another code, if there aren't it moves on.
                 question_more_pdbs = [
                 inquirer.List('Choice',
                                 message="Are there more to add?",
-                                choices=['Yes', 'No'],
-                            ),
-                ]
+                                choices=['Yes', 'No'],),]
                 answer_4 = inquirer.prompt(question_more_pdbs)
 
                 if answer_4['Choice'] == 'No':
                     select_strucs = False
-                else:
-                    pass
 
+        #If the user wants to input through a csv file it follows the same processes as for uniprot code and pdb code inputs.
+        #CSV files should have the following format:
+        #Uniprot Entry PDB Code
+        #P1234         1ABC   ----- to look specifically at that pdb code
+        #P1234                 ----- to look at all pdbs for that uniprot entry
+        #P1234         AF      ---- to only look at the alphafold structure
 
-#If the user wants to input through a csv file it follows the same processes as for uniprot code and pdb code inputs.
-#CSV files should have the following format:
-#Uniprot Entry PDB Code
-#P1234         1ABC   ----- to look specifically at that pdb code
-#P1234                 ----- to look at all pdbs for that uniprot entry
-#P1234         AF      ---- to only look at the alphafold structure
-
-#The csv file is then parsed and the codes fed through as if they were entered manually.
+        #The csv file is then parsed and the codes fed through as if they were entered manually.
         if answers['Choice'] == 'Input Codes Via .csv file':
             csv_name = input('What is the name of the .csv file?')
             if csv_name[-4:] != '.csv':
@@ -258,41 +256,12 @@ while running:
             pdb_codes_df = ul.from_csv_file(csv_name, pdb_codes_df, done_pdbs)
             print(pdb_codes_df)
 
-
-
-#If the user selects quit all pdb files are wiped.
-
-        elif answers ['Choice'] == 'Quit':
-            skip = 1            
-            
-            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("assembled", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            raise Exception
-
-
-
         if (answer_2['Choice'] == 'Yes') or (answer_3['Choice'] == 'Yes'):
             if answer_2['Choice'] == 'Yes':
+                
                 a = True
                 list_of_techniques = list()
+                
                 while a == True:
 
                     question_5 = [
@@ -304,42 +273,36 @@ while running:
                     answer_5 = inquirer.prompt(question_5)
                     ans = str(answer_5['Choice'])
 
-
                     if ans != 'Done':
                         list_of_techniques.append(ans)
                     if ans == 'Done':
                         a = False
                         
-
             elif answer_2['Choice'] == 'No':
                 list_of_techniques = ['X-ray', 'NMR', 'EM', 'Fiber', 'IR', 'MODEL', 'Neutron', 'Predicted']
 
-#The desired techniques are appended to a list.
-
-#It then filters the df to remove those which don't fir the criteria set by the user.
-
+            #The desired techniques are appended to a list.
+            #It then filters the df to remove those which don't fit the criteria set by the user.
             raw_res = ul.search_by_technique(list_of_techniques, pdb_codes_df, wanted_res)
             pdb_codes_df = raw_res[0]
             print(pdb_codes_df)
             skip = raw_res[1]
 
-
-        else:
-            pass
-    
-
-        #Next the dictionary dict_uniprot is created, this is used to keep track of which pdb belongs to which uniprot entry and eventually map them to each other.
-
+        ###############
+        # GATHER DATA #
+        ###############
+        
+        #Next the dictionary dict_uniprot is created,
+        #this is used to keep track of which pdb belongs to which uniprot entry and eventually map them to each other.
         dict_uniprot = dict()
 
         #It then creates the pka_sasa_results df (the final df that will hold the results).
-
         columns = ['resid', 'chain', 'pKa', 'sasa', 'PDB Code', 'Chain_Resid']
         pka_sasa_results = pd.DataFrame(columns=columns)
         num = 0
 
-        #A list of pdb codes from the pdb_codes_df (the df with all the pdbs in) is then created and duplicates taken out.
-
+        #A list of pdb codes from the pdb_codes_df (the df with all the pdbs in)
+        #is then created and duplicates taken out.
         list_of_pdb_codes_no_dup = list()
         list_of_pdb_codes = pdb_codes_df['PDB Code']
         for entry in list_of_pdb_codes:
@@ -349,61 +312,71 @@ while running:
                 continue
         
         #Each one is then fed through one at a time.
-
         for pdb in list_of_pdb_codes_no_dup:
 
+            print(pdb)
+            
             try:
-                fail_dict = dict()
-                print(list_of_pdb_codes_no_dup)
+                
+                #fail_dict = dict()
+                
+                #print(list_of_pdb_codes_no_dup)
                 df_one_pdb_code = pd.DataFrame()
-        #A seperate df is then created which for each pdb code.
+        
+                #A seperate df is then created which for each pdb code.
                 df_one_pdb_code = pdb_codes_df[pdb_codes_df['PDB Code'] == pdb]
                 df_one_pdb_code = df_one_pdb_code.reset_index(drop=True)
                 df_one_pdb_code = df_one_pdb_code[df_one_pdb_code['PDB Code'].notna()]
                 list_chains = df_one_pdb_code['Chains'].to_list()
 
                 gap_dict = dict()
-        #Each entry in the df is then iterated through.
-
+        
+                #Each entry in the df is then iterated through.
                 for i in range(len(df_one_pdb_code)):
+                    
                     print(df_one_pdb_code)
                     chain = df_one_pdb_code.at[i, 'Chains']
                     uniprot = df_one_pdb_code.at[i, 'Uniprot Entry']
-        #If the code is an alphacode structure it is added into the dictionary dict_uniprot here.
 
+                    #If the code is an alphacode structure it is added into the dictionary dict_uniprot here.
                     if pdb[:2] != 'AF':
                         pdb_for_dict = pdb + '_assembled'
                         dict_uniprot.update({pdb_for_dict: uniprot})
                     else:
                         dict_uniprot.update({pdb: uniprot})
 
-                    print('***************** GETTING DATA FOR ' + str(pdb) + str(chain) + '*******************')
-                    print(chain)
-
-        #If the code is an alphacode structure it is downloaded into the assembled file here.
-
+                    print('\n*** GETTING DATA FOR %s %s ***'%(pdb, chain))
+                    
+                    #If the code is an alphacode structure it is downloaded into the assembled file here.
                     if pdb[:2]=='AF':
                         try:
                             af.download_AF_struc(pdb)
                         except:
                             continue
 
-                    #If it is a pdb code it is fed through get_data (and the autopatcher), which takes the file from curate_PDB/conformations, patches it, splits it into chains and saves it to curate_PDB/clean.
-                    #Note the output from get_data (gap) is used to exclude points which could potentially be in contact with a loop that is patched by the autopatcher.
+                    # If it is a pdb code it is fed through get_data (and the autopatcher),
+                    # which takes the file from curate_PDB/conformations, patches it,
+                    # splits it into chains and saves it to curate_PDB/clean.
+                    # Note: the output from patch_structure (gap) is used to exclude points
+                    #       which could potentially be in contact with a loop that is
+                    #       patched by the autopatcher.
                     else:
                         try:
-        
-                            gap = patcher.get_data(pdb, chain)
+      
+                            print('> patching PDB...')
+                            gap = patcher.patch_structure(pdb, chain)
                             gap_dict[chain] = gap
-                            print('****************')
-                            print(gap_dict)
+                            print(">> maximal gap: %s"%gap_dict)
 
                             #The function correct_resid corrects the resid values in the clean files so that they are all in the correct position (as sometimes autopatcher produces some which are shifted).
                             patcher.correct_resid(pdb, chain)
 
+                            #Next the multimer is assembled by taking all the individual chain's pdbs in curate_PDB/clean and assembling them into one protein (using biobox).
+                            print('> Assembling patched PDB...')
+                            chain_resid_near_failed_chain = patcher.assemble_multimer(gap_dict, pdb, list_chains)
+
                         except Exception as e:
-                            print('Error: %s'%e)
-                            print('FAILED FOR: ' + pdb + chain)
+                            print('Error: PDB %s, chain %s, %s'%(pdb, chain, e))
                             continue
                         
                         try:
@@ -411,25 +384,14 @@ while running:
                                 os.remove(f)
                         except:
                             pass
-
-
-                if pdb[:2] == 'AF':
-                    pass
-                
-                else:
-                    
-                    #Next the multimer is assembled by taking all the individual chain's pdbs in curate_PDB/clean and assembling them into one protein (using biobox).
-                    print('Assembling Multimer...')
-                    chain_resid_near_failed_chain = patcher.assemble_multimer(gap_dict, pdb, list_chains)
-      
+    
                 #The code next cycles through the files in the assembled folder.
                 files = list((glob.glob(os.path.join("assembled", "*"))))
 
                 if (len(files) != 0):
+                    
                     pdb_codes_df.index = pd.RangeIndex(len(pdb_codes_df.index))
-
                     pdb_codes_df.index = range(len(pdb_codes_df.index))
-
                     
                     for file in files:
 
@@ -449,67 +411,59 @@ while running:
                         try:
 
                             #The calculate_pKa function also produces propka_lys_fails- a list of chain_resids (chain + resid e.g. A12) to be removed as they appear in the propka output file.
-                            print('Obtaining data...')
+                            print('measuring pKa...')
                             pka_results_df, propka_lys_fails = measure.calculate_pKa(code)
-                            print('Obtaining sasa data...')
+                            print('measuring SASA...')
                             sasa_results_df = measure.break_up_and_calculate_sasa(code)
-                            print('Got pKa and sasa')
-
-                            try:
-                        #The reuslting dfs from the sasa and pka calculators are merged and any columns not needed dropped.
-                        ##########POTENTIALLY COULD IMPROVE THE MERGE SO I DON'T NEED TO GET RID OF OTHER COLUMNS####################
-
-                                pka_results_df["resid"] = pd.to_numeric(pka_results_df["resid"], downcast="float")
-
-                                pka_sasa_res_df = pd.merge(sasa_results_df, pka_results_df, how='inner', on=['Chain_Resid', 'chain', 'resid'])
-                                print(pka_sasa_res_df)
-                                #pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
-                                #pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
-                                #pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
-                                #pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
-
-#If the structure is an AF structure the plddt data is added to the df.
-#For pdb structures the value is assumed to be 0.
-
-                                if code[:2] == 'AF':
-
-                                    pka_sasa_res_df['plddt'] = pka_sasa_res_df['Chain_Resid'].map(dict_plddt)
-                                    pka_sasa_res_df['plddt'] = pka_sasa_res_df['plddt'].fillna(0)
-                                    pka_sasa_res_df['plddt'] = pd.to_numeric(pka_sasa_res_df['plddt'],errors='coerce')
-                                    pka_sasa_res_df = pka_sasa_res_df.where(pka_sasa_res_df['plddt'] > 70)
-                                    pka_sasa_res_df = pka_sasa_res_df[pka_sasa_res_df['plddt'].notna()]
-
-                                else:
-                                    pka_sasa_res_df['plddt'] = '0'
-
-
-                            except Exception as e:
-                                print('Error %s'%e)
-                                print('Failed to put data into dataframe for ' + file)
-                                continue
-                            
-
-                           
-                            
-                            if code[:2] =='AF':
-                                chain_resid_near_failed_chain = list()
-
-                            try:
-
-                                #This function removes any problematic entries from pka_sasa_res_df and returns the updated df.
-                                pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
-
-                            except Exception as e:
-                                print('Error %s'%e)
-                                print('Failure removing problematic values')
-                                continue
-
-
-                            pka_sasa_results = pka_sasa_results.append(pka_sasa_res_df)
-
 
                         except:
                             continue
+
+                        try:
+                            #The resulting dfs from the sasa and pka calculators are merged and any columns not needed dropped.
+                            ###POTENTIALLY COULD IMPROVE THE MERGE SO I DON'T NEED TO GET RID OF OTHER COLUMNS####################
+
+                            pka_results_df["resid"] = pd.to_numeric(pka_results_df["resid"], downcast="float")
+
+                            pka_sasa_res_df = pd.merge(sasa_results_df, pka_results_df, how='inner', on=['Chain_Resid', 'chain', 'resid'])
+                            print(pka_sasa_res_df)
+                            #pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
+                            #pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
+                            #pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
+                            #pka_sasa_res_df.rename(columns={'resid_y': 'resid'}, inplace=True)
+
+                            #If the structure is an AF structure the plddt data is added to the df.
+                            #For pdb structures the value is assumed to be 0.
+                            if code[:2] == 'AF':
+
+                                pka_sasa_res_df['plddt'] = pka_sasa_res_df['Chain_Resid'].map(dict_plddt)
+                                pka_sasa_res_df['plddt'] = pka_sasa_res_df['plddt'].fillna(0)
+                                pka_sasa_res_df['plddt'] = pd.to_numeric(pka_sasa_res_df['plddt'],errors='coerce')
+                                pka_sasa_res_df = pka_sasa_res_df.where(pka_sasa_res_df['plddt'] > 70)
+                                pka_sasa_res_df = pka_sasa_res_df[pka_sasa_res_df['plddt'].notna()]
+
+                            else:
+                                pka_sasa_res_df['plddt'] = '0'
+
+
+                        except Exception as e:
+                            print('Error %s'%e)
+                            print('Failed to put data into dataframe for ' + file)
+                            continue
+                        
+                        if code[:2] =='AF':
+                            chain_resid_near_failed_chain = list()
+
+                        try:
+                            #This function removes any problematic entries from pka_sasa_res_df and returns the updated df.
+                            pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
+
+                        except Exception as e:
+                            print('Error %s'%e)
+                            print('Failure removing problematic values')
+                            continue
+
+                        pka_sasa_results = pka_sasa_results.append(pka_sasa_res_df)
 
                         #Next the uniprot code is mapped against the pdb code into the df from dict uniprot.
                         pka_sasa_results['Uniprot Entry'] = pka_sasa_results['PDB Code'].map(dict_uniprot)
@@ -532,6 +486,7 @@ while running:
                         print('done')
 
             #If the process fails, it is noted in the log_file
+            # TO FIX: will only report a subset of failures!
             except Exception as e:
                 print(pdb + ' Failed')
                 print('Error %s'%e)
@@ -560,7 +515,6 @@ while running:
                 except:
                     pass
 
-
             for f in glob.glob(os.path.join("assembled", "*")):
                 os.remove(f)
             for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
@@ -578,14 +532,14 @@ while running:
         percentage_passed = postprocessing.report_on_results(pdb_codes_df, pka_sasa_results)
         print('Percentage passed = ' + str(percentage_passed) + '%')
 
+        ###################
+        # DATA PROCESSING #
+        ###################
 
-
-#Next it starts the data processing.
-
-#Firstly it asks the user how they would like the data to be processed.
-#Average by resid gives the mean sasa and pka values for each resid.
-#Take most likely for each resid gives the entry with the lowest pKa for each resid.
-#Keep data raw changes nothing.
+        #ask the user how they would like the data to be processed.
+        #Average by resid gives the mean sasa and pka values for each resid.
+        #Take most likely for each resid gives the entry with the lowest pKa for each resid.
+        #Keep data raw changes nothing.
 
         question_avgs = [
         inquirer.List('Choice',
@@ -599,7 +553,7 @@ while running:
             try:
                 print('AVERAGED DATA...')
                 pka_sasa_results = postprocessing.average_prot(pka_sasa_results)
-                print(pka_sasa_results)
+                #print(pka_sasa_results)
             except Exception as e:
                     print("ERROR: %s"%e)
                     print('Failed to average data.')
@@ -610,13 +564,12 @@ while running:
             try:
                 print('TAKING MOST LIKELY FOR EACH RESID')
                 pka_sasa_results = postprocessing.get_most_likely_value(pka_sasa_results)
-                print(pka_sasa_results)
+                #print(pka_sasa_results)
             except Exception as e:
                 print("ERROR: %s"%e)
                 print('Failed to take most likely for each resid.')
                 pass
-        else:
-            pass
+
 
         #The next section plots pKa vs sasa on scatter plot.
         #Also allows any known carbamates to be marked (they will appear as a different colour on the plot).
@@ -633,7 +586,6 @@ while running:
         ]
 
         answer_data_analysis = inquirer.prompt(question_data_analysis)
-
 
         if answer_data_analysis['Choice'] == 'Yes':
             question_carbam = [
@@ -655,7 +607,6 @@ while running:
                             list_of_pdbs_no_dup.append(entry)
                         else:
                             continue
-
 
                     question_carbam_pdb = [
                     inquirer.List('Choice',
@@ -702,17 +653,17 @@ while running:
                     elif continue_ans['Choice'] == 'No':
                         selecting_carbam_lys = False
 
-#Next, the results are plotted.
-#A scatter plot is drawn of sasa (x) vs pKa (y) with each entry as a point.
-#Ideally the carbamates should have a high sasa and low pKa.
+            #Next, the results are plotted.
+            #A scatter plot is drawn of sasa (x) vs pKa (y) with each entry as a point.
+            #Ideally the carbamates should have a high sasa and low pKa.
             try:
                 pka_sasa_results = postprocessing.analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list)
+                print(pka_sasa_results)
+                
             except Exception as e:
                     print("ERROR: %s"%e)
                     pass
                 
-        print(pka_sasa_results)
-
         #Lastly all leftover files are removed.
         try:
             os.remove("gap_data.txt")
@@ -728,9 +679,8 @@ while running:
         pass
 
     except Exception as e:
-        print("Error: %s"%e)
+        print("%s"%e)
         if skip == 1:
-            print('\n' + 'Goodbye' + '\n')
             for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
                 try:
                     os.remove(f)

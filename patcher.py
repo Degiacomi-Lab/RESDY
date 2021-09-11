@@ -23,7 +23,7 @@ from modeller.automodel import *
 
 
 def autopatch(fbasename, gap_cutoff=8):
-    print('*****AUTOPATCHING*****')
+    print('*** AUTOPATCHING ***')
     #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise) 
     pdb_out = ""
     try:
@@ -232,7 +232,7 @@ def correct_resid(pdb, chain):
         name = pdb + '_' + chain + '_patched'
         
         if (cleanfile[17:-4]) == name:
-            print('*********FIXING PATCHED FILE RESID*************')
+            print('*** FIXING PATCHED FILE RESID ***')
             try:
                 #Next it gets the first resid.
                 M = bb.Molecule()
@@ -335,9 +335,8 @@ def analyze_protein(f):
 
 # load PDB file of choice, and return a biobox structure.
 # if needed (outfile != ""), save the cleaned file in a new PDB. 
-def get_data(pdb, chain, download =True, download_fasta =True):
+def patch_structure(pdb, chain, download =True, download_fasta =True):
     
-
         # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
         if not os.path.exists("curate_PDB"):
                 os.mkdir("curate_PDB")
@@ -369,16 +368,17 @@ def get_data(pdb, chain, download =True, download_fasta =True):
                 # if file exists, skip
                 if os.path.exists(fout):
                         print("skipping %s"%fout)
-                        pass
+                        continue
 
-                # else, download file, and get the subset out (only the chain indicated in KLIFS database)
+                # else, download file, and get the subset out
+                # (only the chain indicated in KLIFS database)
                 try:
                         M = bb.Molecule()
                         pdb_location = os.path.join("curate_PDB","raw","%s.pdb"%pdb)
                         M.import_pdb(pdb_location, include_hetatm=True)
                         _, idxs = M.atomselect(chain, "*", "*", get_index=True)
                         path = os.path.join("curate_PDB", "raw", fout)
-                        print(path)
+                        #print(path)
       
                         M.write_pdb(path, index=idxs, split_struc=False)
       
@@ -388,15 +388,14 @@ def get_data(pdb, chain, download =True, download_fasta =True):
                 # remove the downloaded PDB file (we already saved what we need)
                 os.remove(os.path.join("curate_PDB", "raw", fin))
 
-
         # download FASTA sequences of proteins of interest in "raw" folder (not *alt files)
         if download_fasta:
                 for f in glob.glob(os.path.join("curate_PDB", "raw", "*pdb")):
 
                         file_name = f[15:19]
-                        print(file_name)
+                        #print(file_name)
                         chain = f[-5]
-                        print(f)
+                        #print(f)
                         if "PATCHED" in f:
                             continue
 
@@ -407,7 +406,7 @@ def get_data(pdb, chain, download =True, download_fasta =True):
                         web_url = "https://www.rcsb.org/fasta/chain/" + file_name_url + '/download'
                         
                         if sys.platform == "win32":
-                            line = "curl -o " + file_name_fasta + " " + web_url
+                            line = "curl -s -o " + file_name_fasta + " " + web_url
                         else:
                             line = "wget -O " + file_name_fasta + " " + web_url
                         
@@ -431,7 +430,7 @@ def get_data(pdb, chain, download =True, download_fasta =True):
         # clean and analyze downloaded structures: report on gaps and missing residues
         # note: cleaned files are not saved (pass an additional parameter to the load_and_clean function to write them out
         if True:#not os.path.exists("gap_data.txt"):
-                print("GAP ANALYSIS")
+                print("> Sequence gap analysis")
                 # result will contain output, 4 numbers per protein:
                 #sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count (using M.guess_chain_split())
                 result = []
@@ -445,11 +444,11 @@ def get_data(pdb, chain, download =True, download_fasta =True):
 
                         success = True
                         fout = os.path.basename(f)
-                        print("\n%s: %s"%(k, fout.split(".")[0]))
+                        print("\n>> %s: %s"%(k, fout.split(".")[0]))
 
                         # load protein and assess its structure
                         cnt, mol = analyze_protein(f)
-                        print("> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt[3], cnt[0], cnt[1], cnt[2]))
+                        print(">> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt[3], cnt[0], cnt[1], cnt[2]))
 
                         # if a small amount of geometric gaps are present (or C-N atomcount mismatch), send the structure to patching, and re-analyze result
                         if cnt[3] > 0 or cnt[3] == -1 or cnt[0] > 0:
