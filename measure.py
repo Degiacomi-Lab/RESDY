@@ -133,6 +133,7 @@ def break_up_and_calculate_sasa(pdb_code):
         for entry in lys_idx:
             resid = df.at[entry, 'resid']
             list_of_resid.append(resid)
+            
         print(list_of_chains)
 
 #Finds the coordinates and index of every atom in the molecule.
@@ -174,7 +175,7 @@ def break_up_and_calculate_sasa(pdb_code):
             #print(x[0])
             chain_resid_list.append(str(chain + str(resid)))
             list_of_sasa.append(x[0])
-            print(x[0])
+            #print(x[0])
 
         except:
             print('Error obtaining SASA for ' + pdb_code + ' index value ' + str(j))
@@ -184,7 +185,7 @@ def break_up_and_calculate_sasa(pdb_code):
 #The results are appended to a df which is given as outpit
     try:
         df = pd.DataFrame({'Assembled Index': lys_idx, 'chain': list_of_chains, 'resid': list_of_resid, 'sasa': list_of_sasa, 'Chain_Resid':chain_resid_list})
-        print(df)
+        #print(df)
 
     except Exception as e:
         print("Error %s"%e)

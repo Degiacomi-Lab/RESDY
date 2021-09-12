@@ -23,7 +23,8 @@ from modeller.automodel import *
 
 
 def autopatch(fbasename, gap_cutoff=8):
-    print('*** AUTOPATCHING ***')
+
+    print('>> modelling missing residues')
     #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise) 
     pdb_out = ""
     try:
@@ -232,14 +233,14 @@ def correct_resid(pdb, chain):
         name = pdb + '_' + chain + '_patched'
         
         if (cleanfile[17:-4]) == name:
-            print('*** FIXING PATCHED FILE RESID ***')
+            print('> fixing patched file resid')
             try:
                 #Next it gets the first resid.
                 M = bb.Molecule()
                 M.import_pdb(cleanfile)
                 cleandf = M.data
                 cleanresid = cleandf.at[0, 'resid']
-                print(cleanresid)
+                #print(cleanresid)
 
                 #Next it opens the corresponding raw file.
                 rawfiles = np.array(glob.glob(os.path.join("curate_PDB", "raw", "*.pdb")))
@@ -256,15 +257,15 @@ def correct_resid(pdb, chain):
                         
                         #If they aren't teh same, it shifts every resid in the patched file so they match and writes a new pdb file.
                         if cleanresid != rawresid:
-                            print('CHANGING')
+
                             cleandf['resid'] = cleandf['resid'] + rawresid - 1
                             M.write_pdb(cleanfile)
                         else:
                             return
                         
             except Exception as e:
-                print('Error %s'%e)
-                print('Issue correcting resid for' + pdb + chain)
+                raise Exception('Failed correcting resid. %s'%e)
+                
     return
         
 
@@ -300,14 +301,13 @@ def analyze_protein(f):
 
         # check backbone geometric split (error:-1 if N and C atoms count mismatch)
         M = bb.Molecule()
-
         M.import_pdb(f, include_hetatm=True)
-        #print('after')
+ 
         try:
-                c_cnt, _, _ = M.guess_chain_split(distance=3.5)
-                c_cnt -= 1
+            c_cnt, _, _ = M.guess_chain_split(distance=3.5)
+            c_cnt -= 1
         except:
-                c_cnt = 1
+            c_cnt = 1
 
         # check sequence split (note: we avoid residues with negative numbers)
         res = np.unique(M.data["resid"].values)
@@ -316,26 +316,27 @@ def analyze_protein(f):
         patch = []
         cnt = [0, 0, 0, c_cnt]
         for r in range(np.min(res), np.max(res)+1):
-                if r in res:
-                        gap = False
-                        if len(patch) > 0:
-                                missing.append(deepcopy(patch))
-                                cnt[0] += 1
-                                cnt[1] += len(patch)
-                                if len(patch) > cnt[2]:
-                                        cnt[2] = len(patch)
+            if r in res:
+                gap = False
+                if len(patch) > 0:
+                    missing.append(deepcopy(patch))
+                    cnt[0] += 1
+                    cnt[1] += len(patch)
+                    if len(patch) > cnt[2]:
+                        cnt[2] = len(patch)
 
-                                patch = []
-           
-                else:
-                        gap = True
-                        patch.append(r)
+                    patch = []
+       
+            else:
+                gap = True
+                patch.append(r)
+                
         return cnt, M
 
 
 # load PDB file of choice, and return a biobox structure.
 # if needed (outfile != ""), save the cleaned file in a new PDB. 
-def patch_structure(pdb, chain, download =True, download_fasta =True):
+def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8):
     
         # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
         if not os.path.exists("curate_PDB"):
@@ -357,54 +358,52 @@ def patch_structure(pdb, chain, download =True, download_fasta =True):
                 # get PDBs (chain reported in database)
                 fin = "%s.pdb"%pdb
                 fout = "%s_%s.pdb"%(pdb, chain)
-
-                conf_file = open(os.path.join("curate_PDB", "conformations", fin))
+                oldpwd = os.getcwd()
+                
+                conf_file = open(os.path.join("curate_PDB", "conformations", fin))                
                 raw_file = open(os.path.join("curate_PDB", "raw", fin), 'w')
                 for line in conf_file:
                         raw_file.write(line)
                         
                 raw_file.close()
 
-                # if file exists, skip
-                if os.path.exists(fout):
-                        print("skipping %s"%fout)
-                        continue
-
-                # else, download file, and get the subset out
+                # if file does not exist, download file, and get the subset out
                 # (only the chain indicated in KLIFS database)
-                try:
-                        M = bb.Molecule()
-                        pdb_location = os.path.join("curate_PDB","raw","%s.pdb"%pdb)
-                        M.import_pdb(pdb_location, include_hetatm=True)
-                        _, idxs = M.atomselect(chain, "*", "*", get_index=True)
-                        path = os.path.join("curate_PDB", "raw", fout)
-                        #print(path)
-      
-                        M.write_pdb(path, index=idxs, split_struc=False)
-      
-                except Exception as e:
-                        raise Exception("File %s: %s"%(fin, e))
+                if not os.path.exists(fout):
 
-                # remove the downloaded PDB file (we already saved what we need)
+                    try:
+                            M = bb.Molecule()
+                            pdb_location = os.path.join("curate_PDB", "raw", fin)
+                            M.import_pdb(pdb_location, include_hetatm=True)
+                            _, idxs = M.atomselect(chain, "*", "*", get_index=True)
+                            path = os.path.join("curate_PDB", "raw", fout)
+          
+                            M.write_pdb(path, index=idxs, split_struc=False)
+          
+                    except Exception as e:
+                            raise Exception("File %s: %s"%(fin, e))
+    
+                # remove the downloaded PDB file (we already saved the chain subset we need)
                 os.remove(os.path.join("curate_PDB", "raw", fin))
 
         # download FASTA sequences of proteins of interest in "raw" folder (not *alt files)
         if download_fasta:
                 for f in glob.glob(os.path.join("curate_PDB", "raw", "*pdb")):
 
+                    try:
+
                         file_name = f[15:19]
-                        #print(file_name)
                         chain = f[-5]
-                        #print(f)
+
                         if "PATCHED" in f:
                             continue
 
                         file_name_url = file_name + '.' + chain
                         file_name_fasta = file_name + '_' + chain + '.fasta'
-                        oldpwd=os.getcwd()
-                        os.chdir(os.path.join("curate_PDB", "raw"))
                         web_url = "https://www.rcsb.org/fasta/chain/" + file_name_url + '/download'
                         
+                    
+                        os.chdir(os.path.join("curate_PDB", "raw"))
                         if sys.platform == "win32":
                             line = "curl -s -o " + file_name_fasta + " " + web_url
                         else:
@@ -416,16 +415,15 @@ def patch_structure(pdb, chain, download =True, download_fasta =True):
                         subprocess.check_call(line, shell=True)
 
                         new_name = (fin[:-4]) + '_' + chain + '.fasta'
-                        #print(file_name_fasta)
-                        #print(new_name)
-                        os.rename(file_name_fasta, new_name)
                         
-                        try:
-                            os.chdir(oldpwd)
-                            clean_fasta(new_name)
-                        except:
-                            os.chdir(oldpwd)
-                            pass
+                        os.rename(file_name_fasta, new_name)
+                    
+                        os.chdir(oldpwd)
+                        clean_fasta(new_name)
+                        
+                    except:
+                        os.chdir(oldpwd)
+                        pass
             
         # clean and analyze downloaded structures: report on gaps and missing residues
         # note: cleaned files are not saved (pass an additional parameter to the load_and_clean function to write them out
@@ -444,7 +442,7 @@ def patch_structure(pdb, chain, download =True, download_fasta =True):
 
                         success = True
                         fout = os.path.basename(f)
-                        print("\n>> %s: %s"%(k, fout.split(".")[0]))
+                        print(">> working on %s"%fout.split(".")[0])
 
                         # load protein and assess its structure
                         cnt, mol = analyze_protein(f)
@@ -454,7 +452,7 @@ def patch_structure(pdb, chain, download =True, download_fasta =True):
                         if cnt[3] > 0 or cnt[3] == -1 or cnt[0] > 0:
                                 # call patching code in autopatch module
 
-                                f_patched = autopatch(f.split(".")[0], cutoff)
+                                f_patched = autopatch(f.split(".")[0], gap_cutoff)
                                 # test if patching has been successful (empty string returned = failure)
                                 if f_patched != "":
                                         cnt2, mol2 = analyze_protein(f_patched)
@@ -470,7 +468,6 @@ def patch_structure(pdb, chain, download =True, download_fasta =True):
                                         print(">> PATCH: failed, keeping original results in file %s"%f)
                                         patchstat.append(2)
                                         success = False
-
 
                         elif cnt[3] == 0:
                                 print(">> PATCH: not needed")
@@ -572,11 +569,14 @@ def patch_structure(pdb, chain, download =True, download_fasta =True):
 #get_data break the protein up into chains.
 #This code 'reassembles' the protein into a multimer from the chains in the clean folder given the pdb code and chains the protein consists of.
 def assemble_multimer(gap_dict, pdb_code, list_chains):
+    
     #First makes sure there is an assembled folder.
     #rc.rename_chains(pdb_code)
     if not os.path.exists("assembled"):
         os.mkdir("assembled")
 
+    list_to_remove = []
+    print('> Assembling')
     #Next open defines the name of the assembly.
     try:
         name_of_assembly = pdb_code + '_assembled.pdb'
@@ -608,7 +608,6 @@ def assemble_multimer(gap_dict, pdb_code, list_chains):
         #Lastly writes out Multi as a .pdb file.
         path = os.path.join("assembled", name_of_assembly)
         Multi.write_pdb(path)
-        print('Success assembling ' + pdb_code)
         filename = path
         list_to_remove = check_missing_chains(gap_dict, pdb_code, list_chains)
 
@@ -618,8 +617,7 @@ def assemble_multimer(gap_dict, pdb_code, list_chains):
                 print(line, end ='') 
 
     except Exception as e:
-        print("Error: %s"%e)
-        print('Failed to assemble ' + pdb_code)
+        raise Exception("failed to assemble. %s"%e)
 
     return list_to_remove
 

@@ -8,4 +8,6 @@
 
 - error reporting should all be handled in main (all exceptions raised to the top)
 
-- bug in autopatch, existing files don't seem to be found
+- bug in autopatch, mysterious fasta mismatch
+
+- removing hydrogens before splittig would speed things up

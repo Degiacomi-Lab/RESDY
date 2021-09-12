@@ -252,7 +252,8 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
 
 
 
-#Given a list of uniprot codes this function goes to the .txt URL and finds all corresponding .pdb files and all the relevant information.
+#Given a list of uniprot codes this function goes to the .txt URL
+#and finds all corresponding .pdb files and all the relevant information.
 def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
 
 #Firstly it checks if there is uniprot information available for the protein
@@ -361,8 +362,7 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         inquirer.List('Choice',
                             message="Continue?",
                             choices=['Yes', 'No'],
-                        ),
-        ]
+                        ),]
         answer = inquirer.prompt(question)
 
         if answer['Choice'] == 'Yes':
@@ -376,7 +376,6 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         resolution = float(wanted_res)
 
         pdb_codes_df['Resolution'] = pdb_codes_df['Resolution'].astype(float)
-
         pdb_codes_df = pdb_codes_df[pdb_codes_df['Resolution']<= resolution]
 
     except Exception as e:
@@ -411,8 +410,7 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
         csv_df = pd.read_csv(csv_file)
         print('.csv file successfully opened')
     except Exception as e:
-        print('Error: %s'%e)
-        print('Failed to find .csv file.')
+        raise Exception('Failed to find .csv file.')
 
     #Next abstract column names
     try:
@@ -421,8 +419,7 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
         csv_df[column_names[1]] = csv_df[column_names[1]].fillna(0)
 
     except Exception as e:
-        print('Error: %s'%e)
-        print('Failed to get data from .csv file')
+        raise Exception('Failed to get data from .csv file')
         
     #Lastly feed them into the functions which get the data about the protein and append it to the pdb_codes_df dataframe.
     for i in range(len(csv_df)):
@@ -450,7 +447,7 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
                 pdb_codes_df = construct_single_pdb_df(uniprot_code, pdb_code, pdb_codes_df, done_pdbs)
                 
         except Exception as e:
-            print('Error %s'%e)
+            print('> Error %s'%e)
             continue
 
     return(pdb_codes_df)

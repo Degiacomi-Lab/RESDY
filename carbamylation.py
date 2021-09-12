@@ -40,12 +40,15 @@ skip = 0
 running = True
 list_of_techniques = list()
 
+print('\n------------------------------------------------')
+print('\n Welcome to Carbamylation finder')
+print('\n Press Ctrl + C anytime to return to the start')
+print('------------------------------------------------\n')
+
 while running:
     try:
+
         list_of_pdbs = list()
-        print('\n------------------------------------------------------------')
-        print('\n  Hello, press Ctrl + C anytime to return to the start \n')
-        print('------------------------------------------------------------\n')
 
         #let the user chose how they want to input data.
         questions = [
@@ -150,7 +153,7 @@ while running:
             except:
                 print('Try again')
                 skip = 1
-            if (len(pdb_codes_df) == 0):
+            if len(pdb_codes_df) == 0:
                 skip = 1
                 
         #If the user inputs the uniprot code alone it gets all the corresponding pdb codes and the AF code.
@@ -173,8 +176,6 @@ while running:
 
                 if answer_more_uniprot_codes['Choice'] == 'No':
                     asking_for_uniprot_codes = False
-                else:
-                    pass
             
             #go into get_data and gets relevant information/ downloads
             #and clean all the pdb codes belonging to the uniprot codes given.
@@ -203,15 +204,12 @@ while running:
                     try:
                         PDBCODE_inpt = input('What is the PDB code?')
                         PDBCODE_inpt = PDBCODE_inpt.upper()
-                        #print(PDBCODE_inpt)
                         UNIPROT_code_pdb = input('What is the Uniprot Code?')
                         pdb_codes_df = ul.construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs)
-                        #print(pdb_codes_df)
-
+                        
                     except Exception as e:
                         print("ERROR: %s"%e)
-                        print('Unable to obtain data for entry.')
-                        pass
+                        continue
 
                 elif answer_4['Choice'] == 'AlphaFold':
                     try:
@@ -230,6 +228,7 @@ while running:
 
                     except Exception as e:
                         print("ERROR: %s"%e)
+                        continue
 
                 #It then asks if there are more to add, if there are it asks for another code, if there aren't it moves on.
                 question_more_pdbs = [
@@ -253,7 +252,13 @@ while running:
             csv_name = input('What is the name of the .csv file?')
             if csv_name[-4:] != '.csv':
                 csv_name = csv_name + '.csv'
-            pdb_codes_df = ul.from_csv_file(csv_name, pdb_codes_df, done_pdbs)
+                
+            try:
+                pdb_codes_df = ul.from_csv_file(csv_name, pdb_codes_df, done_pdbs)
+            except Exception as e:
+                print("ERROR: %s"%e)
+                continue
+            
             print(pdb_codes_df)
 
         if (answer_2['Choice'] == 'Yes') or (answer_3['Choice'] == 'Yes'):
@@ -312,13 +317,10 @@ while running:
                 continue
         
         #Each one is then fed through one at a time.
+        print("\n> packing final structural dataset")
         for pdb in list_of_pdb_codes_no_dup:
-
-            print(pdb)
-            
+         
             try:
-                
-                #fail_dict = dict()
                 
                 #print(list_of_pdb_codes_no_dup)
                 df_one_pdb_code = pd.DataFrame()
@@ -344,8 +346,6 @@ while running:
                         dict_uniprot.update({pdb_for_dict: uniprot})
                     else:
                         dict_uniprot.update({pdb: uniprot})
-
-                    print('\n*** GETTING DATA FOR %s %s ***'%(pdb, chain))
                     
                     #If the code is an alphacode structure it is downloaded into the assembled file here.
                     if pdb[:2]=='AF':
@@ -372,11 +372,10 @@ while running:
                             patcher.correct_resid(pdb, chain)
 
                             #Next the multimer is assembled by taking all the individual chain's pdbs in curate_PDB/clean and assembling them into one protein (using biobox).
-                            print('> Assembling patched PDB...')
                             chain_resid_near_failed_chain = patcher.assemble_multimer(gap_dict, pdb, list_chains)
 
                         except Exception as e:
-                            print('Error: PDB %s, chain %s, %s'%(pdb, chain, e))
+                            print('ERROR for PDB %s chain %s: %s'%(pdb, chain, e))
                             continue
                         
                         try:
@@ -447,8 +446,8 @@ while running:
 
 
                         except Exception as e:
-                            print('Error %s'%e)
-                            print('Failed to put data into dataframe for ' + file)
+                            print('ERROR: %s'%e)
+                            #print('Failed to put data into dataframe for ' + file)
                             continue
                         
                         if code[:2] =='AF':
@@ -459,8 +458,8 @@ while running:
                             pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
 
                         except Exception as e:
-                            print('Error %s'%e)
-                            print('Failure removing problematic values')
+                            print('ERROR: %s'%e)
+                            #print('Failure removing problematic values')
                             continue
 
                         pka_sasa_results = pka_sasa_results.append(pka_sasa_res_df)
@@ -483,13 +482,11 @@ while running:
                             f.write(pdb + ',Passed')
                             f.close()
                         
-                        print('done')
-
             #If the process fails, it is noted in the log_file
             # TO FIX: will only report a subset of failures!
             except Exception as e:
-                print(pdb + ' Failed')
-                print('Error %s'%e)
+                #print(pdb + ' Failed')
+                print('ERROR: %s'%e)
                 if not os.path.exists('log_file.csv'):
                     f = open('log_file.csv', 'w')
                     f.write('PDB Code,Result')
@@ -545,8 +542,7 @@ while running:
         inquirer.List('Choice',
             message="How would you like the data to be processed?",
                 choices=['Average by resid', 'Take most likely for each resid', 'Keep data raw'],
-                    ),
-        ]
+                    ),]
         answer_avgs = inquirer.prompt(question_avgs)
 
         if answer_avgs['Choice'] == 'Average by resid':
@@ -570,7 +566,6 @@ while running:
                 print('Failed to take most likely for each resid.')
                 pass
 
-
         #The next section plots pKa vs sasa on scatter plot.
         #Also allows any known carbamates to be marked (they will appear as a different colour on the plot).
         carbam_pdb_list = list()
@@ -582,8 +577,7 @@ while running:
         inquirer.List('Choice',
             message="Would you like the data to be analysed?",
                 choices=['Yes', 'No'],
-                    ),
-        ]
+                    ),]
 
         answer_data_analysis = inquirer.prompt(question_data_analysis)
 
@@ -592,8 +586,7 @@ while running:
             inquirer.List('Choice',
                         message="Are there carbamylated lysines you wish to mark?",
                         choices=['Yes', 'No'],
-                        ),
-            ]
+                        ),]
             answer_carbam = inquirer.prompt(question_carbam)
 
             if answer_carbam['Choice'] == 'Yes':
@@ -612,8 +605,7 @@ while running:
                     inquirer.List('Choice',
                                 message="Which structure is the residue in?",
                                 choices=list_of_pdbs_no_dup,
-                                ),
-                    ]
+                                ),]
                     answer_carbam_pdb = inquirer.prompt(question_carbam_pdb)
                     carbam_pdb = answer_carbam_pdb['Choice']
                     carbam_pdb_list.append(carbam_pdb)
@@ -627,24 +619,20 @@ while running:
                         else:
                             continue
 
-
                     question_carbam_resid = [
                     inquirer.List('Choice',
                                 message="What is the Residue ID of the carbamylated residue?",
                                 choices=list_of_resids_no_dup,
-                                ),
-                    ]
+                                ),]
                     answer_carbam_resid = inquirer.prompt(question_carbam_resid)
 
                     carbam_resid_list.append(answer_carbam_resid['Choice'])
-
 
                     continue_q = [
                     inquirer.List('Choice',
                             message="Are there more carbamylated lysines to add?",
                             choices=['Yes', 'No'],
-                            ),
-                    ]
+                            ),]
                     continue_ans = inquirer.prompt(continue_q)
 
                     if continue_ans['Choice'] == 'Yes':
@@ -661,8 +649,8 @@ while running:
                 print(pka_sasa_results)
                 
             except Exception as e:
-                    print("ERROR: %s"%e)
-                    pass
+                print("ERROR: %s"%e)
+                pass
                 
         #Lastly all leftover files are removed.
         try:
@@ -701,4 +689,5 @@ while running:
                     os.remove(f)
                 except:
                     continue
+            
             running = False

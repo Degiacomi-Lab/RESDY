@@ -14,41 +14,33 @@ import fileinput
 import pandas as pd
 import biobox as bb
 
-
 def clean(pdb):
 
+    cwd = os.getcwd()
+    
     try:
+
         #go into curate_PDB/conformations and downloads the .pdb file.
-        cwd = os.getcwd()
+        print("> Downloading PDB")
         os.chdir(os.path.join("curate_PDB", "conformations"))
+                
+        if sys.platform == "win32":
+            line = "curl -s -o %s.pdb https://files.rcsb.org/download/%s.pdb"%(pdb, pdb)
+        else:
+            line = "wget https://files.rcsb.org/download/" + pdb + '.pdb'
         
-        try:
-            
-            print("> Downloading PDB")
-            
-            if sys.platform == "win32":
-                line = "curl -s -o %s.pdb https://files.rcsb.org/download/%s.pdb"%(pdb, pdb)
-            else:
-                line = "wget https://files.rcsb.org/download/" + pdb + '.pdb'
-            
-            subprocess.check_call(line, shell=True)
-                      
-        except Exception as e:
-            print('Error %s'%e)
-            os.chdir(cwd)
-            
-        #Next it returns to the carbamylation folder.
+        subprocess.check_call(line, shell=True)
         os.chdir(cwd)
-        try:
-            rename_chains(pdb)
-        except Exception as e:
-            print('Failure renaming chains')
-            raise Exception('Error %s'%e)
         
     except Exception as e:
-        print('Print failure opening file.')
-        raise Exception('Error %s'%e)
+        print('Error downloading file. %s'%e)
+        os.chdir(cwd)
 
+    try:
+        rename_chains(pdb)
+    except Exception as e:
+        raise Exception('Error renaming chains. %s'%e)
+        
     try:
         replace_mse(pdb)
     except:
@@ -58,11 +50,9 @@ def clean(pdb):
     list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
 
     read_file_path = os.path.join("curate_PDB", "conformations", "%s.pdb"%pdb)
-
     read_file = open(read_file_path)
     
     write_file_path = os.path.join("curate_PDB", "conformations", "%s-clean.pdb"%pdb)
-    
     write_file = open(write_file_path, 'w')
 
     #Next it writes the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
@@ -403,19 +393,23 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         raise Exception('Error %s'%e)
 
 
-#This function renames the protein's chains durin the cleaning process so that they match the chain names given in the fasta file.
+##################################
+
+#rename the protein's chains durin the cleaning process so that they match the chain names given in the fasta file.
 #This is required as pdb files name their chains using the 'auth' name and fasta with the normal chain name.
 #Therefore to avoid confusion we rename them all to what is used in the fasta file.
 def rename_chains(pdb_code):
 
     def get_chain_replacement(pdb_code):
+        
         #Fistly the fasta file is downloaded
         try:
-            web_url = "https://www.rcsb.org/fasta/entry/" + pdb_code + '/download'
-
-            name = pdb_code + '.fasta'
 
             print("> downloading FASTA")
+
+            web_url = "https://www.rcsb.org/fasta/entry/" + pdb_code + '/download'
+            name = pdb_code + '.fasta'
+
             if sys.platform == "win32":
                 line = "curl -s -o " + name + " " + web_url
             else:
@@ -424,8 +418,7 @@ def rename_chains(pdb_code):
             subprocess.check_call(line, shell=True)
 
         except Exception as e:
-            print('Error %s'%e)
-            print('Error downloading FASTA sequence for chain name comparison.')
+            print('Failed downloading FASTA sequence for chain name comparison.%s'%e)
             return {}
 
         try:
@@ -448,13 +441,13 @@ def rename_chains(pdb_code):
             os.remove(name)
             
         except Exception as e:
-            print('Error %s'%e)
-            print('Error parsing through fasta file.')
+            print('FASTA file parsing failed. %s'%e)
             f.close()
             os.remove(name)
             return {}
 
-        #If a chain has two different names (i.e. an auth name and the name given by the RCSB) the chain name will have the following format in the fasta file:
+        #If a chain has two different names (i.e. an auth name and the name given by the RCSB)
+        # the chain name will have the following format in the fasta file:
         #Chains K[auth M], L[auth N]
         #Therefore the code here puts the auth name and name given by RCSB into a dictionary which is later used to replace the auth names.
         #e.g. the two examples here would be appended into the dictionary as {M:K, N:L}
@@ -482,8 +475,7 @@ def rename_chains(pdb_code):
                                 list_of_chains.append(entry)
                                 
             except Exception as e:
-                print('Error %s'%e)
-                print('Failure renaming chains.')
+                print('Failed renaming chains. %s'%e)
                 continue
             
         #This dictionary is then fed onto the next function (replace_chains)
@@ -495,7 +487,7 @@ def rename_chains(pdb_code):
 
         #Firstly, the auth chain names are put in a list.
         auth_list = list(replacement_dict.keys())
-        path = os.path.join("curate_PDB", "conformations", pdb_code)
+        path = os.path.join("curate_PDB", "conformations", "%s.pdb"%pdb_code)
     
         #The relevant file in conformations is then opened and rewritten.
         try:
@@ -503,7 +495,8 @@ def rename_chains(pdb_code):
                 for line in f:
                     try:
 
-                        #On lines with 'ATOM', 'TER' or 'HETATM' if the chain is in the auth_list the auth chain name is replaced with the RCSB chain name.
+                        #On lines with 'ATOM', 'TER' or 'HETATM' if the chain is in the auth_list
+                        #the auth chain name is replaced with the RCSB chain name.
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
                                 chain_name = line[21]
                                 if chain_name in auth_list:
@@ -520,20 +513,21 @@ def rename_chains(pdb_code):
 
         #If the protein fails the replacement process it is removed from the conformations folder.
         except Exception as e:
-            print('Error %s'%e)
-            print('Error renaming chains')
             os.remove(path)
-            pass
-        
+            raise Exception('Failed replacing chains. %s'%e)
+
         return
 
     #The both functions are called within a larger function (rename_chains)
     #Here, if there are no chains to be replaced the replace_chains function won't be called.
-    replacement_dict = get_chain_replacement(pdb_code)
-    if len(replacement_dict) == 0:
-        return
-    else:
-        replace_chains(pdb_code, replacement_dict)
+    try:
+
+        replacement_dict = get_chain_replacement(pdb_code)
+        if len(replacement_dict) > 0:
+            replace_chains(pdb_code, replacement_dict)
+
+    except Exception as e:
+        raise Exception("%s"%e)
 
     return
 
@@ -541,5 +535,6 @@ def rename_chains(pdb_code):
 if __name__ == "__main__":
 
     pdb = '1ci4'
+    pdb = '2mbh'
     done_pdbs = []
     clean_and_split_alt_conformations(pdb, done_pdbs)
