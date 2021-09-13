@@ -4,10 +4,6 @@
 - call PDB loader from carbamylation.py, and not from uniprot_loader
   i.e. uniprot loader only helps creating the database of codes
 
-- patching of PDB files should be carried out when files are downloaded and curated
-
-- error reporting should all be handled in main (all exceptions raised to the top)
-
-- bug in autopatch, mysterious fasta mismatch
+- AlphaFold and PDB download, as well as patching of the latter should be carried out at the same time
 
 - removing hydrogens before splittig would speed things up

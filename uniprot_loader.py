@@ -73,16 +73,14 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                 IDS.append(chromosome)
 
     except Exception as e:
-        print("ERROR: %s"%e)
-        print('Uniprot code is invalid')
-        return
+        raise Exception('Uniprot code is invalid %s'%e)
     
     for chromosome in IDS:
         
         try:
             
             #obtain the other uniprot code which is needed in the URL later on.
-            print(chromosome)
+            print("chromosome: %s"%chromosome)
             chromosome = chromosome.lower()
             web_url = 'https://www.uniprot.org/uniprot/?query=proteome:' + code + '+AND+proteomecomponent:%22' + chromosome + '%22&sort=score'
             html = html = urllib.request.urlopen(web_url)
@@ -118,9 +116,11 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
             if list_clean[0] != name_of_organism:
                 end = 1
                 raise Exception('Likely due to incorrect information added')
+                
             if list_clean[1] != name_of_organism:
                 end = 1
                 raise Exception('Likely due to incorrect information added')
+                
             if list_clean[2] != name_of_organism:
                 end = 1
                 raise Exception('Likely due to incorrect information added')
@@ -131,14 +131,14 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                 number_of_prot = re.findall('var resultsize = .*;', line)
             number_of_prot_2 = number_of_prot[0]
             number_of_prot_2 = int(number_of_prot_2[17:-1])
-            print('Number of Uniprot Entries Identified: ', number_of_prot_2)
-        
+            print('> Number of Uniprot Entries Identified: ', number_of_prot_2)
 
         except Exception as e:
             print("ERROR: %s"%e)
             print('Failed obtaining Uniprot codes for ' + chromosome)
             if end == 1:
                 break
+            
             else:
                 continue
 
@@ -168,8 +168,7 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                     list_UNIPROT_codes.append(protein_code)
 
             except Exception as e:
-                print("Error: %s"%e)
-                print('Failed to obtain Uniprot codes on:' + web_url)
+                print('Failed to obtain Uniprot codes. %s'%e)
                 continue
                 
             if len(list_UNIPROT_codes) == 0:
@@ -196,7 +195,6 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
 
                 except Exception as e:
                     print('Error %s'%e)
-
 
                 #Lastly it searches for available PDB structures
                 for line in html_2:
@@ -243,11 +241,11 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                 print('Number of Uniprot Entries Searched: ' + str(number_of_prot_2) + '\n')
             else:
                 print('Number of Uniprot Entries Searched: ' + str(number) + '\n')
+                
             if number > number_of_prot_2:
                 number = number_of_prot_2
             print((str((number/number_of_prot_2)*100))[0:3] + '%')
             
-
     return df
 
 
@@ -262,9 +260,7 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
         html_2 = urllib.request.urlopen(url_2)
 
     except Exception as e:
-        print('Error %s'%e)
-        print('Failed to obtain data for Uniprot entry: ' + uniprot_code)
-        return
+        raise Exception('Failed to obtain UNIPROT data')
     
     #It then automatically appends the AF structure to the df (if this isn't present it will be removed later).
     try:
@@ -273,6 +269,7 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
         
         if AF_code in done_pdbs:
             pass
+        
         else:
             data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
             df = df.append(data, ignore_index=True)
@@ -338,12 +335,10 @@ def get_chains(f):
             if chain_column[i] not in unique_values_chain:
                 unique_values_chain.append(chain_column[i])
 
-
     except Exception as e:
-        print('Failed to obtain chain information for ' + f)
-        print("Error %s"%e)
-        print("This may be due to the fact that the protein is too large and therefore a .pdb structure doesn't exist.")
-        return
+        print('Failed to obtain chain information')
+        print("This may be due to the fact that the protein is too large and therefore a .pdb structure does not exist.")
+        raise Exception("%s"%e)
 
     return unique_values_chain
 
@@ -356,8 +351,7 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         pdb_codes_df = pdb_codes_df[pdb_codes_df['Method Structure Obtained by'].isin(list_of_techniques)]
 
     except Exception as e:
-        print("ERROR: %s"%e)
-        print('Failed to search by method structure obtained by')
+        print('Failed to search by method structure obtained by %s'%e)
         question = [
         inquirer.List('Choice',
                             message="Continue?",
@@ -379,8 +373,7 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         pdb_codes_df = pdb_codes_df[pdb_codes_df['Resolution']<= resolution]
 
     except Exception as e:
-        print("ERROR: %s"%e)
-        print('Failed to search by resolution')
+        print('Failed to search by resolution. %s'%e)
         question = [
         inquirer.List('Choice',
                             message="Continue?",
@@ -396,7 +389,6 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         elif answer['Choice'] == 'No':
             skip = 1
 
-    
     return pdb_codes_df, skip
 
 
@@ -409,13 +401,13 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
     try:
         csv_df = pd.read_csv(csv_file)
         print('.csv file successfully opened')
+        
     except Exception as e:
         raise Exception('Failed to find .csv file.')
 
     #Next abstract column names
     try:
         column_names = list(csv_df.columns)
-        #print(column_names)
         csv_df[column_names[1]] = csv_df[column_names[1]].fillna(0)
 
     except Exception as e:
@@ -453,20 +445,18 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
     return(pdb_codes_df)
 
 
-
-
 def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs=[]):
 
+    #print("\n", UNIPROT_code_pdb, PDBCODE_inpt)
+    
     #Firstly it opens the correct uniprot page.
     try:
         url_2 = 'https://www.uniprot.org/uniprot/' + UNIPROT_code_pdb + '.txt'
         html_2 = urllib.request.urlopen(url_2)
 
     except Exception as e:
-        print('Error %s'%e)
-        print('Failed to obtain uniprot entry for uniprot code: ' + UNIPROT_code_pdb)
-        return
-
+        raise Exception('Failed to obtain uniprot entry %s'%e)
+    
     #Next it parses and looks for PDB entries
     for line in html_2:
         try:
@@ -513,8 +503,7 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
                     continue
 
         except Exception as e:
-            print("Error %s"%e)
-            return
+            raise Exception("%s"%e)
 
     return pdb_codes_df
     

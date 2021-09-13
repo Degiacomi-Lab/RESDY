@@ -14,7 +14,7 @@ def calculate_pKa(code):
         path = os.path.join("assembled", code)
         #path = "assembled%s%s"%(os.sep, code)
         no_pdb = code[:-4]
-        print('Obtaining pKa data for ' + no_pdb)
+        print('> Obtaining pKa')
         
         error_file_name = os.path.join("propkaoutput", "propka_errors.txt")
         #error_file_name = "propkaoutput%s%s_propka_errors.txt"%(os.sep, os.sep)
@@ -27,8 +27,7 @@ def calculate_pKa(code):
 
         propka_lys_fails = parse_propka_errors(error_file_name)
     except Exception as e:
-        print('Failed to obtain pKa data for ' + code)
-        return
+        raise Exception('Failed to obtain pKa data')
 
     try:
         pkafile = code_for_df + '_assembled.pka'
@@ -41,10 +40,8 @@ def calculate_pKa(code):
             propres = open(pkafile)
             AF_struc = True
         except Exception as e:
-            print("Error: %s" %e)
-            print('Failed to find ' + code + '.pka')
-            return()
-
+            raise Exception('Failed to find ' + code + '.pka')
+            
     lys_number = list()
     pkas = list()
     chain = list()
@@ -68,9 +65,7 @@ def calculate_pKa(code):
                     continue
 
     except Exception as e:
-        print("Error %s"%e)
-        print('Failure parsing ' + code + '.pka')
-        return()
+        raise Exception('Failure parsing ' + code + '.pka')
 
     if AF_struc == True:
         code_for_df = code[:-4]
@@ -86,17 +81,17 @@ def calculate_pKa(code):
         df = df.where(df['pKa'] < 20)
         df = df.dropna()
         df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+        
     except Exception as e:
-        print("Error %s"%e)
-        print('Failed to construct pKa dataframe')
-        return()
+        raise Exception('Failed to construct pKa dataframe. %s'%e)
 
     finally:
         try:
             os.remove(pkafile)
         except:
             pass
-    return(df, propka_lys_fails)
+        
+    return df, propka_lys_fails
 
 
 #Forms small structures which include just the atoms surrounding the lysine of interest
@@ -104,8 +99,7 @@ def calculate_pKa(code):
 def break_up_and_calculate_sasa(pdb_code):
 
     try:
-        print('BREAKING UP MOLECULE')
-        print(pdb_code)
+        print('> Breaking up molecule (for SASA calculation)')
         list_of_index = list()
         list_of_sasa = list()
         list_of_resid = list()
@@ -116,12 +110,11 @@ def break_up_and_calculate_sasa(pdb_code):
         M = bb.Molecule()
         path = os.path.join("assembled", pdb_code)
         #path = "assembled%s%s"%(os.sep, pdb_code)
-        #print(path)
         M.import_pdb(path, include_hetatm=True)
         df = M.data
 
         #Finds the coordinates and index of all lysine residues in the protein.
-        lys_coords, lys_idx = M.atomselect('*',['LYS', 'BLYS'], 'NZ', use_resname=True, get_index=True)
+        lys_coords, lys_idx = M.atomselect('*', ['LYS'], 'NZ', use_resname=True, get_index=True)
         df = M.data
 
         #Use get_subset...
@@ -134,17 +127,16 @@ def break_up_and_calculate_sasa(pdb_code):
             resid = df.at[entry, 'resid']
             list_of_resid.append(resid)
             
-        print(list_of_chains)
+        #print(list_of_chains)
 
-#Finds the coordinates and index of every atom in the molecule.
-
+        #Finds the coordinates and index of every atom in the molecule.
         all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
     except Exception as e:
-        print("Error %s"%e)
-        return()
-#For each lysine it works out the distance between the lys NZ and the each atom in the protein.
-
+        raise Exception("%s"%e)
+    
+    print('> Obtaining SASA')
+    #For each lysine it works out the distance between the lys NZ and the each atom in the protein.
     for j in range(len(lys_coords)):
         list_close_points = list()
         
@@ -159,7 +151,8 @@ def break_up_and_calculate_sasa(pdb_code):
             except:
                 continue
 
-#If the atoms are close to the lys NZ they are included in a small .pdb structure.
+        #If the atoms are close to the lys NZ they are included in a small .pdb structure.
+        #print('> Obtaining SASA')
         try:
             M.write_pdb('temp_struc.pdb', index=list_close_points, split_struc=False)
 
@@ -168,44 +161,40 @@ def break_up_and_calculate_sasa(pdb_code):
             chain = list_of_chains[j]
             resid = list_of_resid[j]
 
-#sasa is calculated for that lysine in the small molecule.
-
+            #SASA is calculated for that lysine in the small molecule.
             pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
             x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
-            #print(x[0])
             chain_resid_list.append(str(chain + str(resid)))
             list_of_sasa.append(x[0])
-            #print(x[0])
 
         except:
             print('Error obtaining SASA for ' + pdb_code + ' index value ' + str(j))
             list_of_sasa.append(None)
             continue
 
-#The results are appended to a df which is given as outpit
+    #The results are appended to a df which is given as outpit
     try:
         df = pd.DataFrame({'Assembled Index': lys_idx, 'chain': list_of_chains, 'resid': list_of_resid, 'sasa': list_of_sasa, 'Chain_Resid':chain_resid_list})
         #print(df)
 
     except Exception as e:
-        print("Error %s"%e)
-        print('Error obtaining sasa data for ' + pdb_code)
-        return()
+        raise Exception('Error obtaining SASA data. %s'%e)
 
     try:
         os.remove('temp_struc.pdb')
+        
     except Exception as e:
         print("Error %s"%e)
         print('Failed to remove temporary pdb structure for ' + pdb_code)
         pass
         
-    return(df)
+    return df
 
 
 #This function parses the propka output file and appends the chain_resid of any lysines mentioned into list_remove.
 #This list is returned to main and later the residues in it are removed from the df.
 def parse_propka_errors(path):
-    print('Checking for errors in propka')
+    print('> Checking for errors and warnings in PROPKA')
     f = open(path, 'r')
     list_remove = list()
     for line in f:

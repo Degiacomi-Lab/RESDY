@@ -12,7 +12,7 @@ def download_AF_struc(pdb):
     print("> Downloading AlphaFold structure")
     try:
         if sys.platform == "win32":
-           line = "curl -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb"%(pdb, pdb)
+           line = "curl -s -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb"%(pdb, pdb)
         else:
             line = "wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb"
         

@@ -147,7 +147,7 @@ def split_struc_NMR(pdb):
     #If there are 'ENDMDL' statements a new file is written for each model.
     elif len(endmdls) != 0:
         
-        print("> Alternate models(s) found. Splitting...")
+        print("> Alternate model(s) found. Splitting...")
 
         #First it opens the clean file in the conformations folder and opens a new folder to write in
         f = open(path)
@@ -324,6 +324,7 @@ def remove_kcx(pdb):
 
 #This script removes any hydrogens from the files in curate_PDB/conformations
 def remove_hydrogens(pdb):
+    
     print('> Removing Hydrogens')
     #Firstly it puts each file name that belongs to the pdb of interest into a list
     files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))

@@ -41,8 +41,8 @@ running = True
 list_of_techniques = list()
 
 print('\n------------------------------------------------')
-print('\n Welcome to Carbamylation finder')
-print('\n Press Ctrl + C anytime to return to the start')
+print('Welcome to Carbamylation finder')
+print('Press Ctrl + C anytime to return to the start')
 print('------------------------------------------------\n')
 
 while running:
@@ -135,7 +135,7 @@ while running:
             answer_3 = inquirer.prompt(question_3)
 
             if answer_3['Choice'] == 'Yes':
-                wanted_res = input('What maximum resolution would you like? (In Angstroms)')
+                wanted_res = input('What maximum resolution would you like (In Angstroms)? ')
 
         #Searches Uniprot for PDB codes
         #Firstly asks for the name of the organismn (note it has to be exactly how it is written on the uniprot page).
@@ -151,7 +151,7 @@ while running:
                 pdb_codes_df = ul.get_pdbs(name_of_organism, code, pdb_codes_df, done_pdbs)
                 print(pdb_codes_df)
             except:
-                print('Try again')
+                print('Please try again')
                 skip = 1
             if len(pdb_codes_df) == 0:
                 skip = 1
@@ -202,9 +202,9 @@ while running:
                 #For each pdb code it downloads and cleans the structure and constructs a df consisting of the pdb code, uniprot code, method obtained and resolution.
                 if answer_4["Choice"] == 'PDB':
                     try:
-                        PDBCODE_inpt = input('What is the PDB code?')
+                        PDBCODE_inpt = input('What is the PDB code? ')
                         PDBCODE_inpt = PDBCODE_inpt.upper()
-                        UNIPROT_code_pdb = input('What is the Uniprot Code?')
+                        UNIPROT_code_pdb = input('What is the Uniprot Code? ')
                         pdb_codes_df = ul.construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs)
                         
                     except Exception as e:
@@ -213,7 +213,7 @@ while running:
 
                 elif answer_4['Choice'] == 'AlphaFold':
                     try:
-                        AF_code = input('What is the Uniprot code?')
+                        AF_code = input('What is the Uniprot code? ')
 
                         keep = True
                         for entry in done_pdbs:
@@ -249,7 +249,7 @@ while running:
 
         #The csv file is then parsed and the codes fed through as if they were entered manually.
         if answers['Choice'] == 'Input Codes Via .csv file':
-            csv_name = input('What is the name of the .csv file?')
+            csv_name = input('What is the name of the .csv file? ')
             if csv_name[-4:] != '.csv':
                 csv_name = csv_name + '.csv'
                 
@@ -317,12 +317,12 @@ while running:
                 continue
         
         #Each one is then fed through one at a time.
-        print("\n> packing final structural dataset")
+        print("\n> packing structural dataset and measuring data!")
         for pdb in list_of_pdb_codes_no_dup:
          
             try:
                 
-                #print(list_of_pdb_codes_no_dup)
+                print("\n*** %s ***"%pdb)
                 df_one_pdb_code = pd.DataFrame()
         
                 #A seperate df is then created which for each pdb code.
@@ -336,9 +336,9 @@ while running:
                 #Each entry in the df is then iterated through.
                 for i in range(len(df_one_pdb_code)):
                     
-                    print(df_one_pdb_code)
                     chain = df_one_pdb_code.at[i, 'Chains']
                     uniprot = df_one_pdb_code.at[i, 'Uniprot Entry']
+                    print("\npreparing %s, chain %s"%(pdb, chain))
 
                     #If the code is an alphacode structure it is added into the dictionary dict_uniprot here.
                     if pdb[:2] != 'AF':
@@ -351,7 +351,8 @@ while running:
                     if pdb[:2]=='AF':
                         try:
                             af.download_AF_struc(pdb)
-                        except:
+                        except Exception as e:
+                            print("%s. Continuing..."%s)
                             continue
 
                     # If it is a pdb code it is fed through get_data (and the autopatcher),
@@ -366,7 +367,7 @@ while running:
                             print('> patching PDB...')
                             gap = patcher.patch_structure(pdb, chain)
                             gap_dict[chain] = gap
-                            print(">> maximal gap: %s"%gap_dict)
+                            #print(">> maximal sequence gap: %s"%gap_dict)
 
                             #The function correct_resid corrects the resid values in the clean files so that they are all in the correct position (as sometimes autopatcher produces some which are shifted).
                             patcher.correct_resid(pdb, chain)
@@ -375,13 +376,14 @@ while running:
                             chain_resid_near_failed_chain = patcher.assemble_multimer(gap_dict, pdb, list_chains)
 
                         except Exception as e:
-                            print('ERROR for PDB %s chain %s: %s'%(pdb, chain, e))
+                            print('> Error for PDB %s chain %s: %s. Continuing...'%(pdb, chain, e))
                             continue
                         
                         try:
                             for f in glob.glob(os.path.join("curate_PDB", "raw", "*")):
                                 os.remove(f)
                         except:
+                            print("> Error during raw folder cleaning. Continuing...")
                             pass
     
                 #The code next cycles through the files in the assembled folder.
@@ -392,6 +394,7 @@ while running:
                     pdb_codes_df.index = pd.RangeIndex(len(pdb_codes_df.index))
                     pdb_codes_df.index = range(len(pdb_codes_df.index))
                     
+                    print("")
                     for file in files:
 
                         code = file[10:]
@@ -402,30 +405,29 @@ while running:
                                 dict_plddt = af.find_AF_plddt(code)
 
                             except Exception as e:
-                                print("ERROR: %s"%e)
+                                print("Error while getting PLDDT score: %s. Continuing..."%e)
                                 continue
 
                         #The functions calculate_pKa and break_up_and_calculate_sasa are then used to calculate the pKa and sasa respectively.
                         #Each function produces a dataframe- these are later merged together to form one results df for the structure (pKa_sasa_res_df)
                         try:
 
-                            #The calculate_pKa function also produces propka_lys_fails- a list of chain_resids (chain + resid e.g. A12) to be removed as they appear in the propka output file.
-                            print('measuring pKa...')
+                            #The calculate_pKa function also produces propka_lys_fails- a list of chain_resids (chain + resid e.g. A12)
+                            #to be removed as they appear in the propka output file.
                             pka_results_df, propka_lys_fails = measure.calculate_pKa(code)
-                            print('measuring SASA...')
                             sasa_results_df = measure.break_up_and_calculate_sasa(code)
 
-                        except:
+                        except Exception as e:
+                            print("> Error while measuring. %s. Continuing..."%e)
                             continue
 
                         try:
                             #The resulting dfs from the sasa and pka calculators are merged and any columns not needed dropped.
-                            ###POTENTIALLY COULD IMPROVE THE MERGE SO I DON'T NEED TO GET RID OF OTHER COLUMNS####################
-
+                            ###POTENTIALLY COULD IMPROVE THE MERGE SO I DON'T NEED TO GET RID OF OTHER COLUMNS
                             pka_results_df["resid"] = pd.to_numeric(pka_results_df["resid"], downcast="float")
 
                             pka_sasa_res_df = pd.merge(sasa_results_df, pka_results_df, how='inner', on=['Chain_Resid', 'chain', 'resid'])
-                            print(pka_sasa_res_df)
+                            #print(pka_sasa_res_df)
                             #pka_sasa_res_df.drop('chain_x', inplace=True, axis=1)
                             #pka_sasa_res_df.drop('resid_x', inplace=True, axis=1)
                             #pka_sasa_res_df.rename(columns={'chain_y': 'chain'}, inplace=True)
@@ -444,10 +446,8 @@ while running:
                             else:
                                 pka_sasa_res_df['plddt'] = '0'
 
-
                         except Exception as e:
-                            print('ERROR: %s'%e)
-                            #print('Failed to put data into dataframe for ' + file)
+                            print('ERROR: Failed to put data into dataframe %s'%e)
                             continue
                         
                         if code[:2] =='AF':
@@ -458,8 +458,7 @@ while running:
                             pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
 
                         except Exception as e:
-                            print('ERROR: %s'%e)
-                            #print('Failure removing problematic values')
+                            print('Failure removing problematic values %s'%e)
                             continue
 
                         pka_sasa_results = pka_sasa_results.append(pka_sasa_res_df)
@@ -467,7 +466,7 @@ while running:
                         #Next the uniprot code is mapped against the pdb code into the df from dict uniprot.
                         pka_sasa_results['Uniprot Entry'] = pka_sasa_results['PDB Code'].map(dict_uniprot)
                         pka_sasa_results.to_csv(os.path.join('Output', "results.csv"))
-                        print(pka_sasa_results)
+                        #print(pka_sasa_results)
 
                         #Next it is reported in the log_file that the structure passed.
                         if not os.path.exists('log_file.csv'):
@@ -485,8 +484,8 @@ while running:
             #If the process fails, it is noted in the log_file
             # TO FIX: will only report a subset of failures!
             except Exception as e:
-                #print(pdb + ' Failed')
-                print('ERROR: %s'%e)
+                
+                print('ERROR: %s. Continuing...'%e)
                 if not os.path.exists('log_file.csv'):
                     f = open('log_file.csv', 'w')
                     f.write('PDB Code,Result')
@@ -507,7 +506,6 @@ while running:
                     code = code[:-4]
                     code_to_remove = code + '.pka'
                     os.remove(code_to_remove)
-                    print('Files removed')
 
                 except:
                     pass
@@ -524,10 +522,10 @@ while running:
         #Once it has done gone through all the files it removes everything from the conformations file.
         for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
             os.remove(f)
-
+      
         #This reports what percentage of files pass the process and gives a percentage pass rate.
         percentage_passed = postprocessing.report_on_results(pdb_codes_df, pka_sasa_results)
-        print('Percentage passed = ' + str(percentage_passed) + '%')
+        print('\nPercentage structures passed = %4.2f'%percentage_passed + "%")
 
         ###################
         # DATA PROCESSING #
@@ -547,24 +545,26 @@ while running:
 
         if answer_avgs['Choice'] == 'Average by resid':
             try:
-                print('AVERAGED DATA...')
+                print('> averaging data...')
                 pka_sasa_results = postprocessing.average_prot(pka_sasa_results)
-                #print(pka_sasa_results)
+                print(pka_sasa_results)
             except Exception as e:
-                    print("ERROR: %s"%e)
-                    print('Failed to average data.')
+                    print('> Failed to average data.%s'%e)
                     pass
 
-        if answer_avgs['Choice'] == 'Take most likely for each resid':
+        elif answer_avgs['Choice'] == 'Take most likely for each resid':
 
             try:
-                print('TAKING MOST LIKELY FOR EACH RESID')
+                print('> Taking most likely value for each resid...')
                 pka_sasa_results = postprocessing.get_most_likely_value(pka_sasa_results)
-                #print(pka_sasa_results)
+                print(pka_sasa_results)
             except Exception as e:
-                print("ERROR: %s"%e)
-                print('Failed to take most likely for each resid.')
+                print('> Failed to take most likely for each resid. %s'%e)
                 pass
+
+        else:
+            print('> Keeping raw data')
+            print(pka_sasa_results)
 
         #The next section plots pKa vs sasa on scatter plot.
         #Also allows any known carbamates to be marked (they will appear as a different colour on the plot).
@@ -603,7 +603,7 @@ while running:
 
                     question_carbam_pdb = [
                     inquirer.List('Choice',
-                                message="Which structure is the residue in?",
+                                message="Which structure is the residue in? ",
                                 choices=list_of_pdbs_no_dup,
                                 ),]
                     answer_carbam_pdb = inquirer.prompt(question_carbam_pdb)
@@ -621,7 +621,7 @@ while running:
 
                     question_carbam_resid = [
                     inquirer.List('Choice',
-                                message="What is the Residue ID of the carbamylated residue?",
+                                message="What is the Residue ID of the carbamylated residue? ",
                                 choices=list_of_resids_no_dup,
                                 ),]
                     answer_carbam_resid = inquirer.prompt(question_carbam_resid)
@@ -646,13 +646,12 @@ while running:
             #Ideally the carbamates should have a high sasa and low pKa.
             try:
                 pka_sasa_results = postprocessing.analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list)
-                print(pka_sasa_results)
                 
             except Exception as e:
                 print("ERROR: %s"%e)
                 pass
                 
-        #Lastly all leftover files are removed.
+        #Lastly all leftover files are removed
         try:
             os.remove("gap_data.txt")
         except:

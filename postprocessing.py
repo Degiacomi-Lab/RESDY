@@ -43,9 +43,9 @@ def report_on_results(pdb_codes_df, pka_sasa_results):
 
 
 def average_prot(pka_sasa_results):
-    print('Averaging Uniprot data...')
-#First creates a dataframe and puts all uniprot entries in a list.
+    print('> Averaging Uniprot data...')
 
+    #First creates a dataframe and puts all uniprot entries in a list.
     try:
         columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'PDB Code', 'sasa']
         avgd_pka_sasa = pd.DataFrame(columns=columns)
@@ -53,11 +53,9 @@ def average_prot(pka_sasa_results):
         list_of_uniprot_codes_no_dup = list()
 
     except Exception as e:
-        print('Failed to construct dataframe')
-        print("ERROR: %s"%e)
-        return
+        raise Exception('Failed to construct dataframe. %s'%e)
 
-#Next removes all duplicates from the list of uniprot entries.
+    #Next removes all duplicates from the list of uniprot entries.
     try:
         for entry in list_of_uniprot_codes:
             if entry not in list_of_uniprot_codes_no_dup:
@@ -67,25 +65,20 @@ def average_prot(pka_sasa_results):
                 continue
 
     except Exception as e:
-        print('Failed to obtain Uniprot Entries from dataframe')
-        print("ERROR: %s"%e)
-        return
+        raise Exception('Failed to obtain Uniprot Entries from dataframe. %s'%e)
     
-#Next constructs a df for all the lysines of all the structures of a given uniprot entry.
+    #Next constructs a df for all the lysines of all the structures of a given uniprot entry.
     for uniprot_code in list_of_uniprot_codes_no_dup:
-        print('Uniprot')
-
+        
         try:
             df_one_uniprot_code = pka_sasa_results.where(pka_sasa_results['Uniprot Entry'] == uniprot_code)
             df_one_uniprot_code = df_one_uniprot_code[df_one_uniprot_code['Uniprot Entry'].notna()]
             
         except Exception as e:
-            print('Failed to construct dataframe for' + uniprot_code)
-            print("ERROR: %s"%e)
-            return
+            raise Exception('Failed to construct dataframe. %s'%e)
 
-#Next it creates a new column called 'PDB' which includes just the pdb code (i.e. not the alt conformation information).
-#This is so the most likely value is selected from all the alt conformations.
+        #Next it creates a new column called 'PDB' which includes just the pdb code (i.e. not the alt conformation information).
+        #This is so the most likely value is selected from all the alt conformations.
         try:
             df_one_uniprot_code['PDB'] = df_one_uniprot_code['PDB Code']
             df_one_uniprot_code['PDB'] = (df_one_uniprot_code['PDB Code']).str[:9]
@@ -121,8 +114,7 @@ def average_prot(pka_sasa_results):
                 list_of_homomers = check_chain_match(entry)
                 #print(list_of_homomers)
 
-
-#For each group of equivalent chains it then creates a df.
+            #For each group of equivalent chains it then creates a df.
             for entry in list_of_homomers:
                 #print('homomers')
                 try:
@@ -207,7 +199,6 @@ def average_prot(pka_sasa_results):
 
                             d = {'resid': residue, 'chain': chain_avgd, 'plddt': avg_plddt, 'Uniprot Entry': uniprot_code, 'pKa': avg_pka, 'pKa stdev':stddev_pka, 'PDB Code': PDB_codes_avgd, 'sasa': avg_sasa, 'sasa stdev': stdev_sasa}
                             avgd_pka_sasa = avgd_pka_sasa.append(d, ignore_index=True)
-
                     
                         except Exception as e:
                             print('Failed to construct final dataframe for residue ' + str(residue))
@@ -230,9 +221,7 @@ def average_prot(pka_sasa_results):
             avgd_pka_sasa.to_csv(os.path.join("Output", "results_avg.csv"))
 
         except Exception as e:
-            print("ERROR: %s"%e)
-            print('Failed to average data')
-            return
+            print('Failed to average data. %s'%e)
 
     return avgd_pka_sasa
 
@@ -274,7 +263,7 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
         try:
             list_of_ids = list_of_ids + list_ids
         except Exception as e:
-                print("ERROR: %s"%e)
+            print("ERROR: %s"%e)
 
     try:
         pka_sasa_results['carbamylated'] = pka_sasa_results.index.isin(list_of_ids)
@@ -282,7 +271,7 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
         #print(pka_sasa_results)
         
     except Exception as e:
-            print("ERROR: %s"%e)
+        print("ERROR: %s"%e)
 
     #Next it plots the data.
     try:
@@ -300,8 +289,8 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list):
         #print('done')
 
     except Exception as e:
-            print("ERROR: %s"%e)
-            print('Error plotting data.')
+        print("ERROR: %s"%e)
+        print('Error plotting data.')
 
     return pka_sasa_results
 
@@ -319,9 +308,7 @@ def get_most_likely_value(pka_sasa_results):
         list_of_uniprot_codes_no_dup = list()
 
     except Exception as e:
-        print('Failed to construct dataframe')
-        print("ERROR: %s"%e)
-        return()
+        raise Exception('Failed to construct dataframe. %s'%e)
 
 #Next removes all duplicates from the list of uniprot entries.
     try:
@@ -333,11 +320,9 @@ def get_most_likely_value(pka_sasa_results):
                 continue
 
     except Exception as e:
-        print('Failed to obtain Uniprot Entries from dataframe')
-        print("ERROR: %s"%e)
-        return
+        raise Exception('Failed to obtain Uniprot Entries from dataframe. %s'%e)
     
-#Next constructs a df for all the lysines of all the structures of a given uniprot entry.
+    #Next constructs a df for all the lysines of all the structures of a given uniprot entry.
     for uniprot_code in list_of_uniprot_codes_no_dup:
 
         try:
@@ -345,19 +330,17 @@ def get_most_likely_value(pka_sasa_results):
             df_one_uniprot_code = df_one_uniprot_code[df_one_uniprot_code['Uniprot Entry'].notna()]
             
         except Exception as e:
-            print('Failed to construct dataframe for' + uniprot_code)
-            print("ERROR: %s"%e)
-            return
+            raise Exception('Failed to construct dataframe %s'%e)
 
-#Next it creates a new column called 'PDB' which includes just the pdb code (i.e. not the alt conformation information).
-#This is so the most likely value is selected from all the alt conformations.
+        #Next it creates a new column called 'PDB' which includes just the pdb code (i.e. not the alt conformation information).
+        #This is so the most likely value is selected from all the alt conformations.
         try:
             df_one_uniprot_code['PDB'] = df_one_uniprot_code['PDB Code']
             df_one_uniprot_code['PDB'] = (df_one_uniprot_code['PDB Code']).str[:9]
             list_of_pdbs = df_one_uniprot_code['PDB']
             list_of_pdbs_no_dup = list()
 
-#Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
+            #Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
             for entry in list_of_pdbs:
                 if entry not in list_of_pdbs_no_dup:
                     list_of_pdbs_no_dup.append(entry)
@@ -368,7 +351,7 @@ def get_most_likely_value(pka_sasa_results):
             print("ERROR: %s"%e)
             continue
 
-#For each element in the list a new df is created with just information beloning to that pdb.
+        #For each element in the list a new df is created with just information beloning to that pdb.
         for entry in list_of_pdbs_no_dup:
             df_one_pdb = df_one_uniprot_code.where(df_one_uniprot_code['PDB'] == entry)
             df_one_pdb = df_one_pdb[df_one_pdb['PDB'].notna()]
@@ -385,8 +368,8 @@ def get_most_likely_value(pka_sasa_results):
             else:
                 list_of_homomers = check_chain_match(entry)
 
- 
-#For each group of equivalent chains it then creates a df.
+
+            #For each group of equivalent chains it then creates a df.
             for entry in list_of_homomers:
                 try:
                     print(entry)
@@ -396,7 +379,7 @@ def get_most_likely_value(pka_sasa_results):
                     
                     try:
 
-#Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
+                        #Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
                         list_of_resids = df_only_homomers['resid']
                         list_of_resids_no_dup = list()
                         for entry in list_of_resids:
@@ -409,8 +392,7 @@ def get_most_likely_value(pka_sasa_results):
                         print("ERROR: %s"%e)
                         continue
 
-#Next makes a new df for each residue in the df_only_homomers
-
+                    #Next makes a new df for each residue in the df_only_homomers
                     for residue in list_of_resids_no_dup:
                         
                         try:
@@ -421,7 +403,8 @@ def get_most_likely_value(pka_sasa_results):
                             print("ERROR: %s"%e)
                             continue
 
-#Next it sorts the data by pKa and selects the pKa and sasa data corresponding to the lowest pKa entry for each resID.
+                        #Next it sorts the data by pKa and selects the pKa and sasa data
+                        #corresponding to the lowest pKa entry for each resID.
                         try:
                             residue = str(residue)
                             df_one_resid["pKa"] = pd.to_numeric(df_one_resid["pKa"], downcast="float")
@@ -443,8 +426,7 @@ def get_most_likely_value(pka_sasa_results):
                         except:
                             avg_plddt = 'N/A'
 
-#Next it gets a list of all the pdb codes that the entry includes.
-
+                        #Next it gets a list of all the pdb codes that the entry includes.
                         try:
                             list_of_pdbs = df_one_resid['PDB Code']
                             list_of_pdbs_no_dup = list()
@@ -455,12 +437,12 @@ def get_most_likely_value(pka_sasa_results):
                                 else:
                                     continue
 
-#It then concatonates them together to create a long string consisting of for example: /1ABC-alt-1A/1ABC-alt-1A/
+                            #It then concatonates them together to create a long string consisting of for example: /1ABC-alt-1A/1ABC-alt-1A/
                             PDB_codes_avgd = ''
                             for i in range(len(list_of_pdbs_no_dup)):
                                 PDB_codes_avgd = PDB_codes_avgd + '/' + list_of_pdbs_no_dup[i]
 
-#Lastly it appends all the information to a df and saves as in the output folder as results_likely.csv
+                            #Lastly it appends all the information to a df and saves as in the output folder as results_likely.csv
                             d = {'resid': residue, 'chain': chain, 'plddt': avg_plddt, 'Uniprot Entry': uniprot_code, 'pKa': lowest_pka, 'PDB Code': PDB_codes_avgd, 'sasa': sasa}
                             low_pka_sasa = low_pka_sasa.append(d, ignore_index=True)
                             
@@ -468,15 +450,15 @@ def get_most_likely_value(pka_sasa_results):
                             print('Failed to construct final dataframe for residue ' + residue)
                             print("ERROR: %s"%e)
                             continue
+                        
                 except Exception as e:
-                    print('Error %s'%e)
-                    print('Failure finding most likely')
-                    return
+                    print('Failure finding most likely %s'%e)
                 
             low_pka_sasa.to_csv(os.path.join('Output', 'results_likely.csv'))
 
-        print('Done')
+        #print('Done')
         print(low_pka_sasa)
+        
     return(low_pka_sasa)
 
 
@@ -491,9 +473,7 @@ def highest_sasa_lowest_pka(pka_sasa_results):
         list_of_uniprot_codes_no_dup = list()
 
     except Exception as e:
-        print('Failed to construct dataframe')
-        print("ERROR: %s"%e)
-        return()
+        raise Exception('Failed to construct dataframe%s'%e)
 
 #Next removes all duplicates from the list of uniprot entries.
     try:
@@ -505,11 +485,9 @@ def highest_sasa_lowest_pka(pka_sasa_results):
                 continue
 
     except Exception as e:
-        print('Failed to obtain Uniprot Entries from dataframe')
-        print("ERROR: %s"%e)
-        return
+        raise Exception('Failed to obtain Uniprot Entries from dataframe%s'%e)
     
-#Next constructs a df for all the lysines of all the structures of a given uniprot entry
+    #Next constructs a df for all the lysines of all the structures of a given uniprot entry
     for uniprot_code in list_of_uniprot_codes_no_dup:
 
         try:
@@ -518,19 +496,17 @@ def highest_sasa_lowest_pka(pka_sasa_results):
             
 
         except Exception as e:
-            print('Failed to construct dataframe for' + uniprot_code)
-            print("ERROR: %s"%e)
-            return
+            raise Exception('Failed to construct dataframe. %s'%e)
 
-#Next it creates a new column called 'PDB' which includes just the pdb code (i.e. not the alt conformation information).
-#This is so the most likely value is selected from all the alt conformations.
+        #Next it creates a new column called 'PDB' which includes just the pdb code (i.e. not the alt conformation information).
+        #This is so the most likely value is selected from all the alt conformations.
         try:
             df_one_uniprot_code['PDB'] = df_one_uniprot_code['PDB Code']
             df_one_uniprot_code['PDB'] = (df_one_uniprot_code['PDB Code']).str[:9]
             list_of_pdbs = df_one_uniprot_code['PDB']
             list_of_pdbs_no_dup = list()
 
-#Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
+            #Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
             for entry in list_of_pdbs:
                 if entry not in list_of_pdbs_no_dup:
                     list_of_pdbs_no_dup.append(entry)
@@ -541,7 +517,7 @@ def highest_sasa_lowest_pka(pka_sasa_results):
             print("ERROR: %s"%e)
             continue
 
-#For each element in the list a new df is created with just information beloning to that pdb.
+        #For each element in the list a new df is created with just information beloning to that pdb.
         for entry in list_of_pdbs_no_dup:
             df_one_pdb = df_one_uniprot_code.where(df_one_uniprot_code['PDB'] == entry)
             df_one_pdb = df_one_pdb[df_one_pdb['PDB'].notna()]
@@ -558,8 +534,7 @@ def highest_sasa_lowest_pka(pka_sasa_results):
             else:
                 list_of_homomers = check_chain_match(entry)
 
- 
-#For each group of equivalent chains it then creates a df.
+            #For each group of equivalent chains it then creates a df.
             for entry in list_of_homomers:
                 try:
                     print(entry)
@@ -569,7 +544,7 @@ def highest_sasa_lowest_pka(pka_sasa_results):
                     
                     try:
 
-#Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
+                        #Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
                         list_of_resids = df_only_homomers['resid']
                         list_of_resids_no_dup = list()
                         for entry in list_of_resids:
@@ -582,7 +557,7 @@ def highest_sasa_lowest_pka(pka_sasa_results):
                         print("ERROR: %s"%e)
                         continue
 
-#Next makes a new df for each residue in the df_only_homomers
+                    #Next makes a new df for each residue in the df_only_homomers
                     for residue in list_of_resids_no_dup:
                         
                         try:
@@ -595,7 +570,7 @@ def highest_sasa_lowest_pka(pka_sasa_results):
 
                         try:
 
-#It then selects the lowest pKa found and highest sasa found for all the entries in df_one_resid.
+                            #It then selects the lowest pKa found and highest sasa found for all the entries in df_one_resid.
                             residue = str(residue)
                             df_one_resid["pKa"] = pd.to_numeric(df_one_resid["pKa"], downcast="float")
                             sorted_pka_df = df_one_resid.sort_values(by=['pKa'], ascending=True)
@@ -631,7 +606,8 @@ def highest_sasa_lowest_pka(pka_sasa_results):
                                 else:
                                     continue
 
-#It then concatonates them together to create a long string consisting of for example: /1ABC-alt-1A/1ABC-alt-1A/.
+                            #It then concatonates them together to create a long string consisting of for example:
+                            #/1ABC-alt-1A/1ABC-alt-1A/.
                             PDB_codes_avgd = ''
                             for i in range(len(list_of_pdbs_no_dup)):
                                 PDB_codes_avgd = PDB_codes_avgd + '/' + list_of_pdbs_no_dup[i]
@@ -645,13 +621,12 @@ def highest_sasa_lowest_pka(pka_sasa_results):
                             print("ERROR: %s"%e)
                             continue
                         
-    #Lastly appends into df and saves as Output/results.csv
+                        #Lastly appends into df and saves as Output/results.csv
                         low_pka_sasa.to_csv(os.path.join('Output', 'results_most_likely.csv'))
 
                     #low_pka_sasa.to_csv('Output/results.csv')
-                    
-                    print('Done')
-                    print(low_pka_sasa)
+                    #print('Done')
+                    #print(low_pka_sasa)
 
                 except Exception as e:
                     print('Error %s'%e)
@@ -723,6 +698,7 @@ def check_chain_match(pdb):
                     else:
                         pass
             list_of_homomers.append(clean_entry_no_dup)
+            
         except Exception as e:
             print('Error %s'%e)
             continue
@@ -731,7 +707,7 @@ def check_chain_match(pdb):
         except:
             pass
         
-    print(list_of_homomers)
+    print("> homomers: ", list_of_homomers)
     return list_of_homomers
 
 
@@ -766,9 +742,7 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
 
     def remove_failures(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df):
     #The program then removes residues that have been selected as problematic along the line.
-        print('Removing problematic residues...')
-        print('\n')
-
+        print('> Removing problematic residues...')
 
         #Firstly, those which were selected as problematic in the propka report are removed.
         try:
@@ -778,23 +752,23 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
             print('Error %s'%e)
             print('Error removing problematic propka residues')
             pka_sasa_res_df = pka_sasa_res_df[0:0]
-            return(pka_sasa_res_df)
+            return pka_sasa_res_df
 
         #Next chain clash is investigated, if two chains clash the relevant residues are removed
         if code[:2] != 'AF':
 
             try:
                 chain_resid_clash = check_clash(code)
-                print(chain_resid_clash)
+                #print(chain_resid_clash)
                 inverse_boolean_series = ~pka_sasa_res_df.Chain_Resid.isin(chain_resid_clash)
                 pka_sasa_res_df = pka_sasa_res_df[inverse_boolean_series]
-                print(pka_sasa_res_df)
+                #print(pka_sasa_res_df)
 
             except Exception as e:
                 print('Error %s'%e)
                 print('Error removing clashing atoms')
                 pka_sasa_res_df = pka_sasa_res_df[0:0]
-                return(pka_sasa_res_df)
+                return pka_sasa_res_df 
 
             #Next residues are removed if they are exposed to any chain that failed the autopatch (as without the chain they are usually exposed to the results are not reliable).
             try:
@@ -806,14 +780,15 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
                 print('Error %s'%e)
                 print('Error removing files near failed chain')
                 pka_sasa_res_df = pka_sasa_res_df[0:0]
-                return(pka_sasa_res_df)
+                return pka_sasa_res_df
+            
         else:
             chain_resid_clash = list()
         
-        print('Residues removed:')
-        print(propka_lys_fails)
-        print(chain_resid_clash)
-        print(chain_resid_near_failed_chain)
+        print('> Residues removed from analysis:')
+        print(">> %s failed PROPKA: %s"%(len(propka_lys_fails), ", ".join(propka_lys_fails)))
+        print(">> %s residue clash: %s"%(len(chain_resid_clash), ", ".join(chain_resid_clash)))
+        print(">> %s adjacency to failed chain: %s"%(len(chain_resid_near_failed_chain), ", ".join(chain_resid_near_failed_chain)))
 
         return chain_resid_clash, pka_sasa_res_df
 
@@ -828,7 +803,7 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
         #Firstly a df is constructed to store results in.
         columns_2 = ['PDB Code', 'Lysine Index', 'Score']
         score_df = pd.DataFrame(columns=columns_2)
-        print('BREAKING UP MOLECULE')
+        print('> Breaking up molecule (for clash prediction)')
 
         #Next the assembled file is opened in biobox and the data is stored in a df.
         try:
@@ -955,8 +930,8 @@ if __name__ == "__main__":
             pka_sasa_results['sasa'] = pka_sasa_results['sasa'].astype(float)
             pka_sasa_results['pKa'] = pka_sasa_results['pKa'].astype(float)
             plt.scatter(pka_sasa_results['sasa'], pka_sasa_results['pKa'], c=pka_sasa_results['carbamylated'].map(colors))#, alpha=pka_sasa_results['carbamylated'].map(alphas))
-            plt.title('pKa vs sasa')
-            plt.xlabel('sasa')
+            plt.title('pKa vs SASA')
+            plt.xlabel('SASA ($\AA^2$)')
             plt.ylabel('pKa')
             plt.show()
             

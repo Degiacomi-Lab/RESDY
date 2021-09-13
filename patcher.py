@@ -184,7 +184,7 @@ def _gap_check(align_file, gap_cutoff):
     for gaps in range(len(struc_gaps)):
         gap_len = len(struc_gaps[gaps])
         if gap_len > gap_cutoff:
-            print("pdb not patched. Long gap: "+ str(gap_len))
+            print(">> struture not patched. Long sequence gap: "+ str(gap_len))
             patch_status = "no"
 
     return patch_status
@@ -442,7 +442,7 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
 
                         success = True
                         fout = os.path.basename(f)
-                        print(">> working on %s"%fout.split(".")[0])
+                        print("> working on %s"%fout.split(".")[0])
 
                         # load protein and assess its structure
                         cnt, mol = analyze_protein(f)
@@ -456,7 +456,7 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
                                 # test if patching has been successful (empty string returned = failure)
                                 if f_patched != "":
                                         cnt2, mol2 = analyze_protein(f_patched)
-                                        print(">> PATCH: geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt2[3], cnt2[0], cnt2[1], cnt2[2]))
+                                        print(">> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt2[3], cnt2[0], cnt2[1], cnt2[2]))
                                         # use data of patched molecule, save patched molecule, edit output name to indicate molecule is patched
                                         cnt = cnt2[:]
                                         mol = deepcopy(mol2)
@@ -465,16 +465,16 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
                                         pdbchain = pdb + chain
 
                                 else:
-                                        print(">> PATCH: failed, keeping original results in file %s"%f)
+                                        print(">> Patching failed, keeping original results in file %s"%f)
                                         patchstat.append(2)
                                         success = False
 
                         elif cnt[3] == 0:
-                                print(">> PATCH: not needed")
+                                print(">> Patching not needed")
                                 patchstat.append(0) # if no gap is present
 
                         else:
-                                print(">> PATCH: not applicable (molecule loading failed)")
+                                print(">> Patching not applicable (molecule loading failed)")
                                 patchstat.append(2) # if protein loading failed
                                 success = False
 
@@ -484,7 +484,7 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
                         try:
                                 if success:
                                         foutname = os.path.join("curate_PDB","clean", fout)
-                                        print(">> SAVING PROTEIN in %s"%foutname)
+                                        print(">> Saving patched protein in %s"%foutname)
                                         mol.write_pdb(foutname, split_struc=False)
                                         
                                 else:
@@ -526,7 +526,6 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
         #print("\n")
         #print("%s protein chains processed"%(len(result)))
         #print("%s proteins not loadable"%(np.sum(result[:, 0] == -2)))
-
         # note: we want to use as dataset all proteins having patchstat equal to 0 or 1
         #print("\nPatching:")
         #print("   %s not needed"%np.sum(patchstat == 0))
@@ -540,10 +539,8 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
         #        else:
         #                print("   %s proteins with %s gaps"%(np.sum(result[:, 0] == n), n))
 
-
         #print("\nGeometry gaps count:")
         #for n in np.unique(result[:, 3]):
-
         #        if n == -2:
         #                continue
         #        elif n == -1:
@@ -552,17 +549,15 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
         #        else:
         #                print("   %s proteins with %s gaps"%(np.sum(result[:, 3] == n), n))
 
+        #print("> Maximal sequence gaps sizes:")
+        #for n in np.unique(result[:, 2]):
+        #
+        #       if n == -2:
+        #               continue
+        #       else:
+        #               print(">> %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
 
-        print("\nSequence maximal gap size:")
-        for n in np.unique(result[:, 2]):
-
-                if n == -2:
-                        continue
-                else:
-                        print("   %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
-
-        print(n)
-        return n
+        return np.max(result[:, 2])
     
 #######################################################
 
@@ -602,7 +597,7 @@ def assemble_multimer(gap_dict, pdb_code, list_chains):
                     Multi.append(M, chain)
 
                 except Exception as e:
-                    print("Error: %s"%e)
+                    print("%s"%e)
                     continue
 
         #Lastly writes out Multi as a .pdb file.
@@ -641,8 +636,7 @@ def check_missing_chains(gap_dict, pdb_code, list_chains):
             clean_chains.append(clean_chain)
 
         except Exception as e:
-            print('Error %s'%e)
-            print('Issue identifying missing chains.')
+            print('>> Issue identifying missing chains. %s'%e)
             continue
 
     #If any chain is not in clean but is in the original protein it is appended to another list (failed_chains)
@@ -652,18 +646,17 @@ def check_missing_chains(gap_dict, pdb_code, list_chains):
 
     #If any chains have failed, rename_chains_assembled and note_residues_near_missing _chain sort out chain naming issues and remove residues close to the missing chains respectively.
     if len(failed_chains) != 0:
-        print('Fixing chain issue....')
+        print('>> Fixing chain issue....')
         try:
             rename_chains_assembled(failed_chains, list_chains)
             list_to_remove = note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains)
         except Exception as e:
-            print('Error %s'%e)
-            print('Error dealing with chain failure- chain labelling may be incorrect in data.')
+            print('Error dealing with chain failure- chain labelling may be incorrect in data. %s'%e)
             return
-        print('Chain issue fixed.')
+        #print('Chain issue fixed.')
     
     else:
-        print('No missing chains found')
+        print('>> no missing chains!')
         list_to_remove = list()
 
     return list_to_remove
@@ -721,8 +714,7 @@ def rename_chains_assembled(failed_chains, list_chains):
                         print(line, end='')
 
         except Exception as e:
-
-            print('Error %s'%e)
+            print('>> %s'%e)
                   
     return
 
@@ -740,22 +732,19 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
     list_of_resid = list()
     list_to_remove = []
     
-    print('BREAKING UP MOLECULE')
-    print(pdb_code)
+    print('> Breaking up molecule...')
+    #print(pdb_code)
     try:
 
-    #First opens file in biobox
-
+        #open file in biobox
         M = bb.Molecule()
         M.import_pdb(path, include_hetatm=True)
         df = M.data
 
-    #Next makes note of all the lysine index/coordinates
-
+        #Next makes note of all the lysine index/coordinates
         lys_coords, lys_idx = M.atomselect('*','LYS', 'CA', use_resname=True, get_index=True)
 
-#Next makes a note of each lysines chain and resid.
-
+        #Next makes a note of each lysines chain and resid.
         for entry in lys_idx:
             chain = df.at[entry, 'chain']
             list_of_chains.append(chain)
@@ -764,16 +753,13 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
             resid = df.at[entry, 'resid']
             list_of_resid.append(resid)
 
-#Next gets coordinates and index for all atoms
-
+        #Next gets coordinates and index for all atoms
         all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
     except Exception as e:
-        print('Error %s'%e)
-        print('Failure identifying residues near missing chain')
-        return()
+        raise Exception('Failed identifying residues near missing chain %s'%e)
 
-#Next goes through all the lysines
+    #Next goes through all the lysines
     for failedchain in failed_chains:
         gapsize = gap_dict.get(failedchain)
         gapsize = int(gapsize)
@@ -781,24 +767,25 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
 
         for j in range(len(lys_coords)):
 
-#Doesn't bother if they are on a chain which failed the autopatch as they won't be in the final structure anyway.
-
+            #Doesn't bother if they are on a chain which failed the autopatch
+            #as they won't be in the final structure anyway.
             chain_lys = list_of_chains[j]
             if chain_lys == failed_chains:
                 continue
+            
             else:
 
                 try:
 
-#Works out the distance between all the atoms and each lysine.
-                    
+                    #Work out the distance between all the atoms and each lysine.
                     for i in range(len(all_coords)):
                         x_dist = (((lys_coords[j])[0] - (all_coords[i])[0])**2)
                         y_dist = (((lys_coords[j])[1] - (all_coords[i])[1])**2)
                         z_dist = (((lys_coords[j])[2] - (all_coords[i])[2])**2)
                         distance = np.sqrt(x_dist + y_dist + z_dist)
 
-#If the distance is less than 10 A AND the atoms chain is one of the failed chains, the lysine's Chain_Resid is appended to the list_to_remove.
+                        #If the distance is less than 10 A AND the atoms chain is one of the failed chains,
+                        #the lysine's Chain_Resid is appended to the list_to_remove.
                         if distance < cutoff:
                             index_of_aa = idx[i]
                             aa_chain = df.at[index_of_aa, 'chain']
@@ -809,7 +796,7 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
 
 
                 except Exception as e:
-                    print('Error %s'%e)
+                    print('> Error %s'%e)
         
     return list_to_remove
 
