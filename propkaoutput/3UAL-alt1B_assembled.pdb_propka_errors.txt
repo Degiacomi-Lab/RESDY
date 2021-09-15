@@ -1,1 +1,0 @@
-Unexpected number (6) of atoms in residue LYS 215 A   in conformation 1A

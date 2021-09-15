@@ -110,7 +110,7 @@ def _full_align(fbasename):
                   knowns   = fbasename,
                   # code of the target
                   sequence = seq_name) 
-    a.auto_align()   # get an automatic alignment (alignment.seg.ali)
+    a.auto_align() # get an automatic alignment (alignment.seg.ali)
     return seq_name
 
 #autopatch step 3. trim the alignment by removing gaps for missing residues at the termini of the structure
@@ -172,7 +172,7 @@ def _gap_check(align_file, gap_cutoff):
     f1 = f.readlines()
     P1_pos = []
     for i in range(len(f1)):
-        if ("P1;" in f1[i]):     #identify positions of different sequances (P1) blocks
+        if ("P1;" in f1[i]): #identify positions of different sequances (P1) blocks
             P1_pos.append(i)
     f.close()
     sec_1 = P1_pos[0]
@@ -240,11 +240,9 @@ def correct_resid(pdb, chain):
                 M.import_pdb(cleanfile)
                 cleandf = M.data
                 cleanresid = cleandf.at[0, 'resid']
-                #print(cleanresid)
 
                 #Next it opens the corresponding raw file.
                 rawfiles = np.array(glob.glob(os.path.join("curate_PDB", "raw", "*.pdb")))
-                #rawfiles = np.array(glob.glob("curate_PDB%sraw%s*pdb"%(os.sep, os.sep)))
                 for rawfile in rawfiles:
                     name2 = pdb + '_' + chain
 
@@ -274,7 +272,6 @@ def clean_fasta(new_name):
 
     #Firstly it opens the fasta file
     path = os.path.join("curate_PDB","raw", new_name)
-    #path = "curate_PDB%sraw%s%s"%(os.sep, os.sep, new_name)
     #Next it rewrites it replacing the amino acids that may cause an issue.
     with fileinput.FileInput(path, inplace = True) as f:
         for line in f:

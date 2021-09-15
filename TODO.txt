@@ -1,9 +1,17 @@
-- create a working directory named upon user's preference
-  all tmp and final output should be dumped in there
+REFACTORING
 
 - call PDB loader from carbamylation.py, and not from uniprot_loader
   i.e. uniprot loader only helps creating the database of codes
 
-- AlphaFold and PDB download, as well as patching of the latter should be carried out at the same time
+- AlphaFold download, and PDB download + cleaning + patching should happen at the same time
 
-- removing hydrogens before splittig would speed things up
+- removing hydrogens before splitting would speed things up
+
+
+DATA LOGGING
+
+- save PROPKA .pka files in [OUTDIR]/propkaoutput
+
+- only save error log files if errors actually happend (avoid empty files)
+
+- suspected error: not all incorrect lysines are logged [check overall identificatio of failed cases]

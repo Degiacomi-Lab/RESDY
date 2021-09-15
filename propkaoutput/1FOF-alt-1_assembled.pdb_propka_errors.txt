@@ -1,1 +1,0 @@
-Unexpected number (5) of atoms in residue GLU 229 B   in conformation 1A

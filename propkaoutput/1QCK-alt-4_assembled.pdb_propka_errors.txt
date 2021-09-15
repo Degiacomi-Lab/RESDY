@@ -1,1 +1,0 @@
-Unexpected number (10) of atoms in residue PHE  10 B   in conformation 1A

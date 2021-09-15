@@ -1,5 +1,0 @@
-Unexpected number (5) of atoms in residue MET   0 A   in conformation 1A
-Unexpected number (5) of atoms in residue GLN  84 A   in conformation 1A
-Unexpected number (5) of atoms in residue GLU 112 A   in conformation 1A
-Unexpected number (5) of atoms in residue PRO   2 B   in conformation 1A
-Unexpected number (5) of atoms in residue ASP  59 B   in conformation 1A

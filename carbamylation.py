@@ -20,7 +20,7 @@
 #Lastly the data is plotted on a graph.
 
 import re
-import os
+import os, shutil
 import glob
 import subprocess
 import urllib.request, urllib.parse, urllib.error
@@ -36,19 +36,43 @@ import patcher
 import measure
 import postprocessing
 
-skip = 0
-running = True
-list_of_techniques = list()
-
-print('\n------------------------------------------------')
+print('-------------------------------')
 print('Welcome to Carbamylation finder')
-print('Press Ctrl + C anytime to return to the start')
-print('------------------------------------------------\n')
+print('-------------------------------')
 
+running = True
 while running:
+    
     try:
 
+        list_of_techniques = list()
         list_of_pdbs = list()
+        
+        # define working directory
+        OUTDIR = input('\nPlease provide a working directory [result]:')
+        if OUTDIR == "":
+            OUTDIR = "result"
+
+        if os.path.exists(OUTDIR) and os.path.isdir(OUTDIR):
+            question_directory = [
+            inquirer.List('Choice',
+                message="Directory exists, would you like to overwrite it?",
+                    choices=['Yes', 'No'],
+                        ),]
+            answers = inquirer.prompt(question_directory)
+        
+            if answers['Choice'] == 'No':
+                continue
+            else:
+                try:
+                    shutil.rmtree(OUTDIR, ignore_errors=True)
+                except Exception as e:
+                    print("ERROR: cannot clear directory. %s"%e)
+                    continue
+
+        os.mkdir(OUTDIR)
+        logfilepath = os.path.join(OUTDIR, 'log_file.csv')
+        print("")
 
         #let the user chose how they want to input data.
         questions = [
@@ -58,34 +82,13 @@ while running:
                     ),]
         answers = inquirer.prompt(questions)
         
-        #If the user selects Quit, wipe everything and kill main loop.
+        #If the user selects Quit, exit the mail loop.
         if answers['Choice'] == 'Quit':
-            
-            skip = 1            
-            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("assembled", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            raise Exception("Goodbye!")
-
+            running = False
+            continue
+   
         # initialise PDB code DataFrame
-        columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
+        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         pdb_codes_df = pd.DataFrame(columns=columns)
 
         #ask the user if they want to wipe the log file (i.e. do you want to continue where the last left off or not).
@@ -97,8 +100,8 @@ while running:
 
         if answer_log_file['Choice'] == 'Yes':
             try:
-                if os.path.exists('log_file.csv'):
-                    os.remove('log_file.csv')
+                if os.path.exists(logfilepath):
+                    os.remove(logfilepath)
                 else:
                     print('No log file found to remove')
             except Exception as e:
@@ -106,15 +109,15 @@ while running:
         
             #If there isn't already a log file it writes a new one and writes the column headers.
             try:
-                if not os.path.exists('log_file.csv'):
-                    f = open('log_file.csv', 'w')
+                if not os.path.exists(logfilepath):
+                    f = open(logfilepath, 'w')
                     f.write('PDB Code,Result')
                     f.close()
-                log_file_df = pd.read_csv('log_file.csv')
+                log_file_df = pd.read_csv(logfilepath)
                 done_pdbs = log_file_df['PDB Code'].to_list()
 
             except Exception as e:
-                print('Error parsing log_file.csv')
+                print('Error parsing log_file.csv in working directory')
                 done_pdbs = []
                 pass
 
@@ -150,11 +153,13 @@ while running:
             try:
                 pdb_codes_df = ul.get_pdbs(name_of_organism, code, pdb_codes_df, done_pdbs)
                 print(pdb_codes_df)
-            except:
-                print('Please try again')
-                skip = 1
+            except Exception as e:
+                print('ERROR: failed loading PDBs. %s'%e)
+                continue
+                
             if len(pdb_codes_df) == 0:
-                skip = 1
+                print('> no pdb found, please try a different selection.')
+                continue
                 
         #If the user inputs the uniprot code alone it gets all the corresponding pdb codes and the AF code.
         if answers['Choice'] == 'Input Uniprot Codes':
@@ -222,7 +227,7 @@ while running:
 
                         if keep == True:
                             AF_code_full = 'AF-' + AF_code + '-F1-model_v1'
-                            d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
+                            d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
                             pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
                             print(pdb_codes_df)
 
@@ -288,10 +293,17 @@ while running:
 
             #The desired techniques are appended to a list.
             #It then filters the df to remove those which don't fit the criteria set by the user.
-            raw_res = ul.search_by_technique(list_of_techniques, pdb_codes_df, wanted_res)
-            pdb_codes_df = raw_res[0]
+            pdb_codes_df, retry = ul.search_by_technique(list_of_techniques, pdb_codes_df, wanted_res)
+    
+            if len(pdb_codes_df) == 0 and retry:
+                running = True
+                continue
+            
+            elif len(pdb_codes_df) == 0 and not retry:
+                running = False
+                continue
+        
             print(pdb_codes_df)
-            skip = raw_res[1]
 
         ###############
         # GATHER DATA #
@@ -393,7 +405,6 @@ while running:
                     
                     pdb_codes_df.index = pd.RangeIndex(len(pdb_codes_df.index))
                     pdb_codes_df.index = range(len(pdb_codes_df.index))
-                    
                     print("")
                     for file in files:
 
@@ -414,7 +425,7 @@ while running:
 
                             #The calculate_pKa function also produces propka_lys_fails- a list of chain_resids (chain + resid e.g. A12)
                             #to be removed as they appear in the propka output file.
-                            pka_results_df, propka_lys_fails = measure.calculate_pKa(code)
+                            pka_results_df, propka_lys_fails = measure.calculate_pKa(code, OUTDIR)
                             sasa_results_df = measure.break_up_and_calculate_sasa(code)
 
                         except Exception as e:
@@ -455,7 +466,7 @@ while running:
 
                         try:
                             #This function removes any problematic entries from pka_sasa_res_df and returns the updated df.
-                            pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
+                            pka_sasa_res_df = postprocessing.remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df, outdir=OUTDIR)
 
                         except Exception as e:
                             print('Failure removing problematic values %s'%e)
@@ -465,35 +476,34 @@ while running:
 
                         #Next the uniprot code is mapped against the pdb code into the df from dict uniprot.
                         pka_sasa_results['Uniprot Entry'] = pka_sasa_results['PDB Code'].map(dict_uniprot)
-                        pka_sasa_results.to_csv(os.path.join('Output', "results.csv"))
-                        #print(pka_sasa_results)
+                        pka_sasa_results.to_csv(os.path.join(OUTDIR, "results.csv"))
 
                         #Next it is reported in the log_file that the structure passed.
-                        if not os.path.exists('log_file.csv'):
-                            f = open('log_file.csv', 'w')
+                        if not os.path.exists(logfilepath):
+                            f = open(logfilepath, 'w')
                             f.write('PDB Code,Result')
                             f.write('\n')
                             f.write(pdb + ',Passed')
                             f.close()
-                        elif os.path.exists('log_file.csv'):
-                            f = open('log_file.csv', 'a')
+                        elif os.path.exists(logfilepath):
+                            f = open(logfilepath, 'a')
                             f.write('\n')
                             f.write(pdb + ',Passed')
                             f.close()
                         
             #If the process fails, it is noted in the log_file
-            # TO FIX: will only report a subset of failures!
+            # TO FIX: suspect it will only report a subset of failures!
             except Exception as e:
                 
                 print('ERROR: %s. Continuing...'%e)
-                if not os.path.exists('log_file.csv'):
-                    f = open('log_file.csv', 'w')
+                if not os.path.exists(logfilepath):
+                    f = open(logfilepath, 'w')
                     f.write('PDB Code,Result')
                     f.write('\n')
                     f.write(pdb + ', Failed')
                     f.close()
-                elif os.path.exists('log_file.csv'):
-                    f = open('log_file.csv', 'a')
+                elif os.path.exists(logfilepath):
+                    f = open(logfilepath, 'a')
                     f.write('\n')
                     f.write(pdb + ', Failed collecting pKa/SASA data')
                     f.close()
@@ -505,7 +515,7 @@ while running:
                 try:
                     code = code[:-4]
                     code_to_remove = code + '.pka'
-                    os.remove(code_to_remove)
+                    os.remove(os.path.join(OUTDIR, "propkaoutput", code_to_remove))
 
                 except:
                     pass
@@ -546,7 +556,7 @@ while running:
         if answer_avgs['Choice'] == 'Average by resid':
             try:
                 print('> averaging data...')
-                pka_sasa_results = postprocessing.average_prot(pka_sasa_results)
+                pka_sasa_results = postprocessing.average_prot(pka_sasa_results, outdir=OUTDIR)
                 print(pka_sasa_results)
             except Exception as e:
                     print('> Failed to average data.%s'%e)
@@ -556,7 +566,7 @@ while running:
 
             try:
                 print('> Taking most likely value for each resid...')
-                pka_sasa_results = postprocessing.get_most_likely_value(pka_sasa_results)
+                pka_sasa_results = postprocessing.get_most_likely_value(pka_sasa_results, outdir=OUTDIR)
                 print(pka_sasa_results)
             except Exception as e:
                 print('> Failed to take most likely for each resid. %s'%e)
@@ -642,51 +652,43 @@ while running:
                         selecting_carbam_lys = False
 
             #Next, the results are plotted.
-            #A scatter plot is drawn of sasa (x) vs pKa (y) with each entry as a point.
-            #Ideally the carbamates should have a high sasa and low pKa.
+            #A scatter plot is drawn of SASA (x-axis) vs pKa (y-axis) with each entry as a point.
+            #Ideally the carbamates should have a high SASA and low pKa.
             try:
-                pka_sasa_results = postprocessing.analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list)
-                
+                pka_sasa_results = postprocessing.analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list, outdir=OUTDIR)  
             except Exception as e:
                 print("ERROR: %s"%e)
                 pass
                 
-        #Lastly all leftover files are removed
-        try:
-            os.remove("gap_data.txt")
-        except:
-            pass
-
-        try:
-            os.remove("patch_data.txt")
-        except:
-            pass
-
-    except KeyboardInterrupt:
-        pass
+            # ask whether new data should be analysed
+            question_quit = [
+            inquirer.List('Choice',
+                message="All done! Analyse more data?",
+                    choices=['Yes', 'No'],
+                        ),]
+            answers = inquirer.prompt(question_quit)    
+            if answers['Choice'] == 'Yes':
+                continue
 
     except Exception as e:
         print("%s"%e)
-        if skip == 1:
-            for f in glob.glob(os.path.join("curate_PDB","clean", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("curate_PDB","conformations", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("curate_PDB","raw", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            for f in glob.glob(os.path.join("assembled", "*")):
-                try:
-                    os.remove(f)
-                except:
-                    continue
-            
-            running = False
+        running = False
+        continue
+        
+############################
+
+# clean the temporary folders and files
+try:
+    if os.path.exists("curate_PDB"):
+        shutil.rmtree("curate_PDB", ignore_errors=True)
+    if os.path.exists("assembled"):
+        shutil.rmtree("assembled", ignore_errors=True) #may want to keep this one...
+    if os.path.exists("patch_data.txt"):        
+        os.remove("patch_data.txt")
+    if os.path.exists("gap_data.txt"):        
+        os.remove("gap_data.txt")
+    
+except:
+    print("> sorry, could not clear all temporary files. Please delete manually.")
+    
+print("\n> Goodbye!")

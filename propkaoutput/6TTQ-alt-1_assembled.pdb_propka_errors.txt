@@ -1,4 +1,0 @@
-Unexpected number (5) of atoms in residue THR 341 A   in conformation 1A
-Unexpected number (5) of atoms in residue THR 341 B   in conformation 1A
-Unexpected number (5) of atoms in residue THR 341 C   in conformation 1A
-Unexpected number (5) of atoms in residue THR 341 D   in conformation 1A

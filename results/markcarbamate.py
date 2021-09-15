@@ -1,11 +1,10 @@
 import pandas as pd
-
 from numpy import true_divide
 
-avg_df = pd.read_csv('Output/results_0109_hetatm_2/results_likely.csv')
+avg_df = pd.read_csv('results_0109_hetatm_2/results_likely.csv')
 avg_df = avg_df.drop(['Unnamed: 0'], axis=1)
 
-carbam_df = pd.read_csv('Output/results_0109_hetatm/results_likely.csv')
+carbam_df = pd.read_csv('results_0109_hetatm/results_likely.csv')
 carbam_df = carbam_df.drop(['Unnamed: 0'], axis=1)
 carbam_df_true = carbam_df.where(carbam_df['carbamylated'] == True)
 carbam_df_true = carbam_df_true[carbam_df_true['carbamylated'].notna()]
@@ -19,4 +18,4 @@ print(map_df)
 
 merge_df = map_df.merge(avg_df, how='outer', left_on=['PDB Code', 'resid'], right_on=['PDB Code', 'resid'])
 merge_df['carbamylated'].fillna(False, inplace=True)
-merge_df.to_csv('Output/results_0109_nohetatm/results_likely_marked.csv')
+merge_df.to_csv('results_0109_nohetatm/results_likely_marked.csv')

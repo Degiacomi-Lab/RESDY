@@ -1,23 +1,29 @@
 import re
-import pandas as pd
-import os
+import os, shutil
 import subprocess
+
+import pandas as pd
 import numpy as np
+
 import biobox as bb
 
 #call propka to calculate the pKa of all groups in the assembled/*.pdb file
 #and then parse the .pka file for the pka of lysine side chains in the protein.
-def calculate_pKa(code):
+def calculate_pKa(code, outdir="Output"):
+
+    print('> Obtaining pKa')
 
     try:
+        
         code_for_df = code[:4]
         path = os.path.join("assembled", code)
-        #path = "assembled%s%s"%(os.sep, code)
         no_pdb = code[:-4]
-        print('> Obtaining pKa')
         
-        error_file_name = os.path.join("propkaoutput", "propka_errors.txt")
-        #error_file_name = "propkaoutput%s%s_propka_errors.txt"%(os.sep, os.sep)
+        pkaoutdir = os.path.join(outdir, "propkaoutput")
+        if not os.path.exists(pkaoutdir):
+            os.mkdir(pkaoutdir)
+        
+        error_file_name = os.path.join(pkaoutdir, "%s_propka_errors.txt"%code_for_df)
         f = open(error_file_name, 'w')
 
         process = subprocess.Popen(['python', '-m', 'propka', path],
@@ -26,6 +32,7 @@ def calculate_pKa(code):
         stdout, stderr = process.communicate()
 
         propka_lys_fails = parse_propka_errors(error_file_name)
+        
     except Exception as e:
         raise Exception('Failed to obtain pKa data')
 
@@ -87,7 +94,9 @@ def calculate_pKa(code):
 
     finally:
         try:
-            os.remove(pkafile)
+            propres.close()
+            f.close()
+            shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
         except:
             pass
         
@@ -127,8 +136,6 @@ def break_up_and_calculate_sasa(pdb_code):
             resid = df.at[entry, 'resid']
             list_of_resid.append(resid)
             
-        #print(list_of_chains)
-
         #Finds the coordinates and index of every atom in the molecule.
         all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
@@ -152,7 +159,6 @@ def break_up_and_calculate_sasa(pdb_code):
                 continue
 
         #If the atoms are close to the lys NZ they are included in a small .pdb structure.
-        #print('> Obtaining SASA')
         try:
             M.write_pdb('temp_struc.pdb', index=list_close_points, split_struc=False)
 
@@ -175,7 +181,6 @@ def break_up_and_calculate_sasa(pdb_code):
     #The results are appended to a df which is given as outpit
     try:
         df = pd.DataFrame({'Assembled Index': lys_idx, 'chain': list_of_chains, 'resid': list_of_resid, 'sasa': list_of_sasa, 'Chain_Resid':chain_resid_list})
-        #print(df)
 
     except Exception as e:
         raise Exception('Error obtaining SASA data. %s'%e)
@@ -194,6 +199,7 @@ def break_up_and_calculate_sasa(pdb_code):
 #This function parses the propka output file and appends the chain_resid of any lysines mentioned into list_remove.
 #This list is returned to main and later the residues in it are removed from the df.
 def parse_propka_errors(path):
+    
     print('> Checking for errors and warnings in PROPKA')
     f = open(path, 'r')
     list_remove = list()

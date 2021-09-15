@@ -1,3 +1,0 @@
-Unexpected number (5) of atoms in residue SER  42 A   in conformation 1A
-Unexpected number (7) of atoms in residue LYS  72 A   in conformation 1A
-Unexpected number (5) of atoms in residue GLU 168 A   in conformation 1A

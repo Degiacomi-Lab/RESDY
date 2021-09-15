@@ -1,7 +1,0 @@
-Unexpected number (5) of atoms in residue SER 148 A   in conformation 1A
-Unexpected number (5) of atoms in residue ARG 151 A   in conformation 1A
-Unexpected number (5) of atoms in residue LYS 162 A   in conformation 1A
-Unexpected number (5) of atoms in residue LYS 258 A   in conformation 1A
-Unexpected number (5) of atoms in residue SER 148 B   in conformation 1A
-Unexpected number (5) of atoms in residue LYS 162 B   in conformation 1A
-Unexpected number (5) of atoms in residue LYS 258 B   in conformation 1A

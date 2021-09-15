@@ -1,9 +1,0 @@
-Missing atoms or failed protonation for HIS 252 A (HIS) -- please check the structure
-Group (HIS) for  1808-  CG   252-HIS (A) [  50.876    2.530   31.866] C
-Expected 4 interaction atoms for acids, found:
-                 0- HD1   252-HIS (A) [  48.802    3.042   31.755] H
-              1810- NE2   252-HIS (A) [  51.395    4.383   33.045] N
-              1807- ND1   252-HIS (A) [  49.733    3.271   32.072] N
-Expected 2 interaction atoms for bases, found:
-              1810- NE2   252-HIS (A) [  51.395    4.383   33.045] N
-              1807- ND1   252-HIS (A) [  49.733    3.271   32.072] N

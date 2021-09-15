@@ -190,7 +190,7 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                 
                 try:
                     AF_code = 'AF-' + protein_code_clean + '-F1-model_v1'
-                    data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
+                    data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
                     df = df.append(data, ignore_index=True)
 
                 except Exception as e:
@@ -227,7 +227,7 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                                 if conf[:4] == PDBCODE:
                                     unique_values_chain = get_chains(f)
                                     for i in range(len(unique_values_chain)):
-                                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': conf, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
                                         df = df.append(data, ignore_index=True)
 
                         except Exception as e:
@@ -271,7 +271,7 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
             pass
         
         else:
-            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
+            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
             df = df.append(data, ignore_index=True)
 
     #Lastly it searches for available PDB structures
@@ -310,7 +310,7 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
 
                         #Lastly the data is appended to the df
                         for i in range(len(unique_values_chain)):
-                            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': conf, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
                             df = df.append(data, ignore_index=True)
 
         except Exception as e:
@@ -343,15 +343,16 @@ def get_chains(f):
     return unique_values_chain
 
 
-#Given a list of techniques from the user and the desired resolution this function removes pdb entries from pdb_codes_df that don't fit the criteeria
+#Given a list of techniques from the user and the desired resolution
+#this function removes pdb entries from pdb_codes_df that don't fit the criteeria
+#the second returned parameters defined whether, upon failure, main program should continue (if False, it stops)
 def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
-    skip = 0
     try:
 
-        pdb_codes_df = pdb_codes_df[pdb_codes_df['Method Structure Obtained by'].isin(list_of_techniques)]
+        pdb_codes_df = pdb_codes_df[pdb_codes_df['Method'].isin(list_of_techniques)]
 
     except Exception as e:
-        print('Failed to search by method structure obtained by %s'%e)
+        print('Failed to search by method %s'%e)
         question = [
         inquirer.List('Choice',
                             message="Continue?",
@@ -360,11 +361,9 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         answer = inquirer.prompt(question)
 
         if answer['Choice'] == 'Yes':
-            skip = 0
-            pass
-
+            return True
         elif answer['Choice'] == 'No':
-            skip = 1
+            return False
 
     try:
         resolution = float(wanted_res)
@@ -383,13 +382,12 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
         answer = inquirer.prompt(question)
 
         if answer['Choice'] == 'Yes':
-            skip = 0
-            pass
-
+            return True
         elif answer['Choice'] == 'No':
-            skip = 1
+            return False
+            
 
-    return pdb_codes_df, skip
+    return pdb_codes_df, True
 
 
 #This code parses a .csv file to find uniprot and pdb codes to pass into the pipeline.
@@ -432,7 +430,7 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
                     keep = False
 
                 if keep == True:
-                    d = {'Uniprot Entry': uniprot_code, 'PDB Code': pdb_code, 'Method Structure Obtained by': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
+                    d = {'Uniprot Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
                     pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
  
             else:
@@ -492,7 +490,7 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
     
                                     for i in range(len(unique_values_chain)):
                                         try:
-                                            data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': conf, 'Method Structure Obtained by': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
+                                            data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
                                             pdb_codes_df = pdb_codes_df.append(data, ignore_index=True)
                                         except Exception as e:
                                             print("Error %s"%e)
@@ -514,14 +512,14 @@ if __name__ == "__main__":
     try:
         #print(get_pdbs('Oryctolagus+cuniculus+(Rabbit)', 'UP000001811'))
         #print(get_chains('6YAM'))
-        #columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution']
+        #columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution']
         #df = pd.DataFrame(columns=columns)
         #uniprot_code = 'P3892'
         #PDB_entries = '2jfi'
         #technique = 'X-ray'
         #resolution = '2.9'
 
-        #data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDB_entries, 'Method Structure Obtained by': technique, 'Resolution':resolution})
+        #data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDB_entries, 'Method': technique, 'Resolution':resolution})
         #df = df.append(data, ignore_index=True)
         #pdb_codes_df = df
 
@@ -533,7 +531,7 @@ if __name__ == "__main__":
         #list_UNIPROT_codes = ['P50897']
         #print(get_pdbs_given_uniprot_code(list_UNIPROT_codes))
         
-        columns = ['Uniprot Entry', 'PDB Code', 'Method Structure Obtained by', 'Resolution', 'Chains']
+        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         pdb_codes_df = pd.DataFrame(columns=columns)
         pdb_codes_df = construct_single_pdb_df("P09167", "1PRE", pdb_codes_df)
         print(pdb_codes_df)

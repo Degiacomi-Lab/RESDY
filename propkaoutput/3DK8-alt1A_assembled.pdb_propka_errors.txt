@@ -1,2 +1,0 @@
-Unexpected number (5) of atoms in residue LYS  93 A   in conformation 1A
-Unexpected number (5) of atoms in residue LYS 296 A   in conformation 1A

@@ -1,4 +1,0 @@
-Unexpected number (5) of atoms in residue GLU 112 A   in conformation 1A
-Unexpected number (5) of atoms in residue LYS  29 B   in conformation 1A
-Unexpected number (5) of atoms in residue ASP  59 B   in conformation 1A
-Unexpected number (5) of atoms in residue ASP 116 B   in conformation 1A
