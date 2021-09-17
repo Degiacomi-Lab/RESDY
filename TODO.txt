@@ -7,11 +7,7 @@ REFACTORING
 
 - removing hydrogens before splitting would speed things up
 
-
-DATA LOGGING
-
-- save PROPKA .pka files in [OUTDIR]/propkaoutput
-
-- only save error log files if errors actually happend (avoid empty files)
-
-- suspected error: not all incorrect lysines are logged [check overall identificatio of failed cases]
+- improve mechanics
+  . ask again for CSV file when file not found
+  . fix separator issue in Windows for CSV file user input
+  . don't ask to wipe log if new folder created

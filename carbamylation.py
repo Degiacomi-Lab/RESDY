@@ -4,19 +4,22 @@
 #The user gives their input (either uniprot codes, pdb codes or organism information).
 #get_initial_data is then called.
 #get_initial data identifies all relevant pdb entries, then puts them through the clean_split module,
-# which cleans them and splits them up into the various alternate conformations.
+#which cleans them and splits them up into the various alternate conformations.
 #This returns a df called pdb_codes_df, which contains every relevant pdb file, their resolution, the method obtained and the chains present.
 #The files are saved in curate_PDB/conformations
 #
-#Next they go through patcher.patch_structure and the autopatcher
+#Next they go through patcher and the autopatcher
 #which patches where needed and returns clean files for each chain in curate_PDB/clean.
-#Each pdbs full structure is then reassembled by the assemble_multimer module.
+#Each pdbs full structure is then reassembled.
 #
 #The pKa of every lysine in the multimer is then calculated.
-#The sasa of every lysine in the multimer is then also calculated, using a method where only the atoms close to each lysine are considered.
+#The SASA of every lysine in the multimer is then also calculated,
+#using a method where only the atoms close to each lysine are considered.
+#
 #These results are then placed in the df 'pka_sasa_results'.
 #
-#Next the data is processed for all the different structures of a protein (either the most likely to form a carbamate value for each resid is taken or an average).
+#Next the data is processed for all the different structures of a protein
+#(either the most likely to form a carbamate value for each resid is taken or an average).
 #Lastly the data is plotted on a graph.
 
 import re
@@ -229,7 +232,6 @@ while running:
                             AF_code_full = 'AF-' + AF_code + '-F1-model_v1'
                             d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
                             pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
-                            print(pdb_codes_df)
 
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -263,8 +265,6 @@ while running:
             except Exception as e:
                 print("ERROR: %s"%e)
                 continue
-            
-            print(pdb_codes_df)
 
         if (answer_2['Choice'] == 'Yes') or (answer_3['Choice'] == 'Yes'):
             if answer_2['Choice'] == 'Yes':
@@ -303,7 +303,8 @@ while running:
                 running = False
                 continue
         
-            print(pdb_codes_df)
+        print("\n> assembled structure database")
+        print(pdb_codes_df)
 
         ###############
         # GATHER DATA #
@@ -434,7 +435,7 @@ while running:
 
                         try:
                             #The resulting dfs from the sasa and pka calculators are merged and any columns not needed dropped.
-                            ###POTENTIALLY COULD IMPROVE THE MERGE SO I DON'T NEED TO GET RID OF OTHER COLUMNS
+                            ### POTENTIALLY COULD IMPROVE THE MERGE SO I DON'T NEED TO GET RID OF OTHER COLUMNS
                             pka_results_df["resid"] = pd.to_numeric(pka_results_df["resid"], downcast="float")
 
                             pka_sasa_res_df = pd.merge(sasa_results_df, pka_results_df, how='inner', on=['Chain_Resid', 'chain', 'resid'])
@@ -481,44 +482,38 @@ while running:
                         #Next it is reported in the log_file that the structure passed.
                         if not os.path.exists(logfilepath):
                             f = open(logfilepath, 'w')
-                            f.write('PDB Code,Result')
-                            f.write('\n')
-                            f.write(pdb + ',Passed')
-                            f.close()
-                        elif os.path.exists(logfilepath):
+                            f.write('PDB Code,Result\n')
+                        else:
                             f = open(logfilepath, 'a')
-                            f.write('\n')
-                            f.write(pdb + ',Passed')
-                            f.close()
+                            
+                        f.write(pdb + ',Passed\n')
+                        f.close()
                         
-            #If the process fails, it is noted in the log_file
-            # TO FIX: suspect it will only report a subset of failures!
+            #If the process fails at any point, it is noted in the log_file
             except Exception as e:
                 
                 print('ERROR: %s. Continuing...'%e)
                 if not os.path.exists(logfilepath):
                     f = open(logfilepath, 'w')
-                    f.write('PDB Code,Result')
-                    f.write('\n')
-                    f.write(pdb + ', Failed')
-                    f.close()
-                elif os.path.exists(logfilepath):
+                    f.write('PDB Code,Result\n')
+                else:
                     f = open(logfilepath, 'a')
-                    f.write('\n')
-                    f.write(pdb + ', Failed collecting pKa/SASA data')
-                    f.close()
+                    
+                f.write(pdb + ', Failed\n')
+                f.close()
 
                 continue
 
+            ### LET'S KEEP THOSE LOGFILE, MAY BE USEFUL!
             #Next removes .pka file and those in assembled, clean and raw 
-            finally:
-                try:
-                    code = code[:-4]
-                    code_to_remove = code + '.pka'
-                    os.remove(os.path.join(OUTDIR, "propkaoutput", code_to_remove))
+            #finally:
+            #    try:
+            #        code = code[:-4]
+            #        code_to_remove = code + '.pka'
+            #        os.remove(os.path.join(OUTDIR, "propkaoutput", code_to_remove))
 
-                except:
-                    pass
+            #   except:
+            #        pass
 
             for f in glob.glob(os.path.join("assembled", "*")):
                 os.remove(f)
@@ -666,9 +661,11 @@ while running:
                 message="All done! Analyse more data?",
                     choices=['Yes', 'No'],
                         ),]
-            answers = inquirer.prompt(question_quit)    
+            answers = inquirer.prompt(question_quit)
             if answers['Choice'] == 'Yes':
                 continue
+            else:
+                running = False
 
     except Exception as e:
         print("%s"%e)

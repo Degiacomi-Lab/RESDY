@@ -626,7 +626,7 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
 
 
 #This function is important for the data processesing section
-#It checks which chains in a protein are equivalent and tells the program to treat them as eqivalent
+#It checks which chains in a protein are equivalent and tells the program to treat them as equivalent
 #(i.e. to take the lowest values for each resid from only the equivalent chains).
 def check_chain_match(pdb):
     pdb = pdb[:4]
@@ -708,6 +708,10 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
 
     def report_lys_fail(code, propka_lys_fails, chain_resid_clash, chain_resid_near_failed_chain, outdir="Output"):
 
+        # no need to create any error log file, if no problem has been found
+        if len(propka_lys_fails) + len(chain_resid_clash) + len(chain_resid_near_failed_chain) == 0:
+            return
+
         outpath = os.path.join(outdir, "Failed_lysines")        
         if not os.path.exists(outpath):
             os.mkdir(outpath)
@@ -717,36 +721,27 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
         path = os.path.join(outpath, "%s_fails.txt"%code_no_pdb)
         f = open(path, 'w')
         for entry in propka_lys_fails:
-            f.write(entry)
-            f.write('-Failed propka- check propka log for explanation')
-            f.write('\n')
+            f.write('%s failed propka, check propka log for explanation\n'%entry)
 
         for entry in chain_resid_clash:
-            f.write(entry)
-            f.write('Clash error, likely due to autopatch adding a section which causes clashing')
-            f.write('\n')
+            f.write('%s clash error, likely due to autopatch adding a section which causes clashing\n')
 
         for entry in chain_resid_near_failed_chain:
-            f.write(entry)
-            f.write('-Near chain error- likely due to autopatch adding a section which causes chains to overlap')
-            f.write('\n')
+            f.write('%s Near chain error, likely due to autopatch adding a section which causes chains to overlap\n'%entry)
+        
         return
 
-
-    def remove_failures(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df):
-    
-        #The program then removes residues that have been selected as problematic along the line.
-        print('> Removing problematic residues...')
+    #remove residues that have been selected as problematic by any analysis
+    def remove_failures(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df):    
 
         #Firstly, those which were selected as problematic in the propka report are removed.
         try:
             inverse_boolean_series = ~pka_sasa_res_df.Chain_Resid.isin(propka_lys_fails)
             pka_sasa_res_df = pka_sasa_res_df[inverse_boolean_series]
         except Exception as e:
-            print('Error %s'%e)
-            print('Error removing problematic propka residues')
+            print('Issue removing problematic propka residues. %s. Continuing...'%e)
             pka_sasa_res_df = pka_sasa_res_df[0:0]
-            return pka_sasa_res_df
+            #return pka_sasa_res_df
 
         #Next chain clash is investigated, if two chains clash the relevant residues are removed
         if code[:2] != 'AF':
@@ -757,10 +752,9 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
                 pka_sasa_res_df = pka_sasa_res_df[inverse_boolean_series]
   
             except Exception as e:
-                print('Error %s'%e)
-                print('Error removing clashing atoms')
+                print('Issue removing clashing atoms. %s. Continuing...'%e)
                 pka_sasa_res_df = pka_sasa_res_df[0:0]
-                return pka_sasa_res_df 
+                #return pka_sasa_res_df 
 
             #Next residues are removed if they are exposed to any chain that failed the autopatch
             #(as without the chain they are usually exposed to the results are not reliable).
@@ -770,18 +764,25 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
                 pka_sasa_res_df = pka_sasa_res_df[inverse_boolean_series]
 
             except Exception as e:
-                print('Error %s'%e)
-                print('Error removing files near failed chain')
+                print('Issue removing files near failed chain. %s. Continuing...'%e)
                 pka_sasa_res_df = pka_sasa_res_df[0:0]
-                return pka_sasa_res_df
+                #return pka_sasa_res_df
             
         else:
             chain_resid_clash = list()
         
-        print('> Residues removed from analysis:')
-        print(">> %s failed PROPKA: %s"%(len(propka_lys_fails), ", ".join(propka_lys_fails)))
-        print(">> %s residue clash: %s"%(len(chain_resid_clash), ", ".join(chain_resid_clash)))
-        print(">> %s adjacency to failed chain: %s"%(len(chain_resid_near_failed_chain), ", ".join(chain_resid_near_failed_chain)))
+        total = len(propka_lys_fails) + len(chain_resid_clash) + len(chain_resid_near_failed_chain)
+        if total > 0:
+            print('> %s residues removed from analysis'%total)
+            if len(propka_lys_fails) > 0:
+                print(">> %s failed PROPKA: %s"%(len(propka_lys_fails), ", ".join(propka_lys_fails)))
+            if len(chain_resid_clash) > 0:
+                print(">> %s residue clash: %s"%(len(chain_resid_clash), ", ".join(chain_resid_clash)))
+            if len(chain_resid_near_failed_chain) > 0:
+                print(">> %s adjacency to failed chain: %s"%(len(chain_resid_near_failed_chain), ", ".join(chain_resid_near_failed_chain)))
+        else:
+            print('> No problematic residue found!')
+
 
         return chain_resid_clash, pka_sasa_res_df
 

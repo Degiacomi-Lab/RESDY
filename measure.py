@@ -12,30 +12,38 @@ import biobox as bb
 def calculate_pKa(code, outdir="Output"):
 
     print('> Obtaining pKa')
+    code_for_df = code[:4]
+    path = os.path.join("assembled", code)
+    no_pdb = code[:-4]
+    
+    pkaoutdir = os.path.join(outdir, "propkaoutput")
+    if not os.path.exists(pkaoutdir):
+        os.mkdir(pkaoutdir)
 
-    try:
-        
-        code_for_df = code[:4]
-        path = os.path.join("assembled", code)
-        no_pdb = code[:-4]
-        
-        pkaoutdir = os.path.join(outdir, "propkaoutput")
-        if not os.path.exists(pkaoutdir):
-            os.mkdir(pkaoutdir)
-        
-        error_file_name = os.path.join(pkaoutdir, "%s_propka_errors.txt"%code_for_df)
+    error_file_name = os.path.join(pkaoutdir, "%s_propka_errors.txt"%code.split(".")[0])
+
+    try:   
         f = open(error_file_name, 'w')
-
         process = subprocess.Popen(['python', '-m', 'propka', path],
-                            stdout=f, 
-                            stderr=f)
+                            stdout=f, stderr=f)
         stdout, stderr = process.communicate()
-
-        propka_lys_fails = parse_propka_errors(error_file_name)
-        
+        f.close()
+                
     except Exception as e:
-        raise Exception('Failed to obtain pKa data')
+        f.close()
+        try:
+            shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
+        except:
+            pass
 
+        raise Exception('Failed to obtain pKa data. %s.'%e)
+
+    
+    try:
+        propka_lys_fails = parse_propka_errors(error_file_name)
+    except:
+        raise Exception("Failed extracting propka errors. %s"%e)
+        
     try:
         pkafile = code_for_df + '_assembled.pka'
         propres = open(pkafile)
@@ -67,11 +75,16 @@ def calculate_pKa(code, outdir="Output"):
                     lys_number.append(line[0])
                     chain.append(line[1])
                     pkas.append(line[2])
+                    
                 except Exception as e:
                     print("Error %s"%e)
                     continue
 
+        propres.close()
+            
     except Exception as e:
+        propres.close()
+        shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
         raise Exception('Failure parsing ' + code + '.pka')
 
     if AF_struc == True:
@@ -94,10 +107,9 @@ def calculate_pKa(code, outdir="Output"):
 
     finally:
         try:
-            propres.close()
-            f.close()
             shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
         except:
+            print("Warning: could not move file %s to destination directory %s"%(pkafile, pkaoutdir))
             pass
         
     return df, propka_lys_fails
@@ -203,7 +215,9 @@ def parse_propka_errors(path):
     print('> Checking for errors and warnings in PROPKA')
     f = open(path, 'r')
     list_remove = list()
+    cnt = 0
     for line in f:
+        cnt += 1
         lys_raw = re.findall('LYS [\d]*[\s][\w]*', line)
 
         for line in lys_raw:
@@ -222,6 +236,14 @@ def parse_propka_errors(path):
             resid = words_2[0]
             chain_resid = chain + resid
             list_remove.append(chain_resid)
+    
+    
+    f.close()
+    
+    # if the file is completely empty, it is pointless to keep it. Let's wipe it!
+    if cnt == 0:
+        os.remove(path)
+    
     
     return list_remove
 
