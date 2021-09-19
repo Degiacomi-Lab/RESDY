@@ -894,13 +894,14 @@ if __name__ == "__main__":
     if OUTDIR == "":
         OUTDIR = "result"
 
-    os.mkdir(OUTDIR)
-
     try:
         question = [
         inquirer.List('Choice',
                         message="How would you like the data to be processed?",
-                        choices=['Average for each resid', 'Most likely to form carbamate for each resid', 'No processing needed', 'Plot input csv file', 'Only plot carbamates', 'Plot with errors', 'Only PDBs', 'Highest sasa lowest pka', 'Mark online structures', 'Show carbamates and mark af'],
+                        choices=['Average for each resid', 'Most likely to form carbamate for each resid',
+                                 'No processing needed', 'Plot input csv file', 'Only plot carbamates', 
+                                 'Plot with errors', 'Only PDBs', 'Highest sasa lowest pKa',
+                                 'Mark online structures', 'Show carbamates and mark AlphaFold'],
                     ),
         ]
         answer = inquirer.prompt(question)

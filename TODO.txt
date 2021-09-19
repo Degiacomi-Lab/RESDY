@@ -7,7 +7,15 @@ REFACTORING
 
 - removing hydrogens before splitting would speed things up
 
-- improve mechanics
-  . ask again for CSV file when file not found
-  . fix separator issue in Windows for CSV file user input
-  . don't ask to wipe log if new folder created
+
+POSTPROCESSING
+
+- bug in "take most likely value for each resid" postprocessing (fasta file not found)
+
+- missing implementation for options in postprocessing.py when launched alone
+
+
+GENERAL IMPROVEMENTS
+
+- fix separator issue in Windows for CSV file user input (add path autocomplete)
+ 

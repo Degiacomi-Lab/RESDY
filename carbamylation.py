@@ -50,33 +50,91 @@ while running:
 
         list_of_techniques = list()
         list_of_pdbs = list()
+        done_pdbs = []
         
-        # define working directory
+        ############################
+        # DEFINE WORKING DIRECTORY #
+        ############################
+        
         OUTDIR = input('\nPlease provide a working directory [result]:')
         if OUTDIR == "":
             OUTDIR = "result"
 
-        if os.path.exists(OUTDIR) and os.path.isdir(OUTDIR):
-            question_directory = [
+        logfilepath = os.path.join(OUTDIR, 'log_file.csv')
+
+        # if folder does not exist, create it and initialise input contains logfile
+        if not (os.path.exists(OUTDIR) and os.path.isdir(OUTDIR)):
+            os.mkdir(OUTDIR)
+            f = open(logfilepath, 'w')
+            f.write('PDB Code,Result')
+            f.close()
+
+        # if directory exists and logfile is found, ask if attenpting restart
+        elif os.path.exists(logfilepath):
+
+            #ask the user if they want to wipe the log file (i.e. do you want to continue where the last left off or not).
+            question_log_file = [
             inquirer.List('Choice',
-                message="Directory exists, would you like to overwrite it?",
-                    choices=['Yes', 'No'],
-                        ),]
-            answers = inquirer.prompt(question_directory)
-        
-            if answers['Choice'] == 'No':
-                continue
-            else:
+                            message="Log file found, restart? (selecting No will wipe folder current content)",
+                            choices=['Yes', 'No', 'Select another folder'],),]
+            answer_log_file = inquirer.prompt(question_log_file)
+    
+            # if no restart needed, clear folder
+            if answer_log_file['Choice'] == 'No':
                 try:
                     shutil.rmtree(OUTDIR, ignore_errors=True)
                 except Exception as e:
-                    print("ERROR: cannot clear directory. %s"%e)
+                    print('ERROR: failed to wipe log file, check if file is closed, or try selecting another folder.')
                     continue
+                
+                os.mkdir(OUTDIR)
+                f = open(logfilepath, 'w')
+                f.write('PDB Code,Result')
+                f.close()     
+ 
+            # if user changed their mind, try again                    
+            elif answer_log_file['Choice'] == 'Select another folder':
+                continue
+ 
+            # else, attempt restart
+            else:
+            
+                try:
+                    log_file_df = pd.read_csv(logfilepath)
+                    done_pdbs = log_file_df['PDB Code'].to_list()
+    
+                except Exception as e:
+                    print('ERROR: could not parse log_file.csv')
+                    continue
+           
+        else:
+            question_log_file = [
+            inquirer.List('Choice',
+                            message="Folder exists, no log file found. Current content will be erased, continue?",
+                            choices=['Yes', 'No'],),]
+            answer_log_file = inquirer.prompt(question_log_file)
+    
+            if answer_log_file['Choice'] == 'No':
+                continue
+            
+            else:
+                try:
+                    shutil.rmtree(OUTDIR, ignore_errors=True)
+                    os.mkdir(OUTDIR)
+                    f = open(logfilepath, 'w')
+                    f.write('PDB Code,Result')
+                    f.close()     
 
-        os.mkdir(OUTDIR)
-        logfilepath = os.path.join(OUTDIR, 'log_file.csv')
+                except Exception as e:
+                    print('ERROR: failed to wipe folder. Check it is not open, or try selecting another folder.')
+                    continue
+          
         print("")
 
+        ########################
+        # DEFINE INPUT SOURCES #
+        ########################
+        
         #let the user chose how they want to input data.
         questions = [
         inquirer.List('Choice',
@@ -94,54 +152,22 @@ while running:
         columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         pdb_codes_df = pd.DataFrame(columns=columns)
 
-        #ask the user if they want to wipe the log file (i.e. do you want to continue where the last left off or not).
-        question_log_file = [
+        #Allow user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
+        #e.g. the user may want to only look at structures obtained by X-ray diffraction and with a resolution less than 3 angstroms
+        question_2 = [
         inquirer.List('Choice',
-                        message="Do you want to wipe the previous log file?",
+                        message="Do you want to select structures only obtained by certain methods?",
                         choices=['Yes', 'No'],),]
-        answer_log_file = inquirer.prompt(question_log_file)
+        answer_2 = inquirer.prompt(question_2)
 
-        if answer_log_file['Choice'] == 'Yes':
-            try:
-                if os.path.exists(logfilepath):
-                    os.remove(logfilepath)
-                else:
-                    print('No log file found to remove')
-            except Exception as e:
-                print('Failed to wipe log file')
-        
-            #If there isn't already a log file it writes a new one and writes the column headers.
-            try:
-                if not os.path.exists(logfilepath):
-                    f = open(logfilepath, 'w')
-                    f.write('PDB Code,Result')
-                    f.close()
-                log_file_df = pd.read_csv(logfilepath)
-                done_pdbs = log_file_df['PDB Code'].to_list()
+        question_3 = [
+        inquirer.List('Choice',
+                        message="Do you want to select structures based on resolution?",
+                        choices=['Yes', 'No'],),]
+        answer_3 = inquirer.prompt(question_3)
 
-            except Exception as e:
-                print('Error parsing log_file.csv in working directory')
-                done_pdbs = []
-                pass
-
-            #Allow user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
-            #e.g. the user may want to only look at structures obtained by X-ray diffraction and with a resolution less than 3 angstroms
-
-            #It first asks the user for their preferences.
-            question_2 = [
-            inquirer.List('Choice',
-                            message="Do you want to select structures only obtained by certain methods?",
-                            choices=['Yes', 'No'],),]
-            answer_2 = inquirer.prompt(question_2)
-
-            question_3 = [
-            inquirer.List('Choice',
-                            message="Do you want to select structures based on resolution?",
-                            choices=['Yes', 'No'],),]
-            answer_3 = inquirer.prompt(question_3)
-
-            if answer_3['Choice'] == 'Yes':
-                wanted_res = input('What maximum resolution would you like (In Angstroms)? ')
+        if answer_3['Choice'] == 'Yes':
+            wanted_res = input('What maximum resolution would you like (In Angstroms)? ')
 
         #Searches Uniprot for PDB codes
         #Firstly asks for the name of the organismn (note it has to be exactly how it is written on the uniprot page).
@@ -201,9 +227,7 @@ while running:
                 question_4 = [
                 inquirer.List('Choice',
                                 message="Do you want to use PDB or AlphaFold structure(s)?",
-                                choices=['PDB', 'AlphaFold'],
-                            ),
-                ]
+                                choices=['PDB', 'AlphaFold'],),]
                 answer_4 = inquirer.prompt(question_4)
 
                 #It asks for the pdb code and uniprot code if PDB codes are being put in or just the alphafold code if alphafold structures are being put in.
@@ -256,15 +280,20 @@ while running:
 
         #The csv file is then parsed and the codes fed through as if they were entered manually.
         if answers['Choice'] == 'Input Codes Via .csv file':
-            csv_name = input('What is the name of the .csv file? ')
-            if csv_name[-4:] != '.csv':
-                csv_name = csv_name + '.csv'
-                
-            try:
-                pdb_codes_df = ul.from_csv_file(csv_name, pdb_codes_df, done_pdbs)
-            except Exception as e:
-                print("ERROR: %s"%e)
-                continue
+
+            # keep asking until a correct file is actually found
+            while True:
+                csv_name = input('What is the name of the .csv file? ')
+                if csv_name[-4:] != '.csv':
+                    csv_name = csv_name + '.csv'
+                    
+                try:
+                    pdb_codes_df = ul.from_csv_file(csv_name, pdb_codes_df, done_pdbs)
+                except Exception as e:
+                    print("ERROR: %s"%e)
+                    continue
+
+                break
 
         if (answer_2['Choice'] == 'Yes') or (answer_3['Choice'] == 'Yes'):
             if answer_2['Choice'] == 'Yes':
