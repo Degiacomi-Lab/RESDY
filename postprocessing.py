@@ -14,24 +14,15 @@ def report_on_results(pdb_codes_df, pka_sasa_results):
  
     try:
         #Firstly it puts each pdb code from pdb_codes_df in a list then gets rid of duplicates.
-        start_pdb_codes_no_dup = []
-        start_pdb_codes = pdb_codes_df['PDB Code'].tolist()
 
-        for code in start_pdb_codes:
-            if code not in start_pdb_codes_no_dup:
-                start_pdb_codes_no_dup.append(code)
-            else:
-                continue
+        #start_pdb_codes_no_dup = []
+        start_pdb_codes = pdb_codes_df['PDB Code']
+        start_pdb_codes_no_dup = list(set(list(start_pdb_codes)))
             
         #Next it does the same for pka_sasa_results
-        end_pdb_code_no_dup = []
-        end_pdb_codes = pka_sasa_results['PDB Code'].tolist()
-        for code in end_pdb_codes:
-            if code not in end_pdb_code_no_dup:
-                end_pdb_code_no_dup.append(code)
-            else:
-                continue
-            
+        end_pdb_codes = pka_sasa_results['PDB Code']
+        end_pdb_code_no_dup = list(set(list(end_pdb_codes)))
+
         #Lastly it gives a percentage pass rate by working out the number of entries in pka_sasa_results compared to pdb_codes_df
         percentage = (len(end_pdb_code_no_dup) / float(len(start_pdb_codes_no_dup)))*100.0
 
@@ -50,25 +41,21 @@ def average_prot(pka_sasa_results, outdir="Output"):
         columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'PDB Code', 'sasa']
         avgd_pka_sasa = pd.DataFrame(columns=columns)
         list_of_uniprot_codes = pka_sasa_results['Uniprot Entry']
-        list_of_uniprot_codes_no_dup = list()
 
     except Exception as e:
         raise Exception('Failed to construct dataframe. %s'%e)
 
     #Next removes all duplicates from the list of uniprot entries.
     try:
-        for entry in list_of_uniprot_codes:
-            if entry not in list_of_uniprot_codes_no_dup:
-                list_of_uniprot_codes_no_dup.append(entry)
-                
-            else:
-                continue
+        list_of_uniprot_codes_no_dup = list(set(list(list_of_uniprot_codes)))
 
     except Exception as e:
         raise Exception('Failed to obtain Uniprot Entries from dataframe. %s'%e)
     
     #Next constructs a df for all the lysines of all the structures of a given uniprot entry.
     for uniprot_code in list_of_uniprot_codes_no_dup:
+        
+        print(">> %s"%uniprot_code)
         
         try:
             df_one_uniprot_code = pka_sasa_results.where(pka_sasa_results['Uniprot Entry'] == uniprot_code)
@@ -83,15 +70,10 @@ def average_prot(pka_sasa_results, outdir="Output"):
             df_one_uniprot_code['PDB'] = df_one_uniprot_code['PDB Code']
             df_one_uniprot_code['PDB'] = (df_one_uniprot_code['PDB Code']).str[:9]
             list_of_pdbs = df_one_uniprot_code['PDB']
-            list_of_pdbs_no_dup = list()
 
             #Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
-            for entry in list_of_pdbs:
-                if entry not in list_of_pdbs_no_dup:
-                    list_of_pdbs_no_dup.append(entry)
-                else:
-                    continue
-                
+            list_of_pdbs_no_dup = list(set(list(list_of_pdbs)))
+
         except Exception as e:
             print("ERROR: %s"%e)
             continue
@@ -103,16 +85,10 @@ def average_prot(pka_sasa_results, outdir="Output"):
             
             if entry[:2] == 'AF':
                 list_of_chains = df_one_pdb['chain'].to_list()
-                list_of_chains_no_dup = list()
-                for entry in list_of_chains:
-                    if entry not in list_of_chains_no_dup:
-                        list_of_chains_no_dup.append(entry)
-                    else:
-                        continue
+                list_of_chains_no_dup = list(set(list(list_of_chains)))
                 list_of_homomers = [list_of_chains_no_dup]
             else:
                 list_of_homomers = check_chain_match(entry)
-                #print(list_of_homomers)
 
             #For each group of equivalent chains it then creates a df.
             for entry in list_of_homomers:
@@ -127,13 +103,7 @@ def average_prot(pka_sasa_results, outdir="Output"):
                     try:
 
                         #Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
-                        list_of_resids = df_only_homomers['resid']
-                        list_of_resids_no_dup = list()
-                        for entry in list_of_resids:
-                            if entry not in list_of_resids_no_dup:
-                                list_of_resids_no_dup.append(entry)
-                            else:
-                                continue
+                        list_of_resids_no_dup = list(set(list(df_only_homomers['resid'])))
                             
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -171,22 +141,10 @@ def average_prot(pka_sasa_results, outdir="Output"):
 
                         try:
                             list_of_pdbs = df_one_resid['PDB Code']
-                            list_of_pdbs_no_dup = list()
+                            list_of_pdbs_no_dup = list(set(list(list_of_pdbs)))
 
-
-                            for entry in list_of_pdbs:
-                                if entry not in list_of_pdbs_no_dup:
-                                    list_of_pdbs_no_dup.append(entry)
-                                else:
-                                    continue
-
-                            list_chains_used_no_dup = list()
-                            list_chains_used = df_one_resid['chain'].to_list()
-                            for chain in list_chains_used:
-                                if chain not in list_chains_used_no_dup:
-                                    list_chains_used_no_dup.append(chain)
-                                else:
-                                    pass
+                            list_chains_used = df_one_resid['chain']
+                            list_chains_used_no_dup = list(set(list(list_chains_used)))
                             chain_avgd = ''
                             for i in range(len(list_chains_used_no_dup)):
                                 chain_avgd = chain_avgd +'/' + list_chains_used_no_dup[i]
@@ -196,7 +154,7 @@ def average_prot(pka_sasa_results, outdir="Output"):
                                 PDB_codes_avgd = PDB_codes_avgd + '/' + list_of_pdbs_no_dup[i]
 
                             d = {'resid': residue, 'chain': chain_avgd, 'plddt': avg_plddt, 'Uniprot Entry': uniprot_code, 'pKa': avg_pka, 'pKa stdev':stddev_pka, 'PDB Code': PDB_codes_avgd, 'sasa': avg_sasa, 'sasa stdev': stdev_sasa}
-                            avgd_pka_sasa = avgd_pka_sasa.append(d, ignore_index=True)
+                            avgd_pka_sasa = pd.concat([avgd_pka_sasa, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
                     
                         except Exception as e:
                             print('Failed to construct final dataframe for residue ' + str(residue))
@@ -300,19 +258,13 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
         columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'PDB Code', 'sasa']
         low_pka_sasa = pd.DataFrame(columns=columns)
         list_of_uniprot_codes = pka_sasa_results['Uniprot Entry']
-        list_of_uniprot_codes_no_dup = list()
-
+ 
     except Exception as e:
         raise Exception('Failed to construct dataframe. %s'%e)
 
     #Next removes all duplicates from the list of uniprot entries.
     try:
-        for entry in list_of_uniprot_codes:
-            if entry not in list_of_uniprot_codes_no_dup:
-                list_of_uniprot_codes_no_dup.append(entry)
-                
-            else:
-                continue
+        list_of_uniprot_codes_no_dup = list(set(list(list_of_uniprot_codes)))
 
     except Exception as e:
         raise Exception('Failed to obtain Uniprot Entries from dataframe. %s'%e)
@@ -333,15 +285,8 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
             df_one_uniprot_code['PDB'] = df_one_uniprot_code['PDB Code']
             df_one_uniprot_code['PDB'] = (df_one_uniprot_code['PDB Code']).str[:9]
             list_of_pdbs = df_one_uniprot_code['PDB']
-            list_of_pdbs_no_dup = list()
-
-            #Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
-            for entry in list_of_pdbs:
-                if entry not in list_of_pdbs_no_dup:
-                    list_of_pdbs_no_dup.append(entry)
-                else:
-                    continue
-                
+            list_of_pdbs_no_dup = list(set(list(list_of_pdbs)))
+               
         except Exception as e:
             print("ERROR: %s"%e)
             continue
@@ -353,16 +298,10 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
             
             if entry[:2] == 'AF':
                 list_of_chains = df_one_pdb['chain'].to_list()
-                list_of_chains_no_dup = list()
-                for entry in list_of_chains:
-                    if entry not in list_of_chains_no_dup:
-                        list_of_chains_no_dup.append(entry)
-                    else:
-                        continue
+                list_of_chains_no_dup = list(set(list(list_of_chains)))
                 list_of_homomers = [list_of_chains_no_dup]
             else:
                 list_of_homomers = check_chain_match(entry)
-
 
             #For each group of equivalent chains it then creates a df.
             for entry in list_of_homomers:
@@ -376,12 +315,7 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
 
                         #Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
                         list_of_resids = df_only_homomers['resid']
-                        list_of_resids_no_dup = list()
-                        for entry in list_of_resids:
-                            if entry not in list_of_resids_no_dup:
-                                list_of_resids_no_dup.append(entry)
-                            else:
-                                continue
+                        list_of_resids_no_dup = list(set(list(list_of_resids)))
                             
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -424,13 +358,7 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
                         #Next it gets a list of all the pdb codes that the entry includes.
                         try:
                             list_of_pdbs = df_one_resid['PDB Code']
-                            list_of_pdbs_no_dup = list()
-
-                            for entry in list_of_pdbs:
-                                if entry not in list_of_pdbs_no_dup:
-                                    list_of_pdbs_no_dup.append(entry)
-                                else:
-                                    continue
+                            list_of_pdbs_no_dup = list(set(list(list_of_pdbs)))
 
                             #It then concatonates them together to create a long string consisting of for example: /1ABC-alt-1A/1ABC-alt-1A/
                             PDB_codes_avgd = ''
@@ -439,7 +367,7 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
 
                             #Lastly it appends all the information to a df and saves as in the output folder as results_likely.csv
                             d = {'resid': residue, 'chain': chain, 'plddt': avg_plddt, 'Uniprot Entry': uniprot_code, 'pKa': lowest_pka, 'PDB Code': PDB_codes_avgd, 'sasa': sasa}
-                            low_pka_sasa = low_pka_sasa.append(d, ignore_index=True)
+                            low_pka_sasa = pd.concat([low_pka_sasa, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
                             
                         except Exception as e:
                             print('Failed to construct final dataframe for residue ' + residue)
@@ -450,10 +378,8 @@ def get_most_likely_value(pka_sasa_results, outdir="Output"):
                     print('Failure finding most likely %s'%e)
                 
             low_pka_sasa.to_csv(os.path.join(outdir, 'results_likely.csv'))
-
-        print(low_pka_sasa)
-        
-    return(low_pka_sasa)
+       
+    return low_pka_sasa
 
 
 
@@ -464,19 +390,13 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
         columns = ['resid', 'chain', 'plddt', 'Uniprot Entry', 'pKa', 'PDB Code', 'sasa']
         low_pka_sasa = pd.DataFrame(columns=columns)
         list_of_uniprot_codes = pka_sasa_results['Uniprot Entry']
-        list_of_uniprot_codes_no_dup = list()
 
     except Exception as e:
         raise Exception('Failed to construct dataframe%s'%e)
 
     #Next removes all duplicates from the list of uniprot entries.
     try:
-        for entry in list_of_uniprot_codes:
-            if entry not in list_of_uniprot_codes_no_dup:
-                list_of_uniprot_codes_no_dup.append(entry)
-                
-            else:
-                continue
+        list_of_uniprot_codes_no_dup = list(set(list(list_of_uniprot_codes)))
 
     except Exception as e:
         raise Exception('Failed to obtain Uniprot Entries from dataframe%s'%e)
@@ -498,14 +418,7 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
             df_one_uniprot_code['PDB'] = df_one_uniprot_code['PDB Code']
             df_one_uniprot_code['PDB'] = (df_one_uniprot_code['PDB Code']).str[:9]
             list_of_pdbs = df_one_uniprot_code['PDB']
-            list_of_pdbs_no_dup = list()
-
-            #Next it makes a list of PDB codes from the PDB column (and gets rid of duplicates).
-            for entry in list_of_pdbs:
-                if entry not in list_of_pdbs_no_dup:
-                    list_of_pdbs_no_dup.append(entry)
-                else:
-                    continue
+            list_of_pdbs_no_dup = list(set(list(list_of_pdbs)))
                 
         except Exception as e:
             print("ERROR: %s"%e)
@@ -518,12 +431,8 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
             
             if entry[:2] == 'AF':
                 list_of_chains = df_one_pdb['chain'].to_list()
-                list_of_chains_no_dup = list()
-                for entry in list_of_chains:
-                    if entry not in list_of_chains_no_dup:
-                        list_of_chains_no_dup.append(entry)
-                    else:
-                        continue
+                list_of_chains_no_dup = list(set(list(list_of_chains)))
+
                 list_of_homomers = [list_of_chains_no_dup]
             else:
                 list_of_homomers = check_chain_match(entry)
@@ -540,13 +449,8 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
 
                         #Next gets a list of resIDs from the df_only_homomers and gets rid of duplicates.
                         list_of_resids = df_only_homomers['resid']
-                        list_of_resids_no_dup = list()
-                        for entry in list_of_resids:
-                            if entry not in list_of_resids_no_dup:
-                                list_of_resids_no_dup.append(entry)
-                            else:
-                                continue
-                            
+                        list_of_resids_no_dup = list(set(list(list_of_resids)))
+
                     except Exception as e:
                         print("ERROR: %s"%e)
                         continue
@@ -592,23 +496,17 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
 
                         try:
                             list_of_pdbs = df_one_resid['PDB Code']
-                            list_of_pdbs_no_dup = list()
+                            list_of_pdbs_no_dup = list(set(list(list_of_pdbs)))
 
-                            for entry in list_of_pdbs:
-                                if entry not in list_of_pdbs_no_dup:
-                                    list_of_pdbs_no_dup.append(entry)
-                                else:
-                                    continue
-
-                            #It then concatonates them together to create a long string consisting of for example:
+                            #It then concatenates them to create a long string consisting of (for example):
                             #/1ABC-alt-1A/1ABC-alt-1A/.
                             PDB_codes_avgd = ''
                             for i in range(len(list_of_pdbs_no_dup)):
                                 PDB_codes_avgd = PDB_codes_avgd + '/' + list_of_pdbs_no_dup[i]
 
                             d = {'resid': residue, 'chain': chain, 'plddt': avg_plddt, 'Uniprot Entry': uniprot_code, 'pKa': lowest_pka, 'PDB Code': PDB_codes_avgd, 'sasa': highest_sasa}
-                            low_pka_sasa = low_pka_sasa.append(d, ignore_index=True)        
-                    
+                            low_pka_sasa = pd.concat([low_pka_sasa, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
+                                                
                         except Exception as e:
                             print('Failed to construct final dataframe for residue ' + residue)
                             print("ERROR: %s"%e)
@@ -622,22 +520,21 @@ def highest_sasa_lowest_pka(pka_sasa_results, outdir="Output"):
                 except Exception as e:
                     print('Error %s'%e)
     
-    return(low_pka_sasa)
+    return low_pka_sasa
 
 
-#This function is important for the data processesing section
-#It checks which chains in a protein are equivalent and tells the program to treat them as equivalent
-#(i.e. to take the lowest values for each resid from only the equivalent chains).
+# Determine which chains in a protein are equivalent
+#(i.e. take the lowest values for each resid from only the equivalent chains)
 def check_chain_match(pdb):
     pdb = pdb[:4]
     try:
         
-        #Firstly it downloads the fasta file from online.
+        #Firs, download the fasta file from online.
         web_url = "https://www.rcsb.org/fasta/entry/" + pdb + '/download'
         file_name_fasta = pdb + '.fasta'
 
         if sys.platform == "win32":
-            line = "curl -O " + file_name_fasta + " " + web_url
+            line = "curl -s -o " + file_name_fasta + " " + web_url
         else:
             line = "wget -O " + file_name_fasta + " " + web_url
             
@@ -647,7 +544,7 @@ def check_chain_match(pdb):
         print('Error %s'%e)
         print('Failed to download fasta sequence')
 
-    #Next it opens the file, parses it and puts all the equivalent chains into a list of lists.
+    #Next open the file, parse it and put all the equivalent chains into a list of lists.
     #For example if A and B are equivalent and so are C and D the list will read [[A, B], [C, D]]
     #This is then fed back into the get_most_likely function.
     try:
@@ -684,12 +581,8 @@ def check_chain_match(pdb):
                 elif len(word) == 1:
                     clean_entry.append(word)
 
-                clean_entry_no_dup = list()
-                for entry in clean_entry:
-                    if entry not in clean_entry_no_dup:
-                        clean_entry_no_dup.append(entry)
-                    else:
-                        pass
+                clean_entry_no_dup = list(set(list(clean_entry)))
+
             list_of_homomers.append(clean_entry_no_dup)
             
         except Exception as e:
@@ -700,7 +593,6 @@ def check_chain_match(pdb):
         except:
             pass
         
-    print("> homomers: ", list_of_homomers)
     return list_of_homomers
 
 
@@ -855,14 +747,14 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
                 chain_resid = str(list_of_chains[j]) + str(list_of_resid[j])
 
                 data = ({'PDB Code': pdb_code, 'Lysine Index': lys_idx[j], 'Resid': list_of_resid[j], 'Chain': list_of_chains[j], 'Chain_Resid': chain_resid,'Score': score})
-                score_df = score_df.append(data, ignore_index=True)
+                score_df = pd.concat([score_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
             except Exception as e:
                 print('Error %s'%e)
-                print('Failure chekcing chain clash')
+                print('Failure checking chain clash')
                 score = 0
                 data = ({'PDB Code': pdb_code, 'Lysine Index': lys_idx[j], 'Resid': list_of_resid[j], 'Chain': list_of_chains[j], 'Chain_Resid': chain_resid,'Score': score})
-                score_df = score_df.append(data, ignore_index=True)
+                score_df = pd.concat([score_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
             
                 continue
 
@@ -877,12 +769,12 @@ def remove_problematic(code, propka_lys_fails, chain_resid_near_failed_chain, pk
                 print('Failure chekcing chain clash')
                 return []
 
-            return(chain_resid_clash)
+            return chain_resid_clash
     
     chain_resid_clash, pka_sasa_res_df = remove_failures(code, propka_lys_fails, chain_resid_near_failed_chain, pka_sasa_res_df)
     report_lys_fail(code, propka_lys_fails, chain_resid_clash, chain_resid_near_failed_chain, outdir)
 
-    return(pka_sasa_res_df)
+    return pka_sasa_res_df
 
 ###############################################################
 

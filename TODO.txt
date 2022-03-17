@@ -10,8 +10,6 @@ REFACTORING
 
 POSTPROCESSING
 
-- bug in "take most likely value for each resid" postprocessing (fasta file not found)
-
 - missing implementation for options in postprocessing.py when launched alone
 
 
