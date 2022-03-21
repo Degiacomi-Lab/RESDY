@@ -12,7 +12,6 @@ POSTPROCESSING
 
 - missing implementation for options in postprocessing.py when launched alone
 
-
 GENERAL IMPROVEMENTS
 
 - fix separator issue in Windows for CSV file user input (add path autocomplete)
