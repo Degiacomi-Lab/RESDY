@@ -16,6 +16,11 @@ import biobox as bb
 import pdb_loader as pl
 
 
+def create_empty_dataframe():
+    columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
+    return pd.DataFrame(columns=columns)
+            
+
 def checks(pdb, done_pdbs):
 
     # Firstly it checks whether they are in the log_file (the file saying what has already been done).
@@ -42,9 +47,14 @@ def checks(pdb, done_pdbs):
     return True
 
 
-#This function obtains all the pdb codes given an organism
+#Obtain all the PDB codes belonging to an organism
 #Note the name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome
-def get_pdbs(name_of_organism, code, df, done_pdbs):
+def get_pdbs(name_of_organism, code, df=[], done_pdbs=[]):
+
+    #if no DataFrame is provide, build an empty one
+    if len(df) == 0:
+        df = create_empty_dataframe()
+
 
     #First, a df is constructed for our results to go in
     list_of_entries = list()
@@ -191,7 +201,8 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                 try:
                     AF_code = 'AF-' + protein_code_clean + '-F1-model_v1'
                     data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-                    df = df.append(data, ignore_index=True)
+                    #df = df.append(data, ignore_index=True)
+                    df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                 except Exception as e:
                     print('Error %s'%e)
@@ -228,7 +239,8 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
                                     unique_values_chain = get_chains(f)
                                     for i in range(len(unique_values_chain)):
                                         data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
-                                        df = df.append(data, ignore_index=True)
+                                        #df = df.append(data, ignore_index=True)
+                                        df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                         except Exception as e:
                             print('Error %s'%e)
@@ -252,9 +264,13 @@ def get_pdbs(name_of_organism, code, df, done_pdbs):
 
 #Given a list of uniprot codes this function goes to the .txt URL
 #and finds all corresponding .pdb files and all the relevant information.
-def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
+def get_pdbs_uniprot(uniprot_code, df=[], done_pdbs=[]):
 
-#Firstly it checks if there is uniprot information available for the protein
+    #if no DataFrame is provided, build an empty one
+    if len(df) == 0:
+        df = create_empty_dataframe()
+
+    #Firstly it checks if there is uniprot information available for the protein
     try:
         url_2 = 'https://www.uniprot.org/uniprot/' + uniprot_code + '.txt'
         html_2 = urllib.request.urlopen(url_2)
@@ -272,7 +288,8 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
         
         else:
             data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-            df = df.append(data, ignore_index=True)
+            #df = df.append(data, ignore_index=True)
+            df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
     #Lastly it searches for available PDB structures
     except Exception as e:
@@ -311,7 +328,9 @@ def get_pdbs_uniprot(uniprot_code, df, done_pdbs):
                         #Lastly the data is appended to the df
                         for i in range(len(unique_values_chain)):
                             data = ({'Uniprot Entry': uniprot_code, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
-                            df = df.append(data, ignore_index=True)
+                            #df = df.append(data, ignore_index=True)
+                            df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
 
         except Exception as e:
             print('Error %s'%e)
@@ -326,18 +345,10 @@ def get_chains(f):
     try:
         M = bb.Molecule()
         M.import_pdb(f, include_hetatm=True)
-        df = M.data
-            
-        #Next puts the chains in a lis and makes sure there are no duplicates.
-        chain_column = df['chain'].tolist()
-        unique_values_chain = list()
-        for i in range(len(chain_column)):
-            if chain_column[i] not in unique_values_chain:
-                unique_values_chain.append(chain_column[i])
+        unique_values_chain = list(set(list(M.data['chain'])))
 
     except Exception as e:
-        print('Failed to obtain chain information')
-        print("This may be due to the fact that the protein is too large and therefore a .pdb structure does not exist.")
+        print("Failed to obtain chain information.\n May be caused by the protein being too large, thus a single .pdb structure does not exist.")
         raise Exception("%s"%e)
 
     return unique_values_chain
@@ -346,9 +357,12 @@ def get_chains(f):
 #Given a list of techniques from the user and the desired resolution
 #this function removes pdb entries from pdb_codes_df that don't fit the criteeria
 #the second returned parameters defined whether, upon failure, main program should continue (if False, it stops)
-def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
-    try:
+def search_by_technique(list_of_techniques, wanted_res, pdb_codes_df=[]):
 
+    if len(pdb_codes_df) == 0:
+        pdb_codes_df = create_empty_dataframe()
+
+    try:
         pdb_codes_df = pdb_codes_df[pdb_codes_df['Method'].isin(list_of_techniques)]
 
     except Exception as e:
@@ -393,7 +407,10 @@ def search_by_technique(list_of_techniques, pdb_codes_df, wanted_res):
 #This code parses a .csv file to find uniprot and pdb codes to pass into the pipeline.
 #If you want to just input uniprot codes put them in the first column and leave the second empty
 #If you want to input pdb codes put the uniprot code in the first column and pdb code in the second.
-def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
+def from_csv_file(csv_file, pdb_codes_df=[], done_pdbs=[]):
+
+    if len(pdb_codes_df) == 0:
+        pdb_codes_df = create_empty_dataframe()
 
     #read .csv file.
     try:
@@ -431,8 +448,9 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
 
                 if keep == True:
                     d = {'Uniprot Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
-                    pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
- 
+                    #pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
+                    pdb_codes_df = pd.concat([pdb_codes_df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
+
             else:
                 pdb_codes_df = construct_single_pdb_df(uniprot_code, pdb_code, pdb_codes_df, done_pdbs)
                 
@@ -443,9 +461,10 @@ def from_csv_file(csv_file, pdb_codes_df, done_pdbs):
     return(pdb_codes_df)
 
 
-def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs=[]):
+def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df=[], done_pdbs=[]):
 
-    #print("\n", UNIPROT_code_pdb, PDBCODE_inpt)
+    if len(pdb_codes_df) == 0:
+        pdb_codes_df = create_empty_dataframe()
     
     #Firstly it opens the correct uniprot page.
     try:
@@ -491,7 +510,9 @@ def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_p
                                     for i in range(len(unique_values_chain)):
                                         try:
                                             data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
-                                            pdb_codes_df = pdb_codes_df.append(data, ignore_index=True)
+                                            #pdb_codes_df = pdb_codes_df.append(data, ignore_index=True)
+                                            pdb_codes_df = pd.concat([pdb_codes_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
                                         except Exception as e:
                                             print("Error %s"%e)
                                             print('Error constructing df')

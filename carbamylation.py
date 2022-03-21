@@ -149,9 +149,9 @@ while running:
             continue
    
         # initialise PDB code DataFrame
-        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
-        pdb_codes_df = pd.DataFrame(columns=columns)
+        pdb_codes_df = ul.create_empty_dataframe()
 
+        
         #Allow user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
         #e.g. the user may want to only look at structures obtained by X-ray diffraction and with a resolution less than 3 angstroms
         question_2 = [
@@ -322,7 +322,7 @@ while running:
 
             #The desired techniques are appended to a list.
             #It then filters the df to remove those which don't fit the criteria set by the user.
-            pdb_codes_df, retry = ul.search_by_technique(list_of_techniques, pdb_codes_df, wanted_res)
+            pdb_codes_df, retry = ul.search_by_technique(list_of_techniques, wanted_res, pdb_codes_df)
     
             if len(pdb_codes_df) == 0 and retry:
                 running = True
@@ -350,13 +350,7 @@ while running:
 
         #A list of pdb codes from the pdb_codes_df (the df with all the pdbs in)
         #is then created and duplicates taken out.
-        list_of_pdb_codes_no_dup = list()
-        list_of_pdb_codes = pdb_codes_df['PDB Code']
-        for entry in list_of_pdb_codes:
-            if entry not in list_of_pdb_codes_no_dup:
-                list_of_pdb_codes_no_dup.append(entry)
-            else:
-                continue
+        list_of_pdb_codes_no_dup = list(set(list(pdb_codes_df['PDB Code'])))
         
         #Each one is then fed through one at a time.
         print("\n> packing structural dataset and measuring data!")
@@ -627,13 +621,7 @@ while running:
 
                 while selecting_carbam_lys == True:
 
-                    list_of_pdbs = pka_sasa_results['PDB Code']
-                    list_of_pdbs_no_dup = list()
-                    for entry in list_of_pdbs:
-                        if entry not in list_of_pdbs_no_dup:
-                            list_of_pdbs_no_dup.append(entry)
-                        else:
-                            continue
+                    list_of_pdbs_no_dup = list(set(list(pka_sasa_results['PDB Code'])))
 
                     question_carbam_pdb = [
                     inquirer.List('Choice',
@@ -645,13 +633,8 @@ while running:
                     carbam_pdb_list.append(carbam_pdb)
                     
                     df_one_pdb = pka_sasa_results.where(pka_sasa_results['PDB Code'] == carbam_pdb)
-                    list_of_resids = df_one_pdb['resid']
-                    list_of_resids_no_dup = list()
-                    for entry in list_of_resids:
-                        if entry not in list_of_resids_no_dup:
-                            list_of_resids_no_dup.append(entry)
-                        else:
-                            continue
+                    
+                    list_of_resids_no_dup = list(set(list(df_one_pdb['resid'])))
 
                     question_carbam_resid = [
                     inquirer.List('Choice',

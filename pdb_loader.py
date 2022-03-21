@@ -21,7 +21,7 @@ def clean(pdb):
     try:
 
         #go into curate_PDB/conformations and downloads the .pdb file.
-        print("> Downloading PDB")
+        print("> Downloading PDB %s"%pdb)
         os.chdir(os.path.join("curate_PDB", "conformations"))
                 
         if sys.platform == "win32":
@@ -41,10 +41,10 @@ def clean(pdb):
     except Exception as e:
         raise Exception('Error renaming chains. %s'%e)
         
-    try:
-        replace_mse(pdb)
-    except:
-        pass
+    #try:
+    #    replace_mse(pdb)
+    #except:
+    #    pass
    
     #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
     list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
@@ -55,27 +55,55 @@ def clean(pdb):
     write_file_path = os.path.join("curate_PDB", "conformations", "%s-clean.pdb"%pdb)
     write_file = open(write_file_path, 'w')
 
-    #Next it writes the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
-    unknown_hetatm = False
+    # Write the clean file, including HETATMs (if they are metal ions),
+    # all atoms and lines starting with TER and END.
+    test_MSE = False
+    test_KCX = False
     for line in read_file:
-        if line[:6] == 'HETATM':
-            words = line.split()
+
+        # replace selenomethionine with methionine
+        if "MSE" in line:
+            line = line.replace("HETATM", "ATOM  ")
+            line = line.replace('MSE', 'MET')
+            line = line.replace('SE', ' S')
+            test_MSE = True
+
+        #transform carboxylated lysine into a normal lysine
+        if "KCX" in line:
+            
+            if ("CX" in line) or ("OQ1" in line) or ("OQ2" in line):
+                continue
+
+            else:
+                line = line.replace("HETATM", "ATOM  ")
+                line = line.replace('KCX', 'MET')
+
+            test_KCX = True
+
+        words = line.split()
+
+        #neglect HETATM atoms, unless they are metal ions
+        if line[:6] == 'HETATM':    
             if words[3] in list_of_metals:
                 write_file.write(line)
                 continue
 
+        #ignore hydrogen atoms
         if line[:4] == 'ATOM':
-            words = line.split()
-            if words[2] != 'H':
+            if words[2] != 'H' and words[-1] != 'H':
                 write_file.write(line)
                 continue
 
-        if line[:3] == 'TER':
+        #same terminal statements
+        if words[0] == 'END' or words[0] == 'TER':
             write_file.write(line)
             continue
-        if line[:3] == 'END':
-            write_file.write(line)
-            continue
+
+    if test_MSE:
+        print(">> mutated MSE to MET")
+
+    if test_KCX:
+        print(">> mutated removed a lysine carboxylation")
         
     write_file.close()
     read_file.close()
@@ -83,38 +111,6 @@ def clean(pdb):
     #remove the original pdb file as it is not needed anymore.
     os.remove(read_file_path)
 
-    return
-
-
-def replace_mse(pdb):
-    
-    print('> Mutating all MSE to MET')
-    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
-    list_of_files = []
-    for file in files:
-        file_name = file[25:]
-        if file_name[:4] == pdb:
-            list_of_files.append(file_name)
-    
-    #For each it then replaces any atoms belonging to KCX with LYS and HETATM with ATOM.
-    for f in list_of_files:
-
-        try:
-            
-            path = os.path.join("curate_PDB", "conformations", f)
-            with fileinput.FileInput(path, inplace = True) as f:
-                for line in f:
-                    if("MSE" in line):
-                        line = line.replace("HETATM", "ATOM  ")
-                        line = line.replace('MSE', 'MET')
-                        line = line.replace('SE', ' S')
-                        print(line, end ='') 
-                    else:
-                        print(line, end ='') 
-
-        except:
-            return
-        
     return
 
 
@@ -142,6 +138,9 @@ def split_struc_NMR(pdb):
     if len(endmdls) == 0:
         
         path_rename = os.path.join("curate_PDB", "conformations", name)
+        if os.path.exists(path_rename):
+            os.remove(path_rename)
+        
         os.rename(path, path_rename)
   
     #If there are 'ENDMDL' statements a new file is written for each model.
@@ -201,7 +200,7 @@ def split_struc_alt_aa(pdb):
         file_name = file[25:]
         if file_name[:4] == pdb:
             list_of_files.append(file_name)
-    
+
     for f in list_of_files:
 
             ABC_list = ['A', 'B', 'C', 'D']
@@ -248,22 +247,21 @@ def split_struc_alt_aa(pdb):
                                 newline = line[:16] + ' ' + line[17:]
                                 f_write.write(newline)
                                 continue
+                            
                             if (line[:4] == 'ATOM') and (line[16] in non_target_letters):
                                 continue
-                            if (line[:4] == 'ATOM'):
+                            
+                            if (line[:4] == 'ATOM') or (line[:6] == 'HETATM') or (line[:3] == 'TER'):
                                 f_write.write(line)
-                            if (line[:6] == 'HETATM'):
-                                f_write.write(line)
-                            if (line[:3] == 'TER'):
-                                f_write.write(line)
-                                
+                                           
                         f_write.close()
                         read.close()
 
                 except Exception as e:
-                    print("Error %s"%e)
+                    #print("Error %s"%e)
                     read_file.close()
                     f_write.close()
+                    raise("%s"%e)
                     
             #The original is then removed if it has been replaced.
             read_file.close()
@@ -272,93 +270,124 @@ def split_struc_alt_aa(pdb):
     return
 
 
-#This script removes the carbamate from any structure
-def remove_kcx(pdb):
+#def replace_mse(pdb):
+#    
+#    print('> Mutating all MSE to MET')
+#    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
+#    list_of_files = []
+#    for file in files:
+#        file_name = file[25:]
+#        if file_name[:4] == pdb:
+#            list_of_files.append(file_name)
+#    
+#    #For each it then replaces any atoms belonging to KCX with LYS and HETATM with ATOM.
+#    for f in list_of_files:
+#
+#        try:
+#            
+#            path = os.path.join("curate_PDB", "conformations", f)
+#            with fileinput.FileInput(path, inplace = True) as f:
+#                for line in f:
+#                    if("MSE" in line):
+#                        line = line.replace("HETATM", "ATOM  ")
+#                        line = line.replace('MSE', 'MET')
+#                        line = line.replace('SE', ' S')
+#                        print(line, end ='')
+#                    else:
+#                        print(line, end ='') 
+#
+#        except:
+#            return
+#        
+#    return
+#
+##This script removes the carbamate from any structure
+#def remove_kcx(pdb):
+#
+#    #Firstly it gets a list of files in curate_PDB/conformations that belong to the pdb of interest.
+#    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
+#    
+#    list_of_files = []
+#    for file in files:
+#        file_name = file[25:]
+#        if file_name[:4] == pdb:
+#            list_of_files.append(file_name)
+#    
+#    for file in list_of_files:
+#        path = os.path.join("curate_PDB", "conformations", file)
+#        
+#        M = bb.Molecule()
+#        M.import_pdb(path, include_hetatm=True)
+#
+#        #Next it removes the atoms belonging to KCX from the structure.
+#        idxs = []
+#        pos ,idx = M.atomignore('*', 'KCX', 'CX', get_index=True, use_resname=True)
+#        A = M.get_subset(idxs=idx)
+#        pos, idx = A.atomignore('*', 'KCX', 'OQ1', get_index=True, use_resname=True)
+#        B = A.get_subset(idxs=idx)
+#        pos, idx = B.atomignore('*', 'KCX', 'OQ2', get_index=True, use_resname=True)
+#        C = B.get_subset(idxs=idx)
+#        try:
+#            C.write_pdb(path, split_struc=True)
+#        except:
+#            C.write_pdb(path, split_struc=False)
+#
+#    #For each it then replaces any atoms beloning to KCX with LYS and HETATM with ATOM.
+#    for f in list_of_files:
+#
+#        try:
+#            path = os.path.join("curate_PDB", "conformations", f)
+#            
+#            with fileinput.FileInput(path, inplace = True) as f:
+#                for line in f:
+#                    
+#                    if("KCX" in line):
+#                        line = line.replace("HETATM", "ATOM  ")
+#                        line = line.replace('KCX', 'LYS')
+#                        print(line, end ='') 
+#                    else:
+#                        print(line, end ='') 
+#
+#        except:
+#            return
 
-    #Firstly it gets a list of files in curate_PDB/conformations that belong to the pdb of interest.
-    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
-    
-    list_of_files = []
-    for file in files:
-        file_name = file[25:]
-        if file_name[:4] == pdb:
-            list_of_files.append(file_name)
-    
-    for file in list_of_files:
-        path = os.path.join("curate_PDB", "conformations", file)
-        
-        M = bb.Molecule()
-        M.import_pdb(path, include_hetatm=True)
-
-        #Next it removes the atoms belonging to KCX from the structure.
-        idxs = []
-        pos ,idx = M.atomignore('*', 'KCX', 'CX', get_index=True, use_resname=True)
-        A = M.get_subset(idxs=idx)
-        pos, idx = A.atomignore('*', 'KCX', 'OQ1', get_index=True, use_resname=True)
-        B = A.get_subset(idxs=idx)
-        pos, idx = B.atomignore('*', 'KCX', 'OQ2', get_index=True, use_resname=True)
-        C = B.get_subset(idxs=idx)
-        try:
-            C.write_pdb(path, split_struc=True)
-        except:
-            C.write_pdb(path, split_struc=False)
-
-    #For each it then replaces any atoms beloning to KCX with LYS and HETATM with ATOM.
-    for f in list_of_files:
-
-        try:
-            path = os.path.join("curate_PDB", "conformations", f)
-            
-            with fileinput.FileInput(path, inplace = True) as f:
-                for line in f:
-                    
-                    if("KCX" in line):
-                        line = line.replace("HETATM","ATOM  ")
-                        line = line.replace('KCX', 'LYS')
-                        print(line, end ='') 
-                    else:
-                        print(line, end ='') 
-
-        except:
-            return
-
-#This script removes any hydrogens from the files in curate_PDB/conformations
-def remove_hydrogens(pdb):
-    
-    print('> Removing Hydrogens')
-    #Firstly it puts each file name that belongs to the pdb of interest into a list
-    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
-
-    list_of_files = []
-    for file in files:
-        file_name = file[25:]
-        if file_name[:4] == pdb:
-            list_of_files.append(file_name)
-
-    #Next it opens them in biobx and gets the index of each non-hydrogen atom
-    for file in list_of_files:
-        
-        path = os.path.join("curate_PDB", "conformations", file)
-        
-        M = bb.Molecule()
-        M.import_pdb(path)
-        df = M.data
-        list_of_names = df['name'].to_list()
-        clean_names = list()
-
-        for name in list_of_names:
-            if name[0] != 'H':
-                clean_names.append(name)
-        pts, idx = M.atomselect('*', '*', clean_names, get_index=True)
-
-        #Next it writes a new pdb including all the atoms except the hydrogens.
-        try:
-            M.write_pdb(path, index=idx, split_struc=True)
-        except:
-            M.write_pdb(path, index=idx, split_struc=False)
-
-    return
-
+##Remove any hydrogens from the files in curate_PDB/conformations
+#def remove_hydrogens(pdb):
+#    
+#    print('> Removing Hydrogens')
+#    #Firstly it puts each file name that belongs to the pdb of interest into a list
+#    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
+#
+#    list_of_files = []
+#    for file in files:
+#        file_name = file[25:]
+#        if file_name[:4] == pdb:
+#            list_of_files.append(file_name)
+#
+#    #Next it opens them in biobx and gets the index of each non-hydrogen atom
+#    for file in list_of_files:
+#        
+#        path = os.path.join("curate_PDB", "conformations", file)
+#        
+#        M = bb.Molecule()
+#        M.import_pdb(path)
+#        df = M.data
+#        list_of_names = df['name'].to_list()
+#        clean_names = list()
+#
+#        for name in list_of_names:
+#            if name[0] != 'H':
+#                clean_names.append(name)
+#        pts, idx = M.atomselect('*', '*', clean_names, get_index=True)
+#
+#        #Next it writes a new pdb including all the atoms except the hydrogens.
+#        try:
+#            M.write_pdb(path, index=idx, split_struc=True)
+#        except:
+#            M.write_pdb(path, index=idx, split_struc=False)
+#
+#    return
+#
 
 ##################################
 
@@ -378,12 +407,12 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         #Download and clean the structure
         clean(pdb)
 
-        #splits into all alternative conformations, and clean more
+        #splits into all alternative conformations into independent structures
         split_struc_NMR(pdb)
         split_struc_alt_aa(pdb)
-        remove_kcx(pdb)
-        remove_hydrogens(pdb)
-            
+        #remove_kcx(pdb)
+        #remove_hydrogens(pdb)
+
     except Exception as e:
         print('Error cleaning %s: %s'%(pdb, e))
         
@@ -391,7 +420,7 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         f.write('\n')
         f.write(pdb + ', Failed cleaning process')
         f.close()
-        raise Exception('Error %s'%e)
+        raise Exception('%s'%e)
 
 
 ##################################
@@ -406,7 +435,7 @@ def rename_chains(pdb_code):
         #Fistly the fasta file is downloaded
         try:
 
-            print("> downloading FASTA")
+            print("> downloading FASTA for %s"%pdb_code)
 
             web_url = "https://www.rcsb.org/fasta/entry/" + pdb_code + '/download'
             name = pdb_code + '.fasta'
