@@ -25,13 +25,13 @@
 import re
 import os, shutil
 import glob
-import subprocess
-import urllib.request, urllib.parse, urllib.error
+#import subprocess
+#import urllib.request #, urllib.parse #, urllib.error
 
 import inquirer
-from bs4 import BeautifulSoup
+#from bs4 import BeautifulSoup
 import pandas as pd
-import numpy as np
+#import numpy as np
 
 import uniprot_loader as ul
 import alphafold_loader as af
@@ -83,7 +83,7 @@ while running:
             if answer_log_file['Choice'] == 'No':
                 try:
                     shutil.rmtree(OUTDIR, ignore_errors=True)
-                except Exception as e:
+                except Exception:
                     print('ERROR: failed to wipe log file, check if file is closed, or try selecting another folder.')
                     continue
                 
@@ -104,7 +104,7 @@ while running:
                     done_pdbs = log_file_df['PDB Code'].to_list()
     
                 except Exception as e:
-                    print('ERROR: could not parse log_file.csv')
+                    print('ERROR: could not parse log_file.csv %s'%e)
                     continue
            
         else:
@@ -125,7 +125,7 @@ while running:
                     f.write('PDB Code,Result')
                     f.close()     
 
-                except Exception as e:
+                except Exception:
                     print('ERROR: failed to wipe folder. Check it is not open, or try selecting another folder.')
                     continue
           
@@ -150,7 +150,6 @@ while running:
    
         # initialise PDB code DataFrame
         pdb_codes_df = ul.create_empty_dataframe()
-
         
         #Allow user to chose if they only want to select structures obtained by certain techniques/of certain resolution.
         #e.g. the user may want to only look at structures obtained by X-ray diffraction and with a resolution less than 3 angstroms
@@ -180,7 +179,7 @@ while running:
 
             #It then goes into get_pdbs and gets all the information for that organism
             try:
-                pdb_codes_df = ul.get_pdbs(name_of_organism, code, pdb_codes_df, done_pdbs)
+                pdb_codes_df = ul.get_organism_proteins(name_of_organism, code, pdb_codes_df, done_pdbs)
                 print(pdb_codes_df)
             except Exception as e:
                 print('ERROR: failed loading PDBs. %s'%e)
@@ -215,7 +214,7 @@ while running:
             #and clean all the pdb codes belonging to the uniprot codes given.
             for uniprot_code in list_of_UNIPROT_codes:
                 print('Getting data for: ' + uniprot_code)
-                pdb_codes_df = ul.get_pdbs_uniprot(uniprot_code, pdb_codes_df, done_pdbs)
+                pdb_codes_df = ul.get_protein_structures(uniprot_code, df=pdb_codes_df, done_pdbs=done_pdbs)
 
         #If the user selects input PDB codes it goes here.
         if answers['Choice'] == 'Input PDB Codes':
@@ -237,7 +236,7 @@ while running:
                         PDBCODE_inpt = input('What is the PDB code? ')
                         PDBCODE_inpt = PDBCODE_inpt.upper()
                         UNIPROT_code_pdb = input('What is the Uniprot Code? ')
-                        pdb_codes_df = ul.construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df, done_pdbs)
+                        pdb_codes_df = ul.get_protein_structures(UNIPROT_code_pdb, PDBCODE_inpt, df=pdb_codes_df, done_pdbs=done_pdbs)
                         
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -249,13 +248,14 @@ while running:
 
                         keep = True
                         for entry in done_pdbs:
-                            if re.search(pdb, entry):
+                            if re.search(AF_code, entry):
                                 keep = False
 
                         if keep == True:
                             AF_code_full = 'AF-' + AF_code + '-F1-model_v1'
                             d = {'Uniprot Entry': AF_code, 'PDB Code': AF_code_full, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'A'}
-                            pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
+                            #pdb_codes_df = pdb_codes_df.append(d, ignore_index=True)
+                            pdb_codes_df = pd.concat([pdb_codes_df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
 
                     except Exception as e:
                         print("ERROR: %s"%e)
@@ -288,7 +288,7 @@ while running:
                     csv_name = csv_name + '.csv'
                     
                 try:
-                    pdb_codes_df = ul.from_csv_file(csv_name, pdb_codes_df, done_pdbs)
+                    pdb_codes_df = ul.from_csv_file(csv_name, df=pdb_codes_df, done_pdbs=done_pdbs)
                 except Exception as e:
                     print("ERROR: %s"%e)
                     continue
@@ -388,7 +388,7 @@ while running:
                         try:
                             af.download_AF_struc(pdb)
                         except Exception as e:
-                            print("%s. Continuing..."%s)
+                            print("%s. Continuing..."%e)
                             continue
 
                     # If it is a pdb code it is fed through get_data (and the autopatcher),

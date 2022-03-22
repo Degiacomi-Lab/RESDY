@@ -14,7 +14,7 @@ def calculate_pKa(code, outdir="Output"):
     print('> Obtaining pKa')
     code_for_df = code[:4]
     path = os.path.join("assembled", code)
-    no_pdb = code[:-4]
+    #no_pdb = code[:-4]
     
     pkaoutdir = os.path.join(outdir, "propkaoutput")
     if not os.path.exists(pkaoutdir):
@@ -31,17 +31,17 @@ def calculate_pKa(code, outdir="Output"):
                 
     except Exception as e:
         f.close()
-        try:
-            shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
-        except:
-            pass
+        #try:
+        #    shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
+        #except:
+        #    pass
 
         raise Exception('Failed to obtain pKa data. %s.'%e)
 
     
     try:
         propka_lys_fails = parse_propka_errors(error_file_name)
-    except:
+    except Exception as e:
         raise Exception("Failed extracting propka errors. %s"%e)
         
     try:
@@ -54,14 +54,14 @@ def calculate_pKa(code, outdir="Output"):
             pkafile = code_pka
             propres = open(pkafile)
             AF_struc = True
-        except Exception as e:
-            raise Exception('Failed to find ' + code + '.pka')
+        except Exception:
+            raise Exception('Failed to find %s.pka'%code)
             
     lys_number = list()
     pkas = list()
     chain = list()
     chain_resid_list = list()
-    buried_percentage = list()
+    #buried_percentage = list()
     
     try:
         for line in propres:
@@ -85,7 +85,7 @@ def calculate_pKa(code, outdir="Output"):
     except Exception as e:
         propres.close()
         shutil.move(pkafile, os.path.join(pkaoutdir, pkafile))
-        raise Exception('Failure parsing ' + code + '.pka')
+        raise Exception('Failure parsing %s.pka. %s'%(code, e))
 
     if AF_struc == True:
         code_for_df = code[:-4]
@@ -121,7 +121,7 @@ def break_up_and_calculate_sasa(pdb_code):
 
     try:
         print('> Breaking up molecule (for SASA calculation)')
-        list_of_index = list()
+        #list_of_index = list()
         list_of_sasa = list()
         list_of_resid = list()
         list_of_chains = list()

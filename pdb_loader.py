@@ -12,7 +12,7 @@ import numpy as np
 import glob
 import fileinput
 import pandas as pd
-import biobox as bb
+#import biobox as bb
 
 def clean(pdb):
 
@@ -21,7 +21,7 @@ def clean(pdb):
     try:
 
         #go into curate_PDB/conformations and downloads the .pdb file.
-        print("> Downloading PDB %s"%pdb)
+        print("> downloading PDB %s"%pdb)
         os.chdir(os.path.join("curate_PDB", "conformations"))
                 
         if sys.platform == "win32":
@@ -95,7 +95,7 @@ def clean(pdb):
                 continue
 
         #same terminal statements
-        if words[0] == 'END' or words[0] == 'TER':
+        if words[0] == 'END' or words[0] == 'TER' or words[0] == 'ENDMDL':
             write_file.write(line)
             continue
 

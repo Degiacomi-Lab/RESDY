@@ -11,11 +11,11 @@ import sys
 import re
 from textwrap import wrap
 import fileinput
-from typing import ChainMap
+#from typing import ChainMap
 
 import numpy as np
 import biobox as bb
-import pandas as pd
+#import pandas as pd
 from copy import deepcopy
 
 from modeller import *

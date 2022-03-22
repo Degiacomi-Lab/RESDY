@@ -1,9 +1,6 @@
 import glob
 import re
 import os
-import sys
-import csv
-import subprocess
 
 import inquirer
 import urllib.request, urllib.parse, urllib.error
@@ -22,9 +19,9 @@ def create_empty_dataframe():
             
 
 def checks(pdb, done_pdbs):
-
-    # Firstly it checks whether they are in the log_file (the file saying what has already been done).
-    # If they are then the structure is not included.
+    '''
+    Check whether a pdb code is the log_file (the file saying what has already been done).
+    '''
     for entry in done_pdbs:
 
         if re.search(pdb, entry):
@@ -47,18 +44,18 @@ def checks(pdb, done_pdbs):
     return True
 
 
-#Obtain all the PDB codes belonging to an organism
-#Note the name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome
-def get_pdbs(name_of_organism, code, df=[], done_pdbs=[]):
-
+def get_organism_proteins(name_of_organism, code, df=[], done_pdbs=[]):
+    '''
+    Obtain all the PDB codes belonging to an organism. The name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome.    
+    '''
+    
     #if no DataFrame is provide, build an empty one
     if len(df) == 0:
         df = create_empty_dataframe()
 
-
     #First, a df is constructed for our results to go in
     list_of_entries = list()
-    list_of_pdbs = list()
+    #list_of_pdbs = list()
     list_clean = list()
     starting_number = 0
     end = 0
@@ -152,7 +149,7 @@ def get_pdbs(name_of_organism, code, df=[], done_pdbs=[]):
             else:
                 continue
 
-        #This code produces a list going up in increments of 25 (0, 25, 50... [number of entries]).
+        #produce a list going up in increments of 25 (0, 25, 50... [number of entries]).
         #This list is needed so for the URL later on so that the code cycles through the uniprot website
         #25 proteins at a time until the end.
         while starting_number < number_of_prot_2:
@@ -161,7 +158,7 @@ def get_pdbs(name_of_organism, code, df=[], done_pdbs=[]):
 
         list_of_entries.append(number_of_prot_2)
 
-        #Next the code goes through uniprot 25 entries at a time and appends uniprot codes of proteins to a list.       
+        #go through uniprot 25 entries at a time and appends uniprot codes of proteins to a list.       
         for number in list_of_entries:
             try:
                 strnum = str(number)
@@ -191,61 +188,11 @@ def get_pdbs(name_of_organism, code, df=[], done_pdbs=[]):
             for protein_code_clean in list_UNIPROT_codes:
 
                 try:
-                    url_2 = 'https://www.uniprot.org/uniprot/' + protein_code_clean + '.txt'
-                    html_2 = urllib.request.urlopen(url_2)
-
+                    df = get_protein_structures(protein_code_clean, df=df)
                 except Exception as e:
-                    print('Error %s'%e)
+                    print("%s", e)
                     continue
-                
-                try:
-                    AF_code = 'AF-' + protein_code_clean + '-F1-model_v1'
-                    data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-                    #df = df.append(data, ignore_index=True)
-                    df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                except Exception as e:
-                    print('Error %s'%e)
-
-                #Lastly it searches for available PDB structures
-                for line in html_2:
-                    line = str(line)
-                    messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
-
-                    for entry in messy_entry:
-                        try:
-                            words = entry.split()
-                            chain_ent_num = (len(words) - 1)
-                            chain_info = words[chain_ent_num]
-                            chain_info = chain_info[:-1]
-                            chain_info = chain_info.split('/')
-                            PDBCODE = (words[1])[:-1]
-                            method_obtained = (words[2])[:-1]
-                            resolution = (words[3])[:-1]
-                  
-                            #check if the pdb is in the log file    
-                            keep = checks(PDBCODE, done_pdbs)
-                            if keep == False:
-                                continue
-                            
-                            # if the PDB is not in the log file
-                            # load, clean, and split it in alternate conformations
-                            pl.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
-                            
-                            files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*pdb")))
-                            for f in files:
-                                conf = f[25:-4]
-                                if conf[:4] == PDBCODE:
-                                    unique_values_chain = get_chains(f)
-                                    for i in range(len(unique_values_chain)):
-                                        data = ({'Uniprot Entry': protein_code_clean, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
-                                        #df = df.append(data, ignore_index=True)
-                                        df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                        except Exception as e:
-                            print('Error %s'%e)
-                            continue
-      
+            
             #Here the code calls the get_chains function which gets chain information for the protein from the PDB.
             number = number + 25
 
@@ -262,10 +209,9 @@ def get_pdbs(name_of_organism, code, df=[], done_pdbs=[]):
 
 
 
-#Given a list of uniprot codes this function goes to the .txt URL
-#and finds all corresponding .pdb files and all the relevant information.
-def get_pdbs_uniprot(uniprot_code, df=[], done_pdbs=[]):
-
+def get_protein_structures(uniprot_code, pdb_code_target="", df=[], done_pdbs=[]):
+    
+    
     #if no DataFrame is provided, build an empty one
     if len(df) == 0:
         df = create_empty_dataframe()
@@ -276,24 +222,27 @@ def get_pdbs_uniprot(uniprot_code, df=[], done_pdbs=[]):
         html_2 = urllib.request.urlopen(url_2)
 
     except Exception as e:
-        raise Exception('Failed to obtain UNIPROT data')
+        raise Exception('Failed to obtain UNIPROT data. %s'%e)
     
-    #It then automatically appends the AF structure to the df (if this isn't present it will be removed later).
-    try:
-
-        AF_code = 'AF-' + uniprot_code + '-F1-model_v1'
-        
-        if AF_code in done_pdbs:
-            pass
-        
-        else:
-            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
-            #df = df.append(data, ignore_index=True)
-            df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-    #Lastly it searches for available PDB structures
-    except Exception as e:
-        print('Error %s'%e)
+    
+    if pdb_code_target != "":
+    
+        #It then automatically appends the AF structure to the df (if this isn't present it will be removed later).
+        try:
+    
+            AF_code = 'AF-' + uniprot_code + '-F1-model_v1'
+            
+            if AF_code in done_pdbs:
+                pass
+            
+            else:
+                data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': 'N/A', 'Chains': 'N/A'})
+                #df = df.append(data, ignore_index=True)
+                df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+    
+        #Lastly it searches for available PDB structures
+        except Exception as e:
+            print('Error %s'%e)
 
     for line in html_2:
         try:
@@ -303,8 +252,12 @@ def get_pdbs_uniprot(uniprot_code, df=[], done_pdbs=[]):
 
             for entry in messy_entry:
                 words = entry.split()
-
+                
                 PDBCODE = (words[1])[:-1]
+                
+                if pdb_code_target != "" and PDBCODE != pdb_code_target:
+                    continue
+                
                 method_obtained = (words[2])[:-1]
                 resolution = (words[3])[:-1]
 
@@ -348,7 +301,7 @@ def get_chains(f):
         unique_values_chain = list(set(list(M.data['chain'])))
 
     except Exception as e:
-        print("Failed to obtain chain information.\n May be caused by the protein being too large, thus a single .pdb structure does not exist.")
+        print("Failed to obtain chain information.\n A single .pdb structure may not exist because the protein is too large.")
         raise Exception("%s"%e)
 
     return unique_values_chain
@@ -418,7 +371,7 @@ def from_csv_file(csv_file, pdb_codes_df=[], done_pdbs=[]):
         print('.csv file successfully opened')
         
     except Exception as e:
-        raise Exception('Failed to find .csv file.')
+        raise Exception('Failed to read %s. %s'%(csv_file, e))
 
     #Next abstract column names
     try:
@@ -426,7 +379,7 @@ def from_csv_file(csv_file, pdb_codes_df=[], done_pdbs=[]):
         csv_df[column_names[1]] = csv_df[column_names[1]].fillna(0)
 
     except Exception as e:
-        raise Exception('Failed to get data from .csv file')
+        raise Exception('Failed to get data from .csv file. %s'%e)
         
     #Lastly feed them into the functions which get the data about the protein and append it to the pdb_codes_df dataframe.
     for i in range(len(csv_df)):
@@ -437,7 +390,7 @@ def from_csv_file(csv_file, pdb_codes_df=[], done_pdbs=[]):
             print("\n", uniprot_code, pdb_code)
             
             if pdb_code == 0:
-                pdb_codes_df = get_pdbs_uniprot(uniprot_code, pdb_codes_df, done_pdbs)
+                pdb_codes_df = get_protein_structures(uniprot_code, pdb_codes_df, done_pdbs)
 
             if pdb_code == 'AF':
                 pdb_code = 'AF-' + uniprot_code + '-F1-model_v1'
@@ -452,112 +405,33 @@ def from_csv_file(csv_file, pdb_codes_df=[], done_pdbs=[]):
                     pdb_codes_df = pd.concat([pdb_codes_df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
 
             else:
-                pdb_codes_df = construct_single_pdb_df(uniprot_code, pdb_code, pdb_codes_df, done_pdbs)
+                pdb_codes_df = get_protein_structures(uniprot_code, pdb_code, pdb_codes_df, done_pdbs=done_pdbs)
                 
         except Exception as e:
             print('> Error %s'%e)
             continue
 
-    return(pdb_codes_df)
-
-
-def construct_single_pdb_df(UNIPROT_code_pdb, PDBCODE_inpt, pdb_codes_df=[], done_pdbs=[]):
-
-    if len(pdb_codes_df) == 0:
-        pdb_codes_df = create_empty_dataframe()
-    
-    #Firstly it opens the correct uniprot page.
-    try:
-        url_2 = 'https://www.uniprot.org/uniprot/' + UNIPROT_code_pdb + '.txt'
-        html_2 = urllib.request.urlopen(url_2)
-
-    except Exception as e:
-        raise Exception('Failed to obtain uniprot entry %s'%e)
-    
-    #Next it parses and looks for PDB entries
-    for line in html_2:
-        try:
-            line = str(line)
-            messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
-            for entry in messy_entry:
-                try:
-                    words = entry.split()
-                    PDBCODE = (words[1])[:-1]
-                    method_obtained = (words[2])[:-1]
-                    resolution = (words[3])[:-1]
-                    
-                    #It only obtains the data from uniprot if the PDB code matches that which was input by the user.
-                    if PDBCODE_inpt == PDBCODE:
-
-                        #check if the pdb is in the log file  
-                        keep = checks(PDBCODE, done_pdbs)
-                        if keep == False:
-                            return
-                       
-                        # if the PDB is not in the log file
-                        # load, clean, and split it in alternate conformations
-                        pl.clean_and_split_alt_conformations(PDBCODE, done_pdbs)
-
-                        files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*pdb")))
-                        for f in files:
-                            pdb = f[25:29]
-                            conf = f[25:-4]
-                            if conf[:4] == PDBCODE:
-                            
-                                if pdb == PDBCODE_inpt:
-                                    unique_values_chain = get_chains(f)
-    
-                                    for i in range(len(unique_values_chain)):
-                                        try:
-                                            data = ({'Uniprot Entry': UNIPROT_code_pdb, 'PDB Code': conf, 'Method': method_obtained, 'Resolution': resolution, 'Chains': unique_values_chain[i]})
-                                            #pdb_codes_df = pdb_codes_df.append(data, ignore_index=True)
-                                            pdb_codes_df = pd.concat([pdb_codes_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                                        except Exception as e:
-                                            print("Error %s"%e)
-                                            print('Error constructing df')
-                                            continue
-                            
-                except:
-                    continue
-
-        except Exception as e:
-            raise Exception("%s"%e)
-
     return pdb_codes_df
-    
+
+
 ########################################################
 
 if __name__ == "__main__":
 
     try:
-        #print(get_pdbs('Oryctolagus+cuniculus+(Rabbit)', 'UP000001811'))
+        print(get_organism_proteins('Oryctolagus+cuniculus+(Rabbit)', 'UP000001811'))
+
         #print(get_chains('6YAM'))
-        #columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution']
-        #df = pd.DataFrame(columns=columns)
-        #uniprot_code = 'P3892'
-        #PDB_entries = '2jfi'
-        #technique = 'X-ray'
-        #resolution = '2.9'
 
-        #data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDB_entries, 'Method': technique, 'Resolution':resolution})
-        #df = df.append(data, ignore_index=True)
-        #pdb_codes_df = df
-
-        #res_raw = (search_by_technique(['X-ray'], pdb_codes_df, '3.0'))
-        #pdb_codes_df = res_raw[0]
-        #skip = res_raw[1]
+        #res_raw = search_by_technique(['X-ray'], pdb_codes_df, '3.0')
         #print(pdb_codes_df)
-
-        #list_UNIPROT_codes = ['P50897']
-        #print(get_pdbs_given_uniprot_code(list_UNIPROT_codes))
+   
+        #pdb_codes_df = get_protein_structures("P09167", "1PRE")
+        #print(pdb_codes_df)
         
-        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
-        pdb_codes_df = pd.DataFrame(columns=columns)
-        pdb_codes_df = construct_single_pdb_df("P09167", "1PRE", pdb_codes_df)
-        print(pdb_codes_df)
+        #test = from_csv_file("inputs\\input_codes_4.csv")
+        #print(test)
+    
         
     except Exception as e:
         print("ERROR: %s"%e)
-
-

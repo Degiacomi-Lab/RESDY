@@ -18,12 +18,12 @@ def download_AF_struc(pdb):
         
         subprocess.check_call(line, shell=True)
         
-    except Exception as e:
-        print('AF structure not found for ' + pdb)
+    except Exception:
+        print('AF structure not found for %s'%pdb)
         pass
     
     os.chdir(oldcwd)
-    newcwd = os.getcwd
+    #newcwd = os.getcwd
 
     return
 
@@ -34,7 +34,7 @@ def find_AF_plddt(AF_code_full):
     print('> Finding plddt')
     
     #Opens .pdb file in assembled folder
-    columns = ['resid', 'chain', 'plddt']
+    #columns = ['resid', 'chain', 'plddt']
     dict_plddt = dict()
 
     try:

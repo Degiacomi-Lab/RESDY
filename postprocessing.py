@@ -5,7 +5,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
-import matplotlib.ticker as ticker
+#import matplotlib.ticker as ticker
 
 import biobox as bb
 
@@ -230,7 +230,7 @@ def analyse_data(pka_sasa_results, carbam_pdb_list, carbam_resid_list, outdir="O
     try:
         fig, ax = plt.subplots()
         colors = {True:'#68246D', False:'black'}
-        alphas = {True:1, False:0.05}
+        #alphas = {True:1, False:0.05}
         pka_sasa_results['sasa'] = pka_sasa_results['sasa'].astype(float)
         pka_sasa_results['pKa'] = pka_sasa_results['pKa'].astype(float)
         plt.scatter(pka_sasa_results['sasa'], pka_sasa_results['pKa'], c=pka_sasa_results['carbamylated'].map(colors))#, alpha=pka_sasa_results['carbamylated'].map(alphas))
@@ -799,14 +799,14 @@ if __name__ == "__main__":
         answer = inquirer.prompt(question)
 
         if answer['Choice'] == 'Average for each resid':
-            pka_sasa_results = pd.read_csv(os.path.join(outdir, 'results.csv'))
+            pka_sasa_results = pd.read_csv(os.path.join(OUTDIR, 'results.csv'))
             pka_sasa_results = pka_sasa_results.drop(['Unnamed: 0'], axis=1)
             carbam_pdb_list = []
             carbam_resid_list = []
             average_prot(pka_sasa_results)
 
         if answer['Choice'] == 'Most likely to form carbamate for each resid':
-            pka_sasa_results = pd.read_csv(os.path.join(outdir, 'results.csv'))
+            pka_sasa_results = pd.read_csv(os.path.join(OUTDIR, 'results.csv'))
             pka_sasa_results = pka_sasa_results.drop(['Unnamed: 0'], axis=1)
             get_most_likely_value(pka_sasa_results)
         
@@ -814,7 +814,7 @@ if __name__ == "__main__":
             csv_file_name = input['Name of CSV file:']
             if csv_file_name[-4:] != '.csv':
                 csv_file_name = csv_file_name + '.pdb'
-            pka_sasa_results = pd.read_csv(os.path.join(outdir, 'results_all.csv'))
+            pka_sasa_results = pd.read_csv(os.path.join(OUTDIR, 'results_all.csv'))
             pka_sasa_results = pka_sasa_results.drop(['Unnamed: 0'], axis=1)
             fig, ax = plt.subplots()
             colors = {True:'#68246D', False:'black'}
