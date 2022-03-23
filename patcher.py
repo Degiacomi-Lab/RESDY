@@ -1,5 +1,4 @@
-#! /usr/bin/python
-# download files, patch them if necessary, and save result in folder "clean" (ready to be used as training set)
+# Download files, patch them if necessary, and save result in folder "clean" (ready to be used as training set)
 # 2 logfiles saved:
 # - gap_data.txt (reports on how many missing residues the protein had)
 # - patch_data.txt (reports on which files had to be patched with modeller, and whether the operation was successful)
@@ -222,12 +221,13 @@ def _patch_model(fbasename, seq_name):
 
 ############################################
 
-#Fix any resid numbering issues that arise as a result of the autopatcher.
 def correct_resid(pdb, chain):
-
-    #Firtly it opens each patched file in clean.
+    '''
+    Fix any resid numbering issues that arise as a result of the autopatcher.
+    '''
+    
+    #opens each patched file in clean.
     cleanfiles = np.array(glob.glob(os.path.join("curate_PDB", "clean", "*.pdb")))
-    #cleanfiles = np.array(glob.glob("curate_PDB%sclean%s*pdb"%(os.sep, os.sep)))
 
     for cleanfile in cleanfiles:
         name = pdb + '_' + chain + '_patched'
@@ -267,12 +267,14 @@ def correct_resid(pdb, chain):
     return
         
 
-#This cleans the fasta file, getting rid of any non-canonical AAs that may cause an issue.
 def clean_fasta(new_name):
-
-    #Firstly it opens the fasta file
+    '''
+    clean the fasta file, getting rid of any non-canonical AAs that may cause an issue.
+    '''
+    
+    #open the fasta file
     path = os.path.join("curate_PDB","raw", new_name)
-    #Next it rewrites it replacing the amino acids that may cause an issue.
+    #rewrite it replacing the amino acids that may cause an issue.
     with fileinput.FileInput(path, inplace = True) as f:
         for line in f:
             if("KCX" in line):
@@ -286,13 +288,14 @@ def clean_fasta(new_name):
 
     return
 
-################################################################
 
-# report on gaps on a given PDB file
-# returns:
-# - 4 elements list, [sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count]]
-# - biobox.Molecule, of loading was successful, nothing otherwise
 def analyze_protein(f):
+        '''
+         report on gaps on a given PDB file
+         returns:
+         - 4 elements list, [sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count]]
+         - biobox.Molecule, of loading was successful, nothing otherwise
+        '''
 
         #attempt loading the protein (error: -2 if unloadable)
 
@@ -331,9 +334,11 @@ def analyze_protein(f):
         return cnt, M
 
 
-# load PDB file of choice, and return a biobox structure.
-# if needed (outfile != ""), save the cleaned file in a new PDB. 
 def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8):
+        '''
+        load PDB file of choice, and return a biobox structure.
+        if needed (outfile != ""), save the cleaned file in a new PDB. 
+        '''
     
         # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
         if not os.path.exists("curate_PDB"):
@@ -459,7 +464,7 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
                                         mol = deepcopy(mol2)
                                         fout = "%s_patched.pdb"%fout.split(".")[0]
                                         patchstat.append(1)
-                                        pdbchain = pdb + chain
+                                        #pdbchain = pdb + chain
 
                                 else:
                                         print(">> Patching failed, keeping original results in file %s"%f)
@@ -514,82 +519,42 @@ def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8
                 result = indata[:, 1:].astype(int)
                 patchstat = np.loadtxt("patch_data.txt")
 
-
-##############################################################################
-##############################################################################
-
-### report on pdb gaps stats, and success of patching ###
-
-        #print("\n")
-        #print("%s protein chains processed"%(len(result)))
-        #print("%s proteins not loadable"%(np.sum(result[:, 0] == -2)))
-        # note: we want to use as dataset all proteins having patchstat equal to 0 or 1
-        #print("\nPatching:")
-        #print("   %s not needed"%np.sum(patchstat == 0))
-        #print("   %s successful"%np.sum(patchstat == 1))
-        #print("   %s failed"%np.sum(patchstat == 2))
-
-        #print("\nSequence gaps count:")
-        #for n in np.unique(result[:, 0]):
-        #        if n == -2:
-        #                continue
-        #        else:
-        #                print("   %s proteins with %s gaps"%(np.sum(result[:, 0] == n), n))
-
-        #print("\nGeometry gaps count:")
-        #for n in np.unique(result[:, 3]):
-        #        if n == -2:
-        #                continue
-        #        elif n == -1:
-        #                print("   %s proteins C-N atoms mismatch"%(np.sum(result[:, 3] == n)))
-        #                continue
-        #        else:
-        #                print("   %s proteins with %s gaps"%(np.sum(result[:, 3] == n), n))
-
-        #print("> Maximal sequence gaps sizes:")
-        #for n in np.unique(result[:, 2]):
-        #
-        #       if n == -2:
-        #               continue
-        #       else:
-        #               print(">> %s proteins with %s gap size"%(np.sum(result[:, 2] == n), n))
-
         return np.max(result[:, 2])
     
-#######################################################
 
-#get_data break the protein up into chains.
-#This code 'reassembles' the protein into a multimer from the chains in the clean folder given the pdb code and chains the protein consists of.
 def assemble_multimer(gap_dict, pdb_code, list_chains):
+    '''
+    get_data break the protein up into chains.
+    This code reassembles the protein into a multimer from the chains in the clean folder given the pdb code and chains the protein consists of.
+    '''
     
-    #First makes sure there is an assembled folder.
+    #makes sure there is an assembled folder.
     #rc.rename_chains(pdb_code)
     if not os.path.exists("assembled"):
         os.mkdir("assembled")
 
     list_to_remove = []
     print('> Assembling')
-    #Next open defines the name of the assembly.
+    
     try:
         name_of_assembly = pdb_code + '_assembled.pdb'
         Multi = bb.Multimer()
 
-        #Next opens the pdb file for each chain in turn and appends to Multi
+        #opens the pdb file for each chain and appends to Multi
         for chain in list_chains:
             name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
             patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
+            
             M = bb.Molecule()
             
             try:
                 path = os.path.join("curate_PDB", "clean", patched_pdb_file)
-                #path = "curate_PDB%sclean%s%s"%(os.sep, os.sep, patched_pdb_file)
                 M.import_pdb(path, include_hetatm=True)
                 Multi.append(M, chain)
 
             except:
                 try:
                     path = os.path.join("curate_PDB", "clean", name_of_pdb_file)
-                    #path = "curate_PDB%sclean%s%s"%(os.sep, os.sep, name_of_pdb_file)
                     M.import_pdb(path, include_hetatm=True)
                     Multi.append(M, chain)
 
@@ -597,13 +562,12 @@ def assemble_multimer(gap_dict, pdb_code, list_chains):
                     print("%s"%e)
                     continue
 
-        #Lastly writes out Multi as a .pdb file.
+        #write Multi as a single .pdb file
         path = os.path.join("assembled", name_of_assembly)
         Multi.write_pdb(path)
-        filename = path
         list_to_remove = check_missing_chains(gap_dict, pdb_code, list_chains)
 
-        with fileinput.FileInput(filename, inplace = True) as f:
+        with fileinput.FileInput(path, inplace = True) as f:
             for line in f:
                 line = line.replace("TER","")
                 print(line, end ='') 
@@ -613,11 +577,14 @@ def assemble_multimer(gap_dict, pdb_code, list_chains):
 
     return list_to_remove
 
-#These next two modules (aswell as one in rename_chains) sort out issues that arise when a chain fails the autopatcher.
-#In particular they do two things:
-#- Make sure the chain naming is correct.
-#- Mark any points that are close to the missing chains to be removed.
+
 def check_missing_chains(gap_dict, pdb_code, list_chains):
+    '''
+    These next two modules (as well as one in rename_chains) sort out issues that arise when a chain fails the autopatcher.
+    In particular they do two things:
+    - Make sure the chain naming is correct.
+    - Mark any points that are close to the missing chains to be removed.
+    '''
 
     clean_chains = []
     failed_chains =[]
@@ -659,18 +626,20 @@ def check_missing_chains(gap_dict, pdb_code, list_chains):
     return list_to_remove
 
 
-#Rename the chains in an assembled structure.
-#This is needed as if any of the chains fail the autopatch, the naming of any chains further down the alphabet shifts.
-#For example if the original chains were ABC and B failed then in the assembled the naming would be AB whereas this program renames B to C.
 def rename_chains_assembled(failed_chains, list_chains):
-
-    #Firstly it creates a copy of the list of chains (a list of all the chains including those which have failed).
+    '''
+    Rename the chains in an assembled structure.
+    This is needed as if any of the chains fail the autopatch, the naming of any chains further down the alphabet shifts.
+    For example if the original chains were ABC and B failed then in the assembled the naming would be AB whereas this program renames B to C.
+    '''
+    
+    #create a copy of the list of chains (a list of all the chains including those which have failed).
     dict_replacements = dict()
     list_chains_updated = list_chains.copy()
 
     for chain in list_chains:
 
-#If any chain has failed, it is removed from the updated copy.
+       #If any chain has failed, it is removed from the updated copy.
         if chain in failed_chains:
 
             list_chains_updated.remove(chain)
@@ -717,20 +686,20 @@ def rename_chains_assembled(failed_chains, list_chains):
 
 
 def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
-    #Works as follows:
-    #- Opens pdb file in curate_PDB/conformations/ with Biobox
-    #- Check each lysine to see if they are near failed chain.
-    #- If they are add chain_resid to list (list_to_remove)
-    #- Later in main those in list_to_remove are removed from the results.
+    '''
+    Works as follows:
+    - Opens pdb file in curate_PDB/conformations/ with Biobox
+    - Check each lysine to see if they are near failed chain.
+    - If they are add chain_resid to list (list_to_remove)
+    - Later in main those in list_to_remove are removed from the results.
+    '''
     
     path = os.path.join("curate_PDB", "conformations", pdb_code)
-    #path = "curate_PDB%sconformations%s%s.pdb"%(os.sep, os.sep, pdb_code)
     list_of_chains = list()
     list_of_resid = list()
     list_to_remove = []
     
     print('> Breaking up molecule...')
-    #print(pdb_code)
     try:
 
         #open file in biobox
@@ -738,10 +707,10 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
         M.import_pdb(path, include_hetatm=True)
         df = M.data
 
-        #Next makes note of all the lysine index/coordinates
+        #note of all the lysine index/coordinates
         lys_coords, lys_idx = M.atomselect('*','LYS', 'CA', use_resname=True, get_index=True)
 
-        #Next makes a note of each lysines chain and resid.
+        #note of each lysines chain and resid.
         for entry in lys_idx:
             chain = df.at[entry, 'chain']
             list_of_chains.append(chain)
@@ -750,13 +719,13 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
             resid = df.at[entry, 'resid']
             list_of_resid.append(resid)
 
-        #Next gets coordinates and index for all atoms
+        #get coordinates and index for all atoms
         all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
     except Exception as e:
         raise Exception('Failed identifying residues near missing chain %s'%e)
 
-    #Next goes through all the lysines
+    #goes through all the lysines
     for failedchain in failed_chains:
         gapsize = gap_dict.get(failedchain)
         gapsize = int(gapsize)
@@ -764,7 +733,7 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
 
         for j in range(len(lys_coords)):
 
-            #Doesn't bother if they are on a chain which failed the autopatch
+            #Does not bother if they are on a chain which failed the autopatch
             #as they won't be in the final structure anyway.
             chain_lys = list_of_chains[j]
             if chain_lys == failed_chains:
@@ -773,7 +742,6 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
             else:
 
                 try:
-
                     #Work out the distance between all the atoms and each lysine.
                     for i in range(len(all_coords)):
                         x_dist = (((lys_coords[j])[0] - (all_coords[i])[0])**2)
@@ -790,7 +758,6 @@ def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
                             if aa_chain in failed_chains:
                                 chain_resid = str(list_of_chains[j]) + str(list_of_resid[j])
                                 list_to_remove.append(chain_resid)
-
 
                 except Exception as e:
                     print('> Error %s'%e)

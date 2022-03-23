@@ -1,18 +1,15 @@
-#OVERALL STRUCTURE...
-#First downloads file into conformations folder
-#Next cleans (i.e. removes heteroatoms that aren't metal ions)
-#Next writes file for alt NMR confs
-#Next writes file for alt AA confs
+#OVERALL STRUCTURE:
+#- download file into curate_PDB/conformations folder
+#- clean files (i.e. removes heteroatoms that aren't metal ions)
+#- write files for alternate conformations (usually from NMR ensembles)
+#- write files for alternate amino acid conformations
 
 import os
 import subprocess
 import re
 import sys
-import numpy as np
 import glob
 import fileinput
-import pandas as pd
-#import biobox as bb
 
 def clean(pdb):
 
@@ -189,18 +186,15 @@ def split_struc_NMR(pdb):
     return
 
 
-#Writes a new file for each alternative amino acid conformation present.
 def split_struc_alt_aa(pdb):
-
-    #Firstly it gets a list of all the .pdb files present in curate_PDB/conformations and selects those that belong to the pdb we are interested in.
-    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
+    '''
+    Writes a new file for each alternative amino acid conformation present.
+    '''
     
-    list_of_files = []
-    for file in files:
-        file_name = file[25:]
-        if file_name[:4] == pdb:
-            list_of_files.append(file_name)
-
+    #Get a list of all the .pdb files present in curate_PDB/conformations
+    #and select those that belong to the pdb we are interested in.
+    list_of_files = glob.glob(os.path.join("curate_PDB", "conformations", "*%s*.pdb"%pdb))
+    
     for f in list_of_files:
 
             ABC_list = ['A', 'B', 'C', 'D']
@@ -208,9 +202,9 @@ def split_struc_alt_aa(pdb):
 
             #Next it checks if there are any alternate amino acid conformations present (i.e. if line[16 == A, B or C]).
             for i in range(len(ABC_list)):
-                path = os.path.join("curate_PDB", "conformations", f)
+                #path = os.path.join("curate_PDB", "conformations", f)
                 
-                read_file = open(path)
+                read_file = open(f)
 
                 for line in read_file:
                     if (line[:4] == 'ATOM') and (line[16] == ABC_list[i]):
@@ -218,7 +212,7 @@ def split_struc_alt_aa(pdb):
 
             list_of_values = ABC_dict.values()
 
-            #If there are note for this file it moves on to the next.
+            #If there are none for this file it moves on to the next.
             if 1 not in list_of_values:
                 continue
             else:
@@ -240,7 +234,7 @@ def split_struc_alt_aa(pdb):
                             if letter != target_letter:
                                 non_target_letters.append(letter)
 
-                        read = open(path)
+                        read = open(f)
                         for line in read:
                             
                             if (line[:4] == 'ATOM') and (line[16] == target_letter):
@@ -258,143 +252,23 @@ def split_struc_alt_aa(pdb):
                         read.close()
 
                 except Exception as e:
-                    #print("Error %s"%e)
                     read_file.close()
                     f_write.close()
                     raise("%s"%e)
                     
             #The original is then removed if it has been replaced.
             read_file.close()
-            os.remove(path)
+            os.remove(f)
             
     return
 
 
-#def replace_mse(pdb):
-#    
-#    print('> Mutating all MSE to MET')
-#    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
-#    list_of_files = []
-#    for file in files:
-#        file_name = file[25:]
-#        if file_name[:4] == pdb:
-#            list_of_files.append(file_name)
-#    
-#    #For each it then replaces any atoms belonging to KCX with LYS and HETATM with ATOM.
-#    for f in list_of_files:
-#
-#        try:
-#            
-#            path = os.path.join("curate_PDB", "conformations", f)
-#            with fileinput.FileInput(path, inplace = True) as f:
-#                for line in f:
-#                    if("MSE" in line):
-#                        line = line.replace("HETATM", "ATOM  ")
-#                        line = line.replace('MSE', 'MET')
-#                        line = line.replace('SE', ' S')
-#                        print(line, end ='')
-#                    else:
-#                        print(line, end ='') 
-#
-#        except:
-#            return
-#        
-#    return
-#
-##This script removes the carbamate from any structure
-#def remove_kcx(pdb):
-#
-#    #Firstly it gets a list of files in curate_PDB/conformations that belong to the pdb of interest.
-#    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
-#    
-#    list_of_files = []
-#    for file in files:
-#        file_name = file[25:]
-#        if file_name[:4] == pdb:
-#            list_of_files.append(file_name)
-#    
-#    for file in list_of_files:
-#        path = os.path.join("curate_PDB", "conformations", file)
-#        
-#        M = bb.Molecule()
-#        M.import_pdb(path, include_hetatm=True)
-#
-#        #Next it removes the atoms belonging to KCX from the structure.
-#        idxs = []
-#        pos ,idx = M.atomignore('*', 'KCX', 'CX', get_index=True, use_resname=True)
-#        A = M.get_subset(idxs=idx)
-#        pos, idx = A.atomignore('*', 'KCX', 'OQ1', get_index=True, use_resname=True)
-#        B = A.get_subset(idxs=idx)
-#        pos, idx = B.atomignore('*', 'KCX', 'OQ2', get_index=True, use_resname=True)
-#        C = B.get_subset(idxs=idx)
-#        try:
-#            C.write_pdb(path, split_struc=True)
-#        except:
-#            C.write_pdb(path, split_struc=False)
-#
-#    #For each it then replaces any atoms beloning to KCX with LYS and HETATM with ATOM.
-#    for f in list_of_files:
-#
-#        try:
-#            path = os.path.join("curate_PDB", "conformations", f)
-#            
-#            with fileinput.FileInput(path, inplace = True) as f:
-#                for line in f:
-#                    
-#                    if("KCX" in line):
-#                        line = line.replace("HETATM", "ATOM  ")
-#                        line = line.replace('KCX', 'LYS')
-#                        print(line, end ='') 
-#                    else:
-#                        print(line, end ='') 
-#
-#        except:
-#            return
-
-##Remove any hydrogens from the files in curate_PDB/conformations
-#def remove_hydrogens(pdb):
-#    
-#    print('> Removing Hydrogens')
-#    #Firstly it puts each file name that belongs to the pdb of interest into a list
-#    files = np.array(glob.glob(os.path.join("curate_PDB", "conformations", "*.pdb")))
-#
-#    list_of_files = []
-#    for file in files:
-#        file_name = file[25:]
-#        if file_name[:4] == pdb:
-#            list_of_files.append(file_name)
-#
-#    #Next it opens them in biobx and gets the index of each non-hydrogen atom
-#    for file in list_of_files:
-#        
-#        path = os.path.join("curate_PDB", "conformations", file)
-#        
-#        M = bb.Molecule()
-#        M.import_pdb(path)
-#        df = M.data
-#        list_of_names = df['name'].to_list()
-#        clean_names = list()
-#
-#        for name in list_of_names:
-#            if name[0] != 'H':
-#                clean_names.append(name)
-#        pts, idx = M.atomselect('*', '*', clean_names, get_index=True)
-#
-#        #Next it writes a new pdb including all the atoms except the hydrogens.
-#        try:
-#            M.write_pdb(path, index=idx, split_struc=True)
-#        except:
-#            M.write_pdb(path, index=idx, split_struc=False)
-#
-#    return
-#
-
-##################################
-
-#Download a pdb, and return a collection of cleaned and splitted alternative conformations
-#The results is saved into a file with the structure *PDB code*-clean.pdb.
-def clean_and_split_alt_conformations(pdb, done_pdbs):
-
+def clean_and_split_alt_conformations(pdb):
+    '''
+    #Download a pdb, and return a collection of cleaned and splitted alternative conformations
+    #The results are saved into files: curate_pdb/conformations/*PDB code*-clean.pdb.
+    '''
+    
     if not os.path.exists("curate_PDB"):
         os.mkdir("curate_PDB")
 
@@ -410,8 +284,6 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         #splits into all alternative conformations into independent structures
         split_struc_NMR(pdb)
         split_struc_alt_aa(pdb)
-        #remove_kcx(pdb)
-        #remove_hydrogens(pdb)
 
     except Exception as e:
         print('Error cleaning %s: %s'%(pdb, e))
@@ -423,13 +295,13 @@ def clean_and_split_alt_conformations(pdb, done_pdbs):
         raise Exception('%s'%e)
 
 
-##################################
-
-#rename the protein's chains durin the cleaning process so that they match the chain names given in the fasta file.
-#This is required as pdb files name their chains using the 'auth' name and fasta with the normal chain name.
-#Therefore to avoid confusion we rename them all to what is used in the fasta file.
 def rename_chains(pdb_code):
-
+    '''
+    Rename the protein's chains durin the cleaning process so that they match the chain names given in the fasta file.
+    This is required as pdb files name their chains using the 'auth' name and fasta with the normal chain name.
+    Therefore to avoid confusion we rename them all to what is used in the fasta file.
+    '''
+    
     def get_chain_replacement(pdb_code):
         
         #Fistly the fasta file is downloaded
@@ -548,7 +420,7 @@ def rename_chains(pdb_code):
 
         return
 
-    #The both functions are called within a larger function (rename_chains)
+    #both functions are called within a larger function (rename_chains)
     #Here, if there are no chains to be replaced the replace_chains function won't be called.
     try:
 
@@ -564,7 +436,5 @@ def rename_chains(pdb_code):
 
 if __name__ == "__main__":
 
-    pdb = '1ci4'
-    pdb = '2mbh'
-    done_pdbs = []
-    clean_and_split_alt_conformations(pdb, done_pdbs)
+    clean_and_split_alt_conformations('1CI4') # test MSE to MET mutation
+    clean_and_split_alt_conformations('2MBH') # test splitting of models
