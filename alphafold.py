@@ -7,11 +7,12 @@ def download_AF_struc(pdb):
     '''
     
     oldcwd = os.getcwd()
-    if not os.path.exists("assembled"):
-        os.mkdir("assembled")
-    os.chdir('assembled')
+    mypath = os.path.join("curate_PDB", "curated")
+    if not os.path.exists(mypath):
+        os.mkdir(mypath)
+    os.chdir(mypath)
     
-    print("> Downloading AlphaFold structure")
+    print("> downloading AlphaFold structure %s"%pdb)
     try:
         if sys.platform == "win32":
            line = "curl -s -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb"%(pdb, pdb)
@@ -42,7 +43,7 @@ def find_AF_plddt(AF_code_full):
     dict_plddt = dict()
 
     try:
-        f = open(os.path.join("assembled", AF_code_full), "r")
+        f = open(os.path.join("curate_PDB", "curated", AF_code_full), "r")
  
         #Parse the file to find plddt value.
         for line in f:
