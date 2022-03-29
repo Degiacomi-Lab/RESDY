@@ -1,15 +1,16 @@
 import os, sys, re
 import subprocess
 
-def download_AF_struc(pdb):
+def download_AF_struc(pdb, outfolder="result"):
     '''
     download AlphaFold2 structures into the assembled folder.
     '''
     
     oldcwd = os.getcwd()
-    mypath = os.path.join("curate_PDB", "curated")
+    mypath = os.path.join(outfolder, "curated")
     if not os.path.exists(mypath):
-        os.mkdir(mypath)
+        os.makedirs(mypath)
+        
     os.chdir(mypath)
     
     print("> downloading AlphaFold structure %s"%pdb)
@@ -22,15 +23,13 @@ def download_AF_struc(pdb):
         subprocess.check_call(line, shell=True)
         
     except Exception:
-        print('AF structure not found for %s'%pdb)
-        pass
-    
+        os.chdir(oldcwd)
+        raise Exception('AF structure not found for %s'%pdb)
+        
     os.chdir(oldcwd)
-    #newcwd = os.getcwd
-
     return
 
-def find_AF_plddt(AF_code_full):
+def find_AF_plddt(AF_code_full, outfolder="result"):
     '''
     Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value
     for each lysine in an alphafold structure.
@@ -43,7 +42,7 @@ def find_AF_plddt(AF_code_full):
     dict_plddt = dict()
 
     try:
-        f = open(os.path.join("curate_PDB", "curated", AF_code_full), "r")
+        f = open(os.path.join(outfolder, "curated", AF_code_full), "r")
  
         #Parse the file to find plddt value.
         for line in f:

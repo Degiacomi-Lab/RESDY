@@ -11,9 +11,7 @@ class Uniprot(object):
 
         columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
-                
-        self.done_pdbs = done_pdbs
-        
+                        
    
     def get_organism_proteins(self, name_of_organism, code):
         '''
@@ -179,7 +177,6 @@ class Uniprot(object):
         The protein is then cleaned (keep only protein atoms, remove hydrogens, MSE and KCX amino acids, split alternative conformations in multiple PDBs)
         If a PDB code is also provided, only that PDB will be downloaded (e.g. useful for consistency check between UNIPROT and PDB)
         If a DataFrame df is provided, extracted structures will be appended to it
-        If a list pdb previously analysed is provided in done_pdbs, only PDB not present in the list will be processed.
         '''    
     
         
@@ -217,11 +214,7 @@ class Uniprot(object):
                     
                     if pdb_code_target != "" and PDBCODE != pdb_code_target:
                         continue
-         
-                    #check if the pdb is in the log file    
-                    #keep = checks(PDBCODE, done_pdbs)
-                    #if keep == False:
-                    #    continue
+
          
                     method_obtained = (words[2])
                     

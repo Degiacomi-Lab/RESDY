@@ -3,9 +3,7 @@
 ## Introduction
 
 This software scans collections of protein structures, looking for lysines that may undergo a carbamlyation post-translational modification.
-To run it, type the following in a terminal:
-
-`python carbamylation.py`
+An example of usage is available in the Jupter notebook `carbamylation.ipynb`
 
  The code will:
 * identify PDB or AlphaFold files from UNIPROT codes either:
@@ -30,16 +28,13 @@ Further insight on produced data can be obtained by observing the data in the Ju
 
 ## Dependencies
 
-The following Python packages are required by `carbamylation.py`
+The following Python packages are required:
 * numpy
 * pandas
 * matplotlib
-* inquirer
 * bs4
 * modeller
 * propka
-
-The notebook `carbamylation.ipynb` also needs:
 * plotly
 * nglview
 
@@ -51,11 +46,11 @@ The notebook `carbamylation.ipynb` also needs:
   - missing implementation for options in postprocessing.py when launched alone
 
 * planned refactoring:
-  - all PDB loader from `carbamylation.py`, and not from uniprot_loader, i.e. uniprot loader should only create the database of codes
-  - AlphaFold download, and PDB download + cleaning + patching should happen at the same time, independently from uniprot data parsing 
-
+  - Convert measuring and postprocessing into classes
+  - edit code so that a chdir into working directory takes place, instead of referring to different working folders as subfolders of results
+  
 * planned new features
-  - add path autocomplete in terminal mode
+  - save classes instances of Uniprot and PDB in results data
   - visualize protein structures using nglview within the Jupyter notebook
   - simplify addition of additional lysine scoring metrics (e.g. depth, sequence conservation).
 

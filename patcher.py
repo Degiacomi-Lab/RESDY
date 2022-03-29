@@ -5,12 +5,12 @@
 
 import glob
 import os
-import subprocess
 import sys
 import re
 from textwrap import wrap
-import fileinput
 import shutil
+#import subprocess
+#import fileinput
 
 import numpy as np
 import biobox as bb
@@ -38,20 +38,25 @@ def autopatch(fbasename, gap_cutoff=8):
             pdb_out = ""
 
     except Exception as e:
-        print("ERROR: %s"%e)
-        return ""
+        raise Exception(">> ERROR: %s"%e)
 
     myfiles = ['%s.seq'%fbasename, '%s.pir'%fbasename, 'alignment.seg',
-               'alignment.seg.ali', 'trimmed_align.ali', 'family.mat',
-               '*.ini', '*.rsr', '*.sch', '%s.V*'%seq_name, '%s.D*'%seq_name]
+               'alignment.seg.ali', 'trimmed_align.ali', 'family.mat']
+    myfiles.extend(glob.glob('*.ini'))
+    myfiles.extend(glob.glob('*.rsr'))
+    myfiles.extend(glob.glob('*.sch'))
+    myfiles.extend(glob.glob('%s.V*'%seq_name))
+    myfiles.extend(glob.glob('%s.D*'%seq_name))
     
-    for m in myfiles:
+    for mfile in myfiles:
+        m = os.path.join(os.getcwd(), mfile)
         try:
             if sys.platform == "win32":
                 os.remove(m)
             else:
                 os.system("rm %s &> /dev/null"%m)
         except:
+            print("cannot remove %s, continuing..."%m)
             continue    
 
     return pdb_out
@@ -218,6 +223,163 @@ def _patch_model(fbasename, seq_name):
     return pdb_out
 
 ############################################
+
+def analyze_protein(M):
+    '''
+    look for gaps in the sequence and return 4 elements list:
+    [number of gaps, number of missing residues, largest sequence gap]]
+    '''
+    
+    res = np.unique(M.data["resid"].values)
+    missing = []
+    patch = []
+    cnt = [0, 0, 0]
+    for r in range(1, np.max(res)+1):
+        if r in res:
+            if len(patch) > 0:
+                missing.append(deepcopy(patch))
+                cnt[0] += 1
+                cnt[1] += len(patch)
+                if len(patch) > cnt[2]:
+                    cnt[2] = len(patch)
+
+                patch = []
+   
+        else:
+            patch.append(r)
+            
+    return cnt
+
+
+def fragment(pdb, fasta, outfolder="."):
+    '''
+    split a PDB file in individual chains
+    split its associated FASTA file in FASTA of individual chains
+    return information of gaps in protein structure (as per the function analyse_protein)
+    '''
+    
+    if not os.path.exists(outfolder):
+        os.mkdir(outfolder)
+   
+    #split PDB file in chains
+    M = bb.Molecule(pdb)
+    chains = np.unique(M.data["chain"].values)
+    gap_count = []
+    for c in chains:
+        _, idxs = M.atomselect([c], "*", "*", get_index=True)
+        M2 = M.get_subset(idxs)
+        M2.write_pdb(os.path.join(outfolder, "chain%s.pdb"%c))
+        gap_count.append(analyze_protein(M2))
+        
+    #split FASTA
+    fin = open(fasta, "r")
+    headers = [] # fasta headers
+    fasta_chains = [] #chains associated with header
+    sequences = [] #collection of sequences
+    for line in fin:
+        if ">" in line:
+            headers.append(line)
+            chain_rawinfo = line.split("|")[1][6:].split(",")
+            chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
+            fasta_chains.append(chain_info)
+            if "sequence" in locals():
+                sequences.append(sequence)
+                
+            sequence = []
+            
+        else:
+            
+            #replace non-canonical aminoacids in FASTA sequence
+            if "KCX" in line:
+                line = line.replace('(KCX)', 'K')
+            if "MSE" in line :
+                line = line.replace('(MSE)', 'M')
+            
+            sequence.append(line)
+            
+    sequences.append(sequence)
+    fin.close() 
+       
+    #write FASTA files
+    for i in range(len(headers)):
+        for c in fasta_chains[i]:
+            if c not in chains:
+                
+                raise Exception("chain mismatch between PDB and FASTA. %s, %s"%(fasta_chains, chains))
+            fout = open(os.path.join(outfolder, "chain%s.fasta"%c), "w")
+            fout.write(headers[i])
+            fout.writelines(sequences[i])
+            fout.close()
+            
+    return np.array(gap_count)
+            
+
+def reassemble(pdbs, labels, outname):
+
+    monomers = []
+    for f in pdbs:
+        monomers.append(bb.Molecule(f))
+
+    M = bb.Multimer()
+    M.load_list(monomers, labels)
+    M.write_pdb(outname)
+
+
+def curate(pdb, fasta, outdir="result", gap=10):
+        
+    tmpfolder = os.path.join(outdir, "tmp")
+    if os.path.exists(tmpfolder):
+        shutil.rmtree(tmpfolder)
+        os.mkdir(tmpfolder)
+
+    # divide structure in individual chains
+    gap_count = fragment(pdb, fasta, tmpfolder)
+
+    largest = np.max(gap_count[:, 2])
+    if largest>gap:
+        raise Exception("large gap detected (%s residues)"%largest)
+                
+    #launch modeller on each individual chain
+    files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
+    chains = []
+    fouts = []
+    for f in files:
+        
+        # attempt modelling
+        fbasename = f.split(".")[0]
+        foutname = autopatch(fbasename, 10)
+        if foutname == "":
+            raise Exception("Autopatching failed.")
+            
+        # ensure that sequences of AA starts from the correct resid
+        M_raw = bb.Molecule("%s.pdb"%fbasename)
+        startval_raw = M_raw.data["resid"].values
+        M_curated = bb.Molecule(foutname)
+        startval_clean = M_curated.data["resid"].values
+        if startval_raw[0] != startval_clean[0]:
+            startval_clean += startval_raw[0] - startval_clean[0]
+            M_curated.data["resid"] = startval_clean
+            M_curated.write_pdb(foutname)
+        
+        chains.append(fbasename[-1])
+        fouts.append(foutname)
+
+    # reassemble complex in final directory
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+        
+    fname = "%s.pdb"%os.path.basename(pdb).split(".")[0]
+    outname = os.path.join(outdir, fname)
+    reassemble(fouts, chains, outname)
+    
+    #TODO
+    #check whether patching process caused clashing with lysine
+    
+    shutil.rmtree(tmpfolder)
+    
+    return outname
+
+
 '''
 def correct_resid(pdb, chain):
     #
@@ -739,164 +901,6 @@ def analyze_protein(f):
         except:
             c_cnt = 1
 '''
-
-def analyze_protein(M):
-    '''
-    look for gaps in the sequence and return 4 elements list:
-    [number of gaps, number of missing residues, largest sequence gap]]
-    '''
-    
-    res = np.unique(M.data["resid"].values)
-    missing = []
-    patch = []
-    cnt = [0, 0, 0]
-    for r in range(1, np.max(res)+1):
-        if r in res:
-            if len(patch) > 0:
-                missing.append(deepcopy(patch))
-                cnt[0] += 1
-                cnt[1] += len(patch)
-                if len(patch) > cnt[2]:
-                    cnt[2] = len(patch)
-
-                patch = []
-   
-        else:
-            patch.append(r)
-            
-    return cnt
-
-
-def fragment(pdb, fasta, outfolder="."):
-    '''
-    split a PDB file in individual chains
-    split its associated FASTA file in FASTA of individual chains
-    return information of gaps in protein structure (as per the function analyse_protein)
-    '''
-    
-    if not os.path.exists(outfolder):
-        os.mkdir(outfolder)
-   
-    #split PDB file in chains
-    M = bb.Molecule(pdb)
-    chains = np.unique(M.data["chain"].values)
-    gap_count = []
-    for c in chains:
-        _, idxs = M.atomselect([c], "*", "*", get_index=True)
-        M2 = M.get_subset(idxs)
-        M2.write_pdb(os.path.join(outfolder, "chain%s.pdb"%c))
-        gap_count.append(analyze_protein(M2))
-        
-    #split FASTA
-    fin = open(fasta, "r")
-    headers = [] # fasta headers
-    fasta_chains = [] #chains associated with header
-    sequences = [] #collection of sequences
-    for line in fin:
-        if ">" in line:
-            headers.append(line)
-            chain_rawinfo = line.split("|")[1][6:].split(",")
-            chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
-            fasta_chains.append(chain_info)
-            if "sequence" in locals():
-                sequences.append(sequence)
-                
-            sequence = []
-            
-        else:
-            
-            #replace non-canonical aminoacids in FASTA sequence
-            if "KCX" in line:
-                line = line.replace('(KCX)', 'K')
-            if "MSE" in line :
-                line = line.replace('(MSE)', 'M')
-            
-            sequence.append(line)
-            
-    sequences.append(sequence)
-    fin.close() 
-       
-    #write FASTA files
-    for i in range(len(headers)):
-        for c in fasta_chains[i]:
-            if c not in chains:
-                
-                raise Exception("chain mismatch between PDB and FASTA. %s, %s"%(fasta_chains, chains))
-            fout = open(os.path.join(outfolder, "chain%s.fasta"%c), "w")
-            fout.write(headers[i])
-            fout.writelines(sequences[i])
-            fout.close()
-            
-    return np.array(gap_count)
-            
-
-def reassemble(pdbs, labels, outname):
-
-    monomers = []
-    for f in pdbs:
-        monomers.append(bb.Molecule(f))
-
-    M = bb.Multimer()
-    M.load_list(monomers, labels)
-    M.write_pdb(outname)
-
-
-
-def curate(pdb, fasta, outfolder="", gap=10):
-
-    if outfolder == "":
-        outfolder = os.path.join("curate_PDB", "curated")
-        
-    if not os.path.exists(outfolder):
-        os.mkdir(outfolder)
-        
-    tmpfolder = os.path.join("curate_PDB", "tmp")
-    if os.path.exists(tmpfolder):
-        shutil.rmtree(tmpfolder)
-        os.mkdir(tmpfolder)
-
-    # divide structure in individual chains
-    gap_count = fragment(pdb, fasta, tmpfolder)
-
-    largest = np.max(gap_count[:, 2])
-    if largest>gap:
-        raise Exception("large gap detected (%s residues)"%largest)
-                
-    #launch modeller on each individual chain
-    files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
-    chains = []
-    fouts = []
-    for f in files:
-        
-        # attempt modelling
-        fbasename = f.split(".")[0]
-        foutname = autopatch(fbasename, 10)
-        if foutname == "":
-            raise Exception("Autopatching failed.")
-            
-        # ensure that sequences of AA starts from the correct resid
-        M_raw = bb.Molecule("%s.pdb"%fbasename)
-        startval_raw = M_raw.data["resid"].values
-        M_curated = bb.Molecule(foutname)
-        startval_clean = M_curated.data["resid"].values
-        if startval_raw[0] != startval_clean[0]:
-            startval_clean += startval_raw[0] - startval_clean[0]
-            M_curated.data["resid"] = startval_clean
-            M_curated.write_pdb(foutname)
-        
-        chains.append(fbasename[-1])
-        fouts.append(foutname)
-
-    # reassemble complex
-    fname = "%s.pdb"%os.path.basename(pdb).split(".")[0]
-    outname = os.path.join(outfolder, fname)
-    reassemble(fouts, chains, outname)
-    
-    #TODO
-    #check whether patching process caused clashing with lysine
-    
-    return outname
-
     
 ##############################################################################
 
