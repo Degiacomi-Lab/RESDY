@@ -59,16 +59,36 @@ class PDB(object):
                     files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                     if PDBCODE in files:
                         print(">> curated %s PDB found, continuing..."%PDBCODE)
-                    else:
-                        try:
-                            af.download_AF_struc(PDBCODE)
-                        except Exception as e:
-                            print(">> FAILED: %s"%e)
-                            continue
+                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                        continue
+
+                try:
+                    af.download_AF_struc(PDBCODE)
+                except Exception as e:
+                    print(">> FAILED: %s"%e)
+                    continue
                 
-                data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
-                self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-            
+                # check if the AlphaFold file contains ATOM statements
+                af_filename = os.path.join(self.curated_dir, "%s.pdb"%PDBCODE)
+                fin = open(af_filename, "r")
+                test = False
+                for line in fin:
+                    if line.split()[0] == "ATOM":
+                        test = True
+                        break
+                fin.close()
+                
+                if test:
+                    data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                    self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                else:
+                    print(">> FAILED: structure not found in AlphaFold database")
+                    try:
+                        os.remove(af_filename)
+                    except:
+                        pass
+                
             else:
                 
                 method_obtained = row["Method"]
