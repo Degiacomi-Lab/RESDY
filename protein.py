@@ -22,6 +22,13 @@ class PDB(object):
     
     def __init__(self, outdir="result", gap=10):
         
+        self._setup(outdir, gap)
+        
+
+    def _setup(self, outdir, gap):
+
+        self.outdir = outdir
+        
         # create folder of curated protein structures      
         self.curated_dir = os.path.join(outdir, "curated")
         if not os.path.exists(self.curated_dir):
@@ -38,6 +45,30 @@ class PDB(object):
 
         #gap to consider as small enough to justify patching
         self.gap = gap
+
+
+    def save_state(self, outname="proteins.csv"):
+        '''
+        Save a csv file in output directory
+        '''
+        self.df.to_csv(os.path.join(self.outdir, outname))
+
+
+    def load_state(self, fname, outdir="", gap=10):
+        '''
+        initialize DataFrame from csv file.
+        If no output directory is given, the folder containing the csv file is used.
+        '''
+        
+        if outdir == "":
+            outdir = os.path.dirname(fname)
+            
+        self._setup(outdir, gap)
+        
+        try:
+            self.df = pd.read_csv(fname)
+        except Exception as e:
+            print("Could not load csv file. %s"%e)
 
 
     def gather_proteins(self, uniprot_df, skip_if_found=True, gap=10):

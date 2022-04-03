@@ -2,6 +2,7 @@ import re
 import os, shutil
 import subprocess
 import glob
+import time
 
 import pandas as pd
 import numpy as np
@@ -11,10 +12,13 @@ import biobox as bb
 
 class Measure(object):
     
-    def __init__(self, df_input, outfolder="result"):
+    def __init__(self, df_input, outdir="result"):
+        
+        
+        self.outdir = outdir
         
         self.df_input = df_input
-        self.folder = os.path.join(outfolder, "curated")
+        self.folder = os.path.join(outdir, "curated")
                
         # Check that all files in DataFrame appear at least once in folder
         files1=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))] #to find AlphaFold entries
@@ -23,7 +27,7 @@ class Measure(object):
             if f not in files1 and f not in files2:
                 print("WARNING: %s not found in folder %s"%(f, self.folder))
 
-        self.pkaoutdir = os.path.join(outfolder, "propkaoutput")
+        self.pkaoutdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pkaoutdir):
             os.makedirs(self.pkaoutdir)
 
@@ -34,6 +38,13 @@ class Measure(object):
         # functions must return a dataframe [chain, resid, measure]
         self.measures = [["pKa", self.calculate_pka], ["sasa", self.calculate_sasa]]
         
+        
+    def save_state(self, outname="measures.csv"):
+        '''
+        Save a csv file in output directory
+        '''
+        self.df.to_csv(os.path.join(self.outdir, outname))
+
     
     def measure_dataframe(self):
 
@@ -53,8 +64,9 @@ class Measure(object):
                 if PDBCODE not in f:
                     continue
 
+                tstart = time.time()
                 print("\n> File: %s"%f)
-  
+                             
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
                 columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
@@ -90,6 +102,8 @@ class Measure(object):
                     except Exception as e:
                         print("ERROR: %s"%e)
                         continue
+                
+                print(">> file processed in %4.2f sec."%(time.time()-tstart))
                 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df], ignore_index=True)

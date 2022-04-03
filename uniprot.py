@@ -214,7 +214,6 @@ class Uniprot(object):
                     
                     if pdb_code_target != "" and PDBCODE != pdb_code_target:
                         continue
-
          
                     method_obtained = (words[2])
                     
@@ -301,7 +300,6 @@ if __name__ == "__main__":
  
     if False:
         UP.get_organism_proteins('Oryctolagus+cuniculus+(Rabbit)', 'UP000001811')
-    
     
     if True:
         UP.get_protein_data("P09167")
