@@ -528,16 +528,19 @@ def check_chain_match(pdb):
     '''
 
     pdb = pdb[:4]
+    tool = get_download_tool()
     try:
         
-        #download the fasta file from online.
+        # download the fasta file from online.
         web_url = "https://www.rcsb.org/fasta/entry/" + pdb + '/download'
         file_name_fasta = pdb + '.fasta'
 
-        if sys.platform == "win32":
+        if tool == "curl":
             line = "curl -s -o " + file_name_fasta + " " + web_url
-        else:
+        elif tool == "wget":
             line = "wget -O " + file_name_fasta + " " + web_url
+        else:
+            raise RuntimeError("You don't have a commandline tool for downloading files")
             
         subprocess.check_call(line, shell=True)
         

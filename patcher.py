@@ -17,7 +17,9 @@ import biobox as bb
 from copy import deepcopy
 
 from modeller import *
-from modeller.automodel import * 
+from modeller.automodel import *
+
+from helper import get_download_tool
 
 def autopatch(fbasename, gap_cutoff=8):
 

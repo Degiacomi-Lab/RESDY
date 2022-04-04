@@ -16,6 +16,7 @@ import numpy as np
 
 import alphafold as af # to load alphafold data
 import patcher # to patch PDB structures with missing regions
+from helper import get_download_tool
 
 
 class PDB(object):
@@ -191,18 +192,20 @@ class PDB(object):
     def download_pdb(self, pdb):
         
         cwd = os.getcwd()
-        
+
+        #go into [[outfolder]/conformations and downloads the .pdb file.
+        print("> downloading PDB %s"%pdb)
+        os.chdir(self.raw_dir)
+
+        tool = get_download_tool()
         try:
-    
-            #go into [[outfolder]/conformations and downloads the .pdb file.
-            print("> downloading PDB %s"%pdb)
-            os.chdir(self.raw_dir)
-                    
-            if sys.platform == "win32":
-                line = "curl -s -o %s.pdb https://files.rcsb.org/download/%s.pdb"%(pdb, pdb)
+            if tool == "curl":
+                line = "curl -s -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb" % (pdb, pdb)
+            elif tool == "wget":
+                line = "wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb"
             else:
-                line = "wget https://files.rcsb.org/download/" + pdb + '.pdb'
-            
+                raise RuntimeError("You don't have a commandline tool for downloading files")
+
             subprocess.check_call(line, shell=True)
             os.chdir(cwd)
             
@@ -214,6 +217,8 @@ class PDB(object):
     def download_fasta(self, pdb):
             
         cwd = os.getcwd()
+
+        tool = get_download_tool()
         
         try:
     
@@ -223,10 +228,12 @@ class PDB(object):
             web_url = "https://www.rcsb.org/fasta/entry/" + pdb + '/download'
             name = pdb + '.fasta'
     
-            if sys.platform == "win32":
+            if tool == "curl":
                 line = "curl -s -o " + name + " " + web_url
-            else:
+            elif tool == "wget":
                 line = "wget -O " + name + " " + web_url
+            else:
+                raise RuntimeError("You don't have a commandline tool for downloading files")
                 
             subprocess.check_call(line, shell=True)
             os.chdir(cwd)
