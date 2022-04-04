@@ -36,8 +36,10 @@ The following Python packages are required:
 * propka
 * plotly
 * nglview
-
-
+* biobox
+* cython
+* inquirer
+* (jupyter)
 ## Notes
 
 * The `Measure` class has been implemented to facilitate the addition of new measurable features. This is done by:
