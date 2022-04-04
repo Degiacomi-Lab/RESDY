@@ -19,6 +19,13 @@ def _is_tool(name):
     return shutil.which(name) is not None
 
 def get_download_tool():
+    """Get the name of the tool used for commandline download
+    Returns:
+    --------
+        tool_name : string
+            Name of the tool currently wget and curl supported if fails None returned
+
+    """
 
     if _is_tool('wget'):
         return 'wget'
