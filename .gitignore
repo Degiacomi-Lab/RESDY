@@ -130,3 +130,7 @@ dmypy.json
 
 # project-specific
 result/
+
+# OS Specific
+.DS_Store
+.idea
