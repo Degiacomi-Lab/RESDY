@@ -180,7 +180,7 @@ class PDB(object):
                 test = True
                     
             except Exception as e:
-                print(">> Patching failed for conformer %s: %s"%(cnt, e))
+                print(">> Patching failed for conformer %s. %s"%(cnt, e))
                 continue
 
         if not test:
@@ -200,9 +200,10 @@ class PDB(object):
         tool = get_download_tool()
         try:
             if tool == "curl":
-                line = "curl -s -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb" % (pdb, pdb)
+                line = "curl -s -o %s.pdb https://files.rcsb.org/download/%s.pdb"%(pdb, pdb)
             elif tool == "wget":
-                line = "wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb"
+                line = "wget https://files.rcsb.org/download/" + pdb + '.pdb'
+
             else:
                 raise RuntimeError("You don't have a commandline tool for downloading files")
 
@@ -212,7 +213,7 @@ class PDB(object):
         except Exception as e:
             print('Error downloading file. %s'%e)
             os.chdir(cwd)
-        
+            
     
     def download_fasta(self, pdb):
             
@@ -589,19 +590,20 @@ class PDB(object):
 
 if __name__ == "__main__":
 
-    from uniprot import Uniprot
-    UP = Uniprot()
-    UP.get_protein_data("P09167") # load strucutres for a single UNIPROT
-    UP.from_csv_file("inputs\\input_codes_4.csv") # add structures from a .csv file
-    print(UP.df)
-
     PDB = PDB()    
-    if False:
+    if True:
         PDB.clean_and_split_pdb('1CI4') # test MSE to MET mutation
         PDB.clean_and_split_pdb('2MBH') # test splitting of models
         PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
       
-    if True:
+    if False:
+
+        from uniprot import Uniprot
+        UP = Uniprot()
+        UP.get_protein_data("P09167") # load strucutres for a single UNIPROT
+        UP.from_csv_file("inputs\\input_codes_4.csv") # add structures from a .csv file
+        print(UP.df)
+
         PDB.gather_proteins(UP.df)
         print(PDB.df)
         
