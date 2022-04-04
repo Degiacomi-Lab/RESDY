@@ -1,5 +1,6 @@
 import os, sys, re
 import subprocess
+from helper import get_download_tool
 
 def download_AF_struc(pdb, outfolder="result"):
     '''
@@ -12,13 +13,17 @@ def download_AF_struc(pdb, outfolder="result"):
         os.makedirs(mypath)
         
     os.chdir(mypath)
-    
+
     print("> downloading AlphaFold structure %s"%pdb)
+
+    tool = get_download_tool()
     try:
-        if sys.platform == "win32":
+        if tool == "curl":
            line = "curl -s -o %s.pdb https://alphafold.ebi.ac.uk/files/%s.pdb"%(pdb, pdb)
-        else:
+        elif tool == "wget":
             line = "wget https://alphafold.ebi.ac.uk/files/" + pdb + ".pdb"
+        else:
+            raise RuntimeError("You don't have a commandline tool for downloading files")
         
         subprocess.check_call(line, shell=True)
         
