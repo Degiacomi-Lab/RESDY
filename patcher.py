@@ -236,6 +236,7 @@ def analyze_protein(M):
     missing = []
     patch = []
     cnt = [0, 0, 0]
+    print(f"There should be {np.max(res)} in this sequence")
     for r in range(1, np.max(res)+1):
         if r in res:
             if len(patch) > 0:
@@ -249,11 +250,11 @@ def analyze_protein(M):
    
         else:
             patch.append(r)
-            
+    print(np.shape(missing))
     return cnt
 
 
-def fragment(pdb, fasta, outfolder="."):
+def fragment(pdb, fasta, outfolder=".", verbose=True):
     '''
     split a PDB file in individual chains
     split its associated FASTA file in FASTA of individual chains
@@ -272,6 +273,9 @@ def fragment(pdb, fasta, outfolder="."):
         M2 = M.get_subset(idxs)
         M2.write_pdb(os.path.join(outfolder, "chain%s.pdb"%c))
         gap_count.append(analyze_protein(M2))
+        if verbose:
+            print(gap_count[-1])
+
         
     #split FASTA
     fin = open(fasta, "r")

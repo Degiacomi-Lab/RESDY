@@ -18,6 +18,9 @@ import alphafold as af # to load alphafold data
 import patcher # to patch PDB structures with missing regions
 from helper import get_download_tool
 
+from modeller import *
+from modeller.automodel import *
+
 
 class PDB(object):
     
@@ -71,11 +74,79 @@ class PDB(object):
         except Exception as e:
             print("Could not load csv file. %s"%e)
 
+    def gather_AF_data(self, PDBCODE, skip_if_found=True):
+        # downloading structure:
+        if skip_if_found:
+            files = [os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
+            if PDBCODE in files:
+                print(">> curated %s PDB found, continuing..." % PDBCODE)
+                data = (
+                    {'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan,
+                     'Chains': "A"})
+                self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
+        try:
+            af.download_AF_struc(PDBCODE)
+            print('Download success')
+        except Exception as e:
+            print(">> FAILED: %s" % e)
+
+        # getting confidence
+        f_name = os.path.join(self.curated_dir, "%s.pdb"%PDBCODE)
+        print(f_name)
+        f = open(f_name)
+        data = f.readlines()
+        f.close()
+        confidence_score = []
+        info_dic = {}
+        for l in data:
+            if l.startswith('ATOM'):
+                curr_line = l.split()
+                confidence_score.append(float(curr_line[-2]))
+        info_dic['mean'] = np.mean(confidence_score)
+        info_dic['std'] = np.std(confidence_score)
+        info_dic['name'] = f_name
+
+        # getting FASTA sequence
+        seq_list = []
+        env = Environ()
+        mdl = Model(env, file=f_name)
+        aln = Alignment(env)
+        aln.append_model(mdl, align_codes=f_name)
+        for seq in aln:
+            for r in seq.residues:
+                seq_list.append(r.name)
+        info_dic['seq_length'] = len(seq_list)
+        info_dic['seq'] = seq_list
+        return info_dic
+
+    def describe_dataset(self, uniprot_df, skip_if_found=True):
+        '''
+        Dry run without fixing anything that will gather intel about the dataset provided in the dataframe
+        Information we want to gather:
+        how many uniprot IDs are there
+        how many pdbs are there per uniport id
+        How many pdbs have small enough gaps to be used?
+        How long is the FASTA sequence?
+        What percentrage of FASTA can be found in any of the pdbs?
+
+        '''
+        for index, row in uniprot_df.iterrows():
+            PDBCODE = row["PDB Code"]
+            uniprot_code = row["Uniprot Entry"]
+
+            print("\nUNIPROT: %s, PDB: %s" % (uniprot_code, PDBCODE))
+            af_info = self.gather_AF_data(PDBCODE)
+            print(af_info)
+
+
+
+
 
     def gather_proteins(self, uniprot_df, skip_if_found=True, gap=10):
         '''
         iterate over lines of a DataFrame containing PDB structure information.
-        download every stucture, and curate it if necessary
+        download every structure, and curate it if necessary
         '''
           
         for index, row in uniprot_df.iterrows():
