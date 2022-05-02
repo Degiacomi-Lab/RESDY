@@ -46,7 +46,11 @@ The following Python packages are required:
   - implementing a method taking a filename as input and returning a pandas DataFrame with three columns [resid, chain, feature].
   - adding the function name and its label in `self.measures` within `__init__`.
 
-* The `Analysis` class is not yet implemented.
-
+* The `Analysis` class is not yet implemented (partially implemented now).
+  - `Analysis` class takes M.df rather than M.df.dropna() as the input in order to make both the aggregation and interactive plot work.
+  - method `aggregate` will aggregate data by [Uniprot Entry, Resid] and return a dataframe with statistics produced for each [Uniprot Entry, Resid]
+  - method `plot_graph` takes the type of plot ('histogram' or 'boxplot'), Uniprot Entry, Resid, and the feature ('pKa' or 'sasa') as inputs and produce the corresponding plot.
+  - method `get_outliers` takes Uniprot Entry, Resid, the feature ('pKa' or 'sasa'), and a number 'whis' that controls the extremeness of the outliers (usually is 1.5) as inputs and return a dataframe with outlier data included.
+  - method `interactive_plot` seems to be working (!!! I wish)
 * planned feature for jupyter notebook: visualize protein structures using nglview.
 
