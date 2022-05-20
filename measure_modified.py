@@ -141,12 +141,11 @@ class Measure(object):
                 
                 # log to the file
                 if df.empty == False:
-                    try:
-                        self.logger.info(df.to_string().strip('    Uniprot Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
-                        self.logger.info('--------------------------------------------------------------------------')
+                    
+                    self.logger.info(df.to_string().strip('    Uniprot Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
+                    self.logger.info('--------------------------------------------------------------------------')
 
-                    except:
-                        print('No logger exists, create a logger first.')
+                
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df], ignore_index=True)
                 
