@@ -447,7 +447,7 @@ class CoolPlots(object):
         block2 = widgets.HBox([self.b,self.GO])
         block3 = widgets.HBox([self.b_2,self.PDB_box])
         
-        self.plot_1 = widgets.VBox([block0,block1,block2,block3])
+        self.plot = widgets.VBox([block0,block1,block2,block3])
         
         return widgets.VBox([block0,block1,block2,block3])                      
                        
