@@ -3,24 +3,33 @@
 
 # In[13]:
 
-
+import re
+import urllib.request, urllib.parse, urllib.error
+from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-
+from ipywidgets import HBox, VBox
+from ipywidgets import widgets
 
 # In[12]:
-
 
 class Analysis(object):
     def __init__(self, df):
         self.df = df.dropna(subset=['pKa', 'sasa'])
         
         self.aggregated_df = pd.DataFrame(columns = ['Uniprot Entry','Resid','Num','pKa mean','pKa std','pKa range', 
-                                                     'SASA mean','SASA std','SASA range'])    
+        'SASA mean','SASA std','SASA range'])
+        
+        self.df_concise = pd.DataFrame(columns = ['Uniprot Entry','PDB Code','Method','Resolution','Chain','Resid','pKa','sasa']) 
+        
+        self.GO_dict = {}
+        self.GO_decode_dict = {}
+        self.GO_decode_dict_reverse = {}
+        
     def get_unique_uniprot_entry(self):
         return self.df['Uniprot Entry'].unique()
     
@@ -36,6 +45,74 @@ class Analysis(object):
         current_df = self.df[self.df['Method'] == 'Predicted']
         return current_df
     
+    # list all the uniprot codes associated with a GO Term
+    def GO_Search_Term(self, df, code = '', name = ''):
+        
+        if code == '' and name == '':
+            return 'Insufficient input!'
+        elif code == '' and name != '':
+            code = self.GO_decode_dict[name]
+        elif code != '' and name != '':
+            # check if they match
+            if code != self.GO_decode_dict[name]:
+                return f'Unmatched GO Term code and name; wrong input code: {code}; Should be: {self.GO_decode_dict[name]}'
+        
+        uni_list = self.GO_dict[code]
+        df_out = pd.DataFrame()
+        for uni in uni_list:
+            cdf = df[df['Uniprot Entry'] == uni]
+            df_out = pd.concat([df_out, cdf], ignore_index=True)
+        return df_out
+    
+    # list all the GO Terms associated with a uniprot code
+    def GO_Search_Protein(self, uniprot_entry):
+        
+        GO_list = list()
+        for code, uni_list in self.GO_dict.items():
+            if uniprot_entry in uni_list:
+                GO_list.append(code)
+        GO_list = [self.GO_decode_dict_reverse[code] for code in GO_list]
+        return GO_list
+      
+    def GO_Get_Data(self):
+        
+        uniprot_codes = self.df['Uniprot Entry'].unique()
+        for uniprot_code in uniprot_codes:
+            try:
+                url_2 = 'https://www.uniprot.org/uniprot/' + uniprot_code + '.txt'
+                html_2 = urllib.request.urlopen(url_2)
+            except Exception as e:
+                raise Exception('Failed to obtain UNIPROT data. %s'%e)
+            
+            try:
+                for line in html_2:
+                    line = str(line)
+                    GO_entry = re.findall('GO;', line)
+
+                    if len(GO_entry) > 0:
+                        # GO; GO:0030089; C:phycobilisome; IEA:UniProtKB-KW.
+                        # GO; GO:0102834; F:1-18:1-2-16:0-monogalactosyldiacylglycerol acyl-lipid omega-6 desaturase activity; IEA:UniProtKB-EC.
+                        GO_code = line.split('; ')[1].split(':')[1]
+                        GO_word_idx = line.split('; ')[2].index(':') + 1
+                        GO_word = line.split('; ')[2][GO_word_idx:]
+
+                        # put it into self.GO_dict
+                        if GO_code not in self.GO_dict.keys():
+                            self.GO_dict[GO_code] = [uniprot_code]
+                        else:
+                            self.GO_dict[GO_code].append(uniprot_code)
+
+                        # put it into self.GO_decode_dict
+                        if GO_word not in self.GO_decode_dict.keys():
+                            self.GO_decode_dict[GO_word] = GO_code
+            
+            except Exception as e:
+                print('Error %s'%e)
+                continue
+        
+        self.GO_decode_dict_reverse = {v: k for k, v in self.GO_decode_dict.items()}
+        
+        
     def aggregate(self):
 
         # get unique uniport entry
@@ -63,8 +140,6 @@ class Analysis(object):
                 index += 1
         
         print(f'In total {index} pairs of Uniport Entry and Resid identified')
-     
-    ########################################################################################
     
     # plot either a histogram with kernal density estimation or a boxplot
     def plot_graph(self, plot_type, feature, uniprot_entry = False, resid = False):
@@ -102,8 +177,8 @@ class Analysis(object):
             else:
                 print('Lack of Information!')
     
-    # whis is a number controlling the extremeness of the outliers, conventionally it is 1.5
-    def get_outliers(self, uniprot_entry, resid, feature, whis):
+    
+    def get_outliers(self, uniprot_entry, resid, feature, whis = 1.5):
         current_df = self.df[(self.df['Uniprot Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
         x = current_df[feature]
         
@@ -118,7 +193,7 @@ class Analysis(object):
         return outlier_df
     
     def get_extreme_values(self, feature, lower = 1, upper = 14):
-        current_df = self.df[(self.df[feature] <= lower) | (self.df[feature] >= upper)]
+        current_df = self.df[(self.df[feature] < lower) | (self.df[feature] > upper)]
         return current_df
     
     
@@ -128,64 +203,79 @@ class Analysis(object):
         self.df = self.df.drop(index = remove_list)
         L2 = len(self.df)
         print(f'Original length: {L1}\nCurrent length: {L2}\nNum of rows removed: {len(df_to_remove)}')
-    ##########################################################################################
-    def interactive_plot(self):
+    
+    def concise(self, df, weight = 0.5, method = 'average'):
         
-        df_data = self.df.reset_index(drop=True)
+        if method != 'average' and method != 'south_east':
+            return 'Wrong input method, try average or south_east.'
         
-        def update_point(trace, points, selector):
+        self.df_concise = pd.DataFrame(columns = ['Uniprot Entry','PDB Code','Method','Resolution','Chain','Resid','pKa','sasa'])
+        
+        # create the function to quantify the tradeoff between pka and sasa
+        def low_pka_large_sasa(df, weight = 0.5):
+    
+            if len(df) > 1:
+
+                df = df.reset_index(drop = True)
+
+                # situation 1: same pka and same sasa
+                if (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) == 1):
+                    return df.iloc[0,:]
+
+                # situation 2: same pka but different sasa maybe unlikely
+                elif (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) != 1):
+                    index = df['sasa'].idxmax()
+                    return df.iloc[index,:]
+
+                # situation 3: different pka but same sasa sometimes  
+                elif (len(df['pKa'].unique()) != 1) and (len(df['sasa'].unique()) == 1):
+                    index = df['pKa'].idxmin()
+                    return df.iloc[index,:]
+
+                # situation 4: different pka and different sasa
+                else:
+                    pka_list = [(14-i) for i in df['pKa'].tolist()]
+                    sasa_list = df['sasa'].tolist()
+
+                    # compute mean and std
+                    pka_m, pka_std = np.mean(pka_list), np.std(pka_list)
+                    sasa_m, sasa_std = np.mean(sasa_list), np.std(sasa_list)
+
+                    # standardize two lists
+                    pka_list = (pka_list - pka_m) / pka_std
+                    sasa_list = (sasa_list - sasa_m) / sasa_std
+
+                    w_pka = weight
+                    w_sasa = 1 - weight
+                    index = -1
+                    base = 0
+                    for i in range(len(pka_list)):
+                        weighted_sum = w_pka * round(pka_list[i],2) + w_sasa * round(sasa_list[i],2)
+                        if weighted_sum >= base:
+                            index = i
+                            base = weighted_sum
+                    return df.iloc[index,:]
+            else:
+                return df.iloc[0,:]
+
+        unique_uni_entries = df['Uniprot Entry'].unique()
+        for uni_entry in unique_uni_entries:
+            current_df = df[df['Uniprot Entry'] == uni_entry]
+
+            unique_resids = current_df['Resid'].unique()
+            for resid in unique_resids:
+                current_df = df[(df['Uniprot Entry'] == uni_entry) & (df['Resid'] == resid)]
+                
+                if method == 'south_east':
+                    row_to_append = low_pka_large_sasa(current_df, weight = weight)
+                    self.df_concise = self.df_concise.append(row_to_append, ignore_index = True)
+                
+                else:
+                    pka_mean = current_df['pKa'].mean()
+                    sasa_mean = current_df['sasa'].mean()
+                    data = {'Uniprot Entry':uni_entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan,
+                           'Resid':resid, 'pKa':pka_mean, 'sasa':sasa_mean}
+                    df_dictionary = pd.DataFrame([data])
+                    self.df_concise = pd.concat([self.df_concise, df_dictionary], ignore_index=True)
           
-            # only work with gray points
-            if len(points.point_inds) == 0:
-                return  
-
-            # gather uniprot and chain ID from full dataset clicked point
-            idx = points.point_inds[0]
-            my_uniprot = df_data.loc[idx, "Uniprot Entry"]
-            my_resid = df_data.loc[idx, "Resid"]
-            my_label = "%s(%i)"%(my_uniprot, my_resid)
-            df_query = df_data[(df_data['Uniprot Entry'] == my_uniprot) & (df_data['Resid'] == my_resid)]
-
-            
-            #plot data associated with selection
-            #labels = ["UNIPROT: %s<br>resid: %i"%(df_query["Uniprot Entry"].values[i], df_query["resid"].values[i]) for i in range(len(df_query))]
-            labels = ["PDB: %s"%(df_query["PDB Code"].values[i]) for i in range(len(df_query))]
-
-            # refresh the previous scatter plot
-            if len(f.data)>1:
-                f.data = [f.data[0]]
-
-
-            f.add_scatter(x=df_query["sasa"], y=df_query["pKa"],
-                          mode='markers', showlegend=False, name=my_label,
-                          text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}')
-
-            
-        # create scatter plot
-        labels = ["UNIPROT: %s<br>resid: %i"%(df_data["Uniprot Entry"].values[i], df_data ["Resid"].values[i]) for i in range(len(df_data))]
-        f = go.FigureWidget([go.Scatter(x=df_data["sasa"], y=df_data["pKa"],
-                                        mode='markers', name="aggregate", showlegend=False, opacity=0.75,
-                                        text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}'
-                                       )
-                            ])
-
-        # add labels
-        f.update_layout(
-            xaxis_title="SASA (A2)",
-            yaxis_title="pKa")
-
-        #set axes properties
-        f.update_xaxes(range=[0, 130])
-        f.update_yaxes(range=[-2, 20])
-        f.update_xaxes(showspikes=True)
-        f.update_yaxes(showspikes=True)
-
-        #parameterize colours and triggers
-        scatter = f.data[0]
-        colors = ['#bae2be'] * len(df_data)
-        scatter.marker.color = colors
-        f.layout.hovermode = 'closest'
-        scatter.on_click(update_point)
-        
-        return f
-
+        return self.df_concise
