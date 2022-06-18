@@ -140,7 +140,7 @@ class CoolPlots(object):
         yaxis_title="pKa")
         
         self.f.update_xaxes(range=[0, 100])
-        self.f.update_yaxes(range=[1, 14])
+        self.f.update_yaxes(range=[(int(self.df['pKa'].min())-1), (int(self.df['pKa'].max())+1)])
         self.f.update_xaxes(showspikes=True)
         self.f.update_yaxes(showspikes=True)
         
