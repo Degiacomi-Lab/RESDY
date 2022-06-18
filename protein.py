@@ -21,14 +21,15 @@ from helper import get_download_tool
 
 class PDB(object):
     
-    def __init__(self, outdir="result", gap=10):
+    def __init__(self, outdir="result", gap=10, PDB_only=False):
         
-        self._setup(outdir, gap)
+        self._setup(outdir, gap, PDB_only)
         
 
-    def _setup(self, outdir, gap):
+    def _setup(self, outdir, gap, PDB_only):
 
         self.outdir = outdir
+        self.PDB_only = PDB_only
         
         # create folder of curated protein structures      
         self.curated_dir = os.path.join(outdir, "curated")
@@ -41,8 +42,12 @@ class PDB(object):
             os.makedirs(self.raw_dir)
                                 
         # dataframe storing data
-        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
-        self.df = pd.DataFrame(columns=columns)
+        if self.PDB_only:
+            columns = ['PDB Code']
+            self.df = pd.DataFrame(columns=columns)
+        else:
+            columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
+            self.df = pd.DataFrame(columns=columns)
 
         #gap to consider as small enough to justify patching
         self.gap = gap
@@ -77,13 +82,23 @@ class PDB(object):
         iterate over lines of a DataFrame containing PDB structure information.
         download every stucture, and curate it if necessary
         '''
-          
+        if self.PDB_only:
+            try:
+                # when the inputs are PDB codes only, convert them to a dataframe
+                dic = {'PDB Code':uniprot_df}
+                uniprot_df = pd.DataFrame(dic)
+            except Exception as e:
+                return e
+        
         for index, row in uniprot_df.iterrows():
     
             PDBCODE = row["PDB Code"]
-            uniprot_code = row["Uniprot Entry"]
-    
-            print("\nUNIPROT: %s, PDB: %s"%(uniprot_code, PDBCODE))
+            
+            if not self.PDB_only:
+                uniprot_code = row["Uniprot Entry"]
+                print("\nUNIPROT: %s, PDB: %s"%(uniprot_code, PDBCODE))
+            else:
+                print("\nPDB: %s"%(PDBCODE))
     
             if PDBCODE[:2] == "AF": 
     
@@ -91,12 +106,17 @@ class PDB(object):
                     files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                     if PDBCODE in files:
                         print(">> curated %s PDB found, continuing..."%PDBCODE)
-                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                        if not self.PDB_only:
+                            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                        else:
+                            data = ({'PDB Code': PDBCODE})
+                        
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                         continue
 
                 try:
-                    af.download_AF_struc(PDBCODE)
+                    """possible bug fixed"""
+                    af.download_AF_struc(PDBCODE,outfolder=self.outdir)
                 except Exception as e:
                     print(">> FAILED: %s"%e)
                     continue
@@ -112,8 +132,12 @@ class PDB(object):
                 fin.close()
                 
                 if test:
-                    data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                    if not self.PDB_only:
+                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                    else:
+                        data = ({'PDB Code': PDBCODE})
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                
                 else:
                     print(">> FAILED: structure not found in AlphaFold database")
                     try:
@@ -122,23 +146,30 @@ class PDB(object):
                         pass
                 
             else:
-                
-                method_obtained = row["Method"]
-                resolution = row["Resolution"]
-                chains = row["Chains"]
-    
+                try:
+                    method_obtained = row["Method"]
+                    resolution = row["Resolution"]
+                    chains = row["Chains"]
+                except:
+                    pass
                 if skip_if_found:
                     files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                     if PDBCODE in files:
                         print(">> curated %s PDB found, continuing..."%PDBCODE)
-                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
+                        if not self.PDB_only:
+                            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
+                        else:
+                            data = ({'PDB Code': PDBCODE})
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                         continue
     
                 # load, clean, and split it in alternate conformations
                 try:
                     self.clean_and_split_pdb(PDBCODE)
-                    data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
+                    if not self.PDB_only:
+                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
+                    else:
+                        data = ({'PDB Code': PDBCODE})
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                 
                 except Exception as e:
@@ -171,8 +202,10 @@ class PDB(object):
             mypath = os.path.split(f)[0]
             fasta = os.path.join(mypath, "%s.fasta"%pdb)
             
-            try:    
+            try: 
+                
                 fname = patcher.curate(f, fasta, outdir=self.curated_dir, gap=self.gap)
+                
                 if len(replacement_dict)>0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())            
                     self.replace_chains(fname, reverse_replacement_dict)
@@ -503,7 +536,7 @@ class PDB(object):
             need_replacing = []
             replacement_dict = dict()
             for line in f:
-                m = re.findall('Chain[ a-z , A-Z \[\]]*|', line)
+                m = re.findall('Chain[ a-z , 0-9, A-Z \[\]]*|', line)
                 for entry in m:
                     if (len(entry) > 0):
                         chains_raw.append(entry)
