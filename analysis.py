@@ -234,7 +234,8 @@ class Analysis(object):
 
                 # situation 4: different pka and different sasa
                 else:
-                    pka_list = [(14-i) for i in df['pKa'].tolist()]
+                    pka_max = df['pKa'].max()
+                    pka_list = [(pka_max-i) for i in df['pKa'].tolist()]
                     sasa_list = df['sasa'].tolist()
 
                     # compute mean and std
