@@ -372,6 +372,14 @@ def curate(pdb, fasta, outdir="result", gap=10):
         
     fname = "%s.pdb"%os.path.basename(pdb).split(".")[0]
     outname = os.path.join(outdir, fname)
+    
+    """possible bug here (fixed by sorting the lists alphabetically)"""
+    chains = sorted(chains)
+    
+    fouts = sorted(fouts, key=lambda x: x.split('_')[-2][-1])
+    
+    """possible bug here (fixed by sorting the lists alphabetically)"""
+    
     reassemble(fouts, chains, outname)
     
     #TODO
