@@ -3,20 +3,35 @@ import os, shutil
 import subprocess
 import glob
 import time
-
 import pandas as pd
 import numpy as np
-
 import biobox as bb
-
+import logging
 
 class Measure(object):
     
-    def __init__(self, df_input, outdir="result"):
+    def __init__(self, df_input, outdir="result", log_path='measure_log.txt'):
         
+        self.log_path = log_path
+        
+        # define a logger
+        self.logger = logging.getLogger('MeasureLog')
+        self.logger.setLevel(level = logging.DEBUG)
+        
+        formatter = logging.Formatter('%(message)s') # as simple as possible
+        handler = logging.FileHandler(self.log_path, encoding = 'UTF-8')
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(formatter)
+        
+        self.logger.addHandler(handler)
+        
+        # for restarting
+        self.current_index = 0
+        
+        # document failed pdb files
+        self.wrong_pdb_file = list()
         
         self.outdir = outdir
-        
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
                
@@ -30,10 +45,16 @@ class Measure(object):
         self.pkaoutdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pkaoutdir):
             os.makedirs(self.pkaoutdir)
-
-        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
-        self.df = pd.DataFrame(columns=columns)
-
+        
+        self.PDB_only = False
+        
+        if 'Uniprot Entry' in self.df_input.columns: 
+            columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            self.df = pd.DataFrame(columns=columns)
+        else:
+            self.PDB_only = True
+            columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'sasa']
+            self.df = pd.DataFrame(columns = columns)
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
         self.measures = [["pKa", self.calculate_pka], ["sasa", self.calculate_sasa]]
@@ -47,15 +68,23 @@ class Measure(object):
 
     
     def measure_dataframe(self):
-
+        
+        # use a different method if handling pdb codes only
+        if self.PDB_only:
+            return 'Call PDB_only method'
+        
         files = glob.glob(os.path.join(self.folder, "*pdb"))
-
+        
+        first_index = self.df_input.index[0]
+        
         for index, row in self.df_input.iterrows():
-
-            PDBCODE = row["PDB Code"]
-            uniprot_code = row["Uniprot Entry"]
-            chains = row["Chains"].split("/")
             
+           
+            PDBCODE = row["PDB Code"]
+            chains = row["Chains"].split("/")
+            self.current_index = index
+            
+            uniprot_code = row["Uniprot Entry"]
             print("\n# UNIPROT: %s PDB: %s, chain(s): %s"%(uniprot_code, PDBCODE, " ".join(chains)))
             
             # calculate features values from all PDB files associated with specific DataFrame entry
@@ -69,27 +98,37 @@ class Measure(object):
                              
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
+                
                 columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
                 df = pd.DataFrame(columns=columns)
-
+                
+                
                 # append to temporary DataFrame all lysines in the file of interest             
-                M = bb.Molecule(f)
+                try:
+                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                except:
+                    self.wrong_pdb_file.append(f)
+                    continue
+                
                 _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
                 for i in idxs:
 
                     #save only lysine entries from chain of interest
                     if M.data["chain"].values[i] not in chains:
                         continue
-                
+                    
+                    
                     data = ({'Uniprot Entry': uniprot_code,
-                    'PDB Code': f.split(".")[0],
-                    'Method': row["Method"],
-                    'Resolution': row["Resolution"],
-                    'Chain': M.data["chain"].values[i],
-                    'Resid': M.data["resid"].values[i]})
-   
+                        'PDB Code': f.split(".")[0],
+                        'Method': row["Method"],
+                        'Resolution': row["Resolution"],
+                        'Chain': M.data["chain"].values[i],
+                        'Resid': M.data["resid"].values[i]})
+
                     df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                   
+                    
+                    
+                        
                 print(">> %s lysines of interest found"%len(df))
 
                 # iterate over measures to carry out (according to self.measures)
@@ -99,21 +138,60 @@ class Measure(object):
                         df[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f) # run measurement
                         df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
+                        
                     except Exception as e:
                         print("ERROR: %s"%e)
                         continue
                 
                 print(">> file processed in %4.2f sec."%(time.time()-tstart))
                 
+                # document the data to a log file
+                if df.empty == False:
+                    try:
+                        self.logger.info(df.to_string().strip('    Uniprot Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
+                        self.logger.info('--------------------------------------------------------------------------')
+                    except:
+                        print('No logger exists, create a logger first.')
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df], ignore_index=True)
-
                 
+            # remove possible duplicated rows (if restarted)
+            if index == first_index:
+                self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+    
+    def recover_from_log(self):
+        if self.PDB_only:
+            return 'Function not callable.'
+        
+        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid', 'pKa', 'sasa']
+        log_to_df = pd.DataFrame(columns=columns)
+        
+        with open(self.log_path) as inf:
+            for line in inf:
+                line = line.replace('--------------------------------------------------------------------------',' ')
+                parts = line.split()
+                if len(parts) == 0:
+                    continue
+                parts = parts[1:]
+                data = dict(zip(columns, parts))
+                log_to_df = log_to_df.append(data, ignore_index=True)
+        
+        return log_to_df
+    
+    def restart_measure(self):
+        if self.PDB_only:
+            return 'Function not callable'
+            
+        self.df_input = self.df_input.loc[self.current_index:,:]
+        self.measure_dataframe()
+      
+  
     def _combine_dataframes(self, target, to_merge, col_name):
         '''
         target is a DataFrame to be filled with data, to_merge contains the data.
         Values to insert are indexed in both array by two columns: Chain and Resid.
         '''
+        # e.g. self._combine_dataframes(df, result, meas[0])
         
         for i in range(len(target)):
             
@@ -128,7 +206,73 @@ class Measure(object):
           
         return target
 
+    def measure_PDB_only(self):
+        
+        if not self.PDB_only:
+            return 'Calling the wrong method.'
+        
+        # no need to log the data since usually we don't process a huge number of pdb codes
+        if os.path.exists(self.log_path):
+              os.remove(self.log_path)
+        
+        files = glob.glob(os.path.join(self.folder, "*pdb"))
+        
+        for _, row in self.df_input.iterrows():
+            PDBCODE = row['PDB Code']
             
+            for f in files:
+                if PDBCODE not in f:
+                    continue
+                    
+                tstart = time.time()
+                print("\n> File: %s"%f)
+                
+                result_list = list()
+                for meas in self.measures:
+                    print(">> evaluating %s..."%meas[0])
+                    try:
+                       
+                        result = meas[1](f) # run measurement
+                        result_list.append(result)
+                        
+                    except Exception as e:
+                        print("ERROR: %s"%e)
+                        continue
+                try:
+                    # add sasa data to pka data
+                    to_merge = result_list[1]
+                    target = result_list[0]
+                    
+                    for i in range(len(to_merge)):      
+    
+                        chain_value = to_merge.loc[i, "Chain"]
+                        resid_value = to_merge.loc[i, "Resid"]
+    
+                        idx = np.where((target["Chain"] == chain_value) & (target["Resid"] == resid_value))
+    
+                        if len(idx[0]) == 0:
+                            row = to_merge.loc[i,:]
+                            target = target.append(row, ignore_index = True)
+                            continue
+    
+                        target.at[idx[0][0], 'sasa'] = to_merge.loc[i, 'sasa']
+                   
+                    # final thing to do: make sure the order of the columns is correct
+                    target = target[['Chain', 'Resid', 'pKa', 'sasa']]
+                    print(">> %s lysines of interest found"%len(target))
+                    
+                    # todo1: add a col i.e. PDB Code
+                    target.insert(0, 'PDB Code', [PDBCODE] * len(target))
+                    
+                    # todo2: append to the main df
+                    self.df = pd.concat([self.df, target], ignore_index=True)
+                    
+                except Exception as e:
+                    print("ERROR: %s"%e)
+                print(">> file processed in %4.2f sec."%(time.time()-tstart))
+                
+    
+   
     def calculate_pka(self, path):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
@@ -183,7 +327,7 @@ class Measure(object):
                             if len(idx[0])>0:
                                 continue    
             
-                        lys_number.append(line[0])
+                        lys_number.append(int(line[0]))
                         chain.append(line[1])
                         pkas.append(line[2])
                         
@@ -285,7 +429,7 @@ class Measure(object):
     
             for entry in lys_idx:
                 resid = df.at[entry, 'resid']
-                list_of_resid.append(resid)
+                list_of_resid.append(int(resid))
                 
             #Find the coordinates and index of every atom in the molecule.
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
