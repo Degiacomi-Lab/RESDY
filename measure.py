@@ -12,7 +12,7 @@ class Measure(object):
     
     def __init__(self, df_input, outdir="result", log_path='measure_log.txt'):
         
-        self.log_path = log_path
+        self.log_path = os.path.join(outdir, log_path)
         
         # define a logger
         self.logger = logging.getLogger('MeasureLog')
