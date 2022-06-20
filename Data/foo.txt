@@ -1,1 +1,0 @@
-Input data and PDB files.
