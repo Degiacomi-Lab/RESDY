@@ -13,13 +13,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
-
+import os
 # In[52]:
 
 
 class CoolPlots(object):
     
-    def __init__(self, analysis):
+    def __init__(self, analysis, outdir = 'result'):
         self.analysis = analysis
         self.df = analysis.df
         self.df_concise = analysis.df_concise
@@ -32,6 +32,7 @@ class CoolPlots(object):
         self.temp_df = pd.DataFrame()
         self.temp_df_2 = pd.DataFrame()
         # the path to store the regional data
+        self.outdir = outdir
         self.export_path = ''
         
         # plot
@@ -248,7 +249,7 @@ class CoolPlots(object):
         
     def advanced_plot(self, export_path = 'Regional_Data.csv'):
         
-        self.export_path = export_path
+        self.export_path = os.path.joint(self.outdir, export_path)
         
         def interact_slides(p,s):
             if len(self.f.data)>1:
