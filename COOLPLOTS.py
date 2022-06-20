@@ -249,7 +249,7 @@ class CoolPlots(object):
         
     def advanced_plot(self, export_path = 'Regional_Data.csv'):
         
-        self.export_path = os.path.joint(self.outdir, export_path)
+        self.export_path = os.path.join(self.outdir, export_path)
         
         def interact_slides(p,s):
             if len(self.f.data)>1:
