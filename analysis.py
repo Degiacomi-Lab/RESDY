@@ -7,13 +7,9 @@ import re
 import urllib.request, urllib.parse, urllib.error
 from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from ipywidgets import HBox, VBox
-from ipywidgets import widgets
+
 
 # In[12]:
 
