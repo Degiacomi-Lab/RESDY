@@ -21,13 +21,6 @@ class Analysis(object):
         
         self.name_to_code = {}
         self.code_to_name = None
-        
-    def get_unique_uniprot_entry(self):
-        return self.df['Uniprot Entry'].unique()
-    
-    def get_unique_resid(self, uniprot_entry):
-        current_df = self.df[self.df['Uniprot Entry'] == uniprot_entry]
-        return current_df['Resid'].unique()
     
     def get_data(self, uniprot_entry, resid):
         df_query = self.df[(self.df['Uniprot Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
