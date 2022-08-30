@@ -11,9 +11,6 @@ class Uniprot(object):
 
         columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
-                        
-        self.GO_dict = {}
-        self.GO_decode_dict = {}
         
     def get_organism_proteins(self, name_of_organism, code):
         '''
@@ -195,7 +192,7 @@ class Uniprot(object):
             #appends the AF structure to the df (if this isn't present it will be removed later).
             try:
         
-                AF_code = 'AF-' + uniprot_code + '-F1-model_v1'
+                AF_code = 'AF-' + uniprot_code + '-F1-model_v3'
               
                 data = ({'Uniprot Entry': uniprot_code, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -234,25 +231,6 @@ class Uniprot(object):
                      
                     
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                
-                # now find the GO term
-                
-                GO_entry = re.findall('GO;', line)
-
-                if len(GO_entry) > 0:
-                    # GO; GO:0030089; C:phycobilisome; IEA:UniProtKB-KW.
-                    GO_code = line.split('; ')[1].split(':')[1]
-                    GO_word = line.split('; ')[2].split(':')[1]
-
-                    # put it into self.GO_dict
-                    if GO_code not in self.GO_dict.keys():
-                        self.GO_dict[GO_code] = [uniprot_code]
-                    else:
-                        self.GO_dict[GO_code].append(uniprot_code)
-                    
-                    # put it into self.GO_decode_dict
-                    if GO_word not in self.GO_decode_dict.keys():
-                        self.GO_decode_dict[GO_word] = GO_code
 
             except Exception as e:
                 print('Error %s'%e)
