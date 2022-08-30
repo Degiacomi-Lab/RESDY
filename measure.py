@@ -10,20 +10,23 @@ import logging
 
 class Measure(object):
     
-    def __init__(self, df_input, outdir="result", log_path='measure_log.txt'):
+    def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt'):
         
-        self.log_path = os.path.join(outdir, log_path)
-        
-        # define a logger
-        self.logger = logging.getLogger('MeasureLog')
-        self.logger.setLevel(level = logging.DEBUG)
-        
-        formatter = logging.Formatter('%(message)s') # as simple as possible
-        handler = logging.FileHandler(self.log_path, encoding = 'UTF-8')
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(formatter)
-        
-        self.logger.addHandler(handler)
+        self.activate_log = False
+        if activate_log:
+            self.activate_log = activate_log
+            self.log_path = os.path.join(outdir, log_path)
+
+            # define a logger
+            self.logger = logging.getLogger('MeasureLog')
+            self.logger.setLevel(level = logging.DEBUG)
+
+            formatter = logging.Formatter('%(message)s') # as simple as possible
+            handler = logging.FileHandler(self.log_path, encoding = 'UTF-8')
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(formatter)
+
+            self.logger.addHandler(handler)
         
         # for restarting
         self.current_index = 0
@@ -55,6 +58,7 @@ class Measure(object):
             self.PDB_only = True
             columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'sasa']
             self.df = pd.DataFrame(columns = columns)
+        
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
         self.measures = [["pKa", self.calculate_pka], ["sasa", self.calculate_sasa]]
@@ -146,12 +150,14 @@ class Measure(object):
                 print(">> file processed in %4.2f sec."%(time.time()-tstart))
                 
                 # document the data to a log file
-                if df.empty == False:
-                    try:
-                        self.logger.info(df.to_string().strip('    Uniprot Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
-                        self.logger.info('--------------------------------------------------------------------------')
-                    except:
-                        print('No logger exists, create a logger first.')
+                if self.activate_log:
+                    if df.empty == False:
+                        try:
+                            self.logger.info(df.to_string().strip('    Uniprot Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
+                            self.logger.info('--------------------------------------------------------------------------')
+                        except:
+                            print('Error in logging.')
+                
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df], ignore_index=True)
                 
@@ -159,14 +165,14 @@ class Measure(object):
             if index == first_index:
                 self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
     
-    def recover_from_log(self):
+    def recover_from_log(self, log_path):
         if self.PDB_only:
             return 'Function not callable.'
         
         columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid', 'pKa', 'sasa']
         log_to_df = pd.DataFrame(columns=columns)
         
-        with open(self.log_path) as inf:
+        with open(log_path) as inf:
             for line in inf:
                 line = line.replace('--------------------------------------------------------------------------',' ')
                 parts = line.split()
@@ -210,10 +216,6 @@ class Measure(object):
         
         if not self.PDB_only:
             return 'Calling the wrong method.'
-        
-        # no need to log the data since usually we don't process a huge number of pdb codes
-        if os.path.exists(self.log_path):
-              os.remove(self.log_path)
         
         files = glob.glob(os.path.join(self.folder, "*pdb"))
         
