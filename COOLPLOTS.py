@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[59]:
-
-
 from ipywidgets import HBox, VBox
 from ipywidgets import widgets
 import numpy as np
@@ -14,29 +8,35 @@ import plotly.graph_objects as go
 from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
 import os
-# In[52]:
-
+import webbrowser
 
 class CoolPlots(object):
     
     def __init__(self, analysis, outdir = 'result'):
         self.analysis = analysis
         self.df = analysis.df
-        self.df_concise = analysis.df_concise
+        self.df_concise = analysis.df_sub
         self.GO_dict = analysis.GO_dict
+        
         # from Term to code
-        self.GO_decode_dict = analysis.GO_decode_dict
+        self.GO_decode_dict = analysis.name_to_code
+        
         # from code to Term
-        self.GO_decode_dict_reverse = analysis.GO_decode_dict_reverse
+        self.GO_decode_dict_reverse = analysis.code_to_name
+        
         # some temp dfs
         self.temp_df = pd.DataFrame()
         self.temp_df_2 = pd.DataFrame()
+        
         # the path to store the regional data
         self.outdir = outdir
         self.export_path = ''
         
+        # store the uniprot code clicked for the pop-up uniprot page
+        self.uni_clicked = ''
+        
         # plot
-        self.plot = 'You have not called advanced_plot method!'
+        self.plot = 'You have not called advanced_plot method.'
         
         # pka slider
         self.p = widgets.FloatRangeSlider(
@@ -112,6 +112,7 @@ class CoolPlots(object):
             self.p.value, self.s.value = [1, 14], [0, 100]
             self.GO.options = (['Welcome'] + list(self.GO_dict.keys()))
             self.GO.value = 'Welcome'
+            self.uni_clicked = ''
     
         self.b = widgets.Button(
                     description='RESET',
@@ -129,6 +130,25 @@ class CoolPlots(object):
                         button_style='info', # 'success', 'info', 'warning', 'danger' or ''
                         tooltip='Click me',
                         icon='check')
+        
+        # buttom that once clicked will pop up the uniprot webpage
+        def call_back_buttom_open_url(b_open_url):
+            if self.uni_clicked == '':
+                return
+            url = 'https://www.uniprot.org/uniprot/' + self.uni_clicked
+            try:
+                webbrowser.open(url)
+            except:
+                print(f'access failed for {url}.')
+                
+        self.b_open_url = widgets.Button(
+                        description='Go to Uniprot',
+                        disabled=False,
+                        button_style='info', # 'success', 'info', 'warning', 'danger' or ''
+                        tooltip='Click me',
+                        icon='check')
+        
+        self.b_open_url.on_click(call_back_buttom_open_url)
         
         # the very fundamental plot
         labels = ["UNIPROT: %s<br>resid: %i"%(self.df_concise["Uniprot Entry"].values[i], self.df_concise["Resid"].values[i]) for i in range(len(self.df_concise))]
@@ -246,7 +266,11 @@ class CoolPlots(object):
             df = pd.concat([df, df_dictionary], ignore_index=True)
         
         return df
+    
+    # here we define a function that can easily add more data to the main data frame
+    #def more_data(self, analysis_2):
         
+    
     def advanced_plot(self, export_path = 'Regional_Data.csv'):
         
         self.export_path = os.path.join(self.outdir, export_path)
@@ -278,12 +302,16 @@ class CoolPlots(object):
                         break
             new_options = [f'{code}: {self.GO_decode_dict_reverse[code]}' for code in new_options]
             self.GO.options = ['Welcome'] + sorted(new_options, key = lambda x: int(x.split(':')[0]))
+            
             ###################################################################################################
             # enrichment analysis and update the barchart
             for i in range(len(self.bar.data)):
                 self.bar.data[i].visible = False
             
             df_e = self.enrichment_analysis(p, s)
+            
+            labels = ['%s'%(self.GO_decode_dict_reverse[df_e['GO ID'].values[i]]) for i in range(len(df_e))]
+            
             self.bar.add_trace(go.Bar(
                         y=df_e['GO ID'],
                         x=-np.log10(df_e['raw p value']),
@@ -291,16 +319,21 @@ class CoolPlots(object):
                         orientation='h',
                         marker=dict(
                                 color='rgba(246, 78, 139, 0.6)',
-                        line=dict(color='rgba(246, 78, 139, 1.0)', width=3))))
+                        line=dict(color='rgba(246, 78, 139, 1.0)', width=3)),
+                        text = labels,
+                        hovertemplate = '%{x}<br>%{text}'))
             self.bar.add_trace(go.Bar(y=df_e['GO ID'],
                         x=-np.log10(df_e['FDR']),
                         name='FDR',
                         orientation='h',
                         marker=dict(
                                     color='rgba(58, 71, 80, 0.6)',
-                                    line=dict(color='rgba(58, 71, 80, 1.0)', width=3))))
+                                    line=dict(color='rgba(58, 71, 80, 1.0)', width=3)),
+                                     text = labels,
+                                     hovertemplate = '%{x}<br>%{text}'))
             self.bar.update_yaxes(autorange="reversed")
             ###################################################################################################
+            
             label = 'pKa: %.1f-%.1f | SASA: %.1f-%.1f'%(pka_l, pka_u, sasa_l, sasa_u)
             labels = ["UNIPROT: %s<br>resid: %i"%(selected_df["Uniprot Entry"].values[i], selected_df["Resid"].values[i]) for i in range(len(selected_df))]
             self.f.add_scatter(x=selected_df["sasa"], y=selected_df["pKa"],
@@ -398,6 +431,7 @@ class CoolPlots(object):
             sasa_l, sasa_u = float(sasa_range[0]), float(sasa_range[1])
 
             my_uniprot = self.temp_df_2.loc[idx, "Uniprot Entry"] # use the temp df defined in the data structure
+            self.uni_clicked = my_uniprot
             my_resid = self.temp_df_2.loc[idx, "Resid"]
             my_label = "%s(%i)"%(my_uniprot, my_resid)
             df_query = self.df[(self.df['Uniprot Entry'] == my_uniprot) & (self.df['Resid'] == my_resid)]
@@ -443,7 +477,7 @@ class CoolPlots(object):
         self.b_2.on_click(call_back_buttom_2)
        
         # output format
-        block0 = widgets.VBox([self.f, self.bar, out_3])
+        block0 = widgets.VBox([self.f, self.b_open_url, self.bar, out_3])
         block1 = widgets.HBox([self.b_export, widgets.VBox([self.p,self.s,out_1,out_2])])
         block2 = widgets.HBox([self.b,self.GO])
         block3 = widgets.HBox([self.b_2,self.PDB_box])
