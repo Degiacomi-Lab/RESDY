@@ -46,10 +46,10 @@ The following Python packages are required:
   - implementing a method taking a filename as input and returning a pandas DataFrame with three columns [resid, chain, feature].
   - adding the function name and its label in `self.measures` within `__init__`.
 
-* The `Analysis` class is responsible for aggregating the data (calculating mean, std, range for the feature of each lysine), scrape GO Terms from the Uniprot Database for each unique protein.
+* The `Analysis` class is responsible for aggregating the data (calculating mean, std, range for the feature of each lysine), scrape GO Terms from the Uniprot Database for each protein.
   - `Analysis` class takes M.df as the input.
-  - method `aggregate` will aggregate data and calculate descriptive statistics for each lysine. The resulting dataframe will be stored in `self.aggregated_df`. 
-  - method `concise` will aggregate data in two ways using either 'average' or 'south_east': (1) only include the average values of the two features for each lysine (2) only include the measure of the lysine with relatively lower pKa and higher sasa, the trade-off between the two features can be controlled by a parameter 'weight'. The resulting dataframe will be stored in `self.df_concise`.
+  - method `aggregate` will aggregate data and calculate descriptive statistics for each lysine. The resulting dataframe will be stored in `self.df_aggregated`. 
+  - method `subset` will aggregate data in two ways using either 'average' or 'south_east': (1) only include the average values of the two features for each lysine (2) only include the measure of the lysine with relatively lower pKa and higher sasa. The resulting dataframe will be stored in `self.df_sub`.
   - method `GO_Get_Data` will identify the unique proteins in the dataset and search for all the GO Terms associated with them from the Uniprot Database. The data will then be stored in a dictionary with the item in the strcture of (GO ID: a list of uniprot codes).
 
 * The `CoolPlots` class can integrate different functionalities all together in an interactive plot.
