@@ -50,7 +50,7 @@ The following Python packages are required:
   - `Analysis` class takes M.df as the input.
   - method `aggregate` will aggregate data and calculate descriptive statistics for each lysine. The resulting dataframe will be stored in `self.df_aggregated`. 
   - method `subset` will aggregate data in two ways using either 'average' or 'south_east': (1) only include the average values of the two features for each lysine (2) only include the measure of the lysine with relatively lower pKa and higher sasa. The resulting dataframe will be stored in `self.df_sub`.
-  - method `GO_Get_Data` will identify the unique proteins in the dataset and search for all the GO Terms associated with them from the Uniprot Database. The data will then be stored in a dictionary with the item in the strcture of (GO ID: a list of uniprot codes).
+  - method `Go_Get_Data` will extract GO Terms associated with each distinct lysine from the Uniprot Database. This operation is sped up by applying multi-threading. The data will be stored in a dictionary (GO ID: a list of uniprot codes).
 
 * The `CoolPlots` class can integrate different functionalities all together in an interactive plot.
   - `CoolPlots` class takes an instance of the `Analysis` class as the input.
