@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 import biobox as bb
+from helper import get_download_tool
 
 #report on how many of the pdb files that passed the initial extraction passed the rest of the process.
 def report_on_results(pdb_codes_df, pka_sasa_results):
