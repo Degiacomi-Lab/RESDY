@@ -57,10 +57,10 @@ class PDB(object):
         '''
         Save a csv file in output directory
         '''
-        self.df.to_csv(os.path.join(self.outdir, outname))
+        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False)
 
 
-    def load_state(self, fname, outdir="", gap=10):
+    def load_state(self, fname, outdir="", gap=10, PDB_only=False):
         '''
         initialize DataFrame from csv file.
         If no output directory is given, the folder containing the csv file is used.
@@ -69,7 +69,7 @@ class PDB(object):
         if outdir == "":
             outdir = os.path.dirname(fname)
             
-        self._setup(outdir, gap)
+        self._setup(outdir, gap, PDB_only)
         
         try:
             self.df = pd.read_csv(fname)

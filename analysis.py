@@ -9,6 +9,7 @@ import threading
 import concurrent.futures
 
 class Analysis(object):
+    
     def __init__(self, df):
         self.df = df.dropna(subset=['pKa', 'sasa'])
         

@@ -1,0 +1,103 @@
+Missing atoms or failed protonation for TRP 151 A (BBN) -- please check the structure
+Group (BBN) for  1101-   N   151-TRP (A) [ -21.530   47.380    6.945] N
+Expected 2 interaction atoms for acids, found:
+              1101-   N   151-TRP (A) [ -21.530   47.380    6.945] N
+Expected 2 interaction atoms for bases, found:
+              1101-   N   151-TRP (A) [ -21.530   47.380    6.945] N
+Missing atoms or failed protonation for TRP 151 A (TRP) -- please check the structure
+Group (TRP) for  1107- NE1   151-TRP (A) [ -23.408   47.610   10.745] N
+Expected 2 interaction atoms for acids, found:
+              1107- NE1   151-TRP (A) [ -23.408   47.610   10.745] N
+Expected 1 interaction atoms for bases, found:
+              1107- NE1   151-TRP (A) [ -23.408   47.610   10.745] N
+Missing atoms or failed protonation for ASN 177 A (AMD) -- please check the structure
+Group (AMD) for  1309-  CG   177-ASN (A) [ -13.068   52.925   -8.994] C
+Expected 3 interaction atoms for acids, found:
+              1311- ND2   177-ASN (A) [ -12.496   54.031   -9.542] N
+                 0- HD2   177-ASN (A) [ -12.676   54.794  -10.179] H
+Expected 1 interaction atoms for bases, found:
+              1310- OD1   177-ASN (A) [ -12.581   51.801   -9.109] O
+Missing atoms or failed protonation for ARG 178 A (BBN) -- please check the structure
+Group (BBN) for  1314-   N   178-ARG (A) [ -16.206   52.029   -6.086] N
+Expected 2 interaction atoms for acids, found:
+              1314-   N   178-ARG (A) [ -16.206   52.029   -6.086] N
+Expected 2 interaction atoms for bases, found:
+              1314-   N   178-ARG (A) [ -16.206   52.029   -6.086] N
+Missing atoms or failed protonation for ASN 179 A (BBN) -- please check the structure
+Group (BBN) for  1325-   N   179-ASN (A) [ -16.247   50.919   -3.547] N
+Expected 2 interaction atoms for acids, found:
+              1325-   N   179-ASN (A) [ -16.247   50.919   -3.547] N
+Expected 2 interaction atoms for bases, found:
+              1325-   N   179-ASN (A) [ -16.247   50.919   -3.547] N
+Missing atoms or failed protonation for ASN 179 A (AMD) -- please check the structure
+Group (AMD) for  1328-  CG   179-ASN (A) [ -15.357   52.490   -1.070] C
+Expected 3 interaction atoms for acids, found:
+              3119-   N   151-TRP (B) [ -15.911   51.879   -2.333] N
+              1330- ND2   179-ASN (A) [ -15.696   53.804   -0.985] N
+Expected 1 interaction atoms for bases, found:
+              3118-   O   150-GLU (B) [ -16.082   51.280   -0.166] O
+              1329- OD1   179-ASN (A) [ -14.187   52.110   -1.107] O
+              3132-   O   151-TRP (B) [ -13.685   53.087   -1.694] O
+Missing atoms or failed protonation for VAL 254 A (BBN) -- please check the structure
+Group (BBN) for  1886-   N   254-VAL (A) [  -2.041   43.503   -9.155] N
+Expected 2 interaction atoms for acids, found:
+              1886-   N   254-VAL (A) [  -2.041   43.503   -9.155] N
+Expected 2 interaction atoms for bases, found:
+              1886-   N   254-VAL (A) [  -2.041   43.503   -9.155] N
+Missing atoms or failed protonation for GLY 149 B (BBN) -- please check the structure
+Group (BBN) for  3106-   N   149-GLY (B) [ -19.567   52.012    2.464] N
+Expected 2 interaction atoms for acids, found:
+              3106-   N   149-GLY (B) [ -19.567   52.012    2.464] N
+Expected 2 interaction atoms for bases, found:
+              3106-   N   149-GLY (B) [ -19.567   52.012    2.464] N
+Missing atoms or failed protonation for TRP 151 B (BBN) -- please check the structure
+Group (BBN) for  3119-   N   151-TRP (B) [ -15.911   51.879   -2.333] N
+Expected 2 interaction atoms for acids, found:
+              3119-   N   151-TRP (B) [ -15.911   51.879   -2.333] N
+Expected 2 interaction atoms for bases, found:
+              3119-   N   151-TRP (B) [ -15.911   51.879   -2.333] N
+Missing atoms or failed protonation for TRP 151 B (TRP) -- please check the structure
+Group (TRP) for  3125- NE1   151-TRP (B) [ -16.431   52.842   -6.433] N
+Expected 2 interaction atoms for acids, found:
+              3125- NE1   151-TRP (B) [ -16.431   52.842   -6.433] N
+Expected 1 interaction atoms for bases, found:
+              3125- NE1   151-TRP (B) [ -16.431   52.842   -6.433] N
+Missing atoms or failed protonation for ASN 179 B (AMD) -- please check the structure
+Group (AMD) for  3346-  CG   179-ASN (B) [ -20.863   47.018    6.816] C
+Expected 3 interaction atoms for acids, found:
+              1101-   N   151-TRP (A) [ -21.530   47.380    6.945] N
+              3348- ND2   179-ASN (B) [ -22.171   47.373    6.928] N
+Expected 1 interaction atoms for bases, found:
+              3347- OD1   179-ASN (B) [ -20.487   45.848    6.870] O
+Missing atoms or failed protonation for HIS 246 B (BBN) -- please check the structure
+Group (BBN) for  3835-   N   246-HIS (B) [  -2.595   44.341   -3.901] N
+Expected 2 interaction atoms for acids, found:
+              3835-   N   246-HIS (B) [  -2.595   44.341   -3.901] N
+Expected 2 interaction atoms for bases, found:
+              3835-   N   246-HIS (B) [  -2.595   44.341   -3.901] N
+His group does not seem to contain a ring Group (HIS) for  3838-  CG   246-HIS (B) [  -2.208   43.530   -6.818] C
+Missing atoms or failed protonation for HIS 246 B (HIS) -- please check the structure
+Group (HIS) for  3838-  CG   246-HIS (B) [  -2.208   43.530   -6.818] C
+Expected 4 interaction atoms for acids, found:
+Expected 2 interaction atoms for bases, found:
+Missing atoms or failed protonation for ARG 249 B (ARG) -- please check the structure
+Group (ARG) for  3867-  CZ   249-ARG (B) [  -3.124   33.237    3.505] C
+Expected 8 interaction atoms for acids, found:
+              3866-  NE   249-ARG (B) [  -2.477   34.149    4.289] N
+              3869- NH2   249-ARG (B) [  -3.157   31.922    3.869] N
+              3868- NH1   249-ARG (B) [  -3.734   33.640    2.352] N
+                 0-  HE   249-ARG (B) [  -2.073   33.868    5.171] H
+                 0-HH21   249-ARG (B) [  -2.704   31.622    4.721] H
+                 0-HH22   249-ARG (B) [  -3.634   31.249    3.287] H
+                 0- HH1   249-ARG (B) [  -3.440   34.605    2.396] H
+Expected 3 interaction atoms for bases, found:
+              3866-  NE   249-ARG (B) [  -2.477   34.149    4.289] N
+              3869- NH2   249-ARG (B) [  -3.157   31.922    3.869] N
+              3868- NH1   249-ARG (B) [  -3.734   33.640    2.352] N
+Side chain interaction failed for HIS 246 B and HIS 176 A
+Side chain interaction failed for HIS 246 B and ASP 200 A
+Side chain interaction failed for HIS 246 B and ASN 251 A
+Side chain interaction failed for HIS 246 B and GLU 257 A
+Side chain interaction failed for HIS 246 B and TYR 231 B
+Side chain interaction failed for HIS 246 B and ASN 233 B
+Side chain interaction failed for ASN 247 B and HIS 246 B

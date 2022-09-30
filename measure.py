@@ -68,7 +68,7 @@ class Measure(object):
         '''
         Save a csv file in output directory
         '''
-        self.df.to_csv(os.path.join(self.outdir, outname))
+        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False)
 
     
     def measure_dataframe(self):
@@ -188,7 +188,7 @@ class Measure(object):
         if self.PDB_only:
             return 'Function not callable'
             
-        self.df_input = self.df_input.loc[self.current_index:,:]
+        self.df_input = self.df_input.loc[self.current_index:, :]
         self.measure_dataframe()
       
   
