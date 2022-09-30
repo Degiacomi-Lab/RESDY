@@ -57,3 +57,15 @@ The following Python packages are required:
   - method `enrichment_analysis` will do identify if there is any GO Term gets enriched within a group of proteins. The process of the enrichment analysis is: (1) for each GO Term, calculate an contingency table (2) compute the p value for that contigency table and obtain a list of p values in the end (3) adjust these p values using BH method to correct possible false-postives.
   - method `advanced_plot` can make the interactive plot that integrates the scatter plot, enrichment analysis, and 3D visualisation of protein structures all together.
   - note the 3D visualisation requires downloaded pdb files.
+
+# Installation notes for MAC environment:
+- Installing modeller:
+
+conda install -c salilab modeller=10.2 
+(There are issues with version 10.3)
+
+You will also need to get a modeller licence key:
+https://salilab.org/modeller/registration.html
+
+- Additional dependencies for Jupyter notebook: 
+   - seaborn
