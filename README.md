@@ -38,9 +38,9 @@ The following Python packages are required:
 * nglview
 * biobox
 * cython
-* inquirer
-* (jupyter)
-## Notes
+* jupyter
+
+## Techniacal Notes
 
 * The `Measure` class has been implemented to facilitate the addition of new measurable features. This is done by:
   - implementing a method taking a filename as input and returning a pandas DataFrame with three columns [resid, chain, feature].
@@ -58,14 +58,13 @@ The following Python packages are required:
   - method `advanced_plot` can make the interactive plot that integrates the scatter plot, enrichment analysis, and 3D visualisation of protein structures all together.
   - note the 3D visualisation requires downloaded pdb files.
 
-# Installation notes for MAC environment:
+# Installation notes for Mac environment:
 - Installing modeller:
 
-conda install -c salilab modeller=10.2 
+`conda install -c salilab modeller=10.2`
 (There are issues with version 10.3)
 
-You will also need to get a modeller licence key:
-https://salilab.org/modeller/registration.html
+You will also need to get a modeller licence key: https://salilab.org/modeller/registration.html
 
 - Additional dependencies for Jupyter notebook: 
    - seaborn
