@@ -52,8 +52,8 @@ The following Python packages are required:
   - method `subset` will aggregate data in two ways using either 'average' or 'south_east': (1) only include the average values of the two features for each lysine (2) only include the measure of the lysine with relatively lower pKa and higher sasa. The resulting dataframe will be stored in `self.df_sub`.
   - method `Go_Get_Data` will extract GO Terms associated with each distinct lysine from the Uniprot Database. This operation is sped up by applying multi-threading. The data will be stored in a dictionary (GO ID: a list of uniprot codes).
 
-* The `CoolPlots` class can integrate different functionalities all together in an interactive plot.
-  - `CoolPlots` class takes an instance of the `Analysis` class as the input.
+* The `Viewer` class can integrate different functionalities all together in an interactive plot.
+  - `Viewer` class takes an instance of the `Analysis` class as the input.
   - method `enrichment_analysis` will do identify if there is any GO Term gets enriched within a group of proteins. The process of the enrichment analysis is: (1) for each GO Term, calculate an contingency table (2) compute the p-value for that contigency table and obtain a list of p-values in the end (3) adjust these p values using BH method to correct possible false postives.
   - method `advanced_plot` can make the interactive plot that integrates the scatter plot, enrichment analysis, and 3D visualisation of protein structures all together.
   - note the 3D visualisation requires downloaded PDB files.
