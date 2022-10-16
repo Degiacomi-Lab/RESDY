@@ -22,7 +22,7 @@ A full description of the operations carried out by the pipeline is provided in 
   
 * calculate pKa and solvent accessible area for every lysine in every curated structure (see `Measure` class). Results are saved in the CSV file `result\measures.csv`.
  
-* Plot scatter plots aggregating all data
+* Plot aggregated data
 
 
 ## Dependencies
@@ -31,16 +31,16 @@ The following Python packages are required:
 * numpy
 * pandas
 * matplotlib
+* cython
+* biobox
 * bs4
 * modeller
 * propka
 * plotly
 * nglview
-* biobox
-* cython
-* jupyter
+* jupyter (optional, required to execute the notebook `carbamylation.ipynb`)
 
-## Techniacal Notes
+## Technical Notes
 
 * The `Measure` class has been implemented to facilitate the addition of new measurable features. This is done by:
   - implementing a method taking a filename as input and returning a pandas DataFrame with three columns [resid, chain, feature].
@@ -54,9 +54,9 @@ The following Python packages are required:
 
 * The `CoolPlots` class can integrate different functionalities all together in an interactive plot.
   - `CoolPlots` class takes an instance of the `Analysis` class as the input.
-  - method `enrichment_analysis` will do identify if there is any GO Term gets enriched within a group of proteins. The process of the enrichment analysis is: (1) for each GO Term, calculate an contingency table (2) compute the p value for that contigency table and obtain a list of p values in the end (3) adjust these p values using BH method to correct possible false-postives.
+  - method `enrichment_analysis` will do identify if there is any GO Term gets enriched within a group of proteins. The process of the enrichment analysis is: (1) for each GO Term, calculate an contingency table (2) compute the p-value for that contigency table and obtain a list of p-values in the end (3) adjust these p values using BH method to correct possible false postives.
   - method `advanced_plot` can make the interactive plot that integrates the scatter plot, enrichment analysis, and 3D visualisation of protein structures all together.
-  - note the 3D visualisation requires downloaded pdb files.
+  - note the 3D visualisation requires downloaded PDB files.
 
 # Installation notes for Mac environment:
 - Installing modeller:
