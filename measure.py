@@ -51,8 +51,8 @@ class Measure(object):
         
         self.PDB_only = False
         
-        if 'Uniprot Entry' in self.df_input.columns: 
-            columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+        if 'Uniprot_Entry' in self.df_input.columns: 
+            columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
@@ -88,7 +88,7 @@ class Measure(object):
             chains = row["Chains"].split("/")
             self.current_index = index
             
-            uniprot_code = row["Uniprot Entry"]
+            uniprot_code = row["Uniprot_Entry"]
             print("\n# UNIPROT: %s PDB: %s, chain(s): %s"%(uniprot_code, PDBCODE, " ".join(chains)))
             
             # calculate features values from all PDB files associated with specific DataFrame entry
@@ -103,7 +103,7 @@ class Measure(object):
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
                 
-                columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+                columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
                 df = pd.DataFrame(columns=columns)
                 
                 
@@ -122,7 +122,7 @@ class Measure(object):
                         continue
                     
                     
-                    data = ({'Uniprot Entry': uniprot_code,
+                    data = ({'Uniprot_Entry': uniprot_code,
                         'PDB Code': f.split(".")[0],
                         'Method': row["Method"],
                         'Resolution': row["Resolution"],
@@ -153,7 +153,7 @@ class Measure(object):
                 if self.activate_log:
                     if df.empty == False:
                         try:
-                            self.logger.info(df.to_string().strip('    Uniprot Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
+                            self.logger.info(df.to_string().strip('    Uniprot_Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
                             self.logger.info('--------------------------------------------------------------------------')
                         except:
                             print('Error in logging.')
@@ -169,7 +169,7 @@ class Measure(object):
         if self.PDB_only:
             return 'Function not callable.'
         
-        columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid', 'pKa', 'sasa']
+        columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid', 'pKa', 'sasa']
         log_to_df = pd.DataFrame(columns=columns)
         
         with open(log_path) as inf:

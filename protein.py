@@ -46,7 +46,7 @@ class PDB(object):
             columns = ['PDB Code']
             self.df = pd.DataFrame(columns=columns)
         else:
-            columns = ['Uniprot Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
+            columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
             self.df = pd.DataFrame(columns=columns)
 
         #gap to consider as small enough to justify patching
@@ -95,7 +95,7 @@ class PDB(object):
             PDBCODE = row["PDB Code"]
             
             if not self.PDB_only:
-                uniprot_code = row["Uniprot Entry"]
+                uniprot_code = row["Uniprot_Entry"]
                 print("\nUNIPROT: %s, PDB: %s"%(uniprot_code, PDBCODE))
             else:
                 print("\nPDB: %s"%(PDBCODE))
@@ -107,7 +107,7 @@ class PDB(object):
                     if PDBCODE in files:
                         print(">> curated %s PDB found, continuing..."%PDBCODE)
                         if not self.PDB_only:
-                            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                            data = ({'Uniprot_Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
                         else:
                             data = ({'PDB Code': PDBCODE})
                         
@@ -133,7 +133,7 @@ class PDB(object):
                 
                 if test:
                     if not self.PDB_only:
-                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
+                        data = ({'Uniprot_Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"})
                     else:
                         data = ({'PDB Code': PDBCODE})
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -157,7 +157,7 @@ class PDB(object):
                     if PDBCODE in files:
                         print(">> curated %s PDB found, continuing..."%PDBCODE)
                         if not self.PDB_only:
-                            data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
+                            data = ({'Uniprot_Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
                         else:
                             data = ({'PDB Code': PDBCODE})
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -167,7 +167,7 @@ class PDB(object):
                 try:
                     self.clean_and_split_pdb(PDBCODE)
                     if not self.PDB_only:
-                        data = ({'Uniprot Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
+                        data = ({'Uniprot_Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains})
                     else:
                         data = ({'PDB Code': PDBCODE})
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
