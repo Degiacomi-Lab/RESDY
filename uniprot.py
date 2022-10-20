@@ -1,9 +1,11 @@
 import re
 import urllib.request, urllib.parse, urllib.error
-from bs4 import BeautifulSoup
+import requests
+from requests.adapters import HTTPAdapter, Retry
 
 import pandas as pd
 import numpy as np
+
 
 class Uniprot(object):
     
@@ -12,162 +14,36 @@ class Uniprot(object):
         columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
         
-    def get_organism_proteins(self, name_of_organism, code):
-        '''
-        Obtain all the PDB codes belonging to an organism.
-        The name has to be exactly that used on the uniprot website and the code needs to be the code in the URL for the proteome.    
-        '''
-           
-        list_of_entries = list()
-        list_clean = list()
-        starting_number = 0
-        end = 0
-        list_UNIPROT_codes = list()
+    
+    def get_organism_proteins(self, code):
         
-        try:
-            
-            #find the names of all the chromosomes the organism has
-            web_url = 'https://www.uniprot.org/proteomes/' + code
-            html = urllib.request.urlopen(web_url)
-            soup = BeautifulSoup(html, 'html.parser')
-            table = soup.find_all('table')
-            for line in table:
-                line = str(line)
-                ID = re.findall('name="[\w ]*" type', line)
-    
-                IDS = list()
-    
-                for chromosome in ID:
-                    chromosome = chromosome[6:-6]
-                    chromosome = chromosome.replace(' ', '+')
-                    IDS.append(chromosome)
-    
-        except Exception as e:
-            raise Exception('Uniprot code is invalid %s'%e)
+        re_next_link = re.compile(r'<(.+)>; rel="next"')
+        retries = Retry(total=5, backoff_factor=0.25, status_forcelist=[500, 502, 503, 504])
+        session = requests.Session()
+        session.mount("https://", HTTPAdapter(max_retries=retries))
         
-        #iterate over all cromosomes to get their proteins
-        for chromosome in IDS:
-            
-            try:
-                
-                #obtain the other uniprot code which is needed in the URL later on.
-                print("chromosome: %s"%chromosome)
-                chromosome = chromosome.lower()
-                web_url = 'https://www.uniprot.org/uniprot/?query=proteome:' + code + '+AND+proteomecomponent:%22' + chromosome + '%22&sort=score'
-                html = html = urllib.request.urlopen(web_url)
-                soup = BeautifulSoup(html, 'html.parser')
-    
-                for line in soup:
-                    line = str(line)
-                    code_other = re.findall('%[\w ()\d -]*%5d%22', line)
-    
-                for other_uniprot_code in code_other:
-                    other_uniprot_code = (code_other[0])[1:-6]
-    
-                #get the species name for the first three entries and checks they correspond to the species name entered.
-                #This check is important as if incorrect data is added by the user, the code will produce incorrect information.
-                if len(IDS) > 1:
-                    web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3a%22' + chromosome + '%22&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=0&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'          
-                else:
-                    #one cromosome only
-                    web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3a' + chromosome + '&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=0&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
-    
-                html = urllib.request.urlopen(web_url)
-                soup = BeautifulSoup(html, 'html.parser')
-    
-                for line in soup:
-                    line = str(line)
-                    list_of_species = re.findall('>[\w ()\d -]*</a></td><td class="number', line)
-                    for species in list_of_species:
-                        species = species[1:-26]
-                        species = species.replace(' ', '+')
-                        list_clean.append(species)
-    
-                if list_clean[0] != name_of_organism:
-                    end = 1
-                    raise Exception('Likely due to incorrect information added')
-                    
-                if list_clean[1] != name_of_organism:
-                    end = 1
-                    raise Exception('Likely due to incorrect information added')
-                    
-                if list_clean[2] != name_of_organism:
-                    end = 1
-                    raise Exception('Likely due to incorrect information added')
-    
-                #identify the number of uniprot codes in the chromosome currently being scanned.
-                for line in soup:
-                    line = str(line)
-                    number_of_prot = re.findall('var resultsize = .*;', line)
-                number_of_prot_2 = number_of_prot[0]
-                number_of_prot_2 = int(number_of_prot_2[17:-1])
-                print('> Number of Uniprot Entries Identified: ', number_of_prot_2)
-    
-            except Exception as e:
-                print("ERROR: %s"%e)
-                print('Failed obtaining Uniprot codes for ' + chromosome)
-                if end == 1:
-                    break
-                
-                else:
-                    continue
-    
-            #produce a list going up in increments of 25 (0, 25, 50... [number of entries]).
-            #This list is needed so for the URL later on so that the code cycles through the uniprot website
-            #25 proteins at a time until the end.
-            while starting_number < number_of_prot_2:
-                list_of_entries.append(starting_number)
-                starting_number = starting_number + 25
-    
-            list_of_entries.append(number_of_prot_2)
-    
-            #go through uniprot 25 entries at a time and appends uniprot codes of proteins to a list.       
-            for number in list_of_entries:
-                try:
-                    strnum = str(number)
-                    web_url = 'https://www.uniprot.org/uniprot/?query=proteomecomponent%3a%22' + chromosome + '%22&fil=organism%3a%22' + name_of_organism + '+%' + other_uniprot_code + '%5d%22+AND+proteome%3a' + code + '&offset=' + strnum + '&sort=score&columns=id%2centry+name%2creviewed%2cprotein+names%2cgenes%2corganism%2clength'
-                    html = urllib.request.urlopen(web_url)
-                    soup = BeautifulSoup(html, 'html.parser')
-    
-                    for line in soup:
-                        line = str(line)
-                        messy_list_of_uniprot_codes = re.findall('id="\w*"><td', line)
-    
-                    for messy_protein_code in messy_list_of_uniprot_codes:
-                        protein_code = messy_protein_code[4:-5]
-                        list_UNIPROT_codes.append(protein_code)
-    
-                except Exception as e:
-                    print('Failed to obtain Uniprot codes. %s'%e)
-                    continue
-                    
-                if len(list_UNIPROT_codes) == 0:
-                    print('No Uniprot codes were found on: ' + web_url)
-                    continue
-    
-                #For each uniprot code identified it then parses through the .txt file
-                #and appends the Uniprot code, PDB code, method structure obtained by, resolution and chain information
-                #to a df for each PDB code.
-                for protein_code_clean in list_UNIPROT_codes:
-    
-                    try:
-                        self.get_protein_data(protein_code_clean)
-                    except Exception as e:
-                        print("%s", e)
-                        continue
-                
-                #Here the code calls the get_chains function which gets chain information for the protein from the PDB.
-                number = number + 25
-    
-                if number > number_of_prot_2:
-                    print('Number of Uniprot Entries Searched: ' + str(number_of_prot_2) + '\n')
-                else:
-                    print('Number of Uniprot Entries Searched: ' + str(number) + '\n')
-                    
-                if number > number_of_prot_2:
-                    number = number_of_prot_2
-                    
-                print((str((number/number_of_prot_2)*100))[0:3] + '%')
+        def _get_next_link(headers):
+            if "Link" in headers:
+                match = re_next_link.match(headers["Link"])
+                if match:
+                    return match.group(1)
+        
+        def _get_batch(batch_url):
+            while batch_url:
+                response = session.get(batch_url)
+                response.raise_for_status()
+                total = response.headers["x-total-results"]
+                yield response, total
+                batch_url = _get_next_link(response.headers)
+        
+        url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29&size=500'
+        codes = []
+        for batch, total in _get_batch(url):
+            for line in batch.text.splitlines()[1:]:
+                codes.append(line)
+            print(f'{len(codes)} / {total}')
+        
+        return codes
     
     
     def get_protein_data(self, uniprot_code, pdb_code_target="", chain_target=""):
@@ -177,7 +53,6 @@ class Uniprot(object):
         If a PDB code is also provided, only that PDB will be downloaded (e.g. useful for consistency check between UNIPROT and PDB)
         If a DataFrame df is provided, extracted structures will be appended to it
         '''    
-    
         
         #check if there is uniprot information available for the protein
         try:
@@ -297,7 +172,7 @@ if __name__ == "__main__":
     UP = Uniprot()
  
     if False:
-        UP.get_organism_proteins('Oryctolagus+cuniculus+(Rabbit)', 'UP000001811')
+        UP.get_organism_proteins('UP000001811')
     
     if True:
         UP.get_protein_data("P09167")
