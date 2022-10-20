@@ -33,7 +33,6 @@ The following Python packages are required:
 * matplotlib
 * cython
 * biobox
-* bs4
 * modeller
 * propka
 * plotly
