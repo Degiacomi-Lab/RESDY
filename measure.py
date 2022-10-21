@@ -68,7 +68,7 @@ class Measure(object):
         '''
         Save a csv file in output directory
         '''
-        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False)
+        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
     
     def measure_dataframe(self):

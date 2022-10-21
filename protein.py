@@ -7,7 +7,6 @@
 import os
 import subprocess
 import re
-import sys
 import glob
 import fileinput
 
@@ -57,7 +56,7 @@ class PDB(object):
         '''
         Save a csv file in output directory
         '''
-        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False)
+        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
     def load_state(self, fname, outdir="", gap=10, PDB_only=False):

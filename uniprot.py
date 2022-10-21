@@ -13,21 +13,43 @@ class Uniprot(object):
 
         columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
+  
         
+    def count_organism_proteins(self, code, reviewed_only=False):
     
-    def get_organism_proteins(self, code):
-        
+       if reviewed_only:
+           url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
+       else:
+           url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29&size=500'
+       
+       retries = Retry(total=5, backoff_factor=0.25, status_forcelist=[500, 502, 503, 504])
+       session = requests.Session()
+       session.mount("https://", HTTPAdapter(max_retries=retries))
+       response = session.get(url)
+       response.raise_for_status()
+       total = response.headers["x-total-results"]
+       
+       return total  
+    
+    
+    def get_organism_proteins(self, code, reviewed_only=False):
+    
+        if reviewed_only:
+            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
+        else:
+            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29&size=500'
+    
         re_next_link = re.compile(r'<(.+)>; rel="next"')
         retries = Retry(total=5, backoff_factor=0.25, status_forcelist=[500, 502, 503, 504])
         session = requests.Session()
         session.mount("https://", HTTPAdapter(max_retries=retries))
-        
+    
         def _get_next_link(headers):
             if "Link" in headers:
                 match = re_next_link.match(headers["Link"])
                 if match:
                     return match.group(1)
-        
+    
         def _get_batch(batch_url):
             while batch_url:
                 response = session.get(batch_url)
@@ -35,8 +57,7 @@ class Uniprot(object):
                 total = response.headers["x-total-results"]
                 yield response, total
                 batch_url = _get_next_link(response.headers)
-        
-        url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29&size=500'
+    
         codes = []
         for batch, total in _get_batch(url):
             for line in batch.text.splitlines()[1:]:
@@ -45,6 +66,7 @@ class Uniprot(object):
         
         return codes
     
+
     
     def get_protein_data(self, uniprot_code, pdb_code_target="", chain_target=""):
         '''
