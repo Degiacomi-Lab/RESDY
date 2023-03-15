@@ -587,7 +587,7 @@ class PDB(object):
     
     def replace_chains(self, path, replacement_dict):
     
-        #Firstly, the auth chain names are put in a list.
+        #First, the auth chain names are put in a list.
         auth_list = list(replacement_dict)
     
         #The relevant file in conformations is then opened and rewritten.

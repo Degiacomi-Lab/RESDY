@@ -526,3 +526,507 @@
 
 0        Q8DIV4  Demo\curated\AF-Q8DIV4-F1-model_v3  Predicted        NaN     A   238  10.33  61.112682
 --------------------------------------------------------------------------
+
+0         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A     2  10.94  19.860298
+1         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A    10  10.31  75.157172
+2         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A    23  11.84  17.918859
+3         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A    31  11.38  26.135400
+4         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A    90  10.44  75.396882
+5         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A    99  10.24  19.517930
+6         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   100   9.85  34.950153
+7         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   130  10.74  60.819336
+8         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   135  10.38  45.723099
+9         P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   144   9.88  18.735771
+10        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   164  10.46  38.920439
+11        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   171  11.20  43.133184
+12        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   212  10.47  68.269852
+13        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   234  10.28  42.827075
+14        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   251  10.51  74.905583
+15        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   296  11.23  45.539414
+16        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   335   9.92  24.217720
+17        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   345  11.50  51.867531
+18        P74285  Demo\curated\AF-P74285-F1-model_v3  Predicted        NaN     A   383  11.36  46.803480
+--------------------------------------------------------------------------
+
+0        Q8DIV4  Demo\curated\AF-Q8DIV4-F1-model_v3  Predicted        NaN     A   238  10.33  61.112682
+--------------------------------------------------------------------------
+
+0         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A     7  10.48  84.582637
+1         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A    11  10.47  88.109762
+2         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A    15  10.43  79.406176
+3         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A    33  10.30  56.072651
+4         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A    82   9.27   6.403024
+5         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   129  10.46  86.260608
+6         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   147  10.29  57.464017
+7         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   162   9.22  35.093946
+8         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   165  10.57  10.070572
+9         P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   176  10.37  33.286810
+10        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   178  12.16  34.690055
+11        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   184  10.08  63.984327
+12        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   202   8.66   2.541778
+13        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   228  10.56  58.968054
+14        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   237   8.86   1.048997
+15        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   253  10.72  54.729424
+16        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   259  11.35  36.246485
+17        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   262  10.43  76.851898
+18        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   306  10.73  24.391031
+19        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   317   9.03   7.317097
+20        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   335   9.80  60.186992
+21        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   359  11.16  44.228814
+22        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   451  10.51  65.619035
+23        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   464  11.53  33.288938
+24        P00879  Demo\curated\AF-P00879-F1-model_v3  Predicted        NaN     A   467  10.94  63.762877
+--------------------------------------------------------------------------
+
+0        P73832  Demo\curated\AF-P73832-F1-model_v3  Predicted        NaN     A    18  10.19  19.905687
+1        P73832  Demo\curated\AF-P73832-F1-model_v3  Predicted        NaN     A    66  10.61  65.967163
+2        P73832  Demo\curated\AF-P73832-F1-model_v3  Predicted        NaN     A    69  10.14  34.212140
+3        P73832  Demo\curated\AF-P73832-F1-model_v3  Predicted        NaN     A   214   9.75  42.793564
+4        P73832  Demo\curated\AF-P73832-F1-model_v3  Predicted        NaN     A   263  10.27  57.480150
+--------------------------------------------------------------------------
+
+0         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     A    18  10.16  25.753762
+1         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     A    66  10.99  50.445142
+2         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     A    69  10.19  34.786594
+3         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     A   214  10.04  60.363674
+4         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     A   263  10.27  52.121247
+5         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     B    18  10.29  25.796403
+6         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     B    66  11.39  50.845041
+7         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     B    69  10.23  41.987026
+8         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     B   214  10.34  47.258520
+9         P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     B   263  10.17  47.329795
+10        P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     C    18  10.10  19.259959
+11        P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     C    66  10.47  59.547383
+12        P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     C    69  10.60  49.626365
+13        P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     C   214   9.60  33.668448
+14        P73832  Demo\curated\3EN0-alt1A  X-ray       1.50     C   263  10.30  45.938429
+--------------------------------------------------------------------------
+
+0         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     A    18  10.02  21.213277
+1         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     A    66  10.55  52.636927
+2         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     A    69  10.36  50.404891
+3         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     A   214   9.36  33.924914
+4         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     A   263  10.33  55.547841
+5         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     B    18  10.02  19.461905
+6         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     B    66  10.60  62.112919
+7         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     B    69  10.42  46.908527
+8         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     B   214  10.81  42.576729
+9         P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     B   263  10.29  54.185732
+10        P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     C    18  10.35  38.447138
+11        P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     C    66  10.51  61.351148
+12        P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     C    69  10.35  37.795290
+13        P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     C   214   9.06  22.631150
+14        P73832  Demo\curated\3EN0-alt1B  X-ray       1.50     C   263  10.25  46.000574
+--------------------------------------------------------------------------
+
+0         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A    30  10.11  29.452333
+1         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A    34  10.29  37.978354
+2         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A    68  10.29  46.234786
+3         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A    70  10.53  81.010123
+4         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A    71  11.54  52.293053
+5         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   124  13.40  37.912577
+6         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   175  10.57  65.753338
+7         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   206  10.43  49.133560
+8         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   262  10.44  71.829244
+9         Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   263   9.48   9.909140
+10        Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   270  10.26  54.080947
+11        Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   279  10.43  71.153376
+12        Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   306  10.74  25.896312
+13        Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   317   9.29  18.377270
+14        Q55650  Demo\curated\AF-Q55650-F1-model_v3  Predicted        NaN     A   328  10.26  62.535071
+--------------------------------------------------------------------------
+
+0         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A    30  10.25  26.500283
+1         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A    34   9.60  33.351082
+2         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A    68  10.28  39.273442
+3         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A    70  10.33  71.894137
+4         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A    71  11.64  52.230909
+5         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   124   9.62  46.080357
+6         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   175   9.95  39.647194
+7         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   206  10.68  48.771426
+8         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   262  10.40  54.147084
+9         Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   263   9.56   5.931229
+10        Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   270  10.22  42.582489
+11        Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   279  10.40  71.716572
+12        Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   306  10.20  35.770698
+13        Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   317  10.21  32.585319
+14        Q55650  Demo\curated\6IR4-alt-1  X-ray       2.00     A   328  10.02  47.367560
+--------------------------------------------------------------------------
+
+0         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A    30   7.84  12.963848
+1         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A    34  10.30  42.126827
+2         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A    68  10.32  44.834291
+3         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A    70  10.49  81.347615
+4         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A    71  11.42  48.262750
+5         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   175  10.19  55.822305
+6         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   206  10.67  64.458249
+7         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   262  10.67  76.092876
+8         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   263   9.49  12.814295
+9         Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   270  10.09  50.883427
+10        Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   279  10.61  68.144679
+11        Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   306  10.73  28.273908
+12        Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   317   9.33  19.127783
+13        Q55650  Demo\curated\6ITD-alt-1  X-ray       2.00     A   328  10.21  53.244269
+--------------------------------------------------------------------------
+
+0         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A    30   9.91  25.225582
+1         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A    34  10.25  41.244137
+2         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A    68  10.31  48.033675
+3         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A    70  10.40  72.378433
+4         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A    71  10.85  53.146487
+5         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   124  10.07  56.433901
+6         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   175  10.34  65.384463
+7         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   206  10.63  58.752102
+8         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   262  10.48  65.169754
+9         Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   263   9.12   5.926353
+10        Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   270   9.39  31.734635
+11        Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   279  10.44  68.262849
+12        Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   306  10.90  40.661176
+13        Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   317   9.87  18.393403
+14        Q55650  Demo\curated\6K36-alt-1  X-ray       2.30     A   328  10.02  50.930322
+--------------------------------------------------------------------------
+
+0         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A    30   9.97  23.761436
+1         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A    34  10.09  39.114759
+2         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A    68  10.24  30.822067
+3         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A    70   9.56  23.470577
+4         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A    71  10.29  43.807546
+5         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   175   9.17  32.542417
+6         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   206  10.52  38.379496
+7         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   262  10.52  78.235638
+8         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   263   9.31   7.775507
+9         Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   270  10.28  55.701649
+10        Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   279  10.29  60.503475
+11        Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   306  10.79  30.450803
+12        Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   317   9.66  17.078810
+13        Q55650  Demo\curated\6K37-alt-1  X-ray       2.50     A   328  10.19  56.179563
+--------------------------------------------------------------------------
+
+0         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A    30  10.15  22.928390
+1         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A    34  10.25  39.625563
+2         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A    68  10.29  41.862737
+3         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A    70  10.13  57.788746
+4         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A    71  10.84  68.687749
+5         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   124  11.69  48.483578
+6         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   175  10.34  72.113721
+7         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   206  10.57  43.539823
+8         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   262  10.35  63.822895
+9         Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   263   9.19   6.517561
+10        Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   270  10.18  52.313441
+11        Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   279  10.40  73.892223
+12        Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   306  10.16  38.243327
+13        Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   317  10.06  22.610402
+14        Q55650  Demo\curated\6K38-alt-1  X-ray       1.78     A   328  10.26  54.556113
+--------------------------------------------------------------------------
+
+0         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A    10  11.42  58.618421
+1         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A    18  11.56  50.833162
+2         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A    23  10.08  17.615499
+3         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A    61  11.25  17.844835
+4         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A    84  10.47  88.531914
+5         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A    95   9.99  26.099141
+6         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   113   9.69  45.618314
+7         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   175  10.85   6.298861
+8         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   179   9.44  30.593975
+9         P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   211  11.37  52.186141
+10        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   227  10.46  55.616367
+11        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   230  10.32  66.823966
+12        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   242   7.11  13.991214
+13        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   246   9.19  57.334851
+14        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   250  10.40  75.686858
+15        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   251  11.59  49.447294
+16        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   254  10.75  22.000933
+17        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   261   7.72  13.948573
+18        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   279  10.49  42.834078
+19        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   289  10.66  44.985971
+20        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   306  10.93  41.731182
+21        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   323   9.44  60.312525
+22        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   356  10.37  69.311224
+23        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   358   9.47  13.400005
+24        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   387  11.21  40.765339
+25        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   410  10.47  72.613267
+26        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   427  10.90  62.239957
+27        P77961  Demo\curated\AF-P77961-F1-model_v3  Predicted        NaN     A   450   9.06  13.662852
+--------------------------------------------------------------------------
+
+0         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A    10  10.68  56.757387
+1         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A    18  10.54  40.807358
+2         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A    23  11.25   5.534963
+3         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A    61  10.97   8.947550
+4         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A    84  10.44  84.170238
+5         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A    95   9.08  21.754842
+6         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   113   8.70  29.112452
+7         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   175  10.48  10.241134
+8         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   179  10.15  41.922492
+9         P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   211  10.48  78.283777
+10        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   227  10.48  48.541730
+11        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   230  10.04  58.033594
+12        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   242   7.35  21.633923
+13        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   246   9.41  58.071358
+14        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   250  10.40  69.661217
+15        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   251  11.15  57.210300
+16        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   254  10.38  46.125747
+17        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   261   9.49  21.868136
+18        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   279  10.78  36.117320
+19        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   289  10.39  45.769994
+20        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   306  10.20  51.330842
+21        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   323   9.52  47.883239
+22        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   356  10.01  59.132857
+23        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   358   9.77  19.425645
+24        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   387  11.34  58.974174
+25        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   410  10.86  62.465039
+26        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   427  10.47  57.009598
+27        P77961  Demo\curated\3NG0-alt-1  X-ray       2.80     A   450   9.27   7.570813
+--------------------------------------------------------------------------
+
+0         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A     8  10.47  89.455116
+1         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A    22  10.45  84.475725
+2         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A    24  10.46  83.827869
+3         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A    35  10.45  86.974862
+4         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A    69  10.62  75.518422
+5         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A    92  10.84  27.694579
+6         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   158   8.96  12.956844
+7         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   167   8.89  16.952394
+8         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   168  10.39  63.724491
+9         P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   169  12.39  42.007152
+10        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   173  10.14  35.519730
+11        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   194  10.42  81.086274
+12        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   210  10.68  52.356703
+13        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   218  10.33  76.779117
+14        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   294  11.78  14.208671
+15        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   300  10.54  71.288922
+16        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   326  10.66  75.397504
+17        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   364  11.44  38.642964
+18        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   365   9.27  32.933807
+19        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   379  11.10  59.028072
+20        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   383  11.29  21.390221
+21        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   407   9.94  50.993350
+22        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   431  11.60  41.847225
+23        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   435   9.05  19.271217
+24        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   444  10.95  17.895723
+25        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   476  10.64  71.284046
+26        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   523  11.33  42.418308
+27        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   535  11.35  49.656243
+28        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   549  11.17  34.950775
+29        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   567  11.32  44.862041
+30        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   612  11.40  39.944172
+31        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   655  10.17  78.991028
+32        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   700  11.60  38.519918
+33        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   705  10.98  48.771688
+34        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   731  11.26  36.155706
+35        P73911  Demo\curated\AF-P73911-F1-model_v3  Predicted        NaN     A   742  10.38  35.527355
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\AF-Q79PF6-F1-model_v3  Predicted        NaN     A    95  11.62  64.314194
+1        Q79PF6  Demo\curated\AF-Q79PF6-F1-model_v3  Predicted        NaN     A   172  10.50  88.498403
+2        Q79PF6  Demo\curated\AF-Q79PF6-F1-model_v3  Predicted        NaN     A   189  11.12  50.738129
+3        Q79PF6  Demo\curated\AF-Q79PF6-F1-model_v3  Predicted        NaN     A   232  11.44  43.686627
+4        Q79PF6  Demo\curated\AF-Q79PF6-F1-model_v3  Predicted        NaN     A   246  10.52  75.933571
+5        Q79PF6  Demo\curated\AF-Q79PF6-F1-model_v3  Predicted        NaN     A   247  11.23  55.456801
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2E-alt-1    NMR          -     A    95  10.34  65.48987
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-1    NMR          -     A    95  10.38  67.474571
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-10    NMR          -     A    95  9.91  40.904518
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-11    NMR          -     A    95  10.16  51.095387
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-12    NMR          -     A    95  10.59  84.479979
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-13    NMR          -     A    95  10.06  49.681506
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-14    NMR          -     A    95  11.45  57.685466
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-15    NMR          -     A    95  10.32  62.590834
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-16    NMR          -     A    95  10.23  59.573007
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-17    NMR          -     A    95  10.25  42.241986
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-18    NMR          -     A    95  10.47  80.668376
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-19    NMR          -     A    95  10.22  45.169656
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-2    NMR          -     A    95  10.48  54.335285
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-20    NMR          -     A    95  10.46  57.979074
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-21    NMR          -     A    95  10.36  41.637655
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-22    NMR          -     A    95  10.32  63.451892
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-23    NMR          -     A    95  10.47  82.175784
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-24    NMR          -     A    95  10.41  79.837458
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-25    NMR          -     A    95  10.48  64.187778
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-3    NMR          -     A    95  10.67  58.383849
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-4    NMR          -     A    95  9.93  53.431586
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-5    NMR          -     A    95  9.96  50.845041
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-6    NMR          -     A    95  10.55  34.604152
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-7    NMR          -     A    95  10.44  71.03946
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-8    NMR          -     A    95  10.29  49.277615
+--------------------------------------------------------------------------
+
+0        Q79PF6  Demo\curated\1M2F-alt-9    NMR          -     A    95  10.42  44.019865
+--------------------------------------------------------------------------
+
+0         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     A    95  10.56  81.012872
+1         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     A   172   9.21  21.998184
+2         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     A   189   7.50   3.439095
+3         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     A   232  11.17  41.395817
+4         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     A   246   9.95  58.563280
+5         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     A   247  10.46  69.497036
+6         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     B    95  10.80  63.803391
+7         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     B   172    NaN  52.992058
+8         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     B   189  10.42  56.186566
+9         Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     B   232  10.40  42.883721
+10        Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     B   246  10.10  64.439989
+11        Q79PF6  Demo\curated\1R8J-alt1A  X-ray       2.03     B   247  10.51  58.965927
+--------------------------------------------------------------------------
+
+0         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     A    95  10.55  81.012872
+1         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     A   172   9.54  41.941636
+2         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     A   189   9.93  20.979948
+3         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     A   232  11.26  41.395817
+4         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     A   246   9.95  58.563280
+5         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     A   247  10.47  69.497036
+6         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     B    95  10.65  77.965167
+7         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     B   172    NaN  64.626062
+8         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     B   189  10.72  61.441306
+9         Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     B   232   9.96  37.909828
+10        Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     B   246  10.54  80.775289
+11        Q79PF6  Demo\curated\1R8J-alt1B  X-ray       2.03     B   247  10.45  58.266923
+--------------------------------------------------------------------------
+
+0         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     A    95  10.69  85.985260
+1         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     A   172  10.26  70.925545
+2         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     A   189  10.66  53.466602
+3         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     A   232  10.39  36.519084
+4         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     A   246  10.37  66.296768
+5         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     A   247  10.58  58.875770
+6         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     B    95    NaN  39.361832
+7         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     B   172    NaN  34.780834
+8         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     B   189    NaN   3.773838
+9         Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     B   232  10.26  50.240710
+10        Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     B   246  10.18  68.134927
+11        Q79PF6  Demo\curated\4G86-alt-1  X-ray       2.39     B   247  10.54  65.725325
+--------------------------------------------------------------------------
+
+0         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A    17  10.50  79.724164
+1         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A    57  12.44  17.828702
+2         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A    95  10.03  57.591317
+3         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   142  10.45  76.657577
+4         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   143  11.43  43.579715
+5         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   145  10.54  74.274483
+6         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   170  10.49  36.161466
+7         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   175  11.12  39.084620
+8         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   194  10.32  59.369196
+9         Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   210  10.43  77.654182
+10        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   232  10.80   8.988064
+11        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   234  10.12  37.245217
+12        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   255  10.10  40.097980
+13        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   295  11.40  56.120789
+14        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   297  10.42  53.583266
+15        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   341  10.46  80.976612
+16        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   344  11.42  14.892785
+17        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   365  10.24  60.039304
+18        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   382  11.57  42.110072
+19        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   386  11.33  50.647971
+20        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   392  10.52  75.705740
+21        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   437  10.57  58.529769
+22        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   449  10.45  81.228823
+23        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   464  10.47  74.073159
+24        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   472  10.47  79.441813
+25        Q55804  Demo\curated\AF-Q55804-F1-model_v3  Predicted        NaN     A   475  10.47  80.327252
+--------------------------------------------------------------------------
+
+0         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A    41  10.22  48.218866
+1         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   150  10.15  22.669798
+2         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   226  10.45  81.226696
+3         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   285  10.48  75.470906
+4         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   300  10.55  88.401243
+5         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   302  10.46  77.072725
+6         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   380  10.32  82.119138
+7         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   409  10.55  79.028792
+8         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   411  10.45  76.712097
+9         Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   431  11.34  62.003618
+10        Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   490  10.10  40.907267
+11        Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   522  10.45  78.838726
+12        Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   536  10.47  85.366039
+13        Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   608  10.46  79.975753
+14        Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   639  10.39  83.409972
+15        Q8DKB5  Demo\curated\AF-Q8DKB5-F1-model_v3  Predicted        NaN     A   652  10.51  89.203527
+--------------------------------------------------------------------------
+
+0         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     A    41  10.16  36.670142
+1         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     A   150  10.07  27.967178
+2         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     B    41  10.32  56.039141
+3         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     B   150  10.24  24.053539
+4         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     C    41  10.21  50.701869
+5         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     C   150   9.81  24.073043
+6         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     D    41  10.10  38.927442
+7         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     D   150  10.17  21.948541
+8         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     E    41  10.61  36.096311
+9         Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     E   150   9.99  20.752118
+10        Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     F    41  10.29  50.912945
+11        Q8DKB5  Demo\curated\3KWC-alt1A  X-ray       2.00     F   150   9.44  18.391276
+--------------------------------------------------------------------------
+
+0         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     A    41  10.19  51.283326
+1         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     A   150   9.29  25.479920
+2         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     B    41  10.32  56.039141
+3         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     B   150  10.24  24.053539
+4         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     C    41  10.20  49.849320
+5         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     C   150   9.78  25.593835
+6         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     D    41  10.09  39.286565
+7         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     D   150  10.25  20.244685
+8         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     E    41  10.62  36.096311
+9         Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     E   150  10.07  20.752118
+10        Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     F    41  10.29  50.912945
+11        Q8DKB5  Demo\curated\3KWC-alt1B  X-ray       2.00     F   150   9.28  18.391276
+--------------------------------------------------------------------------
+
+0        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A    62  10.48  63.774135
+1        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   101  10.14  61.182713
+2        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   250  10.46  67.856831
+3        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   348   9.54  34.710443
+4        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   366  10.29  69.135786
+5        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   433  10.45  75.576313
+6        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   480  10.53  73.384168
+7        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   514  10.44  81.261712
+8        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   516  10.14  65.041211
+9        Q03513  Demo\curated\AF-Q03513-F1-model_v3  Predicted        NaN     A   538  10.42  64.889531
+--------------------------------------------------------------------------

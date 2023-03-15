@@ -9,8 +9,6 @@ import sys
 import re
 from textwrap import wrap
 import shutil
-#import subprocess
-#import fileinput
 
 import numpy as np
 import biobox as bb
@@ -381,10 +379,7 @@ def curate(pdb, fasta, outdir="result", gap=10):
     """possible bug here (fixed by sorting the lists alphabetically)"""
     
     reassemble(fouts, chains, outname)
-    
-    #TODO
-    #check whether patching process caused clashing with lysine
-    
+    #TODO: check whether patching process caused clashing with lysine  
     shutil.rmtree(tmpfolder)
     
     return outname
@@ -890,35 +885,12 @@ def clean_fasta(fname):
 
     return
 '''
-'''
-def analyze_protein(f):
-        
-        # report on gaps on a given PDB file
-        # returns:
-        # - 4 elements list, [sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count]]
-        # - biobox.Molecule, of loading was successful, nothing otherwise
-        
-
-        #attempt loading the protein (error: -2 if unloadable)
-
-        # check backbone geometric split (error:-1 if N and C atoms count mismatch)
-        M = bb.Molecule()
-        M.import_pdb(f, include_hetatm=True)
- 
-        try:
-            c_cnt, _, _ = M.guess_chain_split(distance=3.5)
-            c_cnt -= 1
-        except:
-            c_cnt = 1
-'''
     
 ##############################################################################
 
 if __name__ == "__main__":
 
     if True:
-        #pdb = "curate_PDB\\conformations\\2MBH-alt-1.pdb"
-        #fasta = "curate_PDB\\conformations\\2MBH.fasta"
 
         pdb = "curate_PDB\\conformations\\1U8F-alt1A.pdb"
         fasta = "curate_PDB\\conformations\\1U8F.fasta"

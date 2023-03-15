@@ -130,9 +130,7 @@ class Measure(object):
                         'Resid': M.data["resid"].values[i]})
 
                     df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                    
-                    
-                        
+                
                 print(">> %s lysines of interest found"%len(df))
 
                 # iterate over measures to carry out (according to self.measures)
@@ -164,8 +162,10 @@ class Measure(object):
             # remove possible duplicated rows (if restarted)
             if index == first_index:
                 self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+
     
     def recover_from_log(self, log_path):
+    
         if self.PDB_only:
             return 'Function not callable.'
         
@@ -184,7 +184,9 @@ class Measure(object):
         
         return log_to_df
     
+    
     def restart_measure(self):
+        
         if self.PDB_only:
             return 'Function not callable'
             
@@ -211,6 +213,7 @@ class Measure(object):
             target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
           
         return target
+
 
     def measure_PDB_only(self):
         
@@ -271,8 +274,7 @@ class Measure(object):
                     
                 except Exception as e:
                     print("ERROR: %s"%e)
-                print(">> file processed in %4.2f sec."%(time.time()-tstart))
-                
+                print(">> file processed in %4.2f sec."%(time.time()-tstart))             
     
    
     def calculate_pka(self, path):
@@ -439,7 +441,6 @@ class Measure(object):
         except Exception as e:
             raise Exception("%s"%e)
         
-        ##print('>>> Obtaining SASA')
         #For each lysine it works out the distance between the lys NZ,
         #and the each atom in the protein.
         for j in range(len(lys_coords)):
@@ -497,4 +498,3 @@ class Measure(object):
 
 if __name__ == "__main__":
     pass
-    #M = Measure("")

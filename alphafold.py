@@ -42,14 +42,14 @@ def find_AF_plddt(AF_code_full, outfolder="result"):
     
     print('> Finding plddt')
     
-    #Open .pdb file in assembled folder
-    #columns = ['resid', 'chain', 'plddt']
+    # open .pdb file in assembled folder
+    # columns = ['resid', 'chain', 'plddt']
     dict_plddt = dict()
 
     try:
         f = open(os.path.join(outfolder, "curated", AF_code_full), "r")
  
-        #Parse the file to find plddt value.
+        # parse the file to find plddt value.
         for line in f:
             try:
                 if re.search('CA  LYS', line):
@@ -66,7 +66,7 @@ def find_AF_plddt(AF_code_full, outfolder="result"):
                         chain = data[4]
                         chain_resid = chain + resid          
                         
-                    #Append to dictionary which is later merged into the main dataframe.
+                    # append to dictionary which is later merged into the main dataframe.
                     dict_plddt.update({chain_resid: plddt})
 
             except Exception as e:

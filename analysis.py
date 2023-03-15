@@ -32,8 +32,11 @@ class Analysis(object):
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
     
-    # list all the uniprot codes associated with a GO Term
+
     def GO_search_term(self, df, code = '', name = ''):
+        '''
+        List the subset of UNIPROT codes associated with a GO Term
+        '''
         
         if code == '' and name == '':
             return 'Insufficient input!'
@@ -49,10 +52,13 @@ class Analysis(object):
         for uni in uni_list:
             cdf = df[df['Uniprot_Entry'] == uni]
             df_out = pd.concat([df_out, cdf], ignore_index=True)
+            
         return df_out
     
-    # list all the GO Terms associated with a uniprot code
     def GO_search_protein(self, uniprot_entry):
+        '''
+        List all the GO Terms associated with a UNIPROT code
+        '''
         
         GO_list = list()
         for code, uni_list in self.GO_dict.items():
@@ -62,7 +68,9 @@ class Analysis(object):
         return GO_list
     
     def _GO_get_data(self, uniprot_code, lock, index, total):
-        # worker of function GO_get_data
+        '''
+        worker of the self.GO_get_data method
+        '''
         
         print(f'Searching for {index}/{total} protein.')
         try:
@@ -283,8 +291,10 @@ class Analysis(object):
                 self.df_sub = pd.concat([self.df_sub, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
 
-    # compute contingency table given a GO Term, the list of interest, and a reference list
     def get_contingency_table(self, GO_code, my_list, reference):
+        '''
+        Compute contingency table given a GO Term, the list of interest, and a reference list
+        '''
         
         BP_list = 0
         for uni in my_list:
