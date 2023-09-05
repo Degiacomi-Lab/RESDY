@@ -1,4 +1,5 @@
 import shutil
+import sys, os
 
 
 def get_download_tool():
@@ -18,3 +19,13 @@ def get_download_tool():
 
     else:
         return None
+    
+    
+class ShutUp(object):
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+
+    def __exit__(self, *args):
+        sys.stdout.close()
+        sys.stdout =  self._stdout

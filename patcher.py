@@ -17,7 +17,8 @@ from copy import deepcopy
 from modeller import *
 from modeller.automodel import *
 
-from helper import get_download_tool
+from helper import get_download_tool, ShutUp
+
 
 def autopatch(fbasename, gap_cutoff=8):
 
@@ -325,7 +326,7 @@ def reassemble(pdbs, labels, outname):
     M.write_pdb(outname)
 
 
-def curate(pdb, fasta, outdir="result", gap=10):
+def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         
     tmpfolder = os.path.join(outdir, "tmp")
     if os.path.exists(tmpfolder):
@@ -347,7 +348,14 @@ def curate(pdb, fasta, outdir="result", gap=10):
         
         # attempt modelling
         fbasename = f.split(".")[0]
-        foutname = autopatch(fbasename, 10)
+        
+        if verbose:
+            foutname = autopatch(fbasename, 10)
+        else:
+            with ShutUp:
+                foutname = autopatch(fbasename, 10)
+
+            
         if foutname == "":
             raise Exception("Autopatching failed.")
             

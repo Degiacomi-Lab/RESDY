@@ -15,7 +15,7 @@ import numpy as np
 
 import alphafold as af # to load alphafold data
 import patcher # to patch PDB structures with missing regions
-from helper import get_download_tool
+from helper import get_download_tool, ShutUp
 
 
 class PDB(object):

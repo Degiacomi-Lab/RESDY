@@ -7,6 +7,9 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import logging
+from Bio.PDB import PDBParser
+from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
+
 
 class Measure(object):
     
@@ -27,6 +30,10 @@ class Measure(object):
             handler.setFormatter(formatter)
 
             self.logger.addHandler(handler)
+
+        # measures to carry out [label for DataFrame column, and function evaluating a file]
+        # functions must return a dataframe [chain, resid, measure]
+        self.measures = [["pKa", self.calculate_pka], ["sasa", self.calculate_sasa], ["depth", self.calculate_depth]]
         
         # for restarting
         self.current_index = 0
@@ -56,13 +63,9 @@ class Measure(object):
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'sasa']
+            columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'sasa', 'depth']
             self.df = pd.DataFrame(columns = columns)
-        
-        # measures to carry out [label for DataFrame column, and function evaluating a file]
-        # functions must return a dataframe [chain, resid, measure]
-        self.measures = [["pKa", self.calculate_pka], ["sasa", self.calculate_sasa]]
-        
+                
         
     def save_state(self, outname="measures.csv"):
         '''
@@ -131,18 +134,18 @@ class Measure(object):
 
                     df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                 
-                print(">> %s lysines of interest found"%len(df))
+                print(f">> {len(df)} lysines of interest found")
 
                 # iterate over measures to carry out (according to self.measures)
                 for meas in self.measures:
-                    print(">> evaluating %s..."%meas[0])
+                    print(f">> evaluating {meas[0]}...")
                     try:
                         df[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f) # run measurement
                         df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
                         
                     except Exception as e:
-                        print("ERROR: %s"%e)
+                        print(f"ERROR: {e}")
                         continue
                 
                 print(">> file processed in %4.2f sec."%(time.time()-tstart))
@@ -333,7 +336,7 @@ class Measure(object):
             
                         lys_number.append(int(line[0]))
                         chain.append(line[1])
-                        pkas.append(line[2])
+                        pkas.append(float(line[2]))
                         
                     except Exception as e:
                         print("> Error %s"%e)
@@ -403,7 +406,55 @@ class Measure(object):
         else:
             return pd.DataFrame(np.array(list_remove), columns=["Chain", "Resid"]).drop_duplicates()
     
-    
+ 
+    def calculate_pkaANI(self, path):
+
+        code_for_df = os.path.basename(path).split(".")[0]
+        pdb_path = path.split(".")[0]
+
+        try:   
+            _ = subprocess.run(['pkaani', '-i', path])
+        except Exception as e:
+            raise Exception("Failed to obtain pkaANI data. %s."%e)
+
+        try:
+            log_file = pdb_path + '_pka.log'
+            propres = open(log_file)
+        except Exception:
+            raise Exception('Failed to find pkaANI log file')
+
+        lys_number = list()
+        pkas = list()
+        chains = list()
+        try:
+            for line in propres:
+                if re.search('^LYS', line):
+                    line = line[4:]
+                    info = line.split()
+
+                    lys_number.append(int(info[0]))
+                    chains.append(info[1])
+                    pkas.append(float(info[2]))
+
+            propres.close()
+        except Exception as e:
+            propres.close()
+            raise Exception('Failure parsing %s_pka.log. %s'%(code_for_df, e))
+            
+        try:
+            df = pd.DataFrame({'Resid':lys_number,
+                         'Chain': chains,
+                         'pkaANI':pkas})
+
+            df.sort_values(by=['pkaANI'], inplace=True)
+            df = df.dropna()
+            df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+        except Exception as e:
+            raise Exception('Failed to construct pkaANI dataframe. %s'%e)
+
+        return df
+   
+ 
     def calculate_sasa(self, path):
         '''
         Form small structures which include just the atoms surrounding the lysine of interest,
@@ -411,7 +462,6 @@ class Measure(object):
         '''
         
         try:
-            ###print('>>> Breaking up molecule (for SASA calculation)')
             list_of_sasa = list()
             list_of_resid = list()
             list_of_chains = list()
@@ -494,7 +544,65 @@ class Measure(object):
             pass
         
         return df
+       
+    
+    def calculate_depth(self, path):
         
+        try:
+            M = bb.Molecule(path)
+            pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
+        except:
+            raise Exception(">> could not find NZ atoms")
+        
+        try:
+            parser = PDBParser()
+            structure = parser.get_structure('structure', path)
+            surface = get_surface(structure[0])
+        except:
+            raise Exception(">> could not get biopython structure")
+        
+        
+        results = []
+        for i in range(len(pos)):
+            chain = M.data.loc[idx[i], ["chain"]].values[0]
+            resid = M.data.loc[idx[i], ["resid"]].values[0]
+            
+            mychain = structure[0][chain]
+            myres = mychain[int(resid)]
+            
+            try:
+                #dist = min_dist(pos[i], surface)
+                rd = residue_depth(myres, surface)
+            except:
+                raise Exception(">> failed getting min_dist")
+            
+            results.append([chain, resid, rd])
+         
+    
+        df_Depth = pd.DataFrame(results, columns=["Chain", "Resid", "depth"])
+    
+        return df_Depth
+    
+    
 
 if __name__ == "__main__":
-    pass
+
+
+    f1 = "C:\\Users\\xdzl45\\workspace\\carbamylation\\Demo\\curated\\1M2E-alt-1.pdb"
+
+    from uniprot import Uniprot
+    from protein import PDB
+    
+    print("Scanning UNIPROT...")
+    UP = Uniprot()
+    UP.get_protein_data("P0CG47")
+ 
+    df = UP.df.iloc[7:9]
+ 
+    print("Gathering proteins")
+    PDB = PDB()
+    PDB.gather_proteins(df)
+
+    print("Measuring...")
+    M = Measure(PDB.df)
+    M.measure_dataframe()
