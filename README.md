@@ -27,16 +27,19 @@ A full description of the operations carried out by the pipeline is provided in 
 
 ## Dependencies
 
+### Required
+
 The following Python packages are required to run the overall pipeline:
 * numpy
 * pandas
-* matplotlib
 * biobox
 * modeller
 
 > **Note**
 > Installation of Modeller requires a license key: https://salilab.org/modeller/registration.html.
 > On Mac, install Modeller with: `conda install -c salilab modeller=10.2`, as there are issues with version 10.3.
+
+### Optional
 
 To predict the pKa of individual lysines, at least one of the following should be installed:
 * propka
@@ -48,6 +51,7 @@ To calculate residue depth of individual lysines:
 
 If running the Jupyter notebook `carbamylation.ipynb`, the following additional packages are also required:
 * plotly
+* matplotlib
 * nglview
 * jupyter
 
