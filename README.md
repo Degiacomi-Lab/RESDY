@@ -33,7 +33,7 @@ The following Python packages are required to run the overall pipeline:
 * numpy
 * pandas
 * biobox
-* modeller
+* Modeller
 
 > **Note**
 > Installation of Modeller requires a license key: https://salilab.org/modeller/registration.html.
@@ -49,7 +49,7 @@ To calculate residue depth of individual lysines:
 * biopython
 * MSMS (independent software used by biopython, available at [this website](https://ccsb.scripps.edu/mgltools/))
 
-If running the Jupyter notebook `carbamylation.ipynb`, the following additional packages are also required:
+If running the Jupyter notebook `carbamylation.ipynb`:
 * plotly
 * matplotlib
 * nglview
