@@ -7,13 +7,18 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import logging
-from Bio.PDB import PDBParser
-from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
+
+try:
+    from Bio.PDB import PDBParser
+    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
+except:
+    print("biopython and msms unavailable. Will not be able to calculate residue depth")
 
 
 class Measure(object):
     
-    def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt'):
+    def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
+                 features=["propka", "pkaANI", "sasa", "depth"]):
         
         self.activate_log = False
         if activate_log:
@@ -31,10 +36,8 @@ class Measure(object):
 
             self.logger.addHandler(handler)
 
-        # measures to carry out [label for DataFrame column, and function evaluating a file]
-        # functions must return a dataframe [chain, resid, measure]
-        self.measures = [["pKa", self.calculate_pka], ["sasa", self.calculate_sasa], ["depth", self.calculate_depth]]
-        
+        self._setup_measures(features)
+
         # for restarting
         self.current_index = 0
         
@@ -66,7 +69,27 @@ class Measure(object):
             columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'sasa', 'depth']
             self.df = pd.DataFrame(columns = columns)
                 
-        
+    def _setup_measures(self, features):
+        '''
+        convert a list of features into a measuring protocol
+        '''
+
+        # measures to carry out [label for DataFrame column, and function evaluating a file]
+        # functions must return a dataframe [chain, resid, measure]
+        self.measures = []
+        for m in features:
+            
+            if m == "propka":
+                self.measures.append([m, self.calculate_pka])
+            elif m == "pkaANI":
+                self.measures.append([m, self.calculate_pkaANI])
+            elif m == "sasa":
+                self.measures.append([m, self.calculate_sasa])
+            elif m == "depth":    
+                self.measures.append([m, self.calculate_depth])
+            else:
+                raise Exception(f"measure {m} unknown")
+    
     def save_state(self, outname="measures.csv"):
         '''
         Save a csv file in output directory
@@ -309,7 +332,7 @@ class Measure(object):
         try:
             propka_lys_fails = self.parse_propka_errors(error_file_name)
         except Exception as e:
-            raise Exception("Failed extracting propka errors. %s"%e)
+            raise Exception("Failed extracting PROPKA errors. %s"%e)
            
         try:
             pkafile = code_for_df + '.pka'
@@ -517,7 +540,8 @@ class Measure(object):
                 resid = list_of_resid[j]
     
                 #SASA is calculated for that lysine in the small molecule.
-                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
+                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
+                                             use_resname=False, get_index=True)
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
                 list_of_sasa.append(x[0])
     
@@ -552,14 +576,14 @@ class Measure(object):
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except:
-            raise Exception(">> could not find NZ atoms")
+            raise Exception("could not find NZ atoms in atomic structure")
         
         try:
             parser = PDBParser()
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
-        except:
-            raise Exception(">> could not get biopython structure")
+        except Exception as e:
+            raise Exception(f"could not get biopython structure. {e}")
         
         
         results = []
@@ -587,22 +611,35 @@ class Measure(object):
 
 if __name__ == "__main__":
 
-
-    f1 = "C:\\Users\\xdzl45\\workspace\\carbamylation\\Demo\\curated\\1M2E-alt-1.pdb"
+    f1 = "Demo{os.sep}curated{os.sep}1M2E-alt-1.pdb"
 
     from uniprot import Uniprot
     from protein import PDB
-    
+
     print("Scanning UNIPROT...")
     UP = Uniprot()
     UP.get_protein_data("P0CG47")
- 
-    df = UP.df.iloc[7:9]
- 
-    print("Gathering proteins")
-    PDB = PDB()
-    PDB.gather_proteins(df)
+
+    UP.df = UP.df.iloc[3:10]
+
+    if True:
+        print("Gathering proteins")
+        pdb = PDB(gap=10)
+        pdb.gather_proteins(UP.df)
+        pdb.save_state()
+
+    else:
+        pdb = PDB(gap=10)
+        pdb.load_state('Demo/proteins.csv')
+
+    print(pdb.df)
 
     print("Measuring...")
-    M = Measure(PDB.df)
+    M = Measure(pdb.df)
     M.measure_dataframe()
+
+
+
+
+
+
