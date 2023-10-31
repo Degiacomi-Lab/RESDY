@@ -33,6 +33,8 @@ The following Python packages are required to run the overall pipeline:
 * numpy
 * pandas
 * biobox
+* matplotlib
+* seaborn
 * Modeller
 
 > **Note**
@@ -51,7 +53,6 @@ To calculate residue depth of individual lysines:
 
 If running the Jupyter notebook `carbamylation.ipynb`:
 * plotly
-* matplotlib
 * nglview
 * jupyter
 
