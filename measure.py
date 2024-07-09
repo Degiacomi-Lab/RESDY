@@ -66,7 +66,7 @@ class Measure(object):
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'pkaANI', 'sasa', 'depth']
+            columns = ['PDB Code', 'Chain', 'Resid', 'propka', 'pkaANI', 'sasa', 'depth']
             self.df = pd.DataFrame(columns = columns)
                 
     def _setup_measures(self, features):
@@ -80,7 +80,7 @@ class Measure(object):
         for m in features:
             
             if m == "propka":
-                self.measures.append([m, self.calculate_pka])
+                self.measures.append([m, self.calculate_pka_propka])
             elif m == "pkaANI":
                 self.measures.append([m, self.calculate_pkaANI])
             elif m == "sasa":
@@ -373,7 +373,7 @@ class Measure(object):
                 '''          
     
    
-    def calculate_pka(self, path):
+    def calculate_pka_propka(self, path):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
         parse errors, and return a dataframe containing all measurements not yielding an error.
@@ -399,18 +399,18 @@ class Measure(object):
                 except:
                     pass
                 
-                raise Exception('Failed to obtain pKa data. %s.'%e)
+                raise Exception('Failed to obtain pKa data (PROPKA). %s.'%e)
         
         try:
             propka_lys_fails = self.parse_propka_errors(error_file_name)
         except Exception as e:
-            raise Exception("Failed extracting PROPKA errors. %s"%e)
+            raise Exception("Failed extracting PROPKA errors from output file. %s"%e)
            
         try:
             pkafile = code_for_df + '.pka'
             propres = open(pkafile)
         except Exception:
-            raise Exception('Failed to find %s'%pkafile)
+            raise Exception('Failed to find %s output file to read'%pkafile)
                 
         lys_number = list()
         pkas = list()
@@ -448,14 +448,14 @@ class Measure(object):
         try:
             df = pd.DataFrame({'Resid':lys_number,
                                'Chain': chain,
-                               'pKa':pkas})
+                               'propka':pkas})
             
-            df.sort_values(by=['pKa'], inplace=True)
+            df.sort_values(by=['propka'], inplace=True)
             df = df.dropna()
             df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
             
         except Exception as e:
-            raise Exception('Failed to construct pKa dataframe. %s'%e)
+            raise Exception('Failed to construct pKa (PROPKA) dataframe. %s'%e)
     
         return df
     
@@ -506,13 +506,16 @@ class Measure(object):
 
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]
-
         testPath = pdb_path + '_pka.log'
         if not os.path.isfile(testPath):
             try:   
                 _ = subprocess.run(['pkaani', '-i', path])
             except Exception as e:
-                raise Exception("Failed to obtain pkaANI data. %s."%e)
+                print(e)
+                if "[Errno 2] No such file or directory: 'pkaani'" == str(e):
+                    raise Exception('Error: Failed to obtain pkaANI data: %s. Is pkaANI installed correctly? If so, reload environment and try again.'%e)
+                else:
+                    raise Exception("Failed to obtain pkaANI data through running pkaANI. %s."%e)
 
         try:
             log_file = pdb_path + '_pka.log'
@@ -536,7 +539,7 @@ class Measure(object):
             propres.close()
         except Exception as e:
             propres.close()
-            raise Exception('Failure parsing %s_pka.log. %s'%(code_for_df, e))
+            raise Exception('Failure parsing pkaANI log file for: %s_pka.log. %s'%(code_for_df, e))
             
         try:
             df = pd.DataFrame({'Resid':lys_number,
@@ -612,7 +615,7 @@ class Measure(object):
                 S.import_pdb('temp_struc.pdb', include_hetatm=True)
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
-                print([chain, resid])
+                #print([chain, resid])
     
                 #SASA is calculated for that lysine in the small molecule.
                 pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
