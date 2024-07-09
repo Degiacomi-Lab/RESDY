@@ -1,6 +1,8 @@
+import csv
 import os, sys, re
 import subprocess
 from helper import get_download_tool
+from csv import writer
 
 def download_AF_struc(pdb, outfolder="result"):
     '''
@@ -39,6 +41,15 @@ def find_AF_plddt(AF_code_full, outfolder="result"):
     Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value
     for each lysine in an alphafold structure.
     '''
+
+    if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
+        with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w', newline='') as PLDDT_out_file:
+            writer = csv.writer(PLDDT_out_file)
+            writer.writerow(["Uniprot_Entry", "Resid", "PLDDT"])
+    else:
+        PLDDT_out_file = open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'a', newline='')
+        writer = csv.writer(PLDDT_out_file)
+
     
     print('> Finding plddt')
     
@@ -47,7 +58,7 @@ def find_AF_plddt(AF_code_full, outfolder="result"):
     dict_plddt = dict()
 
     try:
-        f = open(os.path.join(outfolder, "curated", AF_code_full), "r")
+        f = open(os.path.join(outfolder, "curated", AF_code_full + ".pdb"), "r")
  
         # parse the file to find plddt value.
         for line in f:
@@ -69,15 +80,26 @@ def find_AF_plddt(AF_code_full, outfolder="result"):
                     # append to dictionary which is later merged into the main dataframe.
                     dict_plddt.update({chain_resid: plddt})
 
+                    # print out what has been found for checking while the output is running
+                    print(AF_code_full + "; Resid No. " + str(chain_resid) + "; PLDDT: " + plddt)
+
+                    # write the same output to the output file
+                    writer.writerow([AF_code_full, str(chain_resid), str(plddt)])
+
             except Exception as e:
                 print("Error %s"%e)
+                writer.writerow([AF_code_full, str(chain_resid), "Error %s"%e])
                 continue
+        
+        
 
     except Exception as e:
         print("ERROR: %s"%e)
         print('Failed to obtain pLDDT data for ' + AF_code_full)
+        writer.writerow([AF_code_full, str(chain_resid), "Error %s"%e])
         f.close()
         return dict_plddt
 
     f.close()
+    PLDDT_out_file.close()
     return dict_plddt
