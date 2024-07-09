@@ -66,7 +66,7 @@ class Measure(object):
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'sasa', 'depth']
+            columns = ['PDB Code', 'Chain', 'Resid', 'pKa', 'pkaANI', 'sasa', 'depth']
             self.df = pd.DataFrame(columns = columns)
                 
     def _setup_measures(self, features):
@@ -250,7 +250,76 @@ class Measure(object):
         
         for _, row in self.df_input.iterrows():
             PDBCODE = row['PDB Code']
+
+
+            # calculate features values from all PDB files associated with specific DataFrame entry
+            for f in files:
+                
+                if PDBCODE not in f:
+                    continue
+
+                tstart = time.time()
+                print("\n> File: %s"%f)
+                             
+                # create temporary DataFrame for data of current file,
+                # to be then appended to main DataFrame self.df
+                
+                columns = ['PDB Code', 'Chain', 'Resid']
+                df = pd.DataFrame(columns=columns)
+                
             
+                # append to temporary DataFrame all lysines in the file of interest             
+                try:
+                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                except:
+                    self.wrong_pdb_file.append(f)
+                    continue
+                
+                _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                for i in idxs:
+
+                    #save only lysine entries from chain of interest
+                    #if M.data["chain"].values[i] not in chains:
+                    #    continue
+                    
+                    
+                    data = ({'PDB Code': f.split(".")[0],
+                        'Chain': M.data["chain"].values[i],
+                        'Resid': M.data["resid"].values[i]})
+
+                    df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                
+                print(f">> {len(df)} lysines of interest found")
+
+                # iterate over measures to carry out (according to self.measures)
+                for meas in self.measures:
+                    print(f">> evaluating {meas[0]}...")
+                    try:
+                        df[meas[0]] = np.nan # create new column for measure
+                        result = meas[1](f) # run measurement
+                        df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
+                        
+                    except Exception as e:
+                        print(f"ERROR: {e}")
+                        continue
+                
+                print(">> file processed in %4.2f sec."%(time.time()-tstart))
+                
+                # document the data to a log file
+                if self.activate_log:
+                    if df.empty == False:
+                        try:
+                            self.logger.info(df.to_string().strip('PDB Code        Chain Resid    pKa       sasa'))
+                            self.logger.info('--------------------------------------------------------------------------')
+                        except:
+                            print('Error in logging.')
+                
+                #append temporary DataFrame with all measures on a single file to main DataFrame
+                self.df = pd.concat([self.df, df], ignore_index=True)
+
+
+
+            '''
             for f in files:
                 if PDBCODE not in f:
                     continue
@@ -300,7 +369,8 @@ class Measure(object):
                     
                 except Exception as e:
                     print("ERROR: %s"%e)
-                print(">> file processed in %4.2f sec."%(time.time()-tstart))             
+                print(">> file processed in %4.2f sec."%(time.time()-tstart))   
+                '''          
     
    
     def calculate_pka(self, path):
@@ -312,23 +382,25 @@ class Measure(object):
         code_for_df = os.path.basename(path).split(".")[0]
         error_file_name = os.path.join(self.pkaoutdir, "%s_propka_errors.txt"%code_for_df)
     
-        try:   
-            f = open(error_file_name, 'w')
-            process = subprocess.Popen(['python', '-m', 'propka', path],
-                                stdout=f, stderr=f)
-            stdout, stderr = process.communicate()
-            f.close()
-                    
-        except Exception as e:
-            f.close()
-            
-            try:
-                shutil.move(code_for_df, os.path.join(self.pkaoutdir, code_for_df))
-            except:
-                pass
-            
-            raise Exception('Failed to obtain pKa data. %s.'%e)
-    
+        testPath = code_for_df + '.pka'
+        if not os.path.isfile(testPath):
+            try:   
+                f = open(error_file_name, 'w')
+                process = subprocess.Popen(['python', '-m', 'propka', path],
+                                    stdout=f, stderr=f)
+                stdout, stderr = process.communicate()
+                f.close()
+                        
+            except Exception as e:
+                f.close()
+                
+                try:
+                    shutil.move(code_for_df, os.path.join(self.pkaoutdir, code_for_df))
+                except:
+                    pass
+                
+                raise Exception('Failed to obtain pKa data. %s.'%e)
+        
         try:
             propka_lys_fails = self.parse_propka_errors(error_file_name)
         except Exception as e:
@@ -435,10 +507,12 @@ class Measure(object):
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]
 
-        try:   
-            _ = subprocess.run(['pkaani', '-i', path])
-        except Exception as e:
-            raise Exception("Failed to obtain pkaANI data. %s."%e)
+        testPath = pdb_path + '_pka.log'
+        if not os.path.isfile(testPath):
+            try:   
+                _ = subprocess.run(['pkaani', '-i', path])
+            except Exception as e:
+                raise Exception("Failed to obtain pkaANI data. %s."%e)
 
         try:
             log_file = pdb_path + '_pka.log'
@@ -538,10 +612,11 @@ class Measure(object):
                 S.import_pdb('temp_struc.pdb', include_hetatm=True)
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
+                print([chain, resid])
     
                 #SASA is calculated for that lysine in the small molecule.
-                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
-                                             use_resname=False, get_index=True)
+                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
+                #print([pts_2, indx_2, S.data['radius']])
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
                 list_of_sasa.append(x[0])
     
@@ -576,14 +651,14 @@ class Measure(object):
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except:
-            raise Exception("could not find NZ atoms in atomic structure")
+            raise Exception(">> could not find NZ atoms within atomic structure")
         
         try:
             parser = PDBParser()
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
-            raise Exception(f"could not get biopython structure. {e}")
+            raise Exception(f">> could not get biopython structure - {e}")
         
         
         results = []
@@ -611,35 +686,22 @@ class Measure(object):
 
 if __name__ == "__main__":
 
+
     f1 = "Demo{os.sep}curated{os.sep}1M2E-alt-1.pdb"
 
     from uniprot import Uniprot
     from protein import PDB
-
+    
     print("Scanning UNIPROT...")
     UP = Uniprot()
     UP.get_protein_data("P0CG47")
-
-    UP.df = UP.df.iloc[3:10]
-
-    if True:
-        print("Gathering proteins")
-        pdb = PDB(gap=10)
-        pdb.gather_proteins(UP.df)
-        pdb.save_state()
-
-    else:
-        pdb = PDB(gap=10)
-        pdb.load_state('Demo/proteins.csv')
-
-    print(pdb.df)
+ 
+    df = UP.df.iloc[7:9]
+ 
+    print("Gathering proteins")
+    PDB = PDB()
+    PDB.gather_proteins(df)
 
     print("Measuring...")
-    M = Measure(pdb.df)
+    M = Measure(PDB.df)
     M.measure_dataframe()
-
-
-
-
-
-

@@ -1,3 +1,5 @@
+from cgi import test
+import os
 import re
 import urllib.request, urllib.parse, urllib.error
 import pandas as pd
@@ -11,7 +13,7 @@ from statsmodels.stats.multitest import multipletests
 
 class Analysis(object):
     
-    def __init__(self, df):
+    def __init__(self, df,  outdir="result"):
         self.df = df.dropna(subset=['pKa', 'sasa'])
         
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num','pKa mean','pKa std','pKa range', 
@@ -23,6 +25,8 @@ class Analysis(object):
         
         self.name_to_code = {}
         self.code_to_name = None
+
+        self.outdir = outdir
     
     def get_data(self, uniprot_entry, resid):
         df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
@@ -222,7 +226,39 @@ class Analysis(object):
         self.df = self.df.drop(index = remove_list)
         L2 = len(self.df)
         print(f'Original num of rows: {L1}\nCurrent num of rows: {L2}\nNum of rows removed: {len(df_to_remove)}')
-        
+    
+    #function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
+    def remove_not_important_residues(self, req_resid_table):
+        # duplicate the req_resid_table to allow to delete rows with testing
+        test_table = req_resid_table
+        initial_fullData_rows = len(self.df)
+        # iterate over each set of residues of a protein
+        while (len(test_table) > 0):
+            # prints the number of rows left in the hits sheet updating how far through you are
+            print("Number of rows left: " + str(len(test_table)))
+            # read in the uniprot code at the top of the hits sheet
+            test_uniprot = test_table["Uniprot_Entry"][test_table.first_valid_index()]
+            # print out which one you are finding, mainly just for checking
+            print("test_uniprot: " + str(test_uniprot))
+            # find all the desired residues from the particular uniprot code and put into a list, automatically removes duplicates from this (doesn't retain order)
+            desired_residues = list(set(test_table[test_table["Uniprot_Entry"].str.contains(test_uniprot)]["Resid"].tolist()))
+            # search the measures spreadsheet for all rows containing the desired uniprot code
+            search_uniprot = self.df[self.df["Uniprot_Entry"].str.contains(test_uniprot.strip())][["Uniprot_Entry", "Resid"]]
+            all_search_rows = search_uniprot.index.tolist()
+            # go over each row of search_uniprot and see if the residue matches one of the desired ones
+            wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
+            not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
+            print("Rows removed: " + str(len(not_wanted_rows)))
+            # remove the rows which aren't wanted from the main data set
+            self.df = self.df.drop(index = not_wanted_rows)
+            # remove rows which contain the uniprot code that has been searched from test_table
+            test_table = test_table.drop(index = test_table[test_table["Uniprot_Entry"] == test_uniprot].index.tolist())
+
+        final_fullData_rows = len(self.df)
+        diff_rows = initial_fullData_rows - final_fullData_rows
+        print(f'Original num of rows: {initial_fullData_rows}\nCurrent num of rows: {final_fullData_rows}\nNum of rows removed: {diff_rows}')
+        self.df.to_csv(os.path.join(self.outdir, "measures_cut.csv"), index_label=False, index=False) 
+
     def subset(self, df, weight = 0.5, method = 'average'):
         
         if method != 'average' and method != 'south_east':

@@ -3,6 +3,7 @@
 # - gap_data.txt (reports on how many missing residues the protein had)
 # - patch_data.txt (reports on which files had to be patched with modeller, and whether the operation was successful)
 
+import fileinput
 import glob
 import os
 import sys
@@ -16,6 +17,7 @@ from copy import deepcopy
 
 from modeller import *
 from modeller.automodel import *
+
 
 from helper import get_download_tool, ShutUp
 
@@ -65,6 +67,7 @@ def autopatch(fbasename, gap_cutoff=8):
 #autopatch step 1a. pir format of AA from pdb
 def _pdb2seq(fbasename):
     env = Environ()
+    env.io.two_char_chain = True
     mdl = Model(env, file=fbasename)
     aln = Alignment(env)
     aln.append_model(mdl, align_codes=fbasename)
@@ -73,6 +76,7 @@ def _pdb2seq(fbasename):
 #autopatch step 1b. pir from complete AA fasta 
 def _fasta2pir(fbasename):
     env = Environ()
+    env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
     a = Alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
     a.write(file=fbasename+'.pir', alignment_format='PIR')
 
@@ -105,6 +109,7 @@ def _full_align(fbasename):
     os.system(myCmd_A)
 
     env = Environ()
+    env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
     env.io.atom_files_directory = ['.', '..%satom_files'%(os.sep)]
     a = AutoModel(env,
                   # file with template codes and target sequence
@@ -175,7 +180,7 @@ def _gap_check(align_file, gap_cutoff):
     f1 = f.readlines()
     P1_pos = []
     for i in range(len(f1)):
-        if ("P1;" in f1[i]): #identify positions of different sequances (P1) blocks
+        if ("P1;" in f1[i]): #identify positions of different sequences (P1) blocks
             P1_pos.append(i)
     f.close()
     sec_1 = P1_pos[0]
@@ -197,6 +202,7 @@ def _patch_model(fbasename, seq_name):
     print(">> patching model...")
     log.verbose()
     env = Environ()
+    env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
     env.io.atom_files_directory = ['.', '..%satom_files'%(os.sep)]
     a = AutoModel(env,
                   # file with template codes and target sequence
@@ -261,8 +267,8 @@ def fragment(pdb, fasta, outfolder="."):
     
     if not os.path.exists(outfolder):
         os.mkdir(outfolder)
-   
-    #split PDB file in chains
+
+    #split PDB file in chains using biobox
     M = bb.Molecule(pdb)
     chains = np.unique(M.data["chain"].values)
     gap_count = []
@@ -281,7 +287,15 @@ def fragment(pdb, fasta, outfolder="."):
         if ">" in line:
             headers.append(line)
             chain_rawinfo = line.split("|")[1][6:].split(",")
-            chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
+            print(chain_rawinfo[0])
+            #chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
+            if len(chain_rawinfo[0]) == 1:
+                chain_info = chain_rawinfo
+            elif '[' in chain_rawinfo[0]:
+                chain_info = [str(chain_rawinfo[0].split('[')[0])]
+            else:
+                chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
+            print(chain_info)
             fasta_chains.append(chain_info)
             if "sequence" in locals():
                 sequences.append(sequence)
@@ -311,12 +325,124 @@ def fragment(pdb, fasta, outfolder="."):
             fout.write(headers[i])
             fout.writelines(sequences[i])
             fout.close()
+
+
+    # The following section commented out turns the fragmented files into the format specified by Modeller to work with double letter chain names
+    # This should work with the parameter iodata.two_char_chain, however this doesn't appear to be working in this implementation
+    # Therefore this code is left incase the parameter will start to work, new method is added below - GW_04.03.24
+    '''
+    # change the position of the chain names from single character format at 22 to double character 21-22 
+    all_files = os.listdir(outfolder) 
+    pdb_files = []
+    for file in all_files:
+        temp_parts = file.split('.')
+        if file[0:5] == 'chain':
+            if temp_parts[1] == 'pdb' and len(temp_parts[0][5:]) == 2:
+                pdb_files.append(file)
+        
+    for file in pdb_files:
+        # This will move the chain name 1 position to the left such that it will start at position 21 rather than 22 as it currently is
+        # This allows it to work with the two_chain_char modification to allow double chain names to be read by Modeller
+        # This style may be different for other programmes than Modeller
+        # TODO: check if Modeller output of double chain names works for other structures.
+        
+
+        with fileinput.FileInput(os.path.join(outfolder, file), inplace = True) as f:
+            for line in f:
+                try:
+                    #On lines with 'ATOM', 'TER' or 'HETATM' if the chain is in the auth_list
+                    #the auth chain name is replaced with the RCSB chain name.
+                    if (line[:4] == 'ATOM') or (line[:6] == 'HETATM'):
+                            line = line[:20] + line[21:23] + ' ' + line[23:]
+                            print(line, end ='')
+
+                    else:
+                        print(line, end='')
+                except:
+                    print(line, end='')
+    '''
+
+    # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format 
+    # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesnt convert all double letter chain names to A
+    # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
+    
+    # find the double chain name files and store in list to iterate through when converting the single character names
+    all_files = os.listdir(outfolder) 
+    doubleletter_pdb_files = []
+    for file in all_files:
+        temp_parts = file.split('.')
+        if file[0:5] == 'chain':
+            # next take only files which are pdb and have 2 character chain names
+            if temp_parts[1] == 'pdb' and len(temp_parts[0][5:]) == 2:
+                doubleletter_pdb_files.append(file)
+
+    # iterate through the files and for each one replace the chain name with a single letter lowercase version of the chain name: eg. CA would go to c
+    for file in doubleletter_pdb_files:
+        db_chain_name = file.split('.')[0][5:]
+        sl_chain_name = db_chain_name.lower()[0]
+        
+        try:
+            temp_file_path = os.path.join(outfolder, file)
+            with fileinput.FileInput(temp_file_path, inplace = True) as f:
+                for line in f:
+                    try:
+                        #On lines with 'ATOM', 'TER' or 'HETATM'
+                        #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
+                        if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
+                                new_chain_name = ' ' + sl_chain_name
+                                line = line[:20] + new_chain_name + ' ' + line[23:]
+                                
+                                print(line, end ='')
+                                
+                        else:
+                            print(line, end='')
+                    except:
+                        print(line, end='')
+    
+        #If the protein fails, print error message with the error 
+        except Exception as e:
+            raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. %s'%e)
+    
             
     return np.array(gap_count)
-            
 
-def reassemble(pdbs, labels, outname):
 
+
+def reassemble(pdbs, labels, outname, outdir):
+
+    # For each pdb file in pdbs go back through and take the chain name from the file name to replace the chain name back to a double letter
+    # This reverses the temporary measure of changing to lower case single letter names to allow Modeller to patch before changing back
+    tmpfolder = os.path.join(outdir, "tmp")
+    for pdb_file in pdbs:
+        # take pdb_file and extract the chain name - need to find the exact format it needs to go back into that the code is expecting to reconvert it from
+        dbletter = False
+        chainname = pdb_file.split('.')[0].split('/')[-1].split('_')[0][5:]
+        if len(chainname) > 1:
+            dbletter = True
+
+        
+        try:
+            if dbletter:
+                with fileinput.FileInput(pdb_file, inplace = True) as f:
+                    for line in f:
+                        try:
+                            #On lines with 'ATOM', 'TER' or 'HETATM'
+                            #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
+                            if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
+                                    line = line[:20] + chainname + '' + line[22:]
+                                    print(line, end ='')
+                            else:
+                                print(line, end='')
+                        except:
+                            print(line, end='')
+
+        #If the protein fails, print error message with the error 
+        except Exception as e:
+            raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. %s'%e)
+
+
+    # Take all the files in pdbs and turn each into a biobox Molecule object and append this to a list of monomers
+    # create a biobox multimer from the list of monomors and write a new pdb file combining all these
     monomers = []
     for f in pdbs:
         monomers.append(bb.Molecule(f))
@@ -326,8 +452,39 @@ def reassemble(pdbs, labels, outname):
     M.write_pdb(outname)
 
 
+    '''
+    # After the pdb file has been reassembled, with the current method of replacing double letter chain names with lower case single ones temporarily
+    # need to convert back to the format it was given to the patcher.py script in
+    # Iterate through the file line by line and check for lower case letter chain names, replace with upper case version + 'A'
+
+    try:
+        outfile_path = os.path.join(outfolder, pdb)
+        with fileinput.FileInput(outfile_path, inplace = True) as f:
+            for line in f:
+                try:
+                    #On lines with 'ATOM', 'TER' or 'HETATM'
+                    #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
+                    if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
+                            current_chainname = line[21]
+                            if len(current_chainname)
+                            new_db_chainname = current_chainname.upper() + 'A'
+                            line = line[:20] + new_db_chainname + ' ' + line[22:]
+                            
+                            print(line, end ='')
+                            
+                    else:
+                        print(line, end='')
+                except:
+                    print(line, end='')
+
+    #If the protein fails, print error message with the error 
+    except Exception as e:
+        raise Exception(f'Failed replacing chains for file {file}. %s'%e)
+    '''
+    
+
+
 def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
-        
     tmpfolder = os.path.join(outdir, "tmp")
     if os.path.exists(tmpfolder):
         shutil.rmtree(tmpfolder)
@@ -336,10 +493,13 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     # divide structure in individual chains
     gap_count = fragment(pdb, fasta, tmpfolder)
 
+
+    # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
     if largest>gap:
         raise Exception("large gap detected (%s residues)"%largest)
-                
+
+            
     #launch modeller on each individual chain
     files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
     chains = []
@@ -369,10 +529,12 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
             M_curated.data["resid"] = startval_clean
             M_curated.write_pdb(foutname)
         
-        chains.append(fbasename[-1])
+        # GW 18.03.24 - change chains appending to account for double letter chain names
+        chains.append(fbasename.split('chain')[-1])
         fouts.append(foutname)
 
     # reassemble complex in final directory
+    print("outdir: ", outdir)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
         
@@ -386,12 +548,12 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     
     """possible bug here (fixed by sorting the lists alphabetically)"""
     
-    reassemble(fouts, chains, outname)
+    reassemble(fouts, chains, outname, outdir)
     #TODO: check whether patching process caused clashing with lysine  
     shutil.rmtree(tmpfolder)
     
     return outname
-
+    
 
 '''
 def correct_resid(pdb, chain):

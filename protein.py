@@ -17,6 +17,9 @@ import alphafold as af # to load alphafold data
 import patcher # to patch PDB structures with missing regions
 from helper import get_download_tool, ShutUp
 
+import shutil
+import biobox as bb
+
 
 class PDB(object):
     
@@ -136,6 +139,9 @@ class PDB(object):
                     else:
                         data = ({'PDB Code': PDBCODE})
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
+                    # find the PLDDT codes for AF structures - not fully sure quite where to put this
+                    af.find_AF_plddt(PDBCODE,outfolder=self.outdir)
                 
                 else:
                     print(">> FAILED: structure not found in AlphaFold database")
@@ -194,7 +200,9 @@ class PDB(object):
     
         except Exception as e:
             raise Exception('Error cleaning %s: %s'%(pdb, e))
-            
+
+        
+        
         files = glob.glob(os.path.join(self.raw_dir, "*%s*pdb"%pdb))
         test = False
         for cnt, f in enumerate(files):
@@ -204,7 +212,6 @@ class PDB(object):
             try: 
                 
                 fname = patcher.curate(f, fasta, outdir=self.curated_dir, gap=self.gap)
-                
                 if len(replacement_dict)>0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())            
                     self.replace_chains(fname, reverse_replacement_dict)
@@ -217,8 +224,10 @@ class PDB(object):
 
         if not test:
             raise Exception("Patching failed for all conformers")
+        
 
         return
+        
     
 
     def download_pdb(self, pdb):
@@ -285,10 +294,11 @@ class PDB(object):
         '''
         try:
             replacement_dict = self.get_chain_replacement(pdb)
+            path = os.path.join(self.raw_dir, "%s.pdb"%pdb)
+            self.replace_selenocysteine(path, pdb)
             if len(replacement_dict) > 0:
-                
-                path = os.path.join(self.raw_dir, "%s.pdb"%pdb)
-                self.replace_chains(path, replacement_dict)
+                self.new_replace_chains(pdb, path, replacement_dict)
+                #self.replace_chains(path, replacement_dict)
     
         except Exception as e:
             raise Exception('Error renaming chains. %s'%e)
@@ -323,7 +333,7 @@ class PDB(object):
     
                 else:
                     line = line.replace("HETATM", "ATOM  ")
-                    line = line.replace('KCX', 'MET')
+                    line = line.replace('KCX', 'LYS')  # TODO: change to investigate as changed 'MES' to 'LYS' - this should be 'LYS' but wasnt before for some reason
     
                 test_KCX = True
     
@@ -355,6 +365,7 @@ class PDB(object):
         write_file.close()
         read_file.close()
     
+        #self.rewrite_pdb(write_file_path)
         #remove the original pdb file as it is not needed anymore.
         os.remove(read_file_path)
     
@@ -448,6 +459,8 @@ class PDB(object):
         #and select those that belong to the pdb we are interested in.
         list_of_files = glob.glob(os.path.join(self.raw_dir, "*%s*.pdb"%pdb))
         
+
+
         for f in list_of_files:
     
                 ABC_list = ['A', 'B', 'C', 'D']
@@ -459,7 +472,7 @@ class PDB(object):
                     read_file = open(f)
     
                     for line in read_file:
-                        if (line[:4] == 'ATOM') and (line[16] == ABC_list[i]):
+                        if (line[:4] == 'ATOM') and (line[15] == ABC_list[i]):  # TODO NEED TO ENSURE THIS WORKS FOR ALL FILE WITH NEW ROUTINES
                             ABC_dict[ABC_list[i]] = 1
     
                 list_of_values = ABC_dict.values()
@@ -486,12 +499,12 @@ class PDB(object):
                             read = open(f)
                             for line in read:
                                 
-                                if (line[:4] == 'ATOM') and (line[16] == target_letter):
-                                    newline = line[:16] + ' ' + line[17:]
+                                if (line[:4] == 'ATOM') and (line[15] == target_letter):
+                                    newline = line[:15] + ' ' + line[16:]
                                     f_write.write(newline)
                                     continue
                                 
-                                if (line[:4] == 'ATOM') and (line[16] in non_target_letters):
+                                if (line[:4] == 'ATOM') and (line[15] in non_target_letters):
                                     continue
                                 
                                 if (line[:4] == 'ATOM') or (line[:6] == 'HETATM') or (line[:3] == 'TER'):
@@ -589,23 +602,29 @@ class PDB(object):
     
         #First, the auth chain names are put in a list.
         auth_list = list(replacement_dict)
-    
+
         #The relevant file in conformations is then opened and rewritten.
         try:
             with fileinput.FileInput(path, inplace = True) as f:
                 for line in f:
                     try:
-    
                         #On lines with 'ATOM', 'TER' or 'HETATM' if the chain is in the auth_list
                         #the auth chain name is replaced with the RCSB chain name.
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
                                 chain_name = line[21]
                                 if chain_name in auth_list:
                                     replacement_chain_name = replacement_dict.get(chain_name)
-                                    line = line[:21] + replacement_chain_name + line[22:]
-                                    print(line, end ='')
-                                else:
-                                    print(line, end = '')
+                                    if line[25] != ' ':
+                                        #line = line[:21] + replacement_chain_name + ' ' + line[22:]
+                                        line = line[:21] + replacement_chain_name + line[22:]
+                                    else:
+                                        line = line[:21] + replacement_chain_name + line[22:]
+                                
+                                while line[31] == ' ':
+                                    line = line[:31] + line[32:]
+                                
+                                print(line, end ='')
+                                
     
                         else:
                             print(line, end='')
@@ -618,15 +637,159 @@ class PDB(object):
             raise Exception('Failed replacing chains. %s'%e)
     
         return
+    
+
+    def new_replace_chains(self, pdb, path, replacement_dict):
+        # New version of the replace chains which correctly produces pdb files afterwards for the patching. as the original left some protein in space
+        #First, the auth chain names are put in a list.
+        auth_list = list(replacement_dict)
+
+        #The relevant file in conformations is then opened and rewritten.
+        try:
+            M = bb.Molecule(path)
+            print(M)
+            print(path)
+            # find the indices of the atoms in the pdb file
+            indices = M.atomselect('*', '*', '*', True, False)[1]
+            
+
+            # transform to data lists and change the chain names 
+            
+            for index, row in M.data.iterrows():
+                if row['chain'] in auth_list:
+                    replacement_chain_name = replacement_dict.get(row['chain'])
+                    M.data.at[index, 'chain'] = replacement_chain_name
+
+            #print(M.data)
+            
+            path_temp = os.path.join(self.raw_dir, "%s_temp.pdb"%pdb)
+            M.write_pdb(path_temp, index=indices, split_struc=True, dssp=False)
+
+            # take the new written file and insert in place where it would sit in the overall pdb file
+            lines = open(path, 'r').readlines()
+            start_atoms = False
+            first_lines = []
+            second_lines = []
+            for line in lines:
+                if line[:4]  == "ATOM" or line[:6] == 'HETATM' or line[:3] == 'TER':
+                    start_atoms = True
+                else:
+                    if start_atoms:
+                        second_lines.append(line)
+                    else:
+                        first_lines.append(line)
+
+            new_atom_lines = open(path_temp, 'r').readlines()
+            new_file_output = first_lines + new_atom_lines[1:-1] + second_lines
+
+            cleaned_file = open(path, 'w')
+            cleaned_file.writelines(new_file_output)
+            cleaned_file.close()
+
+            os.remove(path_temp)
+
+        
+
+        #If the protein fails the replacement process it is removed from the conformations folder.
+        except Exception as e:
+            os.remove(path)
+            raise Exception('Failed replacing chains. %s'%e)
+    
+        return
+    
+    def rewrite_pdb(self, path):
+        try:
+            M = bb.Molecule(path)
+            indices = M.atomselect('*', '*', '*', True, False)[1]
+            M.write_pdb(path, index=indices, split_struc=False, dssp=False)
+
+        except Exception as e:
+            os.remove(path)
+        raise Exception('Failed rewriting pdb file. %s'%e)
+    
+        return
+    
+
+    def replace_selenocysteine(self, path, pdb):
+        # replace the U residues in the pdb file
+        try:
+            M = bb.Molecule(path)
+            indices = M.atomselect('*', '*', '*', True, False)[1]
+
+            for index, row in M.data.iterrows():
+                if row['resname'] == 'U':
+                    replacement_chain_name = 'C'
+                    M.data.at[index, 'resname'] = replacement_chain_name
+
+
+            path_temp = os.path.join(self.raw_dir, "%s_temp.pdb"%pdb)
+            M.write_pdb(path_temp, index=indices, split_struc=True, dssp=False)
+
+            # take the new written file and insert in place where it would sit in the overall pdb file
+            lines = open(path, 'r').readlines()
+            start_atoms = False
+            first_lines = []
+            second_lines = []
+            for line in lines:
+                if line[:4]  == "ATOM" or line[:6] == 'HETATM' or line[:3] == 'TER':
+                    start_atoms = True
+                else:
+                    if start_atoms:
+                        second_lines.append(line)
+                    else:
+                        first_lines.append(line)
+
+            new_atom_lines = open(path_temp, 'r').readlines()
+            new_file_output = first_lines + new_atom_lines[1:-1] + second_lines
+
+            cleaned_file = open(path, 'w')
+            cleaned_file.writelines(new_file_output)
+            cleaned_file.close()
+
+            os.remove(path_temp)
+
+        except Exception as e:
+            raise Exception('Failed to replace selenocysteine in pdb file. %s'%e)
+        
+
+
+        # replace the U residues in the fasta file
+        try:
+            
+            fasta = os.path.join(self.raw_dir, "%s.fasta"%pdb)
+
+            fin = open(fasta, "r")
+            headers = [] # fasta headers
+            sequences = [] #collection of sequences
+            for line in fin:
+                if ">" in line:
+                    headers.append(line)
+                else:
+                    temp_sequence = line
+                    for i in range(len(temp_sequence)):
+                        if temp_sequence[i] == 'U':
+                            temp_sequence = temp_sequence[:i] + 'C' + temp_sequence[(i+1):]
+                    sequences.append(temp_sequence)
+
+            new_fasta = open(fasta, 'w')
+            for i in range(len(headers)):
+                new_fasta.write(headers[i])
+                new_fasta.write(sequences[i])
+            new_fasta.close()
+
+        except Exception as e:
+            raise Exception('Failed to replace selenocysteine in fasta file. %s'%e)
+        
+        
 
 
 if __name__ == "__main__":
 
     PDB = PDB()    
     if True:
-        PDB.clean_and_split_pdb('1CI4') # test MSE to MET mutation
-        PDB.clean_and_split_pdb('2MBH') # test splitting of models
-        PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
+        PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
+        #PDB.clean_and_split_pdb('2MBH') # test splitting of models
+        #PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
       
     if False:
 
