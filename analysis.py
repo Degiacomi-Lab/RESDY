@@ -17,7 +17,7 @@ class Analysis(object):
         self.df = df.dropna(subset=['pKa', 'sasa'])
         
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num','pKa mean','pKa std','pKa range', 
-        'SASA mean','SASA std','SASA range'])
+        'SASA mean','SASA std','SASA range', 'Depth mean', 'Depth std', 'Depth range'])
         
         self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','PDB Code','Method','Resolution','Chain','Resid','pKa','sasa']) 
         
@@ -117,18 +117,28 @@ class Analysis(object):
         self.code_to_name = {v: k for k, v in self.name_to_code.items()}
         
     def aggregate(self):
+        #df_temp is just used to get the table of uniprot codes and associated resids for repeating over, the aggregation code uses the full dataset
         df_temp = self.df.drop_duplicates(subset=['Uniprot_Entry','Resid'])
         for idx, row in df_temp.iterrows():
+            # extract the uniprot and resid of interest
             entry = row['Uniprot_Entry']
             resid = row['Resid']
+            # create a subset of the dataframe of measurements where the uniprot and resid match
             df_query = self.df[(self.df['Uniprot_Entry'] == entry) & (self.df['Resid'] == resid)]
+            # calculate all the values of interest from the subset dataframe (df_query)
             num = len(df_query)
             pka_mean = round(df_query['pKa'].mean(),2)
             pka_std = round(df_query['pKa'].std(),2)
-            pka_range = [round(df_query['pKa'].min(),2),round(df_query['pKa'].max(),2)]
+            pka_range_values = [round(df_query['pKa'].min(),2),round(df_query['pKa'].max(),2)]
+            pka_range = pka_range_values[1] - pka_range_values[0]
             sasa_mean = round(df_query['sasa'].mean(),2)
             sasa_std = round(df_query['sasa'].std(),2)
-            sasa_range = [round(df_query['sasa'].min(),2),round(df_query['sasa'].max(),2)]
+            sasa_range_values = [round(df_query['sasa'].min(),2),round(df_query['sasa'].max(),2)]
+            sasa_range = sasa_range_values[1] - sasa_range_values[0]
+            depth_mean = round(df_query['depth'].mean(), 2)
+            depth_std = round(df_query['depth'].std(), 2)
+            depth_range_values = [round(df_query['depth'].min(), 2), round(df_query['depth'].max(), 2)]
+            depth_range = depth_range_values[1] - depth_range_values[0]
            
             data = {'Uniprot_Entry': entry,
                         'Resid': resid,
@@ -138,9 +148,13 @@ class Analysis(object):
                         'pKa range': pka_range,
                         'SASA mean': sasa_mean,
                         'SASA std': sasa_std,
-                        'SASA range': sasa_range}
+                        'SASA range': sasa_range,
+                        'Depth mean': depth_mean,
+                        'Depth std': depth_std,
+                        'Depth range': depth_range}
             
-            self.df_aggregated = pd.concat([self.df_aggregated, pd.DataFrame(data)], ignore_index=True)
+            # add in the data to the aggregated dataframe, index provided due to only scalar values being used before being ignored when it is added in. 
+            self.df_aggregated = pd.concat([self.df_aggregated, pd.DataFrame(data, index=[0])], ignore_index=True)
                 
 
     def plot_graph(self, plot_type, feature, uniprot_entry = False, resid = False):
