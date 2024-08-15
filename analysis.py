@@ -19,7 +19,8 @@ class Analysis(object):
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num','pKa mean','pKa std','pKa range', 
         'SASA mean','SASA std','SASA range', 'Depth mean', 'Depth std', 'Depth range'])
         
-        self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','PDB Code','Method','Resolution','Chain','Resid','pKa','sasa']) 
+        #self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','Resid','pKa','sasa', 'depth']) 
+        self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
         
         self.GO_dict = {} # code as the key
         
@@ -278,6 +279,9 @@ class Analysis(object):
         if method != 'average' and method != 'south_east':
             raise ValueError('Wrong input method, try average or south_east.')
         
+        # reset the dataframe incase it is rerun with the other option, stops the dataframe getting bigger and bigger
+        self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
+
         # function to evaluate trade-off between pka and sasa
         def low_pka_large_sasa(df, weight = 0.5):
             if len(df) > 1:
@@ -285,17 +289,17 @@ class Analysis(object):
 
                 # situation 1: same pka and same sasa
                 if (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) == 1):
-                    return df.iloc[0,:]
+                    return df.iloc[[0],:]
 
                 # situation 2: same pka but different sasa
                 elif (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) != 1):
                     index = df['sasa'].idxmax()
-                    return df.iloc[index,:]
+                    return df.iloc[[index],:]
 
                 # situation 3: different pka but same sasa
                 elif (len(df['pKa'].unique()) != 1) and (len(df['sasa'].unique()) == 1):
                     index = df['pKa'].idxmin()
-                    return df.iloc[index,:]
+                    return df.iloc[[index],:]
 
                 # situation 4: different pka and different sasa
                 else:
@@ -309,6 +313,7 @@ class Analysis(object):
 
                     # standardize two lists
                     pka_list = (pka_list - pka_m) / pka_std
+                    #print(pka_list)
                     sasa_list = (sasa_list - sasa_m) / sasa_std
 
                     w_pka = weight
@@ -320,9 +325,13 @@ class Analysis(object):
                         if weighted_sum >= base:
                             index = i
                             base = weighted_sum
-                    return df.iloc[index,:]
+                    return df.iloc[[index],:]
             else:
-                return df.iloc[0,:]
+                return df.iloc[[0],:]
+            
+        # This function gives the best row of values for that lysine from the dataframe based on relative 
+        #def relative_best_3D(df):
+
 
         df_temp = df.drop_duplicates(subset=['Uniprot_Entry','Resid'])
         for idx, row in df_temp.iterrows():
@@ -332,13 +341,16 @@ class Analysis(object):
             
             if method == 'south_east':
                 row_to_append = low_pka_large_sasa(df_query, weight = weight)
-                self.df_sub = self.df_sub.append(row_to_append, ignore_index = True)
+                #self.df_sub = self.df_sub.append(row_to_append, ignore_index = True)  # old line which doesnt work anymore, replaced by new one
+                self.df_sub = pd.concat([self.df_sub, row_to_append], axis=0, ignore_index=True)
             else:
                 pka_mean = df_query['pKa'].mean()
                 sasa_mean = df_query['sasa'].mean()
-                data = {'Uniprot_Entry':entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan,
-                           'Resid':resid, 'pKa':pka_mean, 'sasa':sasa_mean}
-                self.df_sub = pd.concat([self.df_sub, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                depth_mean = df_query['depth'].mean()
+                # GW: Have changed the data entry from the following line to the one after to; not worth including the NaN values in this dataframe when they dont add anything to it
+                #data = {'Uniprot_Entry':entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan, 'Resid':resid, 'pKa':pka_mean, 'sasa':sasa_mean, 'depth':depth_mean}
+                data = {'Uniprot_Entry':entry, 'Resid':resid, 'pKa mean':pka_mean, 'sasa mean':sasa_mean, 'depth mean':depth_mean}
+                self.df_sub = pd.concat([self.df_sub, pd.DataFrame(data, index=[0])], ignore_index=True)
 
 
     def get_contingency_table(self, GO_code, my_list, reference):
