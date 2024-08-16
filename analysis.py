@@ -274,37 +274,56 @@ class Analysis(object):
         print(f'Original num of rows: {initial_fullData_rows}\nCurrent num of rows: {final_fullData_rows}\nNum of rows removed: {diff_rows}')
         self.df.to_csv(os.path.join(self.outdir, "measures_cut.csv"), index_label=False, index=False) 
 
-    def subset(self, df, weight = 0.5, method = 'average'):
+    def subset(self, df, weight = 0.5, method = 'average', metrics=['pKa', 'sasa', 'depth']):
         
         if method != 'average' and method != 'south_east':
             raise ValueError('Wrong input method, try average or south_east.')
         
+        # catch errors with bad input weights and transfer into list format if not there already
+        try:
+            if type(weight) == float or type(weight) == int:
+                if weight == 0.5:
+                    print('Weight remains as default and equal for all metrics')
+                #transfer weight to list to make sure 
+                weight = [weight]
+            elif type(weight) == list:
+                if weight[0] == 0.5:
+                    print('Weight remains as default and equal for all metrics')
+       
+        except:
+            print('Failed reading weight')
+
+                
         # reset the dataframe incase it is rerun with the other option, stops the dataframe getting bigger and bigger
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
 
-        # function to evaluate trade-off between pka and sasa
+
+        # function to evaluate trade-off between pka and sasa - OLD function
+        '''
         def low_pka_large_sasa(df, weight = 0.5):
             if len(df) > 1:
                 df = df.reset_index(drop = True)
 
-                # situation 1: same pka and same sasa
+                # situation 1: both pKa and sasa only have 1 unique value each -> take the first row as all the same
                 if (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) == 1):
                     return df.iloc[[0],:]
 
-                # situation 2: same pka but different sasa
+                # situation 2: only 1 unique pKa value but more than 1 unique sasa value
                 elif (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) != 1):
+                    # as all pKa the same, just find the max value for sasa and return the row which has this
                     index = df['sasa'].idxmax()
                     return df.iloc[[index],:]
 
-                # situation 3: different pka but same sasa
+                # situation 3: more than 1 unique pKa value, only 1 unique sasa value
                 elif (len(df['pKa'].unique()) != 1) and (len(df['sasa'].unique()) == 1):
+                    # all sasa values the same, so just find the lowest pKa value and return the row that this is on
                     index = df['pKa'].idxmin()
                     return df.iloc[[index],:]
 
-                # situation 4: different pka and different sasa
+                # situation 4: more than 1 unique value for both pKa and sasa
                 else:
                     pka_max = df['pKa'].max()
-                    pka_list = [(pka_max-i) for i in df['pKa'].tolist()]
+                    pka_list = [(pka_max-i) for i in df['pKa'].tolist()]  # this effectively inverts the values, eg a lower pKa now had a higher value, allows normalised comparison later
                     sasa_list = df['sasa'].tolist()
 
                     # compute mean and std
@@ -328,9 +347,325 @@ class Analysis(object):
                     return df.iloc[[index],:]
             else:
                 return df.iloc[[0],:]
-            
-        # This function gives the best row of values for that lysine from the dataframe based on relative 
-        #def relative_best_3D(df):
+        '''
+        
+        # general function for investigating the trade off between 2 metrics
+        def relative_best_2D(df, weight_list, metrics):
+            # sort the weights into a list of length 2
+            try:
+                if len(weight_list) == 1:
+                    # only 1 weight provided for comparison - assume equal weighting for each metric
+                    new_weights = [0.5, 0.5]
+                elif len(weight_list) == 2:
+                    # 2 values provided for weights, check they sum to 1 otherwise normalise
+                    if weight_list[0] + weight_list[1] != 1:
+                        new_weights = [round((i/sum(weight_list)), 2) for i in weight_list]
+                elif len(weight_list) > 2:
+                    print('More weights provided than needed, taking the first two through.')
+                    new_weights = weight_list[0,1]
+            except:
+                print('Error sorting the weights for the analysis')
+
+            # if data for the lysine is only 1 row, don't need to run analysis on it
+            if len(df) > 1:
+                df = df.reset_index(drop = True)
+
+                # situation 1: both metric1 and metric2 only have 1 unique value each -> take the first row as all the same
+                if (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) == 1):
+                    return df.iloc[[0],:]
+
+                # situation 2: only 1 unique metric1 value but more than 1 unique metric2 value
+                elif (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) != 1):
+                    # as all metric1 values the same, just find the optimal for metric2 and return the row which has this
+                    match metrics[1]:
+                        case 'pKa':
+                            index = df[metrics[1]].idxmin()
+                        case 'sasa':
+                            index = df[metrics[1]].idxmax()
+                        case 'depth':
+                            index = df[metrics[1]].idxmin()
+                    return df.iloc[[index],:]
+
+                # situation 3: more than 1 unique metric1 value, only 1 unique metric1 value
+                elif (len(df[metrics[0]].unique()) != 1) and (len(df[metrics[1]].unique()) == 1):
+                    # all metric2 values the same, so just find the lowest pKa value and return the row that this is on
+                    match metrics[0]:
+                        case 'pKa':
+                            index = df[metrics[0]].idxmin()
+                        case 'sasa':
+                            index = df[metrics[0]].idxmax()
+                        case 'depth':
+                            index = df[metrics[0]].idxmin()
+                    return df.iloc[[index],:]
+
+                # situation 4: more than 1 unique value for both pKa and sasa
+                else:
+                    # link together the metrics with the weights
+                    try:
+                        metric_and_weights = zip(metrics, new_weights)
+                    except:
+                        print('Failed to link metrics with weights, were the metrics entered correctly?')
+                    
+                    # setup temporary list to house the metrics list after they have been calculated
+                    metric_calculated_values_list_temp = []
+
+                    try:
+                        for metric, met_weight in metric_and_weights:
+                            match metric:
+                                case 'pKa':
+                                    try:
+                                        # preference for lower pKa -> invert list
+                                        pka_max = df['pKa'].max()
+                                        pka_list = [(pka_max-i) for i in df['pKa'].tolist()]
+                                        # compute mean and std
+                                        pka_avg, pka_std = np.mean(pka_list), np.std(pka_list)
+                                        # standardise list
+                                        pka_list_standardised = (pka_list - pka_avg) / pka_std
+                                        # weight the list
+                                        pka_list_weighted = pka_list_standardised * met_weight
+                                        # append the list to the temporary list
+                                        metric_calculated_values_list_temp.append(pka_list_weighted)
+                                    except:
+                                        print('Failed to load the data for the metric: pKa')
+                                case 'sasa':
+                                    try:
+                                        # preference for highest sasa -> just take list
+                                        sasa_list = df['sasa'].tolist()
+                                        # compute mean and std
+                                        sasa_avg, sasa_std = np.mean(sasa_list), np.std(sasa_list)
+                                        # standardise list
+                                        sasa_list_standardised = (sasa_list - sasa_avg) / sasa_std
+                                        # weight the list
+                                        sasa_list_weighted = sasa_list_standardised * met_weight
+                                        # append the list to the temporary list
+                                        metric_calculated_values_list_temp.append(sasa_list_weighted)
+                                    except:
+                                        print('Failed to load the data for the metric: sasa')
+                                case 'depth':
+                                    try:
+                                        # preference for lower depth -> invert list
+                                        depth_max = df['depth'].max()
+                                        depth_list = [(depth_max-i) for i in df['depth'].tolist()]
+                                        # compute mean and std
+                                        depth_avg, depth_std = np.mean(depth_list), np.std(depth_list)
+                                        # standardise list
+                                        depth_list_standardised = (depth_list - depth_avg) / depth_std
+                                        # weight the list
+                                        depth_list_weighted = depth_list_standardised * met_weight
+                                        # append the list to the temporary list
+                                        metric_calculated_values_list_temp.append(depth_list_weighted)
+                                    except:
+                                        print('Failed to load the data for the metric: depth')
+                                case _:
+                                    print('Make sure metrics entered are correct: accepted metrics are currently pKa, sasa and depth')
+                    except:
+                        print('Error loading data for the metrics provided')
+
+                    try:
+                        index = -1
+                        base = 0
+                        for i in range(len(metric_calculated_values_list_temp[0])):
+                            weighted_sum = metric_calculated_values_list_temp[0][i] + metric_calculated_values_list_temp[1][i]
+                            if weighted_sum >= base:
+                                index = i
+                                base = weighted_sum
+                        return df.iloc[[index],:]
+                    except:
+                        print('Failed to find the best row for the desired trade off between the two metrics')
+                        return df.iloc[[0],:]
+            else:
+                return df.iloc[[0],:]
+
+        # This function gives the best row of values for that lysine from the dataframe based on relative trade off between metrics
+        def relative_best_3D(df, weight_list, metrics):
+            uniprot_temp = str(df['Uniprot_Entry'].values[0])
+            lysine_temp = str(df['Resid'].values[0])
+
+            # TODO GW-16.09.24 - as the 2D function is used within the 3D function, this affects the error messages for the weightings, 
+
+            # sort the weights into a list of length 2
+            try:
+                if len(weight_list) == 1:
+                    # only 1 weight provided for comparison -> assume equal weighting for each metric
+                    new_weights = [0.33, 0.33, 0.33]
+                elif len(weight_list) == 2:
+                    # only 2 weights provided for comparison -> assume equal weighting for each metric
+                    print('Only 2 weightings given for 3 metrics, assuming equal weighting for all')
+                    new_weights = [0.33, 0.33, 0.33]
+                elif len(weight_list) == 3:
+                    # 3 values provided for weights -> check they sum to 1 otherwise normalise
+                    if sum(weight_list) != 1:
+                        new_weights = [round((i/sum(weight_list)), 2) for i in weight_list]
+                elif len(weight_list) > 3:
+                    print('More weights provided than needed, taking the first three through.')
+                    new_weights = weight_list[0,1,2]
+            except:
+                print('Error sorting the weights for the analysis')
+
+            # if data for the lysine is only 1 row, don't need to run analysis on it
+            if len(df) > 1:
+                df = df.reset_index(drop = True)
+
+                # situation 1: all 3 metrics only have 1 unique value each -> take the first row as all the same
+                if (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) == 1) and (len(df[metrics[2]].unique()) == 1):
+                    try:
+                        return df.iloc[[0],:]
+                    except:
+                        print(f'Failed 3 metric analysis for situation 1 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+
+                # situation 2.1: only 1 unique value for metric1 and metric2 but more than 1 unique metric3 value
+                elif (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) == 1) and (len(df[metrics[2]].unique()) != 1):
+                    try:
+                        # as all metric1 values the same, just find the max value for metric2 and return the row which has this
+                        match metrics[2]:
+                            case 'pKa':
+                                index = df[metrics[2]].idxmin()
+                            case 'sasa':
+                                index = df[metrics[2]].idxmax()
+                            case 'depth':
+                                index = df[metrics[2]].idxmin()
+                        return df.iloc[[index],:]
+                    except:
+                        print(f'Failed 3 metric analysis for situation 2.1 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+
+                # situation 2.2: only 1 unique value for metric1 and metric3 but more than 1 unique metric2 value
+                elif (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) != 1) and (len(df[metrics[2]].unique()) == 1):
+                    try:
+                        # all sasa values the same, so just find the lowest pKa value and return the row that this is on
+                        match metrics[1]:
+                            case 'pKa':
+                                index = df[metrics[1]].idxmin()
+                            case 'sasa':
+                                index = df[metrics[1]].idxmax()
+                            case 'depth':
+                                index = df[metrics[1]].idxmin()
+                        return df.iloc[[index],:]
+                    except:
+                        print(f'Failed 3 metric analysis for situation 2.2 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+
+                # situation 2.3: only 1 unique value for metric2 and metric3 but more than 1 unique metric1 value
+                elif (len(df[metrics[0]].unique()) != 1) and (len(df[metrics[1]].unique()) == 1) and (len(df[metrics[2]].unique()) == 1):
+                    try:
+                        # all sasa values the same, so just find the lowest pKa value and return the row that this is on
+                        match metrics[0]:
+                            case 'pKa':
+                                index = df[metrics[0]].idxmin()
+                            case 'sasa':
+                                index = df[metrics[0]].idxmax()
+                            case 'depth':
+                                index = df[metrics[0]].idxmin()
+                        return df.iloc[[index],:]
+                    except:
+                        print(f'Failed 3 metric analysis for situation 2.3 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+
+                # situation 3.1: 1 metric has only unique values, 2 metrics have different values -> go to the function for 2D analysis
+                elif (len(df[metrics[0]].unique()) != 1) and (len(df[metrics[1]].unique()) != 1) and (len(df[metrics[2]].unique()) == 1):
+                    try:
+                        new_weight_list = [metrics[0], metrics[1]]
+                        new_metric_list = [new_weights[0], new_weights[1]]
+                        return relative_best_2D(df, metrics=new_metric_list, weight_list=new_weight_list)
+                    except:
+                        print(f'Failed 3 metric analysis for situation 3.1 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+                
+                # situation 3.2: 1 metric has only unique values, 2 metrics have different values -> go to the function for 2D analysis
+                elif (len(df[metrics[0]].unique()) != 1) and (len(df[metrics[1]].unique()) == 1) and (len(df[metrics[2]].unique()) != 1):
+                    try:
+                        new_weight_list = [metrics[0], metrics[2]]
+                        new_metric_list = [new_weights[0], new_weights[2]]
+                        return relative_best_2D(df, metrics=new_metric_list, weight_list=new_weight_list)
+                    except:
+                        print(f'Failed 3 metric analysis for situation 3.2 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+                
+                # situation 3.3: 1 metric has only unique values, 2 metrics have different values -> go to the function for 2D analysis
+                elif (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) != 1) and (len(df[metrics[2]].unique()) != 1):
+                    try:
+                        new_weight_list = [metrics[1], metrics[2]]
+                        new_metric_list = [new_weights[1], new_weights[2]]
+                        return relative_best_2D(df, metrics=new_metric_list, weight_list=new_weight_list)
+                    except:
+                        print(f'Failed 3 metric analysis for situation 3.3 on protein: {uniprot_temp}, Lysine: {lysine_temp}')
+                
+                # situation 4: more than 1 unique value for both all 3 metrics
+                else:
+                    # link together the metrics with the weights
+                    try:
+                        metric_and_weights = zip(metrics, new_weights)
+                    except:
+                        print('Failed to link metrics with weights, were the metrics entered correctly?')
+                    
+                    # setup temporary list to house the metrics list after they have been calculated
+                    metric_calculated_values_list_temp = []
+                    try:
+                        for metric, met_weight in metric_and_weights:
+                            match metric:
+                                case 'pKa':
+                                    try:
+                                        # preference for lower pKa -> invert list
+                                        pka_max = df['pKa'].max()
+                                        pka_list = [(pka_max-i) for i in df['pKa'].tolist()]
+                                        # compute mean and std
+                                        pka_avg, pka_std = np.mean(pka_list), np.std(pka_list)
+                                        # standardise list
+                                        pka_list_standardised = (pka_list - pka_avg) / pka_std
+                                        # weight the list
+                                        pka_list_weighted = pka_list_standardised * met_weight
+                                        # append the list to the temporary list
+                                        metric_calculated_values_list_temp.append(pka_list_weighted)
+                                    except:
+                                        print('Failed to load the data for the metric: pKa')
+                                case 'sasa':
+                                    try:
+                                        # preference for highest sasa -> just take list
+                                        sasa_list = df['sasa'].tolist()
+                                        # compute mean and std
+                                        sasa_avg, sasa_std = np.mean(sasa_list), np.std(sasa_list)
+                                        # standardise list
+                                        sasa_list_standardised = (sasa_list - sasa_avg) / sasa_std
+                                        # weight the list
+                                        sasa_list_weighted = sasa_list_standardised * met_weight
+                                        # append the list to the temporary list
+                                        metric_calculated_values_list_temp.append(sasa_list_weighted)
+                                    except:
+                                        print('Failed to load the data for the metric: sasa')
+                                case 'depth':
+                                    try:
+                                        # preference for lower depth -> invert list
+                                        depth_max = df['depth'].max()
+                                        depth_list = [(depth_max-i) for i in df['depth'].tolist()]
+                                        # compute mean and std
+                                        depth_avg, depth_std = np.mean(depth_list), np.std(depth_list)
+                                        # standardise list
+                                        depth_list_standardised = (depth_list - depth_avg) / depth_std
+                                        # weight the list
+                                        depth_list_weighted = depth_list_standardised * met_weight
+                                        # append the list to the temporary list
+                                        metric_calculated_values_list_temp.append(depth_list_weighted)
+                                    except:
+                                        print('Failed to load the data for the metric: depth')
+                                case _:
+                                    print('Make sure metrics entered are correct: accepted metrics are currently pKa, sasa and depth')
+                    except:
+                        print('Error loading data for the metrics provided')
+
+                    try:
+                        index = -1
+                        base = 0
+                        for i in range(len(metric_calculated_values_list_temp[0])):
+                            weighted_sum = 0
+                            for weighted_value_index in range(len(metric_calculated_values_list_temp)):
+                                weighted_sum += metric_calculated_values_list_temp[weighted_value_index][i]
+                            if weighted_sum >= base:
+                                index = i
+                                base = weighted_sum
+                        return df.iloc[[index],:]
+                    except:
+                        print('Failed to find the best row for the desired trade off between the three metrics')
+                        return df.iloc[[0],:]
+            else:
+                return df.iloc[[0],:]
+
+        # TODO GW-16.09.24 -if more metrics are added, the above 2 functions can be combined into 1 where user can request any number of metrics to be evaluated against each other
+        #                   code is almost there for this, just needs sorting of the weights incase differnet number to the number of metrics
 
 
         df_temp = df.drop_duplicates(subset=['Uniprot_Entry','Resid'])
@@ -340,7 +675,13 @@ class Analysis(object):
             df_query = df[(df['Uniprot_Entry'] == entry) & (df['Resid'] == resid)]
             
             if method == 'south_east':
-                row_to_append = low_pka_large_sasa(df_query, weight = weight)
+                if len(metrics) == 3:
+                    row_to_append = relative_best_3D(df_query, weight_list = weight, metrics=metrics)
+                elif len(metrics) == 2:
+                    row_to_append = relative_best_2D(df_query, weight_list = weight, metrics=metrics)
+                else:
+                    print('Please enter at least 2 metrics to compare the trade off between')
+                # TODO GW-16.09.24 - is it worth adding a function here where a user could take through a row which has the best value for just 1 metric
                 #self.df_sub = self.df_sub.append(row_to_append, ignore_index = True)  # old line which doesnt work anymore, replaced by new one
                 self.df_sub = pd.concat([self.df_sub, row_to_append], axis=0, ignore_index=True)
             else:
