@@ -684,6 +684,7 @@ class Analysis(object):
                 # TODO GW-16.09.24 - is it worth adding a function here where a user could take through a row which has the best value for just 1 metric
                 #self.df_sub = self.df_sub.append(row_to_append, ignore_index = True)  # old line which doesnt work anymore, replaced by new one
                 self.df_sub = pd.concat([self.df_sub, row_to_append], axis=0, ignore_index=True)
+                self.df_sub['Resid'] = self.df_sub['Resid'].astype(int)
             else:
                 pka_mean = df_query['pKa'].mean()
                 sasa_mean = df_query['sasa'].mean()
@@ -692,6 +693,7 @@ class Analysis(object):
                 #data = {'Uniprot_Entry':entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan, 'Resid':resid, 'pKa':pka_mean, 'sasa':sasa_mean, 'depth':depth_mean}
                 data = {'Uniprot_Entry':entry, 'Resid':resid, 'pKa mean':pka_mean, 'sasa mean':sasa_mean, 'depth mean':depth_mean}
                 self.df_sub = pd.concat([self.df_sub, pd.DataFrame(data, index=[0])], ignore_index=True)
+
 
 
     def get_contingency_table(self, GO_code, my_list, reference):
