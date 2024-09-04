@@ -8,6 +8,14 @@ import numpy as np
 import biobox as bb
 import logging
 
+# AEV packages
+try:
+    from ase import Atoms
+    import torch
+    import torchani
+except:
+    print('Packages required for AEV calculation are not available, will not be able to calculate AEVs')
+
 try:
     from Bio.PDB import PDBParser
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
@@ -18,7 +26,7 @@ except:
 class Measure(object):
     
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=["propka", "pkaANI", "sasa", "depth"]):
+                 features=["propka", "pkaANI", "sasa", "depth", 'aev']):
         
         self.activate_log = False
         if activate_log:
@@ -87,6 +95,8 @@ class Measure(object):
                 self.measures.append([m, self.calculate_sasa])
             elif m == "depth":    
                 self.measures.append([m, self.calculate_depth])
+            elif m == 'aev':
+                self.measures.append([m, self.calculate_aevs])
             else:
                 raise Exception(f"measure {m} unknown")
     
@@ -187,7 +197,15 @@ class Measure(object):
                 
             # remove possible duplicated rows (if restarted)
             if index == first_index:
-                self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+                try:
+                    self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+                except:
+                    try:
+                        self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
+                    except:
+                        print('Failed to remove duplicates from measurement dataframe')
+                        pass
+                    
 
     
     def recover_from_log(self, log_path):
@@ -236,8 +254,12 @@ class Measure(object):
             if len(idx[0]) == 0:
                 continue
             
+            # this if statement allows you to add the lists of the aevs into the overall dataframe
+            if col_name == 'aev':
+                target['aev'] = target['aev'].astype('object')
+
             target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
-          
+
         return target
 
 
@@ -685,6 +707,48 @@ class Measure(object):
     
         return df_Depth
     
+
+    def calculate_aevs(self, path):
+        # new function for calculating AEV descriptors for the lysines within the dataset given
+
+        # 1: preparet the biobox structure, take the species and coordinates and convert to Atoms structure, find the locations of the NZ atoms within the lysines in the strucure
+        try:
+            M = bb.Molecule(path)
+            atomSpecies = M.data['atomtype']
+            coords = M.coordinates[0]  # take the coords from the molecule read in through biobox
+            structure = Atoms(atomSpecies, coords)
+        except:
+            raise Exception('AEV Calculations: 1 - could not create the atomic structure representation')
+        
+        # 2: Calculate the AEVs for the protein structure
+        try:
+            deviceSpecs = 'cpu'
+            ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=deviceSpecs)
+            species = ANI.species_to_tensor(structure.get_chemical_symbols()).unsqueeze(0)
+            aniCoords = torch.tensor(structure.get_positions(), dtype=torch.float32).unsqueeze(0)
+            species = species.to(deviceSpecs)
+            aniCoords = aniCoords.to(deviceSpecs)
+            aevs = ANI.aev_computer((species, aniCoords)).aevs
+        except:
+            raise Exception('AEV Calculations: 2 - could not create the AEVs for the protein')
+        
+        # 3: Extract the AEVs of interest from the full protein set and asign these to the output dataframe
+        aevs_results = []
+        df_aevs = pd.DataFrame(columns=["Chain", "Resid", "aev"])
+        try:
+            idx_nz = M.atomselect("*", "LYS", "NZ", use_resname=True, get_index=True)[1]
+            lys_res_nums = list(M.data['resid'][idx_nz])
+            list_chains = list(M.data['chain'][idx_nz])
+            aevs = aevs[0,:,:].squeeze().tolist()
+            df_aevs['Chain'] = list_chains
+            df_aevs['Resid'] = lys_res_nums
+            df_aevs['aev'] = pd.Series(aevs)
+        except:
+            raise Exception('AEV Calculation: 3 - could not select the relevent AEVs and save these to the dataframe')
+        
+        # 4: convert results to dataframe and return this back to the overall set
+        #df_aevs = pd.DataFrame(aevs_results, columns=["Chain", "Resid", "aev"])
+        return df_aevs
     
 
 if __name__ == "__main__":
