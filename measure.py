@@ -26,7 +26,7 @@ except:
 class Measure(object):
     
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=["propka", "pkaANI", "sasa", "depth", 'aev']):
+                 features=["propka", "pkaANI", "sasa", "depth", 'aev', 'sasapath']):
         
         self.activate_log = False
         if activate_log:
@@ -97,6 +97,8 @@ class Measure(object):
                 self.measures.append([m, self.calculate_depth])
             elif m == 'aev':
                 self.measures.append([m, self.calculate_aevs])
+            elif m == 'sasapath':
+                self.measures.append([m, self.calculate_sasapath])
             else:
                 raise Exception(f"measure {m} unknown")
     
@@ -259,6 +261,8 @@ class Measure(object):
                 target['aev'] = target['aev'].astype('object')
 
             target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
+
+        print(target.dtypes)
 
         return target
 
@@ -750,6 +754,48 @@ class Measure(object):
         #df_aevs = pd.DataFrame(aevs_results, columns=["Chain", "Resid", "aev"])
         return df_aevs
     
+
+    def calculate_sasapath(self, path):
+        # function to calculate the shortest solvent accessible path of the NZ atoms within the lysines of the proteins. A half sphere is created over the lysine which removes points which arent accesisble, the number of points can be summed as the density of points is always the same in each case
+        
+        
+        # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
+        try:
+            M = bb.Molecule(path)
+            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            lys_res_nums = list(M.data['resid'][idx_nz])
+            list_chains = list(M.data['chain'][idx_nz])
+        except:
+            raise Exception('SASA Path Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure.')
+        
+        # 2: Setup the Xlink module and create the half spheres 
+        try:
+            XL = bb.Xlink(M)
+            XL.set_clashing_atoms(atoms=["CA", "C", "N", "O", "CB"], densify=True)
+            sasapath_output = []
+            for lys_nz_idx in idx_nz:
+                # the parameteres (pts_surf, thresh, radii) for the _get_half_sphere are already set for lysine residues and therefore the only parameter that needs to be set is i: this is the index of the atom of interest within the lysine
+                half_sphere_coords = XL._get_half_sphere(i=lys_nz_idx)
+                # as the density of points created by the get half sphere is constant for any setup, therefore can just count the number of coordinates that are returned for a measure for SASA Path
+                sasapath_output.append(len(half_sphere_coords))
+            print(sasapath_output)
+        except:
+            raise Exception('SASA Path Calculation: 2 - Failed to calculate the half spheres for the NZ atoms within the lysines.')
+        
+        # 3: Create dataframe to return
+        df_sasapath = pd.DataFrame(columns=["Chain", "Resid", "sasapath"])
+        try:
+            df_sasapath['Chain'] = list_chains
+            df_sasapath['Resid'] = lys_res_nums
+            df_sasapath['sasapath'] = sasapath_output
+        except:
+            raise Exception('SASA Path Calcualtion: 3 - Failed to create datafame to append to the overall dataframe.')
+        
+        return df_sasapath
+        
+        
+        
+        
 
 if __name__ == "__main__":
 
