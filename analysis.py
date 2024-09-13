@@ -11,15 +11,23 @@ import concurrent.futures
 from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
 
+#### TODO Section #### - for general todos in this file, may be more further down
+# TODO GW 13.09.24 - most of the GO term analysis currently only works for propka not pkaani, look into adding this in
+# TODO GW 13.09.24 - look into the GO term functions and see if these stilll actually work with all the extra stuff added in
+
+
+
+
+
 class Analysis(object):
     
     def __init__(self, df,  outdir="result"):
-        self.df = df.dropna(subset=['pKa', 'sasa'])
+        self.df = df.dropna(subset=['propka', 'sasa'])
         
-        self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num','pKa mean','pKa std','pKa range', 
+        self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num','propka mean','propka std','propka range', 
         'SASA mean','SASA std','SASA range', 'Depth mean', 'Depth std', 'Depth range'])
         
-        #self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','Resid','pKa','sasa', 'depth']) 
+        #self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','Resid','propka','sasa', 'depth']) 
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
         
         self.GO_dict = {} # code as the key
@@ -128,10 +136,11 @@ class Analysis(object):
             df_query = self.df[(self.df['Uniprot_Entry'] == entry) & (self.df['Resid'] == resid)]
             # calculate all the values of interest from the subset dataframe (df_query)
             num = len(df_query)
-            pka_mean = round(df_query['pKa'].mean(),2)
-            pka_std = round(df_query['pKa'].std(),2)
-            pka_range_values = [round(df_query['pKa'].min(),2),round(df_query['pKa'].max(),2)]
-            pka_range = pka_range_values[1] - pka_range_values[0]
+            propka_mean = round(df_query['propka'].mean(),2)
+            propka_std = round(df_query['propka'].std(),2)
+            propka_range_values = [round(df_query['propka'].min(),2),round(df_query['propka'].max(),2)]
+            propka_range = propka_range_values[1] - propka_range_values[0]
+            # TODO GW 13.09.24 - Do we need to split up analysis into Propka and pkaANI, at the moment it just takes forward the propka data
             sasa_mean = round(df_query['sasa'].mean(),2)
             sasa_std = round(df_query['sasa'].std(),2)
             sasa_range_values = [round(df_query['sasa'].min(),2),round(df_query['sasa'].max(),2)]
@@ -144,9 +153,9 @@ class Analysis(object):
             data = {'Uniprot_Entry': entry,
                         'Resid': resid,
                         'Num': num,
-                        'pKa mean': pka_mean,
-                        'pKa std': pka_std,
-                        'pKa range': pka_range,
+                        'propka mean': propka_mean,
+                        'propka std': propka_std,
+                        'propka range': propka_range,
                         'SASA mean': sasa_mean,
                         'SASA std': sasa_std,
                         'SASA range': sasa_range,
@@ -274,7 +283,7 @@ class Analysis(object):
         print(f'Original num of rows: {initial_fullData_rows}\nCurrent num of rows: {final_fullData_rows}\nNum of rows removed: {diff_rows}')
         self.df.to_csv(os.path.join(self.outdir, "measures_cut.csv"), index_label=False, index=False) 
 
-    def subset(self, df, weight = 0.5, method = 'average', metrics=['pKa', 'sasa', 'depth']):
+    def subset(self, df, weight = 0.5, method = 'average', metrics=['propka', 'sasa', 'depth']):
         
         if method != 'average' and method != 'south_east':
             raise ValueError('Wrong input method, try average or south_east.')
@@ -305,25 +314,25 @@ class Analysis(object):
                 df = df.reset_index(drop = True)
 
                 # situation 1: both pKa and sasa only have 1 unique value each -> take the first row as all the same
-                if (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) == 1):
+                if (len(df['propka'].unique()) == 1) and (len(df['sasa'].unique()) == 1):
                     return df.iloc[[0],:]
 
                 # situation 2: only 1 unique pKa value but more than 1 unique sasa value
-                elif (len(df['pKa'].unique()) == 1) and (len(df['sasa'].unique()) != 1):
+                elif (len(df['propka'].unique()) == 1) and (len(df['sasa'].unique()) != 1):
                     # as all pKa the same, just find the max value for sasa and return the row which has this
                     index = df['sasa'].idxmax()
                     return df.iloc[[index],:]
 
                 # situation 3: more than 1 unique pKa value, only 1 unique sasa value
-                elif (len(df['pKa'].unique()) != 1) and (len(df['sasa'].unique()) == 1):
+                elif (len(df['propka'].unique()) != 1) and (len(df['sasa'].unique()) == 1):
                     # all sasa values the same, so just find the lowest pKa value and return the row that this is on
-                    index = df['pKa'].idxmin()
+                    index = df['propka'].idxmin()
                     return df.iloc[[index],:]
 
                 # situation 4: more than 1 unique value for both pKa and sasa
                 else:
-                    pka_max = df['pKa'].max()
-                    pka_list = [(pka_max-i) for i in df['pKa'].tolist()]  # this effectively inverts the values, eg a lower pKa now had a higher value, allows normalised comparison later
+                    pka_max = df['propka'].max()
+                    pka_list = [(pka_max-i) for i in df['propka'].tolist()]  # this effectively inverts the values, eg a lower pKa now had a higher value, allows normalised comparison later
                     sasa_list = df['sasa'].tolist()
 
                     # compute mean and std
@@ -378,7 +387,7 @@ class Analysis(object):
                 elif (len(df[metrics[0]].unique()) == 1) and (len(df[metrics[1]].unique()) != 1):
                     # as all metric1 values the same, just find the optimal for metric2 and return the row which has this
                     match metrics[1]:
-                        case 'pKa':
+                        case 'propka':
                             index = df[metrics[1]].idxmin()
                         case 'sasa':
                             index = df[metrics[1]].idxmax()
@@ -390,7 +399,7 @@ class Analysis(object):
                 elif (len(df[metrics[0]].unique()) != 1) and (len(df[metrics[1]].unique()) == 1):
                     # all metric2 values the same, so just find the lowest pKa value and return the row that this is on
                     match metrics[0]:
-                        case 'pKa':
+                        case 'propka':
                             index = df[metrics[0]].idxmin()
                         case 'sasa':
                             index = df[metrics[0]].idxmax()
@@ -412,11 +421,11 @@ class Analysis(object):
                     try:
                         for metric, met_weight in metric_and_weights:
                             match metric:
-                                case 'pKa':
+                                case 'propka':
                                     try:
                                         # preference for lower pKa -> invert list
-                                        pka_max = df['pKa'].max()
-                                        pka_list = [(pka_max-i) for i in df['pKa'].tolist()]
+                                        pka_max = df['propka'].max()
+                                        pka_list = [(pka_max-i) for i in df['propka'].tolist()]
                                         # compute mean and std
                                         pka_avg, pka_std = np.mean(pka_list), np.std(pka_list)
                                         # standardise list
@@ -426,7 +435,7 @@ class Analysis(object):
                                         # append the list to the temporary list
                                         metric_calculated_values_list_temp.append(pka_list_weighted)
                                     except:
-                                        print('Failed to load the data for the metric: pKa')
+                                        print('Failed to load the data for the metric: propka')
                                 case 'sasa':
                                     try:
                                         # preference for highest sasa -> just take list
@@ -457,7 +466,7 @@ class Analysis(object):
                                     except:
                                         print('Failed to load the data for the metric: depth')
                                 case _:
-                                    print('Make sure metrics entered are correct: accepted metrics are currently pKa, sasa and depth')
+                                    print('Make sure metrics entered are correct: accepted metrics are currently propka, sasa and depth')
                     except:
                         print('Error loading data for the metrics provided')
 
@@ -518,7 +527,7 @@ class Analysis(object):
                     try:
                         # as all metric1 values the same, just find the max value for metric2 and return the row which has this
                         match metrics[2]:
-                            case 'pKa':
+                            case 'propka':
                                 index = df[metrics[2]].idxmin()
                             case 'sasa':
                                 index = df[metrics[2]].idxmax()
@@ -533,7 +542,7 @@ class Analysis(object):
                     try:
                         # all sasa values the same, so just find the lowest pKa value and return the row that this is on
                         match metrics[1]:
-                            case 'pKa':
+                            case 'propka':
                                 index = df[metrics[1]].idxmin()
                             case 'sasa':
                                 index = df[metrics[1]].idxmax()
@@ -548,7 +557,7 @@ class Analysis(object):
                     try:
                         # all sasa values the same, so just find the lowest pKa value and return the row that this is on
                         match metrics[0]:
-                            case 'pKa':
+                            case 'propka':
                                 index = df[metrics[0]].idxmin()
                             case 'sasa':
                                 index = df[metrics[0]].idxmax()
@@ -598,11 +607,11 @@ class Analysis(object):
                     try:
                         for metric, met_weight in metric_and_weights:
                             match metric:
-                                case 'pKa':
+                                case 'propka':
                                     try:
                                         # preference for lower pKa -> invert list
-                                        pka_max = df['pKa'].max()
-                                        pka_list = [(pka_max-i) for i in df['pKa'].tolist()]
+                                        pka_max = df['propka'].max()
+                                        pka_list = [(pka_max-i) for i in df['propka'].tolist()]
                                         # compute mean and std
                                         pka_avg, pka_std = np.mean(pka_list), np.std(pka_list)
                                         # standardise list
@@ -612,7 +621,7 @@ class Analysis(object):
                                         # append the list to the temporary list
                                         metric_calculated_values_list_temp.append(pka_list_weighted)
                                     except:
-                                        print('Failed to load the data for the metric: pKa')
+                                        print('Failed to load the data for the metric: propka')
                                 case 'sasa':
                                     try:
                                         # preference for highest sasa -> just take list
@@ -643,7 +652,7 @@ class Analysis(object):
                                     except:
                                         print('Failed to load the data for the metric: depth')
                                 case _:
-                                    print('Make sure metrics entered are correct: accepted metrics are currently pKa, sasa and depth')
+                                    print('Make sure metrics entered are correct: accepted metrics are currently propka, sasa and depth')
                     except:
                         print('Error loading data for the metrics provided')
 
@@ -686,12 +695,12 @@ class Analysis(object):
                 self.df_sub = pd.concat([self.df_sub, row_to_append], axis=0, ignore_index=True)
                 self.df_sub['Resid'] = self.df_sub['Resid'].astype(int)
             else:
-                pka_mean = df_query['pKa'].mean()
+                propka_mean = df_query['propka'].mean()
                 sasa_mean = df_query['sasa'].mean()
                 depth_mean = df_query['depth'].mean()
                 # GW: Have changed the data entry from the following line to the one after to; not worth including the NaN values in this dataframe when they dont add anything to it
-                #data = {'Uniprot_Entry':entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan, 'Resid':resid, 'pKa':pka_mean, 'sasa':sasa_mean, 'depth':depth_mean}
-                data = {'Uniprot_Entry':entry, 'Resid':resid, 'pKa mean':pka_mean, 'sasa mean':sasa_mean, 'depth mean':depth_mean}
+                #data = {'Uniprot_Entry':entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan, 'Resid':resid, 'propka':propka_mean, 'sasa':sasa_mean, 'depth':depth_mean}
+                data = {'Uniprot_Entry':entry, 'Resid':resid, 'propka mean':propka_mean, 'sasa mean':sasa_mean, 'depth mean':depth_mean}
                 self.df_sub = pd.concat([self.df_sub, pd.DataFrame(data, index=[0])], ignore_index=True)
 
 
@@ -728,7 +737,7 @@ class Analysis(object):
         # get all the uniprot codes inside the range and the reference uniprot code list
         pka_l, pka_u = pka_range[0], pka_range[1]
         sasa_l, sasa_u = sasa_range[0], sasa_range[1]
-        selected_df = self.df_sub[(self.df_sub['pKa'] >= pka_l) & (self.df_sub['pKa'] <= pka_u)]
+        selected_df = self.df_sub[(self.df_sub['propka'] >= pka_l) & (self.df_sub['propka'] <= pka_u)]
         selected_df = selected_df[(selected_df['sasa'] >= sasa_l) & (selected_df['sasa'] <= sasa_u)]
         my_list = selected_df['Uniprot_Entry'].unique()
         reference = self.df_sub['Uniprot_Entry'].unique()
