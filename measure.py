@@ -585,95 +585,94 @@ class Measure(object):
  
     def calculate_sasa(self, path):
         '''
-        Form small structures which include just the atoms surrounding the lysine of interest,
-        and compute the SASA from that.
+        Calculate the solvent accessible surface area of the NZ atom within the lysine structure
+
+        Method
+        ------
+        Form small structures which include just the atoms surrounding the lysine of interest.
+        Small structures are classified as any atoms within 15 angstroms of the NZ of the lysines.
+        A new biobox moleucle is created for the substructure and SASA is calculated from that.
+        The SASA calculation uses the bb.sasa() function.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that SASA is being calculated for.
+
+        Returns
+        -------
+
         '''
-        
+
         try:
             list_of_sasa = list()
             list_of_resid = list()
             list_of_chains = list()
-    
+
             #read PDB file
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
             df = M.data
-    
+
             #Find the coordinates and index of all lysine residues in the protein.
             lys_coords, lys_idx = M.atomselect('*', ['LYS'], 'NZ', use_resname=True, get_index=True)
             df = M.data
-    
-            #Use get_subset...
-            #Find the chain and resid of each lysine.
-            for entry in lys_idx:
-                chain = df.at[entry, 'chain']
-                list_of_chains.append(chain)
-    
-            for entry in lys_idx:
-                resid = df.at[entry, 'resid']
-                list_of_resid.append(int(resid))
+
+            #Find the chain and resid number of each lysine.
+            list_of_resid = list(M.data['resid'][lys_idx])
+            list_of_chains = list(M.data['chain'][lys_idx])
                 
             #Find the coordinates and index of every atom in the molecule.
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
-    
+
         except Exception as e:
-            raise Exception("%s"%e)
+            raise Exception(f'{e}')
         
         #For each lysine it works out the distance between the lys NZ,
         #and the each atom in the protein.
-        for j in range(len(lys_coords)):
+        for j, lys_coord in enumerate(lys_coords):
             list_close_points = list()
             
-            for i in range(len(all_coords)):
+            for i, coord in enumerate(all_coords):
                 try:
-                    x_dist = (((lys_coords[j])[0] - (all_coords[i])[0])**2)
-                    y_dist = (((lys_coords[j])[1] - (all_coords[i])[1])**2)
-                    z_dist = (((lys_coords[j])[2] - (all_coords[i])[2])**2)
+                    x_dist = (lys_coord[0] - coord[0])**2
+                    y_dist = (lys_coord[1] - coord[1])**2
+                    z_dist = (lys_coord[2] - coord[2])**2
                     distance = np.sqrt(x_dist + y_dist + z_dist)
                     if distance < 15:
                         list_close_points.append(idx[i])
                 except:
                     continue
-    
+
             #if the atoms are close to the lys NZ they are included in a small .pdb structure.
             try:
-                M.write_pdb('temp_struc.pdb', index=list_close_points, split_struc=False)
-    
-                S = bb.Molecule()
-                S.import_pdb('temp_struc.pdb', include_hetatm=True)
+                S = M.get_subset(idxs=list_close_points) 
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
                 #print([chain, resid])
-    
+
                 #SASA is calculated for that lysine in the small molecule.
-                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],  use_resname=False, get_index=True)
+                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"], 
+                                            use_resname=False, get_index=True)
                 #print([pts_2, indx_2, S.data['radius']])
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
                 list_of_sasa.append(x[0])
-    
+
             except:
                 print('Error obtaining SASA at index value ' + str(j))
                 list_of_sasa.append(None)
                 continue
-    
+
         #append results to a df which is given as output
         try:
-            df = pd.DataFrame({'Chain': list_of_chains,
-                               'Resid': list_of_resid,
-                               'sasa': list_of_sasa})
-    
+            df_sasa = pd.DataFrame({'Chain': list_of_chains,
+                                'Resid': list_of_resid,
+                                'sasa': list_of_sasa})
+
         except Exception as e:
-            raise Exception('Error obtaining SASA data. %s'%e)
-    
-        try:
-            os.remove('temp_struc.pdb')
+            raise Exception(f'Error obtaining SASA data. {e}')
             
-        except Exception as e:
-            print("Error %s"%e)
-            print('Failed to remove temporary pdb structure.')
-            pass
-        
-        return df
+        return df_sasa
        
     
     def calculate_depth(self, path):
