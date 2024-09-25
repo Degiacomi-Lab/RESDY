@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import logging
+import datetime
 
 # AEV packages
 try:
@@ -24,10 +25,10 @@ except:
 
 
 class Measure(object):
-    
+
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features=["propka", "pkaANI", "sasa", "depth", 'aev', 'sasapath']):
-        
+
         self.activate_log = False
         if activate_log:
             self.activate_log = activate_log
@@ -48,14 +49,14 @@ class Measure(object):
 
         # for restarting
         self.current_index = 0
-        
+
         # document failed pdb files
         self.wrong_pdb_file = list()
-        
+
         self.outdir = outdir
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
-               
+
         # Check that all files in DataFrame appear at least once in folder
         files1=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))] #to find AlphaFold entries
         files2=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))] #to find PDB entries
@@ -66,9 +67,9 @@ class Measure(object):
         self.pkaoutdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pkaoutdir):
             os.makedirs(self.pkaoutdir)
-        
+
         self.PDB_only = False
-        
+
         if 'Uniprot_Entry' in self.df_input.columns: 
             columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns=columns)
@@ -76,7 +77,7 @@ class Measure(object):
             self.PDB_only = True
             columns = ['PDB Code', 'Chain', 'Resid', 'propka', 'pkaANI', 'sasa', 'depth']
             self.df = pd.DataFrame(columns = columns)
-                
+
     def _setup_measures(self, features):
         '''
         convert a list of features into a measuring protocol
@@ -118,32 +119,35 @@ class Measure(object):
         files = [file for file in files if 'pkaani' not in file]
 
         first_index = self.df_input.index[0]
+        total_structures = len(files)
+        current_structure = 0
+        overall_st = time.time()
+        print(f'Total number of structures to analyse: {total_structures}')
 
         for index, row in self.df_input.iterrows():
             PDBCODE = row["PDB Code"]
             chains = row["Chains"].split("/")
             self.current_index = index
-            
+
             uniprot_code = row["Uniprot_Entry"]
             print("\n# UNIPROT: %s PDB: %s, chain(s): %s"%(uniprot_code, PDBCODE, " ".join(chains)))
-            
+
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
-                
+
                 if PDBCODE not in f:
                     continue
-
+                print(f'Analysing structure {current_structure}/{total_structures}')
                 tstart = time.time()
                 print("\n> File: %s"%f)
-                             
+
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
-                
+
                 columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
                 df = pd.DataFrame(columns=columns)
-                
-                
-                # append to temporary DataFrame all lysines in the file of interest             
+
+                # append to temporary DataFrame all lysines in the file of interest
                 try:
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
                 except:
@@ -166,7 +170,7 @@ class Measure(object):
                         'Resid': M.data["resid"].values[i]})
 
                     df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                
+
                 print(f">> {len(df)} lysines of interest found")
 
                 # iterate over measures to carry out (according to self.measures)
@@ -176,13 +180,19 @@ class Measure(object):
                         df[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f) # run measurement
                         df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
-                        
+
                     except Exception as e:
                         print(f"ERROR: {e}")
                         continue
-                
-                print(">> file processed in %4.2f sec."%(time.time()-tstart))
-                
+
+                current_structure += 1
+                print(">> file processed in %4.2f seconds."%(time.time()-tstart))
+                average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
+                print(f'>> Time average per file: {average_time_per_file} seconds.')
+                seconds_remaining = average_time_per_file * (total_structures + 1 - current_structure)
+                time_remaining_str = str(datetime.timedelta(seconds=seconds_remaining))
+                print(f'Predicted time remaining: {time_remaining_str}')
+
                 # document the data to a log file
                 if self.activate_log:
                     if df.empty == False:
@@ -191,7 +201,7 @@ class Measure(object):
                             self.logger.info('--------------------------------------------------------------------------')
                         except:
                             print('Error in logging.')
-                
+
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df], ignore_index=True)
                 
