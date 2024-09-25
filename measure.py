@@ -93,7 +93,7 @@ class Measure(object):
                 self.measures.append([m, self.calculate_pkaANI])
             elif m == "sasa":
                 self.measures.append([m, self.calculate_sasa])
-            elif m == "depth":    
+            elif m == "depth":
                 self.measures.append([m, self.calculate_depth])
             elif m == 'aev':
                 self.measures.append([m, self.calculate_aevs])
@@ -101,7 +101,7 @@ class Measure(object):
                 self.measures.append([m, self.calculate_sasapath])
             else:
                 raise Exception(f"measure {m} unknown")
-    
+
     def save_state(self, outname="measures.csv"):
         '''
         Save a csv file in output directory
@@ -116,6 +116,8 @@ class Measure(object):
             return 'Call PDB_only method'
         
         files = glob.glob(os.path.join(self.folder, "*pdb"))
+        # remove the files which have pkaani in the name as these are output files from pkaani
+        files = [file for file in files if 'pkaani' not in file]
         
         first_index = self.df_input.index[0]
         
