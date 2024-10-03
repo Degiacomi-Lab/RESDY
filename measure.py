@@ -27,7 +27,7 @@ except:
 class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=["propka", "pkaANI", "sasa", "depth", 'aev', 'das']):
+                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das']):
 
         self.activate_log = False
         if activate_log:
@@ -51,7 +51,7 @@ class Measure(object):
         self.current_index = 0
 
         # document failed pdb files
-        self.wrong_pdb_file = list()
+        self.wrong_pdb_file = []
 
         self.outdir = outdir
         self.df_input = df_input
@@ -104,15 +104,42 @@ class Measure(object):
 
     def save_state(self, outname="measures.csv"):
         '''
-        Save a csv file in output directory
+        Function to save a csv file of all of the measurements calculated through measure_dataframe()
+        File is automatically saved in the output directory that has been set previously when setting up the measures class
+        Option to customise the name of the output file
+
+        Parameters
+        ----------
+        outname : string
+            the name of the csv file that the output is written to
+
+        Example
+        -------
+        M.save_state(outname='measures.csv')
         '''
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
     def measure_dataframe(self):
+        '''
+        DOCSTRING WRITING NEEDED
+
+        Method
+        ------
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+
+        Example
+        -------
+
+        '''
         # use a different method if handling pdb codes only
         if self.PDB_only:
-            return 'Call PDB_only method'
+            return 'Call PDB_only method instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
         # remove the files which have pkaani in the name as these are output files from pkaani
@@ -219,7 +246,22 @@ class Measure(object):
 
     
     def recover_from_log(self, log_path):
-    
+        '''
+        DOCSTRING WRITING NEEDED
+
+        Method
+        ------
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+
+        Example
+        -------
+
+        '''
         if self.PDB_only:
             return 'Function not callable.'
         
@@ -239,12 +281,62 @@ class Measure(object):
         return log_to_df
     
     
-    def restart_measure(self):
-        
+    def restart_measure(self, log_path='measure_log.txt'):
+        '''
+        A function to restart the measurements calculations
+        Useful if the initial run of the measurements crashes or gets stuck
+        Works out how far along the simulation was by running an analysis of the measures log file
+
+        Method
+        ------
+        Read over the measures log file and collate a list of files that have been analysed
+        Remove the final value from the list as this may not have been done properly
+        Remove completed files from files to do
+        Restart measure_dataframe() with the new list
+
+        Parameters
+        ----------
+        log_path : string
+            The name of the measures log file
+            By default takes the name 'measures_log.txt'
+
+        Example
+        -------
+        >> M.restart_measure()
+        '''
+        # TODO is there a way to restart the PDB_only measurements? Might need to produce on if not
         if self.PDB_only:
-            return 'Function not callable'
-            
-        self.df_input = self.df_input.loc[self.current_index:, :]
+            return 'restart_measure() function not callable when using PDB_only'
+        
+        print(len(self.df_input))
+
+        # 1. Analyse the measures log file to create a list of files that were analysed
+        log_path = os.path.join(self.outdir, log_path)
+        proteins_completed = []
+        words_to_ignore = ['sasa', 'depth', 'pKa', 'PDB', 'Code', 'Method', 'Chain', 'Resid', 'Resolution', 'Uniprot', 'Entry']
+        with open(file=log_path, mode='r') as lpf:
+            for line in lpf:
+                line = line.replace('--------------------------------------------------------------------------',' ')
+                parts = line.split()
+                if len(parts) == 0:
+                    continue
+                protein_code = parts[1].split('/')[-1]
+                if protein_code not in words_to_ignore:
+                    proteins_completed.append(protein_code)
+        
+        # remove the last protein from list incase it wasn't completed fully
+        final_protein = proteins_completed[-1]
+        proteins_completed = [c for c in proteins_completed if c != final_protein]
+        proteins_completed = list(set(proteins_completed))
+
+        # 2. Update df_input to only have the files which haven't been analysed yet
+        idx_to_remove = []
+        for i, r in self.df_input.iterrows():
+            if r['Uniprot_Entry'] in proteins_completed:
+                idx_to_remove.append(i)
+        self.df_input = self.df_input.drop(idx_to_remove)
+        print(len(self.df_input))
+        # 3. Restart the measure_dataframe() with the new file list
         self.measure_dataframe()
       
   
@@ -497,23 +589,23 @@ class Measure(object):
         parse the PROPKA output file and appends unique chain and resid of any lysines mentioned a DataFrame.
         This list is returned to main and later the residues in it are removed from the df.
         '''
-        
+
         f = open(path, 'r')
         list_remove = list()
         cnt = 0
         for line in f:
             cnt += 1
             lys_raw = re.findall('LYS [\d]*[\s][\w]*', line)
-    
+
             for line in lys_raw:
                 words = line.split(' ')
                 resid = words[1]
                 chain = words[2]
                 if resid != "" and chain != "":
                     list_remove.append([chain, resid])  
-    
+
             lys_raw_2 = re.findall('[\d]*-LYS \(\w\)', line)
-    
+
             for line in lys_raw_2:
                 words = line.split()
                 chain = (words[1])[1:-1]
@@ -521,19 +613,19 @@ class Measure(object):
                 resid = words_2[0]
                 if resid != "" and chain != "":
                     list_remove.append([chain, resid])  
-        
+
         f.close()
-        
+
         # if the file is completely empty, let's just wipe it!
         if cnt == 0:
             os.remove(path)
-           
+
         if len(list_remove) == 0:
             return []
         else:
             return pd.DataFrame(np.array(list_remove), columns=["Chain", "Resid"]).drop_duplicates()
-    
- 
+
+
     def calculate_pkaANI(self, path):
 
         code_for_df = os.path.basename(path).split(".")[0]
@@ -572,7 +664,7 @@ class Measure(object):
         except Exception as e:
             propres.close()
             raise Exception('Failure parsing pkaANI log file for: %s_pka.log. %s'%(code_for_df, e))
-            
+
         try:
             df = pd.DataFrame({'Resid':lys_number,
                          'Chain': chains,
@@ -585,8 +677,8 @@ class Measure(object):
             raise Exception('Failed to construct pkaANI dataframe. %s'%e)
 
         return df
-   
- 
+
+
     def calculate_sasa(self, path):
         '''
         Calculate the solvent accessible surface area of the NZ atom within the lysine structure
@@ -625,18 +717,18 @@ class Measure(object):
             #Find the chain and resid number of each lysine.
             list_of_resid = list(M.data['resid'][lys_idx])
             list_of_chains = list(M.data['chain'][lys_idx])
-                
+
             #Find the coordinates and index of every atom in the molecule.
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
             raise Exception(f'{e}')
-        
+
         #For each lysine it works out the distance between the lys NZ,
         #and the each atom in the protein.
         for j, lys_coord in enumerate(lys_coords):
             list_close_points = list()
-            
+
             for i, coord in enumerate(all_coords):
                 try:
                     x_dist = (lys_coord[0] - coord[0])**2
@@ -675,47 +767,46 @@ class Measure(object):
 
         except Exception as e:
             raise Exception(f'Error obtaining SASA data. {e}')
-            
+
         return df_sasa
-       
-    
+
+
     def calculate_depth(self, path):
-        
+
         try:
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except:
             raise Exception(">> could not find NZ atoms within atomic structure")
-        
+
         try:
             parser = PDBParser()
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
             raise Exception(f">> could not get biopython structure - {e}")
-        
-        
+
+
         results = []
         for i in range(len(pos)):
             chain = M.data.loc[idx[i], ["chain"]].values[0]
             resid = M.data.loc[idx[i], ["resid"]].values[0]
-            
+
             mychain = structure[0][chain]
             myres = mychain[int(resid)]
-            
+
             try:
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
             except:
                 raise Exception(">> failed getting min_dist")
-            
+
             results.append([chain, resid, rd])
-         
-    
+
         df_Depth = pd.DataFrame(results, columns=["Chain", "Resid", "depth"])
-    
+
         return df_Depth
-    
+
 
     def calculate_aevs(self, path):
         '''
@@ -915,13 +1006,13 @@ if __name__ == "__main__":
 
     from uniprot import Uniprot
     from protein import PDB
-    
+
     print("Scanning UNIPROT...")
     UP = Uniprot()
     UP.get_protein_data("P0CG47")
- 
+
     df = UP.df.iloc[7:9]
- 
+
     print("Gathering proteins")
     PDB = PDB()
     PDB.gather_proteins(df)
