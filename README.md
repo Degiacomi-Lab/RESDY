@@ -43,13 +43,74 @@ The following Python packages are required to run the overall pipeline:
 
 ### Optional
 
-To predict the pKa of individual lysines, at least one of the following should be installed:
-* propka
-* pKa-ANI (via its [Github repository](https://github.com/isayevlab/pKa-ANI))
+There are different requirements for the methods for calculating different features for the lysines. The table below documents the dependencies for each.
 
-To calculate residue depth of individual lysines:
-* biopython
-* MSMS (independent software used by biopython, available at [this website](https://ccsb.scripps.edu/mgltools/))
+<div class="table_component" role="region" tabindex="0">
+<table>
+    <caption><br></caption>
+    <thead>
+        <tr>
+            <th>Feature<br></th>
+            <th>Methods<br></th>
+            <th>Requirements</th>
+            <th>Where to find</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan='2'>pKa<br></td>
+            <td>PROPKA3</td>
+            <td>propka</td>
+            <td>anaconda</td>
+        </tr>
+        <tr>
+            <td>pKaANI</td>
+            <td>pKaANI</td>
+            <td><a href="https://github.com/isayevlab/pKa-ANI">pKaANI GitHub Repository</a></td>
+        </tr>
+        <tr>
+            <td rowspan='2'>Depth<br></td>
+            <td rowspan='2'>Biopython</td>
+            <td>Biopython</td>
+            <td>anaconda</td>
+        </tr>
+        <tr>
+            <td>MSMS</td>
+            <td><a href="https://ccsb.scripps.edu/mgltools/">from this website</a></td>
+        </tr>
+        <tr>
+            <td>Solvent Accessible Surface Area<br></td>
+            <td>Biobox</td>
+            <td>no extra requirements</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td rowspan='4'>Atomic Environment Vectors<br></td>
+            <td rowspan='4'>ANI-2x</td>
+            <td>ase</td>
+            <td>anaconda</td>
+        </tr>
+        <tr>
+            <td>torch</td>
+            <td>anaconda</td>
+        </tr>
+        <tr>
+            <td><a href="https://github.com/aiqm/torchani/">torchani</a></td>
+            <td>anaconda</td>
+        </tr>
+        <tr>
+            <td>cuaev (optional: for gpu accelerated calculation)</td>
+            <td><a href="https://github.com/aiqm/torchani/tree/master/torchani/cuaev">GitHub Repository</a></td>
+        </tr>
+        <tr>
+            <td>Dynamically Accessible Surface<br></td>
+            <td>Biobox</td>
+            <td>no extra requirements</td>
+            <td></td>
+        </tr>
+    </tbody>
+</table>
+</div>
 
 If running the Jupyter notebook `carbamylation.ipynb`:
 * plotly
