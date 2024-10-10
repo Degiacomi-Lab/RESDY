@@ -10,14 +10,12 @@ import sys
 import re
 from textwrap import wrap
 import shutil
-
+from copy import deepcopy
 import numpy as np
 import biobox as bb
-from copy import deepcopy
 
 from modeller import *
 from modeller.automodel import *
-
 
 from helper import get_download_tool, ShutUp
 
@@ -28,7 +26,7 @@ def autopatch(fbasename, gap_cutoff=8):
     #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise) 
     pdb_out = ""
     try:
-    
+
         _pdb2seq(fbasename)
         _fasta2pir(fbasename)
         seq_name = _full_align(fbasename)
@@ -50,17 +48,17 @@ def autopatch(fbasename, gap_cutoff=8):
     myfiles.extend(glob.glob('*.sch'))
     myfiles.extend(glob.glob('%s.V*'%seq_name))
     myfiles.extend(glob.glob('%s.D*'%seq_name))
-    
+
     for mfile in myfiles:
         m = os.path.join(os.getcwd(), mfile)
         try:
             if sys.platform == "win32":
                 os.remove(m)
             else:
-                os.system("rm %s &> /dev/null"%m)
-        except:
-            print("cannot remove %s, continuing..."%m)
-            continue    
+                os.system(f"rm {m} &> /dev/null")
+        except Exception as e:
+            print(f"cannot remove {m}, error: {e}; continuing...")
+            continue
 
     return pdb_out
 
@@ -73,7 +71,7 @@ def _pdb2seq(fbasename):
     aln.append_model(mdl, align_codes=fbasename)
     aln.write(file=fbasename+'.seq')
 
-#autopatch step 1b. pir from complete AA fasta 
+#autopatch step 1b. pir from complete AA fasta
 def _fasta2pir(fbasename):
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
@@ -88,10 +86,10 @@ def _full_align(fbasename):
     f1 = f.readlines()
     f.close()
     #f1 = [x.rstrip() for x in f1]
-    for i in range(len(f1)):
-        if ("P1;" in f1[i]):
-            seq_name = f1[i][4:8]
-        if ("sequence:" in f1[i]):
+    for i, line in enumerate(f1):
+        if "P1;" in line:
+            seq_name = line[4:8]
+        if "sequence:" in line:
             seq_pos = i 
     P1 = ">P1;"+seq_name+"\n"
     seq_line = "sequence:"+seq_name+":::::::-1.00:-1.00\n"
@@ -102,15 +100,15 @@ def _full_align(fbasename):
     f.close()
 
     if sys.platform == "win32":
-        myCmd_A = 'type %s %s > alignment.seg'%(pir_fname, seq_fname)
+        myCmd_A = f'type {pir_fname} {seq_fname} > alignment.seg'
     else:
-        myCmd_A = 'cat %s %s > alignment.seg'%(pir_fname, seq_fname)
-    
+        myCmd_A = f'cat {pir_fname} {seq_fname} > alignment.seg'
+
     os.system(myCmd_A)
 
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
-    env.io.atom_files_directory = ['.', '..%satom_files'%(os.sep)]
+    env.io.atom_files_directory = ['.', f'..{os.sep}atom_files']
     a = AutoModel(env,
                   # file with template codes and target sequence
                   alnfile  = 'alignment.seg',
@@ -121,16 +119,16 @@ def _full_align(fbasename):
     a.auto_align() # get an automatic alignment (alignment.seg.ali)
     return seq_name
 
-#autopatch step 3. trim the alignment by removing gaps for missing residues at the termini of the structure
+# autopatch step 3. trim the alignment by removing gaps for missing residues at the termini of the structure
 def _trim_align(align_file):
     align_file = "alignment.seg.ali"
     f=open(align_file, "r")
     f1 = f.readlines()
     P1_pos = []
 
-    #identify positions of different sequances (P1) blocks
-    for i in range(len(f1)):
-        if ("P1;" in f1[i]):
+    #identify positions of different sequences (P1) blocks
+    for i, line in enumerate(f1):
+        if "P1;" in line:
             P1_pos.append(i)
     f.close()
     sec_1 = P1_pos[0]
@@ -156,15 +154,15 @@ def _trim_align(align_file):
     AA_struc_len = len(AA_struc)
     AA_struc_new = AA_struc[start_gaps_len : AA_struc_len - end_gaps_len]+"*"
     AA_struc_new = wrap(AA_struc_new, 75) #split after 75 characters 
-    
+
     AA_seq = ''.join([str(elem.rstrip("\n").rstrip("*")) for elem in f1[sec_2+2:]])
     AA_seq_len = len(AA_seq)
     AA_seq_new = AA_seq[start_gaps_len : AA_seq_len - end_gaps_len]+"*"
     AA_seq_new = wrap(AA_seq_new, 75) 
-    
+
     AA_struc_new = '\n'.join([str(elem) for elem in AA_struc_new])
     AA_seq_new = '\n'.join([str(elem) for elem in AA_seq_new])
-    
+
     struc_sec = f1[sec_1] + f1[sec_1+1] + AA_struc_new + "\n"
     seq_sec = f1[sec_2] + f1[sec_2+1] + AA_seq_new + "\n"
     f = open("trimmed_align.ali", 'w')
@@ -179,8 +177,8 @@ def _gap_check(align_file, gap_cutoff):
     f=open(align_file, "r")
     f1 = f.readlines()
     P1_pos = []
-    for i in range(len(f1)):
-        if ("P1;" in f1[i]): #identify positions of different sequences (P1) blocks
+    for i, line in enumerate(f1):
+        if "P1;" in line: #identify positions of different sequences (P1) blocks
             P1_pos.append(i)
     f.close()
     sec_1 = P1_pos[0]
@@ -189,10 +187,10 @@ def _gap_check(align_file, gap_cutoff):
     AA_struc = ''.join([str(elem.rstrip("\n").rstrip("*")) for elem in f1[sec_1    +2:sec_2]])
     #check for gap_lengths in AA_struc
     struc_gaps = re.findall('[-]+', AA_struc)
-    for gaps in range(len(struc_gaps)):
-        gap_len = len(struc_gaps[gaps])
+    for i, struc_gap in enumerate(struc_gaps):
+        gap_len = len(struc_gap)
         if gap_len > gap_cutoff:
-            print(">> struture not patched. Long sequence gap: "+ str(gap_len))
+            print(f">> struture not patched. Long sequence gap: {str(gap_len)}")
             patch_status = "no"
 
     return patch_status
@@ -203,30 +201,30 @@ def _patch_model(fbasename, seq_name):
     log.verbose()
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
-    env.io.atom_files_directory = ['.', '..%satom_files'%(os.sep)]
+    env.io.atom_files_directory = ['.', f'..{os.sep}atom_files']
     a = AutoModel(env,
                   # file with template codes and target sequence
                   alnfile  = 'trimmed_align.ali',
                   # PDB codes of the templates
                   knowns   = fbasename,
                   # code of the target
-                  sequence = seq_name, 
-                  assess_methods = (assess.DOPE, assess.GA341))     
+                  sequence = seq_name,
+                  assess_methods = (assess.DOPE, assess.GA341))
     a.md_level = refine.fast #very_fast, fast, slow, very_slow, slow_large, refine
     #repeat whole cycle twice and do not stop unless obj. func > 1e6
     #a.repeat_optimization = 2
     a.max_molpdf = 1e6
     a.make()
 
-    pdb_out = "%s_PATCHED.pdb"%fbasename
-    
+    pdb_out = f"{fbasename}_PATCHED.pdb"
+
     if sys.platform == "win32":
-        myCmd_mv = 'MOVE /Y %s.B99990001.pdb %s'%(seq_name, pdb_out)
+        myCmd_mv = f'MOVE /Y {seq_name}.B99990001.pdb {pdb_out}'
     else:
-        myCmd_mv = 'mv %s.B99990001.pdb %s'%(seq_name, pdb_out)
-    
+        myCmd_mv = f'mv {seq_name}.B99990001.pdb {pdb_out}'
+
     os.system(myCmd_mv)
-    
+
     return pdb_out
 
 ############################################
@@ -236,7 +234,7 @@ def analyze_protein(M):
     look for gaps in the sequence and return 4 elements list:
     [number of gaps, number of missing residues, largest sequence gap]]
     '''
-    
+
     res = np.unique(M.data["resid"].values)
     missing = []
     patch = []
@@ -251,10 +249,10 @@ def analyze_protein(M):
                     cnt[2] = len(patch)
 
                 patch = []
-   
+
         else:
             patch.append(r)
-            
+
     return cnt
 
 
@@ -264,7 +262,7 @@ def fragment(pdb, fasta, outfolder="."):
     split its associated FASTA file in FASTA of individual chains
     return information of gaps in protein structure (as per the function analyse_protein)
     '''
-    
+
     if not os.path.exists(outfolder):
         os.mkdir(outfolder)
 
@@ -275,9 +273,9 @@ def fragment(pdb, fasta, outfolder="."):
     for c in chains:
         _, idxs = M.atomselect([c], "*", "*", get_index=True)
         M2 = M.get_subset(idxs)
-        M2.write_pdb(os.path.join(outfolder, "chain%s.pdb"%c))
+        M2.write_pdb(os.path.join(outfolder, f"chain{c}.pdb"))
         gap_count.append(analyze_protein(M2))
-        
+
     #split FASTA
     fin = open(fasta, "r")
     headers = [] # fasta headers
@@ -299,30 +297,29 @@ def fragment(pdb, fasta, outfolder="."):
             fasta_chains.append(chain_info)
             if "sequence" in locals():
                 sequences.append(sequence)
-                
+
             sequence = []
-            
+
         else:
-            
+
             #replace non-canonical aminoacids in FASTA sequence
             if "KCX" in line:
                 line = line.replace('(KCX)', 'K')
             if "MSE" in line :
                 line = line.replace('(MSE)', 'M')
-            
+
             sequence.append(line)
-            
+
     sequences.append(sequence)
-    fin.close() 
-       
+    fin.close()
+
     #write FASTA files
-    for i in range(len(headers)):
+    for i, header in enumerate(headers):
         for c in fasta_chains[i]:
             if c not in chains:
-                
-                raise Exception("chain mismatch between PDB and FASTA. %s, %s"%(fasta_chains, chains))
-            fout = open(os.path.join(outfolder, "chain%s.fasta"%c), "w")
-            fout.write(headers[i])
+                raise Exception(f"chain mismatch between PDB and FASTA. {fasta_chains}, {chains}")
+            fout = open(os.path.join(outfolder, f"chain{c}.fasta"), "w")
+            fout.write(header)
             fout.writelines(sequences[i])
             fout.close()
 
@@ -365,7 +362,7 @@ def fragment(pdb, fasta, outfolder="."):
     # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format 
     # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesnt convert all double letter chain names to A
     # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
-    
+
     # find the double chain name files and store in list to iterate through when converting the single character names
     all_files = os.listdir(outfolder) 
     doubleletter_pdb_files = []
@@ -380,7 +377,7 @@ def fragment(pdb, fasta, outfolder="."):
     for file in doubleletter_pdb_files:
         db_chain_name = file.split('.')[0][5:]
         sl_chain_name = db_chain_name.lower()[0]
-        
+
         try:
             temp_file_path = os.path.join(outfolder, file)
             with fileinput.FileInput(temp_file_path, inplace = True) as f:
@@ -389,21 +386,21 @@ def fragment(pdb, fasta, outfolder="."):
                         #On lines with 'ATOM', 'TER' or 'HETATM'
                         #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
-                                new_chain_name = ' ' + sl_chain_name
-                                line = line[:20] + new_chain_name + ' ' + line[23:]
-                                
-                                print(line, end ='')
-                                
+                            new_chain_name = ' ' + sl_chain_name
+                            line = line[:20] + new_chain_name + ' ' + line[23:]
+
+                            print(line, end ='')
+
                         else:
                             print(line, end='')
                     except:
                         print(line, end='')
-    
-        #If the protein fails, print error message with the error 
+
+        #If the protein fails, print error message with the error
         except Exception as e:
             raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. %s'%e)
-    
-            
+
+
     return np.array(gap_count)
 
 
@@ -420,7 +417,7 @@ def reassemble(pdbs, labels, outname, outdir):
         if len(chainname) > 1:
             dbletter = True
 
-        
+
         try:
             if dbletter:
                 with fileinput.FileInput(pdb_file, inplace = True) as f:
@@ -429,14 +426,14 @@ def reassemble(pdbs, labels, outname, outdir):
                             #On lines with 'ATOM', 'TER' or 'HETATM'
                             #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
                             if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
-                                    line = line[:20] + chainname + '' + line[22:]
-                                    print(line, end ='')
+                                line = line[:20] + chainname + '' + line[22:]
+                                print(line, end ='')
                             else:
                                 print(line, end='')
                         except:
                             print(line, end='')
 
-        #If the protein fails, print error message with the error 
+        #If the protein fails, print error message with the error
         except Exception as e:
             raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. %s'%e)
 
@@ -481,7 +478,7 @@ def reassemble(pdbs, labels, outname, outdir):
     except Exception as e:
         raise Exception(f'Failed replacing chains for file {file}. %s'%e)
     '''
-    
+
 
 
 def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
@@ -499,26 +496,26 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     if largest>gap:
         raise Exception("large gap detected (%s residues)"%largest)
 
-            
+
     #launch modeller on each individual chain
     files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
     chains = []
     fouts = []
     for f in files:
-        
+
         # attempt modelling
         fbasename = f.split(".")[0]
-        
+
         if verbose:
             foutname = autopatch(fbasename, 10)
         else:
             with ShutUp:
                 foutname = autopatch(fbasename, 10)
 
-            
+
         if foutname == "":
             raise Exception("Autopatching failed.")
-            
+
         # ensure that sequences of AA starts from the correct resid
         M_raw = bb.Molecule("%s.pdb"%fbasename)
         startval_raw = M_raw.data["resid"].values
@@ -528,7 +525,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
             startval_clean += startval_raw[0] - startval_clean[0]
             M_curated.data["resid"] = startval_clean
             M_curated.write_pdb(foutname)
-        
+
         # GW 18.03.24 - change chains appending to account for double letter chain names
         chains.append(fbasename.split('chain')[-1])
         fouts.append(foutname)
@@ -537,17 +534,17 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     print("outdir: ", outdir)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-        
+
     fname = "%s.pdb"%os.path.basename(pdb).split(".")[0]
     outname = os.path.join(outdir, fname)
-    
-    """possible bug here (fixed by sorting the lists alphabetically)"""
+
+    #possible bug here (fixed by sorting the lists alphabetically)
     chains = sorted(chains)
-    
+
     fouts = sorted(fouts, key=lambda x: x.split('_')[-2][-1])
-    
-    """possible bug here (fixed by sorting the lists alphabetically)"""
-    
+
+    #possible bug here (fixed by sorting the lists alphabetically)
+
     reassemble(fouts, chains, outname, outdir)
     #TODO: check whether patching process caused clashing with lysine  
     shutil.rmtree(tmpfolder)
@@ -1064,14 +1061,14 @@ if __name__ == "__main__":
 
         pdb = "curate_PDB\\conformations\\1U8F-alt1A.pdb"
         fasta = "curate_PDB\\conformations\\1U8F.fasta"
-        
+
         outfolder = "curate_PDB\\curated"
         gap = 10
-        
+
         #tmpfolder = "curate_PDB\\tmp"
-        #fragment(pdb, fasta, tmpfolder) 
-        
-        fname = curate(pdb, fasta, outfolder=outfolder, gap=gap)
+        #fragment(pdb, fasta, tmpfolder)
+
+        fname = curate(pdb, fasta, outdir=outfolder, gap=gap)
         print("generated %s"%fname)
         sys.exit()
 
@@ -1091,4 +1088,3 @@ if __name__ == "__main__":
         print("autopatch failed")
     else:
         print("saved patched file %s"%foutname)
-        
