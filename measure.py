@@ -1,27 +1,28 @@
 import re
-import os, shutil
+import os
+import logging
+import datetime
+import shutil
 import subprocess
 import glob
 import time
 import pandas as pd
 import numpy as np
 import biobox as bb
-import logging
-import datetime
 
 # AEV packages
 try:
     from ase import Atoms
     import torch
     import torchani
-except:
-    print('Packages required for AEV calculation are not available, will not be able to calculate AEVs')
+except Exception as e:
+    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
 
 try:
     from Bio.PDB import PDBParser
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except:
-    print("biopython and msms unavailable. Will not be able to calculate residue depth")
+except Exception as e:
+    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
 
 
 class Measure(object):
@@ -58,11 +59,13 @@ class Measure(object):
         self.folder = os.path.join(outdir, "curated")
 
         # Check that all files in DataFrame appear at least once in folder
-        files1=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))] #to find AlphaFold entries
-        files2=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))] #to find PDB entries
+        # find all AlphaFold entries
+        files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
+        # find all PDB entries
+        files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
         for f in df_input["PDB Code"].values:
-            if f not in files1 and f not in files2:
-                print("WARNING: %s not found in folder %s"%(f, self.folder))
+            if f not in files_af and f not in files_pdb:
+                print(f'WARNING: {f} not found in folder {self.folder}')
 
         self.pkaoutdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pkaoutdir):
@@ -104,9 +107,10 @@ class Measure(object):
 
     def save_state(self, outname="measures.csv"):
         '''
-        Function to save a csv file of all of the measurements calculated through measure_dataframe()
-        File is automatically saved in the output directory that has been set previously when setting up the measures class
-        Option to customise the name of the output file
+        Function saves a csv file of all of the measurements calculated through measure_dataframe()
+        File automatically saved in the output directory that has been set
+         previously when setting up the measures class
+        Option to customise the name of the output file through outname parameter
 
         Parameters
         ----------
@@ -152,17 +156,17 @@ class Measure(object):
         print(f'Total number of structures to analyse: {total_structures}')
 
         for index, row in self.df_input.iterrows():
-            PDBCODE = row["PDB Code"]
+            pdb_code = row["PDB Code"]
             chains = row["Chains"].split("/")
             self.current_index = index
 
             uniprot_code = row["Uniprot_Entry"]
-            print("\n# UNIPROT: %s PDB: %s, chain(s): %s"%(uniprot_code, PDBCODE, " ".join(chains)))
+            print(f'\n# UNIPROT: {uniprot_code} PDB: {pdb_code}, chain(s): {" ".join(chains)}')
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
 
-                if PDBCODE not in f:
+                if pdb_code not in f:
                     continue
                 print(f'Analysing structure {current_structure}/{total_structures}')
                 tstart = time.time()
@@ -172,7 +176,7 @@ class Measure(object):
                 # to be then appended to main DataFrame self.df
 
                 columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
-                df = pd.DataFrame(columns=columns)
+                df_currentfile = pd.DataFrame(columns=columns)
 
                 # append to temporary DataFrame all lysines in the file of interest
                 try:
@@ -196,17 +200,17 @@ class Measure(object):
                         'Chain': M.data["chain"].values[i],
                         'Resid': M.data["resid"].values[i]})
 
-                    df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                    df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
-                print(f">> {len(df)} lysines of interest found")
+                print(f">> {len(df_currentfile)} lysines of interest found")
 
                 # iterate over measures to carry out (according to self.measures)
                 for meas in self.measures:
                     print(f">> evaluating {meas[0]}...")
                     try:
-                        df[meas[0]] = np.nan # create new column for measure
+                        df_currentfile[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f) # run measurement
-                        df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
+                        df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
                         print(f"ERROR: {e}")
@@ -216,35 +220,34 @@ class Measure(object):
                 print(">> file processed in %4.2f seconds."%(time.time()-tstart))
                 average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
                 print(f'>> Time average per file: {average_time_per_file} seconds.')
-                seconds_remaining = average_time_per_file * (total_structures + 1 - current_structure)
-                time_remaining_str = str(datetime.timedelta(seconds=seconds_remaining))
+                sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
+                time_remaining_str = str(datetime.timedelta(seconds=sec_remaining))
                 print(f'Predicted time remaining: {time_remaining_str}')
 
                 # document the data to a log file
                 if self.activate_log:
-                    if df.empty == False:
+                    if df_currentfile.empty is False:
                         try:
-                            self.logger.info(df.to_string().strip('    Uniprot_Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
+                            self.logger.info(df_currentfile.to_string().strip('    Uniprot_Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
                             self.logger.info('--------------------------------------------------------------------------')
-                        except:
-                            print('Error in logging.')
+                        except Exception as e:
+                            print(f'Error in logging: {e}')
 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
-                self.df = pd.concat([self.df, df], ignore_index=True)
-                
+                self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
+
             # remove possible duplicated rows (if restarted)
             if index == first_index:
                 try:
                     self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
-                except:
+                except Exception as e_one:
                     try:
                         self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
-                    except:
-                        print('Failed to remove duplicates from measurement dataframe')
+                    except Exception as e_two:
+                        print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
                         pass
-                    
 
-    
+
     def recover_from_log(self, log_path):
         '''
         DOCSTRING WRITING NEEDED
@@ -264,10 +267,10 @@ class Measure(object):
         '''
         if self.PDB_only:
             return 'Function not callable.'
-        
+
         columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid', 'pKa', 'sasa']
         log_to_df = pd.DataFrame(columns=columns)
-        
+
         with open(log_path) as inf:
             for line in inf:
                 line = line.replace('--------------------------------------------------------------------------',' ')
@@ -277,10 +280,10 @@ class Measure(object):
                 parts = parts[1:]
                 data = dict(zip(columns, parts))
                 log_to_df = log_to_df.append(data, ignore_index=True)
-        
+
         return log_to_df
-    
-    
+
+
     def restart_measure(self, log_path='measure_log.txt'):
         '''
         A function to restart the measurements calculations
@@ -307,7 +310,7 @@ class Measure(object):
         # TODO is there a way to restart the PDB_only measurements? Might need to produce on if not
         if self.PDB_only:
             return 'restart_measure() function not callable when using PDB_only'
-        
+
         print(len(self.df_input))
 
         # 1. Analyse the measures log file to create a list of files that were analysed
@@ -323,7 +326,7 @@ class Measure(object):
                 protein_code = parts[1].split('/')[-1]
                 if protein_code not in words_to_ignore:
                     proteins_completed.append(protein_code)
-        
+
         # remove the last protein from list incase it wasn't completed fully
         final_protein = proteins_completed[-1]
         proteins_completed = [c for c in proteins_completed if c != final_protein]
@@ -338,24 +341,24 @@ class Measure(object):
         print(len(self.df_input))
         # 3. Restart the measure_dataframe() with the new file list
         self.measure_dataframe()
-      
-  
+
+
     def _combine_dataframes(self, target, to_merge, col_name):
         '''
         target is a DataFrame to be filled with data, to_merge contains the data.
         Values to insert are indexed in both array by two columns: Chain and Resid.
         '''
         # e.g. self._combine_dataframes(df, result, meas[0])
-        
+
         for i in range(len(target)):
-            
+
             chain_value = target.loc[i, "Chain"]
             resid_value = target.loc[i, "Resid"]
-            
+
             idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
             if len(idx[0]) == 0:
                 continue
-            
+
             # this if statement allows you to add the lists of the aevs into the overall dataframe
             if col_name == 'aev':
                 target['aev'] = target['aev'].astype('object')
@@ -366,53 +369,53 @@ class Measure(object):
 
 
     def measure_PDB_only(self):
-        
+
         if not self.PDB_only:
             return 'Calling the wrong method.'
-        
+
         files = glob.glob(os.path.join(self.folder, "*pdb"))
-        
+
         for _, row in self.df_input.iterrows():
             PDBCODE = row['PDB Code']
 
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
-                
+
                 if PDBCODE not in f:
                     continue
 
                 tstart = time.time()
-                print("\n> File: %s"%f)
-                             
+                print(f"\n> File: {f}")
+
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
-                
+
                 columns = ['PDB Code', 'Chain', 'Resid']
                 df = pd.DataFrame(columns=columns)
-                
-            
-                # append to temporary DataFrame all lysines in the file of interest             
+
+
+                # append to temporary DataFrame all lysines in the file of interest
                 try:
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
-                except:
+                except Exception as e:
                     self.wrong_pdb_file.append(f)
                     continue
-                
+
                 _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
                 for i in idxs:
 
                     #save only lysine entries from chain of interest
                     #if M.data["chain"].values[i] not in chains:
                     #    continue
-                    
-                    
+
+
                     data = ({'PDB Code': f.split(".")[0],
                         'Chain': M.data["chain"].values[i],
                         'Resid': M.data["resid"].values[i]})
 
                     df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                
+
                 print(f">> {len(df)} lysines of interest found")
 
                 # iterate over measures to carry out (according to self.measures)
@@ -422,22 +425,23 @@ class Measure(object):
                         df[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f) # run measurement
                         df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
-                        
+
                     except Exception as e:
                         print(f"ERROR: {e}")
                         continue
-                
-                print(">> file processed in %4.2f sec."%(time.time()-tstart))
-                
+
+                processing_time = round((time.time()-tstart), 2)
+                print(f">> file processed in {processing_time} sec.")
+
                 # document the data to a log file
                 if self.activate_log:
-                    if df.empty == False:
+                    if df.empty is False:
                         try:
                             self.logger.info(df.to_string().strip('PDB Code        Chain Resid    pKa       sasa'))
                             self.logger.info('--------------------------------------------------------------------------')
-                        except:
-                            print('Error in logging.')
-                
+                        except Exception as e:
+                            print(f'Error in logging measurements: {e}')
+
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df], ignore_index=True)
 
@@ -494,56 +498,56 @@ class Measure(object):
                 except Exception as e:
                     print("ERROR: %s"%e)
                 print(">> file processed in %4.2f sec."%(time.time()-tstart))   
-                '''          
-    
-   
+                '''
+
+
     def calculate_pka_propka(self, path):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
         parse errors, and return a dataframe containing all measurements not yielding an error.
         '''
-        
+
         code_for_df = os.path.basename(path).split(".")[0]
-        error_file_name = os.path.join(self.pkaoutdir, "%s_propka_errors.txt"%code_for_df)
-    
-        testPath = code_for_df + '.pka'
-        if not os.path.isfile(testPath):
+        error_file_name = os.path.join(self.pkaoutdir, f"{code_for_df}_propka_errors.txt")
+
+        test_path = code_for_df + '.pka'
+        if not os.path.isfile(test_path):
             try:   
                 f = open(error_file_name, 'w')
                 process = subprocess.Popen(['python', '-m', 'propka', path],
                                     stdout=f, stderr=f)
                 stdout, stderr = process.communicate()
                 f.close()
-                        
+
             except Exception as e:
                 f.close()
-                
+
                 try:
                     shutil.move(code_for_df, os.path.join(self.pkaoutdir, code_for_df))
                 except:
                     pass
-                
-                raise Exception('Failed to obtain pKa data (PROPKA). %s.'%e)
-        
+
+                raise Exception(f'Failed to obtain pKa data (PROPKA): {e}') from e
+
         try:
             propka_lys_fails = self.parse_propka_errors(error_file_name)
         except Exception as e:
-            raise Exception("Failed extracting PROPKA errors from output file. %s"%e)
-           
+            raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
+
         try:
             pkafile = code_for_df + '.pka'
             propres = open(pkafile)
-        except Exception:
-            raise Exception('Failed to find %s output file to read'%pkafile)
-                
+        except Exception as e:
+            raise Exception(f'Failed to find {pkafile} output file to read') from e
+
         lys_number = list()
         pkas = list()
-        chain = list() 
+        chain = list()
         try:
             for line in propres:
                 if re.search('^   LYS' , line):
                     try:
-    
+
                         line = line[6:]
                         line = line.split()
 
@@ -551,38 +555,38 @@ class Measure(object):
                         if len(propka_lys_fails)>0:
                             idx = np.where((propka_lys_fails["Chain"] == line[1]) & (propka_lys_fails["Resid"].astype(int) == int(line[0])))
                             if len(idx[0])>0:
-                                continue    
-            
+                                continue
+
                         lys_number.append(int(line[0]))
                         chain.append(line[1])
                         pkas.append(float(line[2]))
-                        
+
                     except Exception as e:
-                        print("> Error %s"%e)
+                        print(f"> Error {e}")
                         continue
-    
+
             propres.close()
             shutil.move(pkafile, os.path.join(self.pkaoutdir, pkafile))
-        
+
         except Exception as e:
             propres.close()
             shutil.move(pkafile, os.path.join(self.pkaoutdir, pkafile))
-            raise Exception('Failure parsing %s.pka. %s'%(code_for_df, e))
-            
+            raise Exception(f'Failure parsing {code_for_df}.pka, error: {e}') from e
+
         try:
-            df = pd.DataFrame({'Resid':lys_number,
+            df_propka = pd.DataFrame({'Resid':lys_number,
                                'Chain': chain,
                                'propka':pkas})
-            
-            df.sort_values(by=['propka'], inplace=True)
-            df = df.dropna()
-            df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
-            
+
+            df_propka.sort_values(by=['propka'], inplace=True)
+            df_propka = df_propka.dropna()
+            df_propka = df_propka.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+
         except Exception as e:
-            raise Exception('Failed to construct pKa (PROPKA) dataframe. %s'%e)
-    
-        return df
-    
+            raise Exception(f'Failed to construct pKa (PROPKA) dataframe. {e}') from e
+
+        return df_propka
+
 
     def parse_propka_errors(self, path):
         '''
@@ -602,7 +606,7 @@ class Measure(object):
                 resid = words[1]
                 chain = words[2]
                 if resid != "" and chain != "":
-                    list_remove.append([chain, resid])  
+                    list_remove.append([chain, resid])
 
             lys_raw_2 = re.findall('[\d]*-LYS \(\w\)', line)
 
@@ -612,7 +616,7 @@ class Measure(object):
                 words_2 = line.split('-')
                 resid = words_2[0]
                 if resid != "" and chain != "":
-                    list_remove.append([chain, resid])  
+                    list_remove.append([chain, resid])
 
         f.close()
 
@@ -630,26 +634,26 @@ class Measure(object):
 
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]
-        testPath = pdb_path + '_pka.log'
-        if not os.path.isfile(testPath):
-            try:   
+        test_path = pdb_path + '_pka.log'
+        if not os.path.isfile(test_path):
+            try:
                 _ = subprocess.run(['pkaani', '-i', path])
             except Exception as e:
                 print(e)
                 if "[Errno 2] No such file or directory: 'pkaani'" == str(e):
-                    raise Exception('Error: Failed to obtain pkaANI data: %s. Is pkaANI installed correctly? If so, reload environment and try again.'%e)
+                    raise Exception(f'Error: Failed to obtain pkaANI data: {e}. Is pkaANI installed correctly? If so, reload environment and try again.')
                 else:
-                    raise Exception("Failed to obtain pkaANI data through running pkaANI. %s."%e)
+                    raise Exception(f"Failed to obtain pkaANI data through running pkaANI, error: {e}")
 
         try:
             log_file = pdb_path + '_pka.log'
             propres = open(log_file)
-        except Exception:
-            raise Exception('Failed to find pkaANI log file')
+        except Exception as e:
+            raise Exception(f'Failed to find pkaANI log file: {e}') from e
 
-        lys_number = list()
-        pkas = list()
-        chains = list()
+        lys_number = []
+        pkas = []
+        chains = []
         try:
             for line in propres:
                 if re.search('^LYS', line):
@@ -663,20 +667,20 @@ class Measure(object):
             propres.close()
         except Exception as e:
             propres.close()
-            raise Exception('Failure parsing pkaANI log file for: %s_pka.log. %s'%(code_for_df, e))
+            raise Exception(f'Failure parsing pkaANI log file for: {code_for_df}_pka.log. {e}') from e
 
         try:
-            df = pd.DataFrame({'Resid':lys_number,
+            df_pkaani = pd.DataFrame({'Resid':lys_number,
                          'Chain': chains,
                          'pkaANI':pkas})
 
-            df.sort_values(by=['pkaANI'], inplace=True)
-            df = df.dropna()
-            df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+            df_pkaani.sort_values(by=['pkaANI'], inplace=True)
+            df_pkaani = df_pkaani.dropna()
+            df_pkaani = df_pkaani.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
         except Exception as e:
-            raise Exception('Failed to construct pkaANI dataframe. %s'%e)
+            raise Exception(f'Failed to construct pkaANI dataframe, error: {e}') from e
 
-        return df
+        return df_pkaani
 
 
     def calculate_sasa(self, path):
@@ -722,7 +726,7 @@ class Measure(object):
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
-            raise Exception(f'{e}')
+            raise Exception(f'{e}') from e
 
         #For each lysine it works out the distance between the lys NZ,
         #and the each atom in the protein.
@@ -776,8 +780,8 @@ class Measure(object):
         try:
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
-        except:
-            raise Exception(">> could not find NZ atoms within atomic structure")
+        except Exception as e:
+            raise Exception(f">> could not find NZ atoms within atomic structure - {e}")
 
         try:
             parser = PDBParser()
@@ -798,14 +802,14 @@ class Measure(object):
             try:
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
-            except:
-                raise Exception(">> failed getting min_dist")
+            except Exception as e:
+                raise Exception(f">> failed getting min_dist - {e}")
 
             results.append([chain, resid, rd])
 
-        df_Depth = pd.DataFrame(results, columns=["Chain", "Resid", "depth"])
+        df_depth = pd.DataFrame(results, columns=["Chain", "Resid", "depth"])
 
-        return df_Depth
+        return df_depth
 
 
     def calculate_aevs(self, path):
@@ -858,7 +862,7 @@ class Measure(object):
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
         except Exception as e:
-            print(f'AEV Calculations: 1 - could not create the atomic structure representation: {e}')
+            print(f'AEV Calculations: 1 - could not create atomic structure representation: {e}')
             return
 
         # 2: Iterate over the protein structure to cut out substructures and calculate an AEV at each of these.
@@ -869,9 +873,9 @@ class Measure(object):
                 distance_cut_off = 6  # current cutoff for substructure from analysis done on different cutoffs and matching pkaANI
                 for i, coord in enumerate(all_coords):
                     try:
-                        x_dist = ((lys_coord[0] - coord[0])**2)
-                        y_dist = ((lys_coord[1] - coord[1])**2)
-                        z_dist = ((lys_coord[2] - coord[2])**2)
+                        x_dist = (lys_coord[0] - coord[0])**2
+                        y_dist = (lys_coord[1] - coord[1])**2
+                        z_dist = (lys_coord[2] - coord[2])**2
                         distance = np.sqrt(x_dist + y_dist + z_dist)
                         if distance < distance_cut_off:
                             list_close_points.append(idx[i])
@@ -889,18 +893,18 @@ class Measure(object):
 
                 # 2.2: calculate the AEV for the subset of the protein and add this to the output dataframe
                 try:
-                    deviceSpecs = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-                    ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=deviceSpecs)
+                    device_specs = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                    ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=device_specs)
                     species = ANI.species_to_tensor(temp_structure.get_chemical_symbols()).unsqueeze(0)
                     ani_coords = torch.tensor(temp_structure.get_positions(), dtype=torch.float32).unsqueeze(0)
-                    species = species.to(deviceSpecs)
-                    ani_coords = ani_coords.to(deviceSpecs)
+                    species = species.to(device_specs)
+                    ani_coords = ani_coords.to(device_specs)
                     aevs = ANI.aev_computer((species, ani_coords)).aevs
                     lys_nz_location = list_close_points.index(idx_nz[j])
                     aevs = aevs[0,lys_nz_location,:]
                     aevs = aevs.tolist()
                 except Exception as e:
-                    print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}')
+                    print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}, error: {e}')
 
                 # 2.3: Append the new AEV to the output dataframe
                 aev_to_append = {'Chain': chain, 'Resid': resid, 'aev': aevs}
@@ -925,7 +929,7 @@ class Measure(object):
 
     def calculate_das(self, path):
         '''
-        Calculate the Dynamically Accessible Surface (DAS) of the NZ atom within the lysine structure
+        Calculate the Dynamically Accessible Surface (DAS) of the NZ atom in the lysine structure
         This is effectively the number of positions that the NZ atom can take within the structure of the protein
 
         Method
