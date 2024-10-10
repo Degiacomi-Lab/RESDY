@@ -130,6 +130,16 @@ dmypy.json
 
 # project-specific
 result/
+data/
+outTest/
+input/
+*testing*
+*Testing*
+# temp ignore to fix git commit problem
+graph_measures_carbamylation.ipynb
+graph_measures_general.ipynb
+plotProduction.py
+gw*
 
 # OS Specific
 .DS_Store
