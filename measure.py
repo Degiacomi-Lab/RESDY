@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import glob
 import time
+import re
 import pandas as pd
 import numpy as np
 import biobox as bb
@@ -73,7 +74,7 @@ class Measure(object):
 
         self.PDB_only = False
 
-        if 'Uniprot_Entry' in self.df_input.columns: 
+        if 'Uniprot_Entry' in self.df_input.columns:
             columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns=columns)
         else:
@@ -126,20 +127,22 @@ class Measure(object):
 
     def measure_dataframe(self):
         '''
-        DOCSTRING WRITING NEEDED
+        TODO FINISH THIS
+        Function to measure specified features for all the structure files curated earlier in the programme.
+        Will take a list of the required proteins, finds associated curated structures and runs the reequired measurement functions.
+        Results are saved to memory and a log file produced at the same time. (M.save_state() can be used to save the data to a csv)
 
         Method
         ------
+        Create list of files that have been curated into the self.outdir directory.
+        Iterate over the list of the files, check if structure file is
 
         Parameters
         ----------
 
-        Returns
-        -------
-
         Example
         -------
-
+        >> M.measure_dataframe()
         '''
         # use a different method if handling pdb codes only
         if self.PDB_only:
@@ -170,7 +173,7 @@ class Measure(object):
                     continue
                 print(f'Analysing structure {current_structure}/{total_structures}')
                 tstart = time.time()
-                print("\n> File: %s"%f)
+                print(f"\n> File: {f}")
 
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
@@ -217,7 +220,8 @@ class Measure(object):
                         continue
 
                 current_structure += 1
-                print(">> file processed in %4.2f seconds."%(time.time()-tstart))
+                processing_time = round((time.time()-tstart), 2)
+                print(f">> file processed in {processing_time} seconds.")
                 average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
                 print(f'>> Time average per file: {average_time_per_file} seconds.')
                 sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
@@ -228,7 +232,7 @@ class Measure(object):
                 if self.activate_log:
                     if df_currentfile.empty is False:
                         try:
-                            self.logger.info(df_currentfile.to_string().strip('    Uniprot_Entry                    PDB Code Method Resolution Chain Resid    pKa       sasa'))
+                            self.logger.info(df_currentfile.to_string().strip())
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
                             print(f'Error in logging: {e}')
@@ -250,37 +254,102 @@ class Measure(object):
 
     def recover_from_log(self, log_path):
         '''
-        DOCSTRING WRITING NEEDED
+        Take the log file produced through running measure_dataframe() and convert this to a csv
 
         Method
         ------
+        Read in the log file (measure_log.txt)
+        Work out the columns from the header
+        If the headers can't be worked out, ask for input to match up columns
+        Read in data
+        Sets self.df to be the data output recovered from the log file.
 
         Parameters
         ----------
+        log_path : string
+            the file name for the log file to convert
 
         Returns
         -------
+        log_to_df : dataframe
+            Dataframe containing all the measurements that were in the given log file
 
         Example
         -------
-
+        M.recover_from_log()
         '''
         if self.PDB_only:
             return 'Function not callable.'
 
-        columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid', 'pKa', 'sasa']
-        log_to_df = pd.DataFrame(columns=columns)
+        base_columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+        log_to_df = pd.DataFrame(columns=base_columns)
+        log_path = os.path.join(self.outdir, log_path)
 
+        test_lines = 0
+        columns_all_set = False
+        potential_col_names = {'1': 'propka', '2': 'pkaANI', '3': 'sasa',
+                               '4': 'depth', '5': 'aev', '6': 'das'}
+        with open(log_path, "rb") as f:
+            num_lines = sum(1 for _ in f)
+        curr_line = 0
         with open(log_path) as inf:
             for line in inf:
-                line = line.replace('--------------------------------------------------------------------------',' ')
-                parts = line.split()
+                curr_line += 1
+                # check if it is a header line, check if doesn't start with number or -
+                if line[0].isalpha():
+                    # found a header line
+                    parts = line.split()
+                    # check that columns have been written to the log file correctly
+                    if len(parts) <= 6 and columns_all_set:
+                        continue
+                    elif len(parts) <= 6 and not columns_all_set:
+                        print('Columns were not set correctly in the log file.')
+                        print(f'The first 6 columns are assumed to be: {base_columns}')
+                        continue
+                    # if all seems correct with the writing
+                    # check that all the columns can be found in the current columns, if not, add in
+                    for part in parts:
+                        if part not in base_columns:
+                            base_columns.append(part)
+                line_splitter_bool = all(a == '-' for a in line.strip())
+                if line_splitter_bool:
+                    line = ''
+
+                # split information into parts keeping the AEV as one unit
+                parts = re.split(r'([\w.,\/-]+)|(\[.+?\])', line)
                 if len(parts) == 0:
                     continue
+                # remove None elemnts from matching and reduce all space values to ''
+                parts = [elmnt.strip() for elmnt in parts if elmnt is not None]
+                # remove '' elements from the list
+                parts = [elmnt for elmnt in parts if elmnt != '']
                 parts = parts[1:]
-                data = dict(zip(columns, parts))
-                log_to_df = log_to_df.append(data, ignore_index=True)
 
+                if len(parts) == 0:
+                    continue
+                num_parts = len(parts)
+                if num_parts != len(base_columns):
+                    while num_parts != len(base_columns):
+                        print('Need to set a column header')
+                        print(f'Options for columns are: {potential_col_names}')
+                        print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
+                        new_header_val = input('Enter the number for the new column header: ')
+                        while True:
+                            if not new_header_val.isnumeric():
+                                new_header_val = input('Enter the number for the new column header: ')
+                            elif 1 <= int(new_header_val) <= len(potential_col_names):
+                                break
+                            else:
+                                new_header_val = input('Enter the number for the new column header: ')
+                        base_columns.append(potential_col_names[new_header_val])
+                    columns_all_set = True
+                data = dict(zip(base_columns, parts))
+                log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                test_lines += 1
+                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
+
+        self.df = log_to_df
+        print('Data recovered from log file')
         return log_to_df
 
 
