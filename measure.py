@@ -6,10 +6,13 @@ import shutil
 import subprocess
 import glob
 import time
-import re
+from multiprocessing import cpu_count
+from multiprocessing import Manager
+from multiprocessing.pool import Pool
 import pandas as pd
 import numpy as np
 import biobox as bb
+
 
 # AEV packages
 try:
@@ -29,7 +32,7 @@ except Exception as e:
 class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das']):
+                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das'], parallel=True):
 
         self.activate_log = False
         if activate_log:
@@ -54,6 +57,10 @@ class Measure(object):
 
         # document failed pdb files
         self.wrong_pdb_file = []
+
+        # for parallel measurements
+        self.parallel = parallel
+        self.files_to_analyse = []
 
         self.outdir = outdir
         self.df_input = df_input
@@ -151,6 +158,7 @@ class Measure(object):
         files = glob.glob(os.path.join(self.folder, "*pdb"))
         # remove the files which have pkaani in the name as these are output files from pkaani
         files = [file for file in files if 'pkaani' not in file]
+        self.files_to_analyse = files
 
         first_index = self.df_input.index[0]
         total_structures = len(files)
@@ -158,98 +166,167 @@ class Measure(object):
         overall_st = time.time()
         print(f'Total number of structures to analyse: {total_structures}')
 
-        for index, row in self.df_input.iterrows():
-            pdb_code = row["PDB Code"]
-            chains = row["Chains"].split("/")
-            self.current_index = index
+        # 2 options: either linear or parallel measurements
+        match self.parallel:
+            case True:
+                # determine how to parallelise
+                n_cores_to_use = cpu_count() - 1
+                print(f'>> Measurements running in parallel')
+            case False:
+                # use a singular core for step by step processing
+                n_cores_to_use = 1
+                print(f'>> Measurements running step by step')
 
-            uniprot_code = row["Uniprot_Entry"]
-            print(f'\n# UNIPROT: {uniprot_code} PDB: {pdb_code}, chain(s): {" ".join(chains)}')
+        with Manager() as manager:
+            # create lock to avoid multiple parts writing to output files at the same time
+            lock = manager.Lock()
+            ns = manager.Namespace()
+            ns.df = self.df
+            # prepare the inputs for the parallelisation
+            items = []
+            for i, r in self.df_input.iterrows():
+                pdb_code = r["PDB Code"]
+                chains = r["Chains"].split("/")
+                method = r['Method']
+                res = r['Resolution']
+                uniprot_code = r["Uniprot_Entry"]
+                file_details = [uniprot_code, pdb_code, method, res, chains]
+                items.append([file_details, lock, ns])
+            with Pool(n_cores_to_use) as pool:
+                result = pool.starmap_async(self._measure_file, items)
+                result.wait()
+                print(result)
+                self.df = ns.df
+        
+        # remove possible duplicated rows (if restarted)
+        try:
+            self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+        except Exception as e_one:
+            try:
+                self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
+            except Exception as e_two:
+                print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
+                pass
 
-            # calculate features values from all PDB files associated with specific DataFrame entry
-            for f in files:
 
-                if pdb_code not in f:
+    def _measure_file(self, file_details, lock, ns):
+        '''
+        Take a file and calculate the required measurements for this.
+        Return the dataframe of the calculations to the overall self.df
+
+        Method
+        ------
+        Take the given information about the file and through the given file_list,
+        find the files to analyse. Through the structure, identify all lysines and
+        create a temporary dataframe for the results. Iterate over the required measurements
+        (self.measures) and insert results into the temporary dataframe. Append temporary
+        dataframe to main dataframe.
+
+        Parameters
+        ----------
+        file_details : list
+            list of details for the file that has been selected to be calculated
+            takes the form of [uniprot_code, pdb_code, method, res, chains]
+        
+        lock : multiprocessing manager lock
+            lock used to stop processes writing to output files and dataframes at the same time
+
+        ns : multiprocessing manager namespace
+            allows appending the dataframe results to a shared out dataframe, this is then transferred to self.df
+
+        Example
+        -------
+        self._measure_file(file_details, files_list)
+        '''
+
+        # decompose the file_details into variables
+        uniprot_code, pdb_code, method, res, chains = file_details
+        files_list = self.files_to_analyse
+
+        # calculate features values from all PDB files associated with specific DataFrame entry
+        for f in files_list:
+            # check the file for the required pbd code, if not there, skip
+            if pdb_code not in f:
+                continue
+            
+            terminal_out_statements = []
+            #print(f'Analysing structure {current_structure}/{total_structures}')
+            tstart = time.time()
+            #print(f"\n> File: {f}")
+            terminal_out_statements.append(f"\n> File: {f}")
+
+            # create temporary DataFrame for data of current file,
+            # to be then appended to main DataFrame self.df
+
+            columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            df_currentfile = pd.DataFrame(columns=columns)
+
+            # append to temporary DataFrame all lysines in the file of interest
+            try:
+                M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+            except:
+                self.wrong_pdb_file.append(f)
+                continue
+
+            _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+            for i in idxs:
+
+                #save only lysine entries from chain of interest
+                if M.data["chain"].values[i] not in chains:
                     continue
-                print(f'Analysing structure {current_structure}/{total_structures}')
-                tstart = time.time()
-                print(f"\n> File: {f}")
 
-                # create temporary DataFrame for data of current file,
-                # to be then appended to main DataFrame self.df
 
-                columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
-                df_currentfile = pd.DataFrame(columns=columns)
+                data = ({'Uniprot_Entry': uniprot_code,
+                    'PDB Code': f.split(".")[0],
+                    'Method': method,
+                    'Resolution': res,
+                    'Chain': M.data["chain"].values[i],
+                    'Resid': M.data["resid"].values[i]})
 
-                # append to temporary DataFrame all lysines in the file of interest
+                df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
+            #print(f">> {len(df_currentfile)} lysines of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
+
+            # iterate over measures to carry out (according to self.measures)
+            for meas in self.measures:
+                #print(f">> evaluating {meas[0]}...")
+                terminal_out_statements.append(f">> evaluating {meas[0]}...")
                 try:
-                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
-                except:
-                    self.wrong_pdb_file.append(f)
+                    df_currentfile[meas[0]] = np.nan # create new column for measure
+                    result = meas[1](f) # run measurement
+                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
+
+                except Exception as e:
+                    #print(f"ERROR: {e}")
+                    terminal_out_statements.append(f"ERROR: {e}")
                     continue
-                
-                _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
-                for i in idxs:
 
-                    #save only lysine entries from chain of interest
-                    if M.data["chain"].values[i] not in chains:
-                        continue
-                    
-                    
-                    data = ({'Uniprot_Entry': uniprot_code,
-                        'PDB Code': f.split(".")[0],
-                        'Method': row["Method"],
-                        'Resolution': row["Resolution"],
-                        'Chain': M.data["chain"].values[i],
-                        'Resid': M.data["resid"].values[i]})
+            processing_time = round((time.time()-tstart), 2)
+            #print(f">> file processed in {processing_time} seconds.")
+            terminal_out_statements.append(f">> file processed in {processing_time} seconds.")
+            #average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
+            #print(f'>> Time average per file: {average_time_per_file} seconds.')
+            #sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
+            #time_remaining_str = str(datetime.timedelta(seconds=sec_remaining))
+            #print(f'Predicted time remaining: {time_remaining_str}')
 
-                    df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                print(f">> {len(df_currentfile)} lysines of interest found")
-
-                # iterate over measures to carry out (according to self.measures)
-                for meas in self.measures:
-                    print(f">> evaluating {meas[0]}...")
-                    try:
-                        df_currentfile[meas[0]] = np.nan # create new column for measure
-                        result = meas[1](f) # run measurement
-                        df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
-
-                    except Exception as e:
-                        print(f"ERROR: {e}")
-                        continue
-
-                current_structure += 1
-                processing_time = round((time.time()-tstart), 2)
-                print(f">> file processed in {processing_time} seconds.")
-                average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
-                print(f'>> Time average per file: {average_time_per_file} seconds.')
-                sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
-                time_remaining_str = str(datetime.timedelta(seconds=sec_remaining))
-                print(f'Predicted time remaining: {time_remaining_str}')
+            with lock:
+                # write all terminal outputs for file
+                for statement in terminal_out_statements:
+                    print(statement)
 
                 # document the data to a log file
                 if self.activate_log:
                     if df_currentfile.empty is False:
                         try:
-                            self.logger.info(df_currentfile.to_string().strip())
+                            self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
                             print(f'Error in logging: {e}')
 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
-                self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
-
-            # remove possible duplicated rows (if restarted)
-            if index == first_index:
-                try:
-                    self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
-                except Exception as e_one:
-                    try:
-                        self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
-                    except Exception as e_two:
-                        print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
-                        pass
+                ns.df = pd.concat([ns.df, df_currentfile], ignore_index=True)
 
 
     def recover_from_log(self, log_path):
