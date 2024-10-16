@@ -39,7 +39,7 @@ def autopatch(fbasename, gap_cutoff=8):
             pdb_out = ""
 
     except Exception as e:
-        raise Exception(">> ERROR: %s"%e)
+        raise Exception(f">> ERROR: {e}")
 
     myfiles = ['%s.seq'%fbasename, '%s.pir'%fbasename, 'alignment.seg',
                'alignment.seg.ali', 'trimmed_align.ali', 'family.mat']
@@ -100,11 +100,11 @@ def _full_align(fbasename):
     f.close()
 
     if sys.platform == "win32":
-        myCmd_A = f'type {pir_fname} {seq_fname} > alignment.seg'
+        my_cmd_a = f'type {pir_fname} {seq_fname} > alignment.seg'
     else:
-        myCmd_A = f'cat {pir_fname} {seq_fname} > alignment.seg'
+        my_cmd_a = f'cat {pir_fname} {seq_fname} > alignment.seg'
 
-    os.system(myCmd_A)
+    os.system(my_cmd_a)
 
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
@@ -115,7 +115,7 @@ def _full_align(fbasename):
                   # PDB codes of the templates
                   knowns   = fbasename,
                   # code of the target
-                  sequence = seq_name) 
+                  sequence = seq_name)
     a.auto_align() # get an automatic alignment (alignment.seg.ali)
     return seq_name
 
@@ -285,7 +285,7 @@ def fragment(pdb, fasta, outfolder="."):
         if ">" in line:
             headers.append(line)
             chain_rawinfo = line.split("|")[1][6:].split(",")
-            print(chain_rawinfo[0])
+            #print(chain_rawinfo[0])
             #chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
             if len(chain_rawinfo[0]) == 1:
                 chain_info = chain_rawinfo
@@ -293,7 +293,7 @@ def fragment(pdb, fasta, outfolder="."):
                 chain_info = [str(chain_rawinfo[0].split('[')[0])]
             else:
                 chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
-            print(chain_info)
+            #print(chain_info)
             fasta_chains.append(chain_info)
             if "sequence" in locals():
                 sequences.append(sequence)
@@ -364,7 +364,7 @@ def fragment(pdb, fasta, outfolder="."):
     # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
 
     # find the double chain name files and store in list to iterate through when converting the single character names
-    all_files = os.listdir(outfolder) 
+    all_files = os.listdir(outfolder)
     doubleletter_pdb_files = []
     for file in all_files:
         temp_parts = file.split('.')
@@ -531,7 +531,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         fouts.append(foutname)
 
     # reassemble complex in final directory
-    print("outdir: ", outdir)
+    #print("outdir: ", outdir)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
@@ -1052,7 +1052,7 @@ def clean_fasta(fname):
 
     return
 '''
-    
+
 ##############################################################################
 
 if __name__ == "__main__":
@@ -1069,7 +1069,7 @@ if __name__ == "__main__":
         #fragment(pdb, fasta, tmpfolder)
 
         fname = curate(pdb, fasta, outdir=outfolder, gap=gap)
-        print("generated %s"%fname)
+        print(f"generated {fname}")
         sys.exit()
 
     # fname should be a basename: expect to find both a .pdb and a .fasta file with that name
@@ -1087,4 +1087,4 @@ if __name__ == "__main__":
     if foutname == "":
         print("autopatch failed")
     else:
-        print("saved patched file %s"%foutname)
+        print(f"saved patched file {foutname}")
