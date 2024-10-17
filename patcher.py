@@ -23,7 +23,7 @@ from helper import get_download_tool, ShutUp
 def autopatch(fbasename, gap_cutoff=8):
 
     print('>> modelling missing residues')
-    #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise) 
+    #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise)
     pdb_out = ""
     try:
 
@@ -39,15 +39,15 @@ def autopatch(fbasename, gap_cutoff=8):
             pdb_out = ""
 
     except Exception as e:
-        raise Exception(f">> ERROR: {e}")
+        raise Exception(f">> ERROR: {e}") from e
 
-    myfiles = ['%s.seq'%fbasename, '%s.pir'%fbasename, 'alignment.seg',
+    myfiles = [f'{fbasename}.seq', f'{fbasename}.pir', 'alignment.seg',
                'alignment.seg.ali', 'trimmed_align.ali', 'family.mat']
     myfiles.extend(glob.glob('*.ini'))
     myfiles.extend(glob.glob('*.rsr'))
     myfiles.extend(glob.glob('*.sch'))
-    myfiles.extend(glob.glob('%s.V*'%seq_name))
-    myfiles.extend(glob.glob('%s.D*'%seq_name))
+    myfiles.extend(glob.glob(f'{seq_name}.V*'))
+    myfiles.extend(glob.glob(f'{seq_name}.D*'))
 
     for mfile in myfiles:
         m = os.path.join(os.getcwd(), mfile)
@@ -153,7 +153,7 @@ def _trim_align(align_file):
 
     AA_struc_len = len(AA_struc)
     AA_struc_new = AA_struc[start_gaps_len : AA_struc_len - end_gaps_len]+"*"
-    AA_struc_new = wrap(AA_struc_new, 75) #split after 75 characters 
+    AA_struc_new = wrap(AA_struc_new, 75) #split after 75 characters
 
     AA_seq = ''.join([str(elem.rstrip("\n").rstrip("*")) for elem in f1[sec_2+2:]])
     AA_seq_len = len(AA_seq)
@@ -219,11 +219,11 @@ def _patch_model(fbasename, seq_name):
     pdb_out = f"{fbasename}_PATCHED.pdb"
 
     if sys.platform == "win32":
-        myCmd_mv = f'MOVE /Y {seq_name}.B99990001.pdb {pdb_out}'
+        my_cmd_mv = f'MOVE /Y {seq_name}.B99990001.pdb {pdb_out}'
     else:
-        myCmd_mv = f'mv {seq_name}.B99990001.pdb {pdb_out}'
+        my_cmd_mv = f'mv {seq_name}.B99990001.pdb {pdb_out}'
 
-    os.system(myCmd_mv)
+    os.system(my_cmd_mv)
 
     return pdb_out
 
@@ -359,7 +359,7 @@ def fragment(pdb, fasta, outfolder="."):
                     print(line, end='')
     '''
 
-    # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format 
+    # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format
     # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesnt convert all double letter chain names to A
     # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
 
@@ -435,7 +435,7 @@ def reassemble(pdbs, labels, outname, outdir):
 
         #If the protein fails, print error message with the error
         except Exception as e:
-            raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. %s'%e)
+            raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. {e}')
 
 
     # Take all the files in pdbs and turn each into a biobox Molecule object and append this to a list of monomers
@@ -494,7 +494,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
     if largest>gap:
-        raise Exception("large gap detected (%s residues)"%largest)
+        raise Exception(f"large gap detected ({largest} residues)")
 
 
     #launch modeller on each individual chain
@@ -517,7 +517,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
             raise Exception("Autopatching failed.")
 
         # ensure that sequences of AA starts from the correct resid
-        M_raw = bb.Molecule("%s.pdb"%fbasename)
+        M_raw = bb.Molecule(f"{fbasename}.pdb")
         startval_raw = M_raw.data["resid"].values
         M_curated = bb.Molecule(foutname)
         startval_clean = M_curated.data["resid"].values
@@ -535,7 +535,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    fname = "%s.pdb"%os.path.basename(pdb).split(".")[0]
+    fname = f"{os.path.basename(pdb).split('.')[0]}.pdb"
     outname = os.path.join(outdir, fname)
 
     #possible bug here (fixed by sorting the lists alphabetically)
@@ -546,11 +546,11 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     #possible bug here (fixed by sorting the lists alphabetically)
 
     reassemble(fouts, chains, outname, outdir)
-    #TODO: check whether patching process caused clashing with lysine  
+    #TODO: check whether patching process caused clashing with lysine
     shutil.rmtree(tmpfolder)
-    
+
     return outname
-    
+
 
 '''
 def correct_resid(pdb, chain):
