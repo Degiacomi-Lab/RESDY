@@ -659,7 +659,7 @@ class PDB(object):
             #print(M.data)
 
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
-            M.write_pdb(path_temp, index=indices, split_struc=True, dssp=False)
+            M.write_pdb(path_temp, index=indices, split_struc=True)
 
             # take the new written file and insert in place where it would sit in the overall pdb file
             lines = open(path, 'r').readlines()
@@ -696,7 +696,7 @@ class PDB(object):
         try:
             M = bb.Molecule(path)
             indices = M.atomselect('*', '*', '*', True, False)[1]
-            M.write_pdb(path, index=indices, split_struc=False, dssp=False)
+            M.write_pdb(path, index=indices, split_struc=False)
 
         except Exception as e:
             os.remove(path)
@@ -718,7 +718,7 @@ class PDB(object):
 
 
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
-            M.write_pdb(path_temp, index=indices, split_struc=True, dssp=False)
+            M.write_pdb(path_temp, index=indices, split_struc=True)
 
             # take the new written file and insert in place where it would sit in the overall pdb file
             lines = open(path, 'r').readlines()
@@ -744,13 +744,13 @@ class PDB(object):
             os.remove(path_temp)
 
         except Exception as e:
-            raise Exception(f'Failed to replace selenocysteine in pdb file. {e}')
+            raise Exception(f'Failed to replace selenocysteine in pdb file: {e}') from e
 
 
         # replace the U residues in the fasta file
         try:
 
-            fasta = os.path.join(self.raw_dir, "%s.fasta"%pdb)
+            fasta = os.path.join(self.raw_dir, f"{pdb}.fasta")
 
             fin = open(fasta, "r")
             headers = [] # fasta headers
@@ -772,7 +772,7 @@ class PDB(object):
             new_fasta.close()
 
         except Exception as e:
-            raise Exception(f'Failed to replace selenocysteine in fasta file. {e}')
+            raise Exception(f'Failed to replace selenocysteine in fasta file: {e}') from e
 
 
 
