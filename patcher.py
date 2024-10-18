@@ -290,7 +290,7 @@ def fragment(pdb, fasta, outfolder="."):
             if len(chain_rawinfo[0]) == 1:
                 chain_info = chain_rawinfo
             elif '[' in chain_rawinfo[0]:
-                chain_info = [str(chain_rawinfo[0].split('[')[0])]
+                chain_info = [str(chain_rawinfo[0].split('[')[0].strip())]
             else:
                 chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
             #print(chain_info)
@@ -316,6 +316,7 @@ def fragment(pdb, fasta, outfolder="."):
     #write FASTA files
     for i, header in enumerate(headers):
         for c in fasta_chains[i]:
+            print(c)
             if c not in chains:
                 raise Exception(f"chain mismatch between PDB and FASTA. {fasta_chains}, {chains}")
             fout = open(os.path.join(outfolder, f"chain{c}.fasta"), "w")
@@ -398,7 +399,7 @@ def fragment(pdb, fasta, outfolder="."):
 
         #If the protein fails, print error message with the error
         except Exception as e:
-            raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. %s'%e)
+            raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. {e}')
 
 
     return np.array(gap_count)
