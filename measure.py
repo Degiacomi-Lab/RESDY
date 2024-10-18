@@ -129,6 +129,8 @@ class Measure(object):
         -------
         M.save_state(outname='measures.csv')
         '''
+        # sort by uniprot code to give order to output after parallel run
+        self.df = self.df.sort_values(by='Uniprot_Entry')
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
@@ -171,17 +173,17 @@ class Measure(object):
             case True:
                 # determine how to parallelise
                 n_cores_to_use = cpu_count() - 1
-                print(f'>> Measurements running in parallel')
+                print('>> Measurements running in parallel')
             case False:
                 # use a singular core for step by step processing
                 n_cores_to_use = 1
-                print(f'>> Measurements running step by step')
+                print('>> Measurements running step by step')
 
         with Manager() as manager:
             # create lock to avoid multiple parts writing to output files at the same time
             lock = manager.Lock()
-            ns = manager.Namespace()
-            ns.df = self.df
+            ns_measures = manager.Namespace()
+            ns_measures.df = self.df
             # prepare the inputs for the parallelisation
             items = []
             for i, r in self.df_input.iterrows():
@@ -191,12 +193,12 @@ class Measure(object):
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
-                items.append([file_details, lock, ns])
+                items.append([file_details, lock, ns_measures])
             with Pool(n_cores_to_use) as pool:
                 result = pool.starmap_async(self._measure_file, items)
                 result.wait()
                 print(result)
-                self.df = ns.df
+                self.df = ns_measures.df
         
         # remove possible duplicated rows (if restarted)
         try:
@@ -232,7 +234,8 @@ class Measure(object):
             lock used to stop processes writing to output files and dataframes at the same time
 
         ns : multiprocessing manager namespace
-            allows appending the dataframe results to a shared out dataframe, this is then transferred to self.df
+            allows appending the dataframe results to a shared out dataframe,
+            this is then transferred to self.df
 
         Example
         -------
@@ -248,7 +251,7 @@ class Measure(object):
             # check the file for the required pbd code, if not there, skip
             if pdb_code not in f:
                 continue
-            
+
             terminal_out_statements = []
             #print(f'Analysing structure {current_structure}/{total_structures}')
             tstart = time.time()
@@ -264,8 +267,9 @@ class Measure(object):
             # append to temporary DataFrame all lysines in the file of interest
             try:
                 M = bb.Molecule(f) # sometimes bb does not work with a pdb file
-            except:
+            except Exception as e:
                 self.wrong_pdb_file.append(f)
+                terminal_out_statements.append(f'Failed to produce bb for pdb file with error: {e}')
                 continue
 
             _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
@@ -872,7 +876,7 @@ class Measure(object):
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
-            raise Exception(f'{e}') from e
+            raise Exception(f'SASA calc error: {e}') from e
 
         #For each lysine it works out the distance between the lys NZ,
         #and the each atom in the protein.
@@ -892,13 +896,13 @@ class Measure(object):
 
             #if the atoms are close to the lys NZ they are included in a small .pdb structure.
             try:
-                S = M.get_subset(idxs=list_close_points) 
+                S = M.get_subset(idxs=list_close_points)
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
                 #print([chain, resid])
 
                 #SASA is calculated for that lysine in the small molecule.
-                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"], 
+                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
                                             use_resname=False, get_index=True)
                 #print([pts_2, indx_2, S.data['radius']])
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
@@ -927,14 +931,14 @@ class Measure(object):
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except Exception as e:
-            raise Exception(f">> could not find NZ atoms within atomic structure - {e}")
+            raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
         try:
             parser = PDBParser()
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
-            raise Exception(f">> could not get biopython structure - {e}")
+            raise Exception(f">> DEPTH error: could not get biopython structure - {e}")
 
 
         results = []
@@ -949,7 +953,7 @@ class Measure(object):
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
             except Exception as e:
-                raise Exception(f">> failed getting min_dist - {e}")
+                raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
 
             results.append([chain, resid, rd])
 
@@ -1058,11 +1062,11 @@ class Measure(object):
 
         except torch.cuda.OutOfMemoryError:
             # potential that calculating the AEVs could overload the gpu, if too much memory, catch this and skip the file
-            print(f'CUDA memory error with file: {path}, skipping')
+            print(f'AEV calc error: CUDA memory error with file: {path}, skipping')
             return df_aevs
         except MemoryError:
             # potential that calculating the AEVs could overload the cpu, if too much memory, catch this and skip the file
-            print(f'CPU memory error with file: {path}, skipping')
+            print(f'AEV calc error: CPU memory error with file: {path}, skipping')
             return df_aevs
         except Exception as e:
             print(f'AEV Calculations: 2 - could not create the AEVs for the protein for protein {path}, error: {e}')
