@@ -51,6 +51,11 @@ class Measure(object):
             self.logger.addHandler(handler)
 
         self._setup_measures(features)
+        pd.set_option("display.max_rows", None,
+                      "display.max_columns", None,
+                      'display.max_colwidth', None,
+                      'display.width', None,
+                      'max_seq_items', None)
 
         # for restarting
         self.current_index = 0
@@ -199,7 +204,7 @@ class Measure(object):
                 result.wait()
                 print(result)
                 self.df = ns_measures.df
-        
+
         # remove possible duplicated rows (if restarted)
         try:
             self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
