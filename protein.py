@@ -230,26 +230,30 @@ class PDB(object):
 
         cwd = os.getcwd()
 
-        #go into [[outfolder]/conformations and downloads the .pdb file.
-        print(f"> downloading PDB {pdb}")
-        os.chdir(self.raw_dir)
+        # check if the file has already been downloaded
+        files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*pdb"))]
+        if pdb not in files:
+            #go into [[outfolder]/conformations and downloads the .pdb file.
+            print(f"> downloading PDB {pdb}")
+            os.chdir(self.raw_dir)
+            tool = get_download_tool()
+            try:
+                if tool == "curl":
+                    line = f"curl -s -o {pdb}.pdb https://files.rcsb.org/download/{pdb}.pdb"
+                elif tool == "wget":
+                    line = f"wget https://files.rcsb.org/download/{pdb}.pdb"
 
-        tool = get_download_tool()
-        try:
-            if tool == "curl":
-                line = f"curl -s -o {pdb}.pdb https://files.rcsb.org/download/{pdb}.pdb"
-            elif tool == "wget":
-                line = f"wget https://files.rcsb.org/download/{pdb}.pdb"
+                else:
+                    raise RuntimeError("You don't have a commandline tool for downloading files")
 
-            else:
-                raise RuntimeError("You don't have a commandline tool for downloading files")
+                subprocess.check_call(line, shell=True)
+                os.chdir(cwd)
 
-            subprocess.check_call(line, shell=True)
-            os.chdir(cwd)
-            
-        except Exception as e:
-            print(f'Error downloading file. {e}')
-            os.chdir(cwd)
+            except Exception as e:
+                print(f'Error downloading file. {e}')
+                os.chdir(cwd)
+        else:
+            print(f'PDB file ({pdb}) has previously been downloaded, using previous copy.')
 
 
     def download_fasta(self, pdb):
@@ -258,27 +262,32 @@ class PDB(object):
 
         tool = get_download_tool()
 
-        try:
+        # check if the file has already been downloaded
+        files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
+        if pdb not in files:
+            try:
 
-            print(f"> downloading FASTA for {pdb}")
-            os.chdir(self.raw_dir)
+                print(f"> downloading FASTA for {pdb}")
+                os.chdir(self.raw_dir)
 
-            web_url = f'https://www.rcsb.org/fasta/entry/{pdb}/download'
-            name = pdb + '.fasta'
+                web_url = f'https://www.rcsb.org/fasta/entry/{pdb}/download'
+                name = pdb + '.fasta'
 
-            if tool == "curl":
-                line = f"curl -s -o {name} {web_url}"
-            elif tool == "wget":
-                line = f"wget -O {name} {web_url}"
-            else:
-                raise RuntimeError("You don't have a commandline tool for downloading files")
+                if tool == "curl":
+                    line = f"curl -s -o {name} {web_url}"
+                elif tool == "wget":
+                    line = f"wget -O {name} {web_url}"
+                else:
+                    raise RuntimeError("You don't have a commandline tool for downloading files")
 
-            subprocess.check_call(line, shell=True)
-            os.chdir(cwd)
+                subprocess.check_call(line, shell=True)
+                os.chdir(cwd)
 
-        except Exception as e:
-            os.chdir(cwd)
-            raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{e}') from e
+            except Exception as e:
+                os.chdir(cwd)
+                raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{e}') from e
+        else:
+            print(f'Fasta file for {pdb} previously downloaded, using previos copy.')
 
 
 
@@ -702,7 +711,6 @@ class PDB(object):
             os.remove(path)
         raise Exception(f'Failed rewriting pdb file. {e}')
 
-        return
 
 
     def replace_selenocysteine(self, path, pdb):
