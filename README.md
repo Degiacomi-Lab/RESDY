@@ -119,6 +119,15 @@ If running the Jupyter notebook `carbamylation.ipynb`:
 
 ## Technical Notes
 
+* The `Uniprot` class is used to handle collecting the structural information for the proteins required by mining the UNIPROT database. There are multiple ways to use this:
+  - from_csv_file() function allow you to pass a list of UNIPROT codes as a csv to mine. Respective headers for the file should be from: 'Uniprot_Entry', PDB_Code', 'Resid'. 'Uniprot_Entry' is the only required column. Add in data in the 'PDB_Code' if you only require a specific PDB file from this protein. 'Resid' allows you to note a specific residue of interest within this protein, can be used for later analysis.
+  - get_protein_data() function allows you to pass a UNIPROT code directly as a function input
+  - count_organism_proteins() function allows you to pass a code for a whole proteome and extract information about all the proteins within this.
+
+* The `Protein` class is used to handle extracting PDB files for proteins specified within the Uniprot class. Structures are downloaded and patched to ensure good quality structures as used for calculations.
+
+* THe `Alphafold` class is used to handle extracting AlphaFold data for proteins specified within the Uniprot class. Structures are downloaded and patched to ensure good quality structures as used for calculations.
+
 * The `Measure` class has been implemented to facilitate the addition of new measurable features. This is done by:
   - implementing a method taking a filename as input and returning a pandas DataFrame with three columns [resid, chain, feature].
   - adding the function name and its label in `self.measures` within `__init__`.
