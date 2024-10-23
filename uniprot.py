@@ -11,7 +11,7 @@ class Uniprot(object):
     
     def __init__(self, done_pdbs=[]):
 
-        columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
+        columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
   
         
@@ -91,7 +91,7 @@ class Uniprot(object):
         
                 AF_code = 'AF-' + uniprot_code + '-F1-model_v3'
               
-                data = ({'Uniprot_Entry': uniprot_code, 'PDB Code': AF_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
+                data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': AF_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
         
             #search for available PDB structures
@@ -122,9 +122,9 @@ class Uniprot(object):
                     if chain_target != "":      
                         for j, c in enumerate(chains.split('/')):
                             if chain_target == c:     
-                                data = {'Uniprot_Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains' : c}
+                                data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains' : c}
                     else:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains' : chains}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': PDBCODE, 'Method': method_obtained, 'Resolution': resolution, 'Chains' : chains}
                      
                     
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -169,7 +169,7 @@ class Uniprot(object):
                 if pdb_code == 'AF':
                     pdb_code = 'AF-' + uniprot_code + '-F1-model_v1'
     
-                    d = {'Uniprot_Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}
+                    d = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
     
                 else:

@@ -51,11 +51,8 @@ class Measure(object):
             self.logger.addHandler(handler)
 
         self._setup_measures(features)
-        pd.set_option("display.max_rows", None,
-                      "display.max_columns", None,
-                      'display.max_colwidth', None,
-                      'display.width', None,
-                      'max_seq_items', None)
+        pd.set_option("display.max_columns", None)
+        pd.reset_option('display.max_rows')
 
         # for restarting
         self.current_index = 0
@@ -76,7 +73,7 @@ class Measure(object):
         files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
         # find all PDB entries
         files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        for f in df_input["PDB Code"].values:
+        for f in df_input["PDB_Code"].values:
             if f not in files_af and f not in files_pdb:
                 print(f'WARNING: {f} not found in folder {self.folder}')
 
@@ -87,11 +84,11 @@ class Measure(object):
         self.PDB_only = False
 
         if 'Uniprot_Entry' in self.df_input.columns:
-            columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB Code', 'Chain', 'Resid', 'propka', 'pkaANI', 'sasa', 'depth']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'propka', 'pkaANI', 'sasa', 'depth']
             self.df = pd.DataFrame(columns = columns)
 
     def _setup_measures(self, features):
@@ -192,7 +189,7 @@ class Measure(object):
             # prepare the inputs for the parallelisation
             items = []
             for i, r in self.df_input.iterrows():
-                pdb_code = r["PDB Code"]
+                pdb_code = r["PDB_Code"]
                 chains = r["Chains"].split("/")
                 method = r['Method']
                 res = r['Resolution']
@@ -266,7 +263,7 @@ class Measure(object):
             # create temporary DataFrame for data of current file,
             # to be then appended to main DataFrame self.df
 
-            columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             df_currentfile = pd.DataFrame(columns=columns)
 
             # append to temporary DataFrame all lysines in the file of interest
@@ -286,7 +283,7 @@ class Measure(object):
 
 
                 data = ({'Uniprot_Entry': uniprot_code,
-                    'PDB Code': f.split(".")[0],
+                    'PDB_Code': f.split(".")[0],
                     'Method': method,
                     'Resolution': res,
                     'Chain': M.data["chain"].values[i],
@@ -328,11 +325,21 @@ class Measure(object):
                 # document the data to a log file
                 if self.activate_log:
                     if df_currentfile.empty is False:
+                        pd.set_option('display.max_colwidth', None,
+                                      'display.width', None,
+                                      'max_seq_items', None,
+                                      "display.max_rows", None)
                         try:
                             self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
                             print(f'Error in logging: {e}')
+
+                        # reset the pandas display options back to default for regular displaying
+                        pd.reset_option('display.max_colwidth')
+                        pd.reset_option('display.width')
+                        pd.reset_option('max_seq_items')
+                        pd.reset_option('display.max_rows')
 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 ns.df = pd.concat([ns.df, df_currentfile], ignore_index=True)
@@ -367,9 +374,11 @@ class Measure(object):
         if self.PDB_only:
             return 'Function not callable.'
 
-        base_columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chain', 'Resid']
+        base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
+        print(f'Recovering measuered data from file: {log_path}')
+        print('WARNING: could take up to a few minutes depending on the number of measurements completed.')
 
         test_lines = 0
         columns_all_set = False
@@ -378,25 +387,29 @@ class Measure(object):
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
         curr_line = 0
+
         with open(log_path) as inf:
             for line in inf:
                 curr_line += 1
                 # check if it is a header line, check if doesn't start with number or -
-                if line[0].isalpha():
+                if line[0].isalpha() or line[0] == ' ':
                     # found a header line
                     parts = line.split()
                     # check that columns have been written to the log file correctly
-                    if len(parts) <= 6 and columns_all_set:
+                    if columns_all_set:
                         continue
                     elif len(parts) <= 6 and not columns_all_set:
                         print('Columns were not set correctly in the log file.')
                         print(f'The first 6 columns are assumed to be: {base_columns}')
                         continue
-                    # if all seems correct with the writing
-                    # check that all the columns can be found in the current columns, if not, add in
-                    for part in parts:
-                        if part not in base_columns:
-                            base_columns.append(part)
+                    elif len(parts) >= 6 and not columns_all_set:
+                        # if all seems correct with the writing
+                        # check that all the columns can be found in the current columns, if not, add in
+                        for part in parts:
+                            if part not in base_columns:
+                                base_columns.append(part)
+                        continue
+
                 line_splitter_bool = all(a == '-' for a in line.strip())
                 if line_splitter_bool:
                     line = ''
@@ -436,6 +449,7 @@ class Measure(object):
 
         self.df = log_to_df
         print('Data recovered from log file')
+        print(f'Numer of measurements read: {len(log_to_df)}')
         return log_to_df
 
 
@@ -466,21 +480,24 @@ class Measure(object):
         if self.PDB_only:
             return 'restart_measure() function not callable when using PDB_only'
 
-        print(len(self.df_input))
-
+        print('Restarting measurements')
         # 1. Analyse the measures log file to create a list of files that were analysed
         log_path = os.path.join(self.outdir, log_path)
+        print(f'Finding measured proteins from log file: {log_path}')
         proteins_completed = []
-        words_to_ignore = ['sasa', 'depth', 'pKa', 'PDB', 'Code', 'Method', 'Chain', 'Resid', 'Resolution', 'Uniprot', 'Entry']
+        with open(log_path, "rb") as f:
+            num_lines = sum(1 for _ in f)
+        curr_line = 0
         with open(file=log_path, mode='r') as lpf:
             for line in lpf:
-                line = line.replace('--------------------------------------------------------------------------',' ')
-                parts = line.split()
-                if len(parts) == 0:
+                curr_line += 1
+                if line[0].isalpha() or line[0] == ' ' or line[0] == '-':
                     continue
-                protein_code = parts[1].split('/')[-1]
-                if protein_code not in words_to_ignore:
-                    proteins_completed.append(protein_code)
+                parts = line.split()
+                protein_code = parts[1]
+                proteins_completed.append(protein_code)
+                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
+        print('Measured proteins recovered from log file')
 
         # remove the last protein from list incase it wasn't completed fully
         final_protein = proteins_completed[-1]
@@ -493,8 +510,8 @@ class Measure(object):
             if r['Uniprot_Entry'] in proteins_completed:
                 idx_to_remove.append(i)
         self.df_input = self.df_input.drop(idx_to_remove)
-        print(len(self.df_input))
         # 3. Restart the measure_dataframe() with the new file list
+        print('Continuing measurements')
         self.measure_dataframe()
 
 
@@ -524,14 +541,14 @@ class Measure(object):
 
 
     def measure_PDB_only(self):
-
+        # TODO GW 23.10.24 - Note this function will need updating with the logging to be consistent in the styles
         if not self.PDB_only:
             return 'Calling the wrong method.'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
 
         for _, row in self.df_input.iterrows():
-            PDBCODE = row['PDB Code']
+            PDBCODE = row['PDB_Code']
 
 
             # calculate features values from all PDB files associated with specific DataFrame entry
@@ -546,7 +563,7 @@ class Measure(object):
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
 
-                columns = ['PDB Code', 'Chain', 'Resid']
+                columns = ['PDB_Code', 'Chain', 'Resid']
                 df = pd.DataFrame(columns=columns)
 
 
@@ -565,7 +582,7 @@ class Measure(object):
                     #    continue
 
 
-                    data = ({'PDB Code': f.split(".")[0],
+                    data = ({'PDB_Code': f.split(".")[0],
                         'Chain': M.data["chain"].values[i],
                         'Resid': M.data["resid"].values[i]})
 
@@ -592,7 +609,7 @@ class Measure(object):
                 if self.activate_log:
                     if df.empty is False:
                         try:
-                            self.logger.info(df.to_string().strip('PDB Code        Chain Resid    pKa       sasa'))
+                            self.logger.info(df.to_string().strip('PDB_Code        Chain Resid    pKa       sasa'))
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
                             print(f'Error in logging measurements: {e}')

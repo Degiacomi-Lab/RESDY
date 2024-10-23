@@ -344,7 +344,7 @@ class Viewer(object):
             my_resid = self.temp_df_2.loc[idx, "Resid"]
             my_label = "%s(%i)"%(my_uniprot, my_resid)
             df_query = self.df[(self.df['Uniprot_Entry'] == my_uniprot) & (self.df['Resid'] == my_resid)]
-            labels = ["PDB: %s"%(df_query["PDB Code"].values[i]) for i in range(len(df_query))]
+            labels = ["PDB: %s"%(df_query["PDB_Code"].values[i]) for i in range(len(df_query))]
             
             # a region, an option, and a point all selected
             if (len(self.f.data) == 4):
@@ -373,7 +373,7 @@ class Viewer(object):
             my_uniprot = points.trace_name.split('(')[0]
             my_resid = int(points.trace_name.split('(')[1].strip(')'))
             df_query = self.df[(self.df['Uniprot_Entry'] == my_uniprot) & (self.df['Resid'] == my_resid)].reset_index(drop=True)
-            pdb_file_path = df_query.loc[idx, 'PDB Code'] + '.pdb'
+            pdb_file_path = df_query.loc[idx, 'PDB_Code'] + '.pdb'
             self.PDB_box.value = pdb_file_path
         
         out_1 = widgets.interactive_output(interact_slides, {'p': self.p, 's':self.s})

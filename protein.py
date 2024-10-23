@@ -42,10 +42,10 @@ class PDB(object):
 
         # dataframe storing data
         if self.PDB_only:
-            columns = ['PDB Code']
+            columns = ['PDB_Code']
             self.df = pd.DataFrame(columns=columns)
         else:
-            columns = ['Uniprot_Entry', 'PDB Code', 'Method', 'Resolution', 'Chains']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
             self.df = pd.DataFrame(columns=columns)
 
         #gap to consider as small enough to justify patching
@@ -84,14 +84,14 @@ class PDB(object):
         if self.PDB_only:
             try:
                 # when the inputs are PDB codes only, convert them to a dataframe
-                dic = {'PDB Code':uniprot_df}
+                dic = {'PDB_Code':uniprot_df}
                 uniprot_df = pd.DataFrame(dic)
             except Exception as e:
                 return e
 
         for index, row in uniprot_df.iterrows():
 
-            pdb_code = row["PDB Code"]
+            pdb_code = row["PDB_Code"]
 
             if not self.PDB_only:
                 uniprot_code = row["Uniprot_Entry"]
@@ -106,9 +106,9 @@ class PDB(object):
                     if pdb_code in files:
                         print(f">> curated {pdb_code} PDB found, continuing...")
                         if not self.PDB_only:
-                            data = {'Uniprot_Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
                         else:
-                            data = {'PDB Code': pdb_code}
+                            data = {'PDB_Code': pdb_code}
 
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                         continue
@@ -132,9 +132,9 @@ class PDB(object):
 
                 if test:
                     if not self.PDB_only:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
                     else:
-                        data = {'PDB Code': pdb_code}
+                        data = {'PDB_Code': pdb_code}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                     # find the PLDDT codes for AF structures - not fully sure where to put this
@@ -159,9 +159,9 @@ class PDB(object):
                     if pdb_code in files:
                         print(f">> curated {pdb_code} PDB found, continuing...")
                         if not self.PDB_only:
-                            data = {'Uniprot_Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
+                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
                         else:
-                            data = {'PDB Code': pdb_code}
+                            data = {'PDB_Code': pdb_code}
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                         continue
 
@@ -169,9 +169,9 @@ class PDB(object):
                 try:
                     self.clean_and_split_pdb(pdb_code)
                     if not self.PDB_only:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
                     else:
-                        data = {'PDB Code': pdb_code}
+                        data = {'PDB_Code': pdb_code}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                 except Exception as e:

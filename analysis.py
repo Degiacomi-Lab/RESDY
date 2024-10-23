@@ -699,7 +699,7 @@ class Analysis(object):
                 sasa_mean = df_query['sasa'].mean()
                 depth_mean = df_query['depth'].mean()
                 # GW: Have changed the data entry from the following line to the one after to; not worth including the NaN values in this dataframe when they dont add anything to it
-                #data = {'Uniprot_Entry':entry, 'PDB Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan, 'Resid':resid, 'propka':propka_mean, 'sasa':sasa_mean, 'depth':depth_mean}
+                #data = {'Uniprot_Entry':entry, 'PDB_Code':np.nan, 'Method':np.nan, 'Resolution':np.nan, 'Chain':np.nan, 'Resid':resid, 'propka':propka_mean, 'sasa':sasa_mean, 'depth':depth_mean}
                 data = {'Uniprot_Entry':entry, 'Resid':resid, 'propka mean':propka_mean, 'sasa mean':sasa_mean, 'depth mean':depth_mean}
                 self.df_sub = pd.concat([self.df_sub, pd.DataFrame(data, index=[0])], ignore_index=True)
 
