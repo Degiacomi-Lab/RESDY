@@ -250,26 +250,41 @@ class Analysis(object):
         self.df = self.df.drop(index = remove_list)
         L2 = len(self.df)
         print(f'Original num of rows: {L1}\nCurrent num of rows: {L2}\nNum of rows removed: {len(df_to_remove)}')
-    
-    #function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
+
+    # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
     def remove_not_important_residues(self, req_resid_table):
+        print('>> Removing unrequired residues')
         # duplicate the req_resid_table to allow to delete rows with testing
         test_table = req_resid_table
-        initial_fullData_rows = len(self.df)
+        initial_data_one = len(self.df)
+        self.df = self.df.drop_duplicates()
+        duplicate_rows_removed = initial_data_one - len(self.df)
+        print(f'Removed {duplicate_rows_removed} rows of duplicates')
+        initial_full_data_rows = len(self.df)
+        # remove rows which have a UNIPROT code which isnt required
+        uniprot_codes = test_table['Uniprot_Entry'].drop_duplicates().tolist()
+        entries_to_remove = []
+        for i, r in self.df.iterrows():
+            if r['Uniprot_Entry'] not in uniprot_codes:
+                entries_to_remove.append(i)
+        self.df = self.df.drop(index=entries_to_remove)
+        uniprot_rows_removed = initial_full_data_rows - len(self.df)
+        print(f'Removed {uniprot_rows_removed} rows of Uniprot codes which were not mentioned in the required residues file')
         # iterate over each set of residues of a protein
-        while (len(test_table) > 0):
+        while len(test_table) > 0:
             # prints the number of rows left in the hits sheet updating how far through you are
             print("Number of rows left: " + str(len(test_table)))
             # read in the uniprot code at the top of the hits sheet
             test_uniprot = test_table["Uniprot_Entry"][test_table.first_valid_index()]
             # print out which one you are finding, mainly just for checking
             print("test_uniprot: " + str(test_uniprot))
-            # find all the desired residues from the particular uniprot code and put into a list, automatically removes duplicates from this (doesn't retain order)
+            # find all the desired residues from the particular uniprot code and put into a list
+            # automatically removes duplicates from this (doesn't retain order)
             desired_residues = list(set(test_table[test_table["Uniprot_Entry"].str.contains(test_uniprot)]["Resid"].tolist()))
             # search the measures spreadsheet for all rows containing the desired uniprot code
             search_uniprot = self.df[self.df["Uniprot_Entry"].str.contains(test_uniprot.strip())][["Uniprot_Entry", "Resid"]]
             all_search_rows = search_uniprot.index.tolist()
-            # go over each row of search_uniprot and see if the residue matches one of the desired ones
+            # go over each row of search_uniprot, see if the residue matches one of the desired ones
             wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
             not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
             print("Rows removed: " + str(len(not_wanted_rows)))
@@ -278,9 +293,9 @@ class Analysis(object):
             # remove rows which contain the uniprot code that has been searched from test_table
             test_table = test_table.drop(index = test_table[test_table["Uniprot_Entry"] == test_uniprot].index.tolist())
 
-        final_fullData_rows = len(self.df)
-        diff_rows = initial_fullData_rows - final_fullData_rows
-        print(f'Original num of rows: {initial_fullData_rows}\nCurrent num of rows: {final_fullData_rows}\nNum of rows removed: {diff_rows}')
+        final_full_data_rows = len(self.df)
+        diff_rows = initial_full_data_rows - final_full_data_rows
+        print(f'Original num of rows: {initial_full_data_rows}\nCurrent num of rows: {final_full_data_rows}\nNum of rows removed: {diff_rows}')
         self.df.to_csv(os.path.join(self.outdir, "measures_cut.csv"), index_label=False, index=False) 
 
     def subset(self, df, weight = 0.5, method = 'average', metrics=['propka', 'sasa', 'depth']):
