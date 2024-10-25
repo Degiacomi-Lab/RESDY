@@ -15,6 +15,8 @@ class Uniprot(object):
 
         columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
+        pd.reset_option('display.max_rows')
+        pd.set_option("display.max_columns", None)
 
 
     def count_organism_proteins(self, code, reviewed_only=False):
@@ -93,7 +95,7 @@ class Uniprot(object):
             #appends the AF structure to the df (if this isn't present it will be removed later).
             try:
 
-                AF_code = 'AF-' + uniprot_code + '-F1-model_v3'
+                AF_code = f'AF-{uniprot_code}-F1-model_v3'
 
                 data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': AF_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -155,22 +157,22 @@ class Uniprot(object):
         #Next abstract column names
         try:
             column_names = list(csv_df.columns)
-            csv_df[column_names[1]] = csv_df[column_names[1]].fillna(0)
+            csv_df['PDB_Code'] = csv_df['PDB_Code'].fillna(0)
 
         except Exception as e:
             raise Exception(f'Failed to get data from .csv file. {e}') from e
 
         #get the data about the protein and append it to the dataframe.
-        for i in range(len(csv_df)):
+        for i, r in csv_df.iterrows():
             try:
-                uniprot_code = csv_df.at[i, column_names[0]]
-                pdb_code = csv_df.at[i, column_names[1]]
+                uniprot_code = r['Uniprot_Entry']
+                pdb_code = r['PDB_Code']
 
                 if pdb_code == 0:
                     self.get_protein_data(uniprot_code)
 
                 if pdb_code == 'AF':
-                    pdb_code = 'AF-' + uniprot_code + '-F1-model_v1'
+                    pdb_code = f'AF-{uniprot_code}-F1-model_v1'
 
                     d = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
