@@ -72,6 +72,8 @@ class PDB(object):
 
         try:
             self.df = pd.read_csv(fname)
+            # remove duplicates from the dataframe to avoid extra uneccessary calculations
+            self.df = self.df.drop_duplicates()
         except Exception as e:
             print(f"Could not load csv file, error: {e}")
 
@@ -138,7 +140,7 @@ class PDB(object):
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                     # find the PLDDT codes for AF structures - not fully sure where to put this
-                    af.find_AF_plddt(pdb_code,outfolder=self.outdir)
+                    af.find_af_plddt(pdb_code,outfolder=self.outdir)
 
                 else:
                     print(">> FAILED: structure not found in AlphaFold database")
@@ -231,8 +233,9 @@ class PDB(object):
         cwd = os.getcwd()
 
         # check if the file has already been downloaded
-        files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*pdb"))]
-        if pdb not in files:
+        files=glob.glob(os.path.join(self.raw_dir, "*pdb"))
+        print(files)
+        if f'{pdb}.pdb' not in files:
             #go into [[outfolder]/conformations and downloads the .pdb file.
             print(f"> downloading PDB {pdb}")
             os.chdir(self.raw_dir)
@@ -261,7 +264,6 @@ class PDB(object):
         cwd = os.getcwd()
 
         tool = get_download_tool()
-
         # check if the file has already been downloaded
         files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
         if pdb not in files:
