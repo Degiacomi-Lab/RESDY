@@ -5,6 +5,7 @@ import urllib.parse
 import urllib.error
 import threading
 import concurrent.futures
+from ast import literal_eval
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,10 +25,7 @@ class Analysis(object):
     def __init__(self, df,  outdir="result"):
         self.df = df.dropna(subset=['propka', 'sasa'])
 
-        self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num','propka mean',
-                                                     'propka std','propka range','SASA mean',
-                                                     'SASA std','SASA range', 'Depth mean',
-                                                     'Depth std', 'Depth range'])
+        self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
         #self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','Resid','propka','sasa', 'depth'])
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
@@ -39,10 +37,13 @@ class Analysis(object):
 
         self.outdir = outdir
 
+
+    # GW 05.12.24 function potentially unused - remove?
     def get_data(self, uniprot_entry, resid):
         df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
         return df_query
 
+    # GW 05.12.24 function potentially unused - remove?
     def get_data_alphafold(self):
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
@@ -127,9 +128,95 @@ class Analysis(object):
         self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
     def aggregate(self):
-        # df_temp is just used to get the table of uniprot codes and associated resids
-        # for repeating over, the aggregation code uses the full dataset
+        '''
+        Aggregate the overall measurements to give the mean, standard deviation and range
+        for every feature for each protein.
+
+        Method
+        ------
+        Find the features that are present within the measurements.
+        Create a list of individual proteins and associated residues.
+        Loop over the inidividual protein combinations and find all measurements done on this set.
+        Create aggregated data for each set and write this to the output dataframe (df_aggregated).
+
+        Returns
+        -------
+        df_aggregated : dataframe
+            Dataframe with the averaged information for each protein for every measurement. Outline:
+            Uniprot_Entry   Resid   Num propka_mean propka_std  propka_range  \
+            x               x       x   x           x           x
+
+            aev_mean    aev_std aev_range   depth_mean  depth_std   depth_range  \
+            [x]         [x]     [x]         x           x           x
+
+            das_mean    das_std das_range   sasa_mean   sasa_std    sasa_range
+            x           x       x           x           x           x
+
+        Example
+        -------
+        >> analysis.aggregate()
+        >> print(analysis.df_aggregated.tail())
+                Uniprot_Entry Resid Num  propka_mean  propka_std  propka_range  \
+        45        P69441      57    50        10.38        0.31          1.79   
+        46        P69441      69    50        10.23        0.34          2.06   
+        47        P76044      23     1        10.34         NaN          0.00   
+        48        P77257     325     1        10.32         NaN          0.00   
+        49        Q46948      31     9        10.42        0.14          0.44   
+
+                                                    aev_mean  \
+        45  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        46  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        47  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        48  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        49  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+
+                                                    aev_std  \
+        45  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        46  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        47  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        48  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+        49  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...   
+
+                                                    aev_range  depth_mean  depth_std  \
+        45  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...        1.96       0.09   
+        46  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...        2.06       0.12   
+        47  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...        2.22        NaN   
+        48  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...        2.18        NaN   
+        49  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...        2.12       0.06   
+
+            depth_range  das_mean  das_std  das_range  sasa_mean  sasa_std  sasa_range  
+        45         0.62     36.46     2.47       12.0      58.41     11.16       39.18  
+        46         0.47     49.44     3.04       14.0      60.03     10.92       45.15  
+        47         0.00     31.00      NaN        0.0      55.22       NaN        0.00  
+        48         0.00     47.00      NaN        0.0      76.70       NaN        0.00  
+        49         0.17     48.11     3.33       12.0      67.81     10.41       28.70
+        '''
+
         df_temp = self.df.drop_duplicates(subset=['Uniprot_Entry','Resid'])
+        column_heads = list(self.df.columns.values)
+        potential_features = ['propka', 'pkaANI', 'depth', 'sasa', 'aev', 'das']
+        features_to_aggregate = [x for x in column_heads if x in potential_features]
+
+        def calculate_stats(data, feature, df_query):
+            temp_mean = round(df_query[feature].mean(),2)
+            temp_std = round(df_query[feature].std(),2)
+            temp_range_values = [round(df_query[feature].min(),2),round(df_query[feature].max(),2)]
+            temp_range = temp_range_values[1] - temp_range_values[0]
+
+            data[f'{feature}_mean'] = temp_mean
+            data[f'{feature}_std'] = temp_std
+            data[f'{feature}_range'] = temp_range
+
+        def calculate_aev_stats(data, df_query):
+            list_aevs = df_query['aev'].tolist()
+            list_aevs = [literal_eval(aev) for aev in list_aevs]
+            aev_avg = np.average(list_aevs, axis=0)
+            aev_range = np.ptp(list_aevs, axis=0)
+            aev_std = np.std(list_aevs, axis=0)
+            data['aev_mean'] = aev_avg
+            data['aev_std'] = aev_std
+            data['aev_range'] = aev_range
+
         for idx, row in df_temp.iterrows():
             # extract the uniprot and resid of interest
             entry = row['Uniprot_Entry']
@@ -138,36 +225,20 @@ class Analysis(object):
             df_query = self.df[(self.df['Uniprot_Entry'] == entry) & (self.df['Resid'] == resid)]
             # calculate all the values of interest from the subset dataframe (df_query)
             num = len(df_query)
-            propka_mean = round(df_query['propka'].mean(),2)
-            propka_std = round(df_query['propka'].std(),2)
-            propka_range_values = [round(df_query['propka'].min(),2),round(df_query['propka'].max(),2)]
-            propka_range = propka_range_values[1] - propka_range_values[0]
-            # TODO GW 13.09.24 - Do we need to split up analysis into Propka and pkaANI, at the moment it just takes forward the propka data
-            sasa_mean = round(df_query['sasa'].mean(),2)
-            sasa_std = round(df_query['sasa'].std(),2)
-            sasa_range_values = [round(df_query['sasa'].min(),2),round(df_query['sasa'].max(),2)]
-            sasa_range = sasa_range_values[1] - sasa_range_values[0]
-            depth_mean = round(df_query['depth'].mean(), 2)
-            depth_std = round(df_query['depth'].std(), 2)
-            depth_range_values = [round(df_query['depth'].min(), 2), round(df_query['depth'].max(), 2)]
-            depth_range = depth_range_values[1] - depth_range_values[0]
 
             data = {'Uniprot_Entry': entry,
                         'Resid': resid,
-                        'Num': num,
-                        'propka mean': propka_mean,
-                        'propka std': propka_std,
-                        'propka range': propka_range,
-                        'SASA mean': sasa_mean,
-                        'SASA std': sasa_std,
-                        'SASA range': sasa_range,
-                        'Depth mean': depth_mean,
-                        'Depth std': depth_std,
-                        'Depth range': depth_range}
+                        'Num': num}
+
+            for feature in features_to_aggregate:
+                if feature == 'aev':
+                    calculate_aev_stats(data, df_query)
+                else:
+                    calculate_stats(data, feature, df_query)
 
             # add in the data to the aggregated dataframe, index provided due to
             # only scalar values being used before being ignored when it is added in.
-            self.df_aggregated = pd.concat([self.df_aggregated, pd.DataFrame(data, index=[0])], ignore_index=True)
+            self.df_aggregated = pd.concat([self.df_aggregated, pd.DataFrame([data])], ignore_index=True)
 
 
     def plot_graph(self, plot_type, feature, uniprot_entry = False, resid = False):
