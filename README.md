@@ -5,7 +5,9 @@
 This software scans collections of protein structures, looking for lysines that may undergo a carbamlyation post-translational modification (PTM).
 
 It is implemented in a set of Python classes, assembled as a pipeline in the Jupyter notebook `carbamylation.ipynb`.
-A full description of the operations carried out by the pipeline is provided in the notebook. In short, the code will:
+A full description of the operations carried out by the pipeline is provided in the notebook.
+In order to run the notebook without errors, please download the entire repository.
+In short, the code will:
 
 * Identify PDB or AlphaFold files from UNIPROT codes (see `Uniprot` class). UNIPROT codes are either:
   - associated with an organism
@@ -39,7 +41,7 @@ The following Python packages are required to run the overall pipeline:
 
 > **Note**
 > Installation of Modeller requires a license key: https://salilab.org/modeller/registration.html.
-> On Mac, install Modeller with: `conda install -c salilab modeller=10.2`, as there are issues with version 10.3.
+> Note: there are issues with Modeller version 10.3, but any more recent version works correctly.
 
 ### Optional
 
