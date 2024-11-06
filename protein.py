@@ -234,8 +234,8 @@ class PDB(object):
 
         # check if the file has already been downloaded
         files=glob.glob(os.path.join(self.raw_dir, "*pdb"))
-        print(files)
-        if f'{pdb}.pdb' not in files:
+        test_file = os.path.join(self.raw_dir, f'{pdb}.pdb')
+        if test_file not in files:
             #go into [[outfolder]/conformations and downloads the .pdb file.
             print(f"> downloading PDB {pdb}")
             os.chdir(self.raw_dir)
@@ -289,7 +289,7 @@ class PDB(object):
                 os.chdir(cwd)
                 raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{e}') from e
         else:
-            print(f'Fasta file for {pdb} previously downloaded, using previos copy.')
+            print(f'Fasta file for {pdb} previously downloaded, using previous copy.')
 
 
 
