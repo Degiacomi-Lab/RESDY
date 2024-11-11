@@ -1,5 +1,6 @@
 import re
 import os
+import io
 import logging
 import datetime
 import shutil
@@ -9,6 +10,7 @@ import time
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
+from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
@@ -132,7 +134,8 @@ class Measure(object):
         M.save_state(outname='measures.csv')
         '''
         # sort by uniprot code to give order to output after parallel run
-        self.df = self.df.sort_values(by='Uniprot_Entry')
+        if 'Uniprot_Entry' in self.df.columns:
+            self.df = self.df.sort_values(by='Uniprot_Entry')
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
@@ -300,7 +303,10 @@ class Measure(object):
                 terminal_out_statements.append(f">> evaluating {meas[0]}...")
                 try:
                     df_currentfile[meas[0]] = np.nan # create new column for measure
-                    result = meas[1](f) # run measurement
+                    out_print_trap = io.StringIO()
+                    with redirect_stdout(out_print_trap):
+                        result = meas[1](f) # run measurement
+                    terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                 except Exception as e:
@@ -511,7 +517,7 @@ class Measure(object):
                 idx_to_remove.append(i)
         self.df_input = self.df_input.drop(idx_to_remove)
         # 3. Restart the measure_dataframe() with the new file list
-        print('Continuing measurements')
+        print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
         self.measure_dataframe()
 
 
