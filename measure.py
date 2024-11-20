@@ -554,13 +554,13 @@ class Measure(object):
         files = glob.glob(os.path.join(self.folder, "*pdb"))
 
         for _, row in self.df_input.iterrows():
-            PDBCODE = row['PDB_Code']
+            pdb_code = row['PDB_Code']
 
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
 
-                if PDBCODE not in f:
+                if pdb_code not in f:
                     continue
 
                 tstart = time.time()
@@ -570,7 +570,7 @@ class Measure(object):
                 # to be then appended to main DataFrame self.df
 
                 columns = ['PDB_Code', 'Chain', 'Resid']
-                df = pd.DataFrame(columns=columns)
+                df_currentfile = pd.DataFrame(columns=columns)
 
 
                 # append to temporary DataFrame all lysines in the file of interest
@@ -592,17 +592,17 @@ class Measure(object):
                         'Chain': M.data["chain"].values[i],
                         'Resid': M.data["resid"].values[i]})
 
-                    df = pd.concat([df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                    df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
-                print(f">> {len(df)} lysines of interest found")
+                print(f">> {len(df_currentfile)} lysines of interest found")
 
                 # iterate over measures to carry out (according to self.measures)
                 for meas in self.measures:
                     print(f">> evaluating {meas[0]}...")
                     try:
-                        df[meas[0]] = np.nan # create new column for measure
+                        df_currentfile[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f) # run measurement
-                        df = self._combine_dataframes(df, result, meas[0]) #insert measures into temporary DataFrame
+                        df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
                         print(f"ERROR: {e}")
@@ -613,15 +613,28 @@ class Measure(object):
 
                 # document the data to a log file
                 if self.activate_log:
-                    if df.empty is False:
+                    if df_currentfile.empty is False:
                         try:
-                            self.logger.info(df.to_string().strip('PDB_Code        Chain Resid    pKa       sasa'))
-                            self.logger.info('--------------------------------------------------------------------------')
+                            pd.set_option('display.max_colwidth', None,
+                                        'display.width', None,
+                                        'max_seq_items', None,
+                                        "display.max_rows", None)
+                            try:
+                                self.logger.info(df_currentfile)
+                                self.logger.info('--------------------------------------------------------------------------')
+                            except Exception as e:
+                                print(f'Error in logging: {e}')
+
+                            # reset the pandas display options back to default for regular displaying
+                            pd.reset_option('display.max_colwidth')
+                            pd.reset_option('display.width')
+                            pd.reset_option('max_seq_items')
+                            pd.reset_option('display.max_rows')
                         except Exception as e:
                             print(f'Error in logging measurements: {e}')
 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
-                self.df = pd.concat([self.df, df], ignore_index=True)
+                self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
 
 
