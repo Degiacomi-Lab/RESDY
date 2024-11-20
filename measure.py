@@ -1171,15 +1171,21 @@ class Measure(object):
         try:
             XL = bb.Xlink(M)
             das_output = []
-            for lys_nz_idx in idx_nz:
-                # the parameteres (pts_surf, thresh, radii) for the _get_half_sphere are already set for lysine residues
-                # therefore the only parameter that needs to be set is i: this is the index of the atom of interest within the lysine
+        except Exception as e:
+            print(f'DAS Calculation: 2 - Failed to setup the Xlink biobox class: {e}')
+
+        for i, lys_nz_idx in enumerate(idx_nz):
+            try:
+                # the parameteres (pts_surf, thresh, radii) for the _get_half_sphere are already set
+                # for lysine residues therefore the only parameter that needs to be set is i: this
+                # is the index of the atom of interest within the lysine
                 half_sphere_coords = XL._get_half_sphere(i=lys_nz_idx)
                 # as the density of points created by the get half sphere is constant for any setup,
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))
-        except Exception as e:
-            print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms within the lysines: {e}')
+            except Exception as e:
+                print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms on lysine no {lys_res_nums[i]}: {e}')
+                das_output.append(None)
 
         # 3: Create dataframe to return
         df_das = pd.DataFrame(columns=["Chain", "Resid", "das"])
