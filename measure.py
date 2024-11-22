@@ -549,16 +549,32 @@ class Measure(object):
 
 
     def measure_PDB_only(self):
-        # TODO GW 23.10.24 - Note this function will need updating with the logging to be consistent in the styles
+        '''
+        TODO FINISH THIS
+        Function to measure specified features for a set of pdb files. Takes a list of pdb files,
+        finds associated curated structures and runs the required measurement functions.
+        Results are saved to memory and a log file produced at the same time.
+        M.save_state() can be used to save the data to a csv.
+
+        Method
+        ------
+
+        Parameters
+        ----------
+
+        Example
+        -------
+        >> M.measure_PDB_only()
+        '''
         if not self.PDB_only:
             return 'Calling the wrong method.'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
-        tstart = time.time()
+        tstart_overall = time.time()
+        num_pdb_files = len(self.df_input) + self.progress_index
 
         for pdb_idx, row in self.df_input.iterrows():
             pdb_code = row['PDB_Code']
-            num_pdb_files = len(self.df_input)
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
@@ -628,7 +644,7 @@ class Measure(object):
                             except Exception as e:
                                 print(f'Error in logging: {e}')
 
-                            # reset the pandas display options back to default for regular displaying
+                            # reset the display options back to default for regular displaying
                             pd.reset_option('display.max_colwidth')
                             pd.reset_option('display.width')
                             pd.reset_option('max_seq_items')
@@ -639,64 +655,12 @@ class Measure(object):
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
-            avg_time_per_file = (time.time() - tstart) / (pdb_idx + 1)
-            time_remaining = (num_pdb_files - (pdb_idx + 1)) * avg_time_per_file
-            print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)} %. Predicted time remaining: {round(time_remaining, 2)}s \r', end='', flush=True)
+            avg_time_per_file = (time.time() - tstart_overall) / ((pdb_idx - self.progress_index) + 1)
+            time_remaining = datetime.timedelta(seconds=int(round((num_pdb_files - (pdb_idx + 1)) * avg_time_per_file, 0)))
+            print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
 
 
-            '''
-            for f in files:
-                if PDBCODE not in f:
-                    continue
-                    
-                tstart = time.time()
-                print("\n> File: %s"%f)
-                
-                result_list = list()
-                for meas in self.measures:
-                    print(">> evaluating %s..."%meas[0])
-                    try:
-                       
-                        result = meas[1](f) # run measurement
-                        result_list.append(result)
-                        
-                    except Exception as e:
-                        print("ERROR: %s"%e)
-                        continue
-                try:
-                    # add sasa data to pka data
-                    to_merge = result_list[1]
-                    target = result_list[0]
-                    
-                    for i in range(len(to_merge)):      
-    
-                        chain_value = to_merge.loc[i, "Chain"]
-                        resid_value = to_merge.loc[i, "Resid"]
-    
-                        idx = np.where((target["Chain"] == chain_value) & (target["Resid"] == resid_value))
-    
-                        if len(idx[0]) == 0:
-                            row = to_merge.loc[i,:]
-                            target = target.append(row, ignore_index = True)
-                            continue
-    
-                        target.at[idx[0][0], 'sasa'] = to_merge.loc[i, 'sasa']
-                   
-                    # final thing to do: make sure the order of the columns is correct
-                    target = target[['Chain', 'Resid', 'pKa', 'sasa']]
-                    print(">> %s lysines of interest found"%len(target))
-                    
-                    # todo1: add a col i.e. PDB Code
-                    target.insert(0, 'PDB Code', [PDBCODE] * len(target))
-                    
-                    # todo2: append to the main df
-                    self.df = pd.concat([self.df, target], ignore_index=True)
-                    
-                except Exception as e:
-                    print("ERROR: %s"%e)
-                print(">> file processed in %4.2f sec."%(time.time()-tstart))   
-                '''
-            
+
     def restart_measure_pdb_only(self, log_path='measure_log.txt'):
         '''
         A function to restart the measurements calculations for the pdb only function
