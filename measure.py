@@ -58,6 +58,7 @@ class Measure(object):
 
         # for restarting
         self.current_index = 0
+        self.progress_index = 0
 
         # document failed pdb files
         self.wrong_pdb_file = []
@@ -65,6 +66,7 @@ class Measure(object):
         # for parallel measurements
         self.parallel = parallel
         self.files_to_analyse = []
+        self.parallel_items = {}
 
         self.outdir = outdir
         self.df_input = df_input
@@ -177,7 +179,7 @@ class Measure(object):
         match self.parallel:
             case True:
                 # determine how to parallelise
-                n_cores_to_use = cpu_count() - 1
+                n_cores_to_use = cpu_count() - 2
                 print('>> Measurements running in parallel')
             case False:
                 # use a singular core for step by step processing
@@ -199,7 +201,7 @@ class Measure(object):
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append([file_details, lock, ns_measures])
-            with Pool(n_cores_to_use) as pool:
+            with Pool(n_cores_to_use, maxtasksperchild=10) as pool:
                 result = pool.starmap_async(self._measure_file, items)
                 result.wait()
                 print(result)
@@ -552,10 +554,11 @@ class Measure(object):
             return 'Calling the wrong method.'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
+        tstart = time.time()
 
-        for _, row in self.df_input.iterrows():
+        for pdb_idx, row in self.df_input.iterrows():
             pdb_code = row['PDB_Code']
-
+            num_pdb_files = len(self.df_input)
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
@@ -580,7 +583,7 @@ class Measure(object):
                     self.wrong_pdb_file.append(f)
                     continue
 
-                _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                df_idx, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
                 for i in idxs:
 
                     #save only lysine entries from chain of interest
@@ -636,6 +639,9 @@ class Measure(object):
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
+            avg_time_per_file = (time.time() - tstart) / (pdb_idx + 1)
+            time_remaining = (num_pdb_files - (pdb_idx + 1)) * avg_time_per_file
+            print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)} %. Predicted time remaining: {round(time_remaining, 2)}s \r', end='', flush=True)
 
 
             '''
@@ -690,6 +696,72 @@ class Measure(object):
                     print("ERROR: %s"%e)
                 print(">> file processed in %4.2f sec."%(time.time()-tstart))   
                 '''
+            
+    def restart_measure_pdb_only(self, log_path='measure_log.txt'):
+        '''
+        A function to restart the measurements calculations for the pdb only function
+        Useful if the initial run of the measurements crashes or gets stuck
+        Works out how far along the simulation was by running an analysis of the measures log file
+
+        Method
+        ------
+        Read over the measures log file and collate a list of files that have been analysed
+        Remove the final value from the list as this may not have been done properly
+        Remove completed files from files to do
+        Restart measure_dataframe() with the new list
+
+        Parameters
+        ----------
+        log_path : string
+            The name of the measures log file
+            By default takes the name 'measures_log.txt'
+
+        Example
+        -------
+        >> M.restart_measure()
+        '''
+        # TODO is there a way to restart the PDB_only measurements? Might need to produce on if not
+        if not self.PDB_only:
+            return 'restart_measure_pdb_only() function not callable when not running PDB only'
+
+        print('Restarting measurements')
+        # 1. Analyse the measures log file to create a list of files that were analysed
+        log_path = os.path.join(self.outdir, log_path)
+        print(f'Finding measured proteins from log file: {log_path}')
+        proteins_completed = []
+        with open(log_path, "rb") as f:
+            num_lines = sum(1 for _ in f)
+        curr_line = 0
+        with open(file=log_path, mode='r') as lpf:
+            for line in lpf:
+                curr_line += 1
+                if line[0].isalpha() or line[0] == ' ' or line[0] == '-':
+                    continue
+                parts = line.split()
+                protein_code = parts[1].split('/')[-1] + '.pdb'
+                proteins_completed.append(protein_code)
+                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
+        print('Measured proteins recovered from log file')
+
+        # remove the last protein from list incase it wasn't completed fully
+        final_protein = proteins_completed[-1]
+        proteins_completed = [c for c in proteins_completed if c != final_protein]
+        proteins_completed = list(set(proteins_completed))
+        self.progress_index = len(proteins_completed)
+
+        # 2. Update df_input to only have the files which haven't been analysed yet
+        old_len_df_input = len(self.df_input)
+        idx_to_remove = []
+        for i, r in self.df_input.iterrows():
+            if r['PDB_Code'] in proteins_completed:
+                idx_to_remove.append(i)
+        self.df_input = self.df_input.drop(idx_to_remove)
+        new_len_df_input = len(self.df_input)
+        lines_df_input_removed = old_len_df_input - new_len_df_input
+        # 3. Restart the measure_dataframe() with the new file list
+        print(f'{lines_df_input_removed} PDB codes removed from the input list that have already been calculated.')
+        print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
+        self.measure_PDB_only()
 
 
     def calculate_pka_propka(self, path):
