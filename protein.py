@@ -54,7 +54,17 @@ class PDB(object):
 
     def save_state(self, outname="proteins.csv"):
         '''
-        Save a csv file in output directory
+        Take the current dataframe of proteins that have been gathered (pdb.df) and write this
+        to a csv file in the output directory for later use.
+
+        Parameters
+        ----------
+        outname -> string
+            the desired name for the pdb.df csv file to be written as
+
+        Example
+        -------
+        pdb.save_state()
         '''
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
@@ -194,7 +204,7 @@ class PDB(object):
             replacement_dict = self.clean(pdb)
 
             #splits into all alternative conformations into independent structures
-            self.split_struc_NMR(pdb)
+            self.split_struc_nmr(pdb)
             self.split_struc_alt_aa(pdb)
 
         except Exception as e:
@@ -229,7 +239,24 @@ class PDB(object):
 
 
     def download_pdb(self, pdb):
-
+        '''
+        Download the required PDB file for the PDB code specified. This is used for the coordinates
+        of the protein to extract the featurised data for each protein from.
+        
+        Method
+        ------
+        Identify the download tool that is available for use. Check if PDB file has already been
+        downloaded, if so skip. Otherwise download the PDB file from the RCSB website. 
+        
+        Parameters
+        ----------
+        pdb -> string
+            the PDB code for the PDB file to be downloaded
+            
+        Example
+        -------
+        >> self.download_pdb('1ubq')
+        '''
         cwd = os.getcwd()
 
         # check if the file has already been downloaded
@@ -260,7 +287,24 @@ class PDB(object):
 
 
     def download_fasta(self, pdb):
-
+        '''
+        Download the required fasta file for the PDB code specified. This is used to
+        align the structures and check for missing residues and extract sequences for comparison.
+        
+        Method
+        ------
+        Identify the download tool that is available for use. Check if fasta file has already been
+        downloaded, if so skip. Otherwise download the fasta file from the RCSB website. 
+        
+        Parameters
+        ----------
+        pdb -> string
+            the PDB code for the fasta file to be downloaded
+            
+        Example
+        -------
+        >> self.download_fasta('1ubq')
+        '''
         cwd = os.getcwd()
 
         tool = get_download_tool()
@@ -379,7 +423,7 @@ class PDB(object):
         return replacement_dict
 
 
-    def split_struc_NMR(self, pdb):
+    def split_struc_nmr(self, pdb):
         '''
         write a new file for each alternate NMR structure.
         '''
@@ -537,7 +581,15 @@ class PDB(object):
 
 
     def get_chain_replacement(self, pdb_code):
+        '''
+        Identify the names of the chains given from the FASTA file that has been
+        downloaded for the specific PDB code. 
 
+        Method
+        ------
+        Open the corresponding FASTA file for the PDB code and parse the data to
+        identify the chain names for the protein. 
+        '''
         try:
             self.download_fasta(pdb_code)
         except Exception as e:
@@ -704,6 +756,19 @@ class PDB(object):
         return
 
     def rewrite_pdb(self, path):
+        '''
+        Short function to take a pdb file, load it into biobox as a molecule and
+        rewrite a pdb file from the molecule class.
+
+        Parameters
+        ----------
+        path -> string
+            the path to the pdb file to rewrite
+
+        Example
+        -------
+        >> self.rewrite_pdb(path)
+        '''
         try:
             M = bb.Molecule(path)
             indices = M.atomselect('*', '*', '*', True, False)[1]
@@ -716,6 +781,22 @@ class PDB(object):
 
 
     def replace_selenocysteine(self, path, pdb):
+        '''
+        Identify all the selenocysteine residues within the structure with cyteine in order
+        for the model to process this protein structure.
+
+        Parameters
+        ----------
+        path -> string
+            the path to the PDB file to sort
+
+        pdb -> string
+            the name of the PDB file
+        
+        Example
+        -------
+        >> self.replace_selenocysteine(path, pdb)
+        '''
         # replace the U residues in the pdb file
         try:
             M = bb.Molecule(path)
