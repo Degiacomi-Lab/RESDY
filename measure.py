@@ -934,7 +934,7 @@ class Measure(object):
         cnt = 0
         for line in f:
             cnt += 1
-            lys_raw = re.findall('LYS [\d]*[\s][\w]*', line)
+            lys_raw = re.findall(r'LYS [\d]*[\s][\w]*', line)
 
             for line in lys_raw:
                 words = line.split(' ')
@@ -943,7 +943,7 @@ class Measure(object):
                 if resid != "" and chain != "":
                     list_remove.append([chain, resid])
 
-            lys_raw_2 = re.findall('[\d]*-LYS \(\w\)', line)
+            lys_raw_2 = re.findall(r'[\d]*-LYS \(\w\)', line)
 
             for line in lys_raw_2:
                 words = line.split()

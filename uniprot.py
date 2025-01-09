@@ -107,7 +107,7 @@ class Uniprot(object):
         for line in html_2:
             try:
                 line = str(line)
-                messy_entry = re.findall('PDB; [\w -. ; \d /]*=', line)
+                messy_entry = re.findall(r'PDB; [\w -. ; \d /]*=', line)
 
                 if len(messy_entry)>0:
 

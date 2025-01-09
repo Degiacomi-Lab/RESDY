@@ -606,7 +606,7 @@ class PDB(object):
             need_replacing = []
             replacement_dict = dict()
             for line in f:
-                m = re.findall('Chain[ a-z , 0-9, A-Z \[\]]*|', line)
+                m = re.findall(r'Chain[ a-z , 0-9, A-Z \[\]]*|', line)
                 for entry in m:
                     if len(entry) > 0:
                         chains_raw.append(entry)
