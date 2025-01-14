@@ -136,7 +136,7 @@ class Measure(object):
         M.save_state(outname='measures.csv')
         '''
         # sort by uniprot code to give order to output after parallel run
-        if 'Uniprot_Entry' in self.df.columns:
+        if not self.PDB_only:
             self.df = self.df.sort_values(by='Uniprot_Entry')
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
