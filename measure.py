@@ -582,6 +582,9 @@ class Measure(object):
                 if pdb_code not in f:
                     continue
 
+                if f in self.pdb_only_files_to_ignore:
+                    continue
+
                 tstart = time.time()
                 print(f"\n> File: {f}")
 
@@ -663,16 +666,16 @@ class Measure(object):
 
     def restart_measure_pdb_only(self, log_path='measure_log.txt'):
         '''
-        A function to restart the measurements calculations for the pdb only function
-        Useful if the initial run of the measurements crashes or gets stuck
-        Works out how far along the simulation was by running an analysis of the measures log file
+        A function to restart the measurements calculations for the PDB only function.
+        Useful if the initial run of the measurements crashes or gets stuck.
+        Works out how far along the simulation was by running an analysis of the measures log file.
 
         Method
         ------
-        Read over the measures log file and collate a list of files that have been analysed
-        Remove the final value from the list as this may not have been done properly
-        Remove completed files from files to do
-        Restart measure_dataframe() with the new list
+        Read over the measures log file and collate a list of files that have been analysed.
+        Remove the final value from the list as this may not have been done properly.
+        Remove completed files from files to do.
+        Restart measure_dataframe() with the new list.
 
         Parameters
         ----------
@@ -682,19 +685,25 @@ class Measure(object):
 
         Example
         -------
-        >> M.restart_measure()
+        >> M.restart_measure_pdb_only()
         '''
-        # TODO is there a way to restart the PDB_only measurements? Might need to produce on if not
+
         if not self.PDB_only:
+            print('>> restart_measure_pdb_only() function not callable when not running PDB only')
             return 'restart_measure_pdb_only() function not callable when not running PDB only'
 
-        print('Restarting measurements')
+        print('>> Preparing to restart measurements on PDB only')
         # 1. Analyse the measures log file to create a list of files that were analysed
         log_path = os.path.join(self.outdir, log_path)
-        print(f'Finding measured proteins from log file: {log_path}')
+        print(f'>> Finding measured proteins from log file: {log_path}')
         proteins_completed = []
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
+
+        if num_lines == 0:
+            print('>> No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.')
+            return 'No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.'
+
         curr_line = 0
         with open(file=log_path, mode='r') as lpf:
             for line in lpf:
@@ -702,29 +711,50 @@ class Measure(object):
                 if line[0].isalpha() or line[0] == ' ' or line[0] == '-':
                     continue
                 parts = line.split()
-                protein_code = parts[1].split('/')[-1] + '.pdb'
+                protein_code = parts[1].split('/')[-1]
                 proteins_completed.append(protein_code)
-                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
-        print('Measured proteins recovered from log file')
+                percent_prog = round((curr_line/num_lines)*100, 2)
+                print(f'Progress analysing log file: {percent_prog} %\r', end='', flush=True)
+        print('>> Measured proteins recovered from log file')
 
-        # remove the last protein from list incase it wasn't completed fully
+        # 2. remove the last protein from list incase it wasn't completed fully
         final_protein = proteins_completed[-1]
         proteins_completed = [c for c in proteins_completed if c != final_protein]
         proteins_completed = list(set(proteins_completed))
         self.progress_index = len(proteins_completed)
+        # TODO GW 14.01.25 - need to remove this measurement from the measures_log.txt file
+        #                    eventually currently doesn't matter too much as will just be
+        #                    removed with remove duplicates later
 
-        # 2. Update df_input to only have the files which haven't been analysed yet
+        # 3. Update df_input to only have the files which haven't been analysed yet
         old_len_df_input = len(self.df_input)
         idx_to_remove = []
+        files = [a.split('/')[-1] for a in glob.glob(os.path.join(self.folder, "*pdb"))]
         for i, r in self.df_input.iterrows():
-            if r['PDB_Code'] in proteins_completed:
-                idx_to_remove.append(i)
+            matched_pdb_files = [a.replace('.pdb', '') for a in files if r['PDB_Code'] in a]
+            for recover_file in proteins_completed:
+                # case 1: exact match code and file - for measuring data from simulations mainly
+                if r['PDB_Code'] == recover_file:
+                    idx_to_remove.append(i)
+                    break
+                # case 2: PDB files renamed by curation that are not the PDB code alone
+                if recover_file in matched_pdb_files:
+                    if recover_file not in self.pdb_only_files_to_ignore:
+                        full_recover_file = self.folder + os.sep + recover_file + '.pdb'
+                        self.pdb_only_files_to_ignore.append(full_recover_file)
+
+            perc_prog_remove = round((i/len(self.df_input))*100, 2)
+            print(f'Progress removing measured files: {perc_prog_remove} %\r', end='', flush=True)
+
         self.df_input = self.df_input.drop(idx_to_remove)
         new_len_df_input = len(self.df_input)
         lines_df_input_removed = old_len_df_input - new_len_df_input
-        # 3. Restart the measure_dataframe() with the new file list
-        print(f'{lines_df_input_removed} PDB codes removed from the input list that have already been calculated.')
-        print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
+
+        # 4. Restart the measure_dataframe() with the new file list
+        files_left_to_calc = len(self.df_input) - len(self.pdb_only_files_to_ignore)
+        print(f'>> {lines_df_input_removed} exact matches in PDB codes removed from the input list that have already been calculated.')
+        print(f'>> {len(self.pdb_only_files_to_ignore)} files to ignore in measurements that have already been calculated.')
+        print(f'>> Continuing measurements. {files_left_to_calc} proteins to measure.')
         self.measure_PDB_only()
 
 
