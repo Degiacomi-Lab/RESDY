@@ -689,6 +689,7 @@ class Measure(object):
         '''
 
         if not self.PDB_only:
+            print('>> restart_measure_pdb_only() function not callable when not running PDB only')
             return 'restart_measure_pdb_only() function not callable when not running PDB only'
 
         print('>> Preparing to restart measurements on PDB only')
@@ -698,6 +699,11 @@ class Measure(object):
         proteins_completed = []
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
+
+        if num_lines == 0:
+            print('>> No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.')
+            return 'No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.'
+
         curr_line = 0
         with open(file=log_path, mode='r') as lpf:
             for line in lpf:
