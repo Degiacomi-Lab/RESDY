@@ -596,14 +596,12 @@ class Measure(object):
         Method
         ------
 
-        Parameters
-        ----------
-
         Example
         -------
         >> M.measure_PDB_only()
         '''
         if not self.PDB_only:
+            print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
             return 'Calling the wrong method.'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
@@ -636,6 +634,7 @@ class Measure(object):
                 try:
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
                 except Exception as e:
+                    print(f'Failed to create biobox molecule for file {f} with error: {e}')
                     self.wrong_pdb_file.append(f)
                     continue
 
@@ -664,7 +663,7 @@ class Measure(object):
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
-                        print(f"ERROR: {e}")
+                        print(f"ERROR adding the measurements for file {f} to the dataframe: {e}")
                         continue
 
                 processing_time = round((time.time()-tstart), 2)
@@ -696,11 +695,12 @@ class Measure(object):
                 self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
             try:
-                avg_time_per_file = (time.time() - tstart_overall) / ((pdb_idx - self.progress_index) + 1)
-                time_remaining = datetime.timedelta(seconds=int(round((num_pdb_files - (pdb_idx + 1)) * avg_time_per_file, 0)))
-                print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
-            except:
-                print('Broken progress updater')
+                avg_time_per_file = (time.time() - tstart_overall) / (pdb_idx + 1)
+                time_remaining = datetime.timedelta(seconds=int(round((len(self.df_input) - (pdb_idx + 1)) * avg_time_per_file, 0)))
+                perc_prog_measure = round(((pdb_idx + self.progress_index + 1)/num_pdb_files)*100, 2)
+                print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
+            except Exception as e:
+                print(f'>> Broken progress updater: {e} \r', end='', flush=True)
 
 
 
