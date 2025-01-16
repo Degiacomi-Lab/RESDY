@@ -34,8 +34,41 @@ except Exception as e:
 class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das'], parallel=True):
+                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das'], parallel=True,
+                 include_modified=False):
+        '''
+        Initialisation of the Measure class. This class provides all the resources to measure
+        specific quantities for the protein structures given as input
 
+        Parameters
+        ----------
+        df_input -> dataframe
+            The input dataframe containing information on the structures over which the measurements
+            will be done. This is usually the output given from the curation steps (pdb.df).
+            This contains the filepath, Uniprot_Entry, PDB_Code, etc
+            TODO: finish this description with full set of required column names here.
+        outdir -> string
+            The name of the directory where the measurement output will be written to.
+        activate_log -> bool
+            By default a log is produced for the measurements, the option here enables a more
+            detailed log of the measurements work for debugging. TODO Check this
+        log_path -> string
+            The name of the output file which contains the log of the measurements.
+            This file can be used to create the measurement csv file through using the
+            recover_from_log() function.
+        features -> list
+            The list of measurements that you wish to use on the given structures. Select which
+            of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das'.
+        parallel -> bool
+            Option to run the measurements in parallel.
+        include_modified -> bool
+            Option to include lysines that have been seen to be modified in the measurements
+            analysis. If False, only lysines of type 'LYS' will be included in the measurements.
+            If True, lysines of types 'LYN' will be included in the measurements as well as all
+            'LYS' residues. In either case, a column will be included stating if the measured
+            residue is a modified one.
+
+        '''
         self.activate_log = False
         if activate_log:
             self.activate_log = activate_log
@@ -59,9 +92,13 @@ class Measure(object):
         # for restarting
         self.current_index = 0
         self.progress_index = 0
+        self.pdb_only_files_to_ignore = []
 
         # document failed pdb files
         self.wrong_pdb_file = []
+
+        # modified lysine management
+        self.include_modified = include_modified
 
         # for parallel measurements
         self.parallel = parallel
@@ -484,7 +521,7 @@ class Measure(object):
         -------
         >> M.restart_measure()
         '''
-        # TODO is there a way to restart the PDB_only measurements? Might need to produce on if not
+
         if self.PDB_only:
             return 'restart_measure() function not callable when using PDB_only'
 
@@ -658,9 +695,12 @@ class Measure(object):
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
-            avg_time_per_file = (time.time() - tstart_overall) / ((pdb_idx - self.progress_index) + 1)
-            time_remaining = datetime.timedelta(seconds=int(round((num_pdb_files - (pdb_idx + 1)) * avg_time_per_file, 0)))
-            print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
+            try:
+                avg_time_per_file = (time.time() - tstart_overall) / ((pdb_idx - self.progress_index) + 1)
+                time_remaining = datetime.timedelta(seconds=int(round((num_pdb_files - (pdb_idx + 1)) * avg_time_per_file, 0)))
+                print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
+            except:
+                print('Broken progress updater')
 
 
 

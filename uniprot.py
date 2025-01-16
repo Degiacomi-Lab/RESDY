@@ -88,14 +88,14 @@ class Uniprot(object):
             html_2 = urllib.request.urlopen(url_2)
 
         except Exception as e:
-            raise Exception(f'Failed to obtain UNIPROT data. {e}') from e
+            raise Exception(f'Failed to obtain UNIPROT data for code: {uniprot_code}. {e}') from e
 
         if pdb_code_target == "":
 
             #appends the AF structure to the df (if this isn't present it will be removed later).
             try:
 
-                AF_code = f'AF-{uniprot_code}-F1-model_v3'
+                AF_code = f'AF-{uniprot_code}-F1-model_v4'
 
                 data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': AF_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
