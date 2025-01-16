@@ -151,7 +151,6 @@ gw*
 # Temporary files to ignore
 analyse_charge_data.py
 3d_seq_logo_creator.py
-random_forest_model.py
 sequence_logo_creator*
 sequence_secondary_structure.py
 test_find_broken_curated_files.py
