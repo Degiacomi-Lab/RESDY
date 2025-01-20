@@ -181,7 +181,7 @@ class Model(object):
         print('Top 100 aev features: ', self.top_n_features)
 
 
-    def _reduce_aevs_after(self):
+    def _reduce_aevs_after(self, method='vif'):
         '''
         Model performs worse when more of the features of the AEV are taken through to training.
         Reduce the AEVs down to the required number of features based on one of the methods chosen
@@ -194,23 +194,38 @@ class Model(object):
         ------
         Take the dataframe and perform a standard deviation over the AEVs, take the top
         required number of structures in terms of standard deviation as the new input
-        dataframe going forward. 
+        dataframe going forward.
+
+        Parameters
+        ----------
+        method -> string
+            The method required for cutting down the columns of the AEV- takes either 'vif' or 'sd'
         
         Example
         -------
         >> self.reduce_aevs()
         '''
-        # TODO work on X_all - will eventually change all these functions so that they are general rather than single use
-        aev_stds = {}
-        for column in self.X_final.columns:
-            if 'AEV' in column:
-                aev_stds[column] = self.X_final[column].std(ddof=0)
+        match method:
+            case 'vif':
+                columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
+                                   30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
+                                   399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
+                                   50,51,52,53,54,543,544,555,556,557,558,563,57,573,579,58,580,
+                                   583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
+                                   709,711,716,719,73,74,745,75,751,76,77,78,79,9]
+                self.top_n_features = ['AEV_' + str(a) for a in columns_to_keep]
+            case 'sd':
+                # TODO work on X_all - will eventually change all these functions so that they are general rather than single use
+                aev_stds = {}
+                for column in self.X_final.columns:
+                    if 'AEV' in column:
+                        aev_stds[column] = self.X_final[column].std(ddof=0)
 
-        df_std = pd.DataFrame({'aev_std': aev_stds})
-        df_std = df_std.sort_values(by=['aev_std'], ascending=False)
-        top_n_features = list(df_std.index.values[:self.num_aev_features_req])
-        self.top_n_features = top_n_features
-        print('Top 100 aev features: ', self.top_n_features)
+                df_std = pd.DataFrame({'aev_std': aev_stds})
+                df_std = df_std.sort_values(by=['aev_std'], ascending=False)
+                top_n_features = list(df_std.index.values[:self.num_aev_features_req])
+                self.top_n_features = top_n_features
+                print('Top 100 aev features: ', self.top_n_features)
 
 
     def _aggregate(self):
@@ -270,10 +285,35 @@ class Model(object):
         print(f'Final number of columns: {len(self.X_final.columns.tolist())}')
 
     def get_extreme_values(self, feature, lower = 1, upper = 14):
+        '''
+        Obtain any values within the dataframe that are deemed to be values that are likely wrong.
+
+        Parameters
+        ----------
+        feature -> string
+            The feature of interest to get the extreme values from
+        lower -> float
+            The lowest acceptable value for the feature of interest
+        upper -> float
+            The highest acceptable value for the feature of interest
+        
+        Returns
+        -------
+        df_query -> dataframe
+            A subset of the dataframe which are the extreme values within the dataframe X_all
+        '''
         df_query = self.X_all[(self.X_all[feature] < lower) | (self.X_all[feature] > upper)]
         return df_query
 
     def remove_df(self, df_to_remove):
+        '''
+        Function for removing values from a dataframe give a dataframe of the items to remove
+
+        Parameters
+        ----------
+        df_to_remove -> dataframe
+            dataframe of items from the overall dataset you want to remove from X_all
+        '''
         len_one = len(self.X_all)
         remove_list = df_to_remove.index.tolist()
         self.X_all = self.X_all.drop(index = remove_list)
@@ -718,7 +758,7 @@ class Model(object):
         >> model.rf_ubq_test()
         '''
         # read in data about the ubiquitin data
-        ubq_data = pd.read_csv('aev_data_randomforestmodel/measures_ubq.csv')
+        ubq_data = pd.read_csv('data/measures_ubq.csv')
         y_test = [1, 0, 0, 0, 1, 1, 1]
         ubq_data['class'] = y_test
         original_cols = ubq_data.columns.values
@@ -902,6 +942,6 @@ if __name__ == "__main__":
     model.prepare_dataset()
     #print(model.X_final)
 
-    model.rf_ubq_test()
+    #model.rf_ubq_test()
     model.rf_five_fold()
     model.rf_five_fold_optimised()
