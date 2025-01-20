@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import glob
 import time
+import urllib.request
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -34,8 +35,8 @@ except Exception as e:
 class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das'], parallel=True,
-                 include_modified=False):
+                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
+                 parallel=True, include_modified=False):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -58,7 +59,8 @@ class Measure(object):
             recover_from_log() function.
         features -> list
             The list of measurements that you wish to use on the given structures. Select which
-            of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das'.
+            of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth', 'aev',
+            'das', 'seqcharge'.
         parallel -> bool
             Option to run the measurements in parallel.
         include_modified -> bool
@@ -153,6 +155,8 @@ class Measure(object):
                 self.measures.append([m, self.calculate_aevs])
             elif m == 'das':
                 self.measures.append([m, self.calculate_das])
+            elif m == 'seqcharge':
+                self.measures.append([m, self.calculate_seqcharge])
             else:
                 raise Exception(f"measure {m} unknown")
 
@@ -1426,6 +1430,100 @@ class Measure(object):
             print(f'DAS Calcualtion: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das
+    
+
+    def calculate_seqcharge(self, path, num_add_aa=10):
+        '''
+        Calculate the Sequence Charge of the local sequence around a LYS of interest.
+        This is a single value number representing the summation of the charges of the amino acids
+        over the specified number of amino acids either side of the lysine.
+
+        Method
+        ------
+
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that DAS is being calculated for.
+        num_add_aa : int
+            The number of amino acids to include either side of the lysine of interest.
+            An optional parameter which is set to 10 by default.
+
+        Returns
+        -------
+        df_seqcharge : dataframe
+            Dataframe with information on chain, residue number and seqcharge output. Outline:
+            Chain   Resid   seqcharge
+            x       x       x
+
+        Example
+        -------
+        >> print(self.calculate_seqcharge(1ubq.pdb))
+        Chain  Resid  seqcharge
+        0     A      6   x
+        '''
+        # NOTE This currently only works with not PDB only
+
+        # 1: Extract the overall sequence for the protein given
+        try:
+            M = bb.Molecule(path)
+            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            lys_res_nums = list(M.data['resid'][idx_nz])
+            list_chains = list(M.data['chain'][idx_nz])
+
+            sequence = ''.join(list(M.data['resid']))
+
+        except Exception as e:
+            print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
+
+        # 2: Extract local sequences based on the overall chain, calculate charge score and add to output
+        seqcharge_output = []
+        for i, lys_nz_idx in enumerate(idx_nz):
+            try:
+                start_idx = lys_nz_idx - num_add_aa
+                end_idx = lys_nz_idx + num_add_aa + 1
+                start_null = 0
+                end_null = 0
+                
+                if start_idx < 0:
+                    start_null = - start_idx
+                    start_idx = 0
+                    
+                if end_idx >= len(sequence):
+                    end_null = - end_idx
+                    end_idx = len(sequence)
+
+                seq = ('-' * start_null) + sequence[start_idx:end_idx] + ('-' * end_null)
+                seq_split = list(seq)
+                if seq_split[10] != 'K':
+                    print(f'A lysine was not found at the desired position {lys_nz_idx+1} read in for PDB file {path}; sequence -> {seq}')
+                    continue
+            
+                pos_aa = ['K', 'H', 'R']
+                neg_aa = ['D', 'E']
+                count = 0
+                for aa in sequence:
+                    if aa in pos_aa:
+                        count += 1
+                    elif aa in neg_aa:
+                        count -= 1
+                seqcharge_output.append(count)
+
+            except Exception as e:
+                print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_nz_idx}, error: {e}')
+                seqcharge_output.append(None)
+
+        # 3: Create dataframe to return
+        df_seqcharge = pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
+        try:
+            df_seqcharge['Chain'] = list_chains
+            df_seqcharge['Resid'] = lys_res_nums
+            df_seqcharge['das'] = seqcharge_output
+        except Exception as e:
+            print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
+
+        return df_seqcharge
 
 
 
