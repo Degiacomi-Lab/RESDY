@@ -1,38 +1,42 @@
+from copy import deepcopy
 import numpy as np
 import pandas as pd
-from copy import deepcopy
 from statsmodels.stats.outliers_influence import variance_inflation_factor as VIF
+from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.spatial.distance import euclidean
-from sklearn.preprocessing import StandardScaler
+
 
 scaler = StandardScaler()
 
-class Negative_preprocessing:
-    
+class Preprocessing:
+    '''
+    Class encompasing methods used for preprocesing the data before it is passed through
+    to a model to train on the data. Functions include correlation analysis of the features
+    using VIF and undersampling to be used to reduce the size of a dataset without losing
+    key information.
+    '''
+
     def __init__(self, df, features=[]):
         self.df = df
-        self.N_obs = len(self.df)
+        self.n_obs = len(self.df)
         self.features = features
-        
-        self.df_cleaned, self.N_obs_cleaned = self.clean(df, features)
+
+        self.df_cleaned, self.n_obs_cleaned = self.clean(df, features)
         self.data = self.df_cleaned[features]
-        
-        
+
         self.aev = np.zeros((len(self.df_cleaned), 1008))
-        for i in range(self.N_obs_cleaned):
+        for i in range(self.n_obs_cleaned):
             self.aev[i] = np.array(self.df_cleaned['aev'][i].strip("[]").split(","), dtype=float)
         self.aev = pd.DataFrame(self.aev)
         self.aev = self.aev.loc[:, (self.aev != 0).any(axis=0)]
-        
-        
+
         self.data_full = pd.concat([self.data, self.aev], axis=1)
 
-        
+
     def clean(self, df, features):
         """
-        Remove rows containing NaN and duplicated rows
-        ----------
+        Clean the input dataframe by removing rows containing NaN and duplicated rows.
         
         Parameters
         ----------
@@ -44,7 +48,7 @@ class Negative_preprocessing:
         Returns
         -------
         df_cleaned : Pandas DataFrame
-        N_obs_cleaned : int
+        n_obs_cleaned : int
             Number of rows in the cleaned dataframe.
 
         """
@@ -53,23 +57,23 @@ class Negative_preprocessing:
         print("Number of observations after removing rows containing NaN: ", len(df_cleaned))
         df_cleaned = df_cleaned.drop_duplicates(subset=features)
         df_cleaned = df_cleaned.reset_index(drop=True)
-        N_obs_cleaned = len(df_cleaned)  
-        print("Number of observations after removing duplicates: ", N_obs_cleaned)
-     
-        
-        return df_cleaned, N_obs_cleaned
-    
-    
-    
-    def VIF(self, data, features):
+        n_obs_cleaned = len(df_cleaned)
+        print("Number of observations after removing duplicates: ", n_obs_cleaned)
+
+        return df_cleaned, n_obs_cleaned
+
+
+
+    def calculate_vif(self, data, features):
         """
-        Calculate Variance Inflation Factors (VIFs) of the features selected
-        ----------
+        Calculate Variance Inflation Factors (VIFs) of the features selected.
+        This allows for the n most decorrelated features to be selected later to take
+        forward into the model, reducing the degrees of complexity.
 
         Parameters
         ----------
         data : Pandas DataFrame
-
+            The overall measures dataframe
         features : list
             List of features to be considered for VIF calculations.
 
@@ -81,17 +85,15 @@ class Negative_preprocessing:
             vals.append(VIF(data.values, i))
             if i % 10 == 0:
                 print(i)
-        
+
         self.vif = pd.DataFrame({'vif': vals}, index=data.columns)
-        
-    
-    
-    
+
+
+
+
     def normalise(self, data_input="data", features=None):
         """
-        Normalise all specified feature columns to mean zero, standard 
-        deviation 1.
-        ----------
+        Normalise all specified feature columns to mean zero, standard deviation 1.
 
         Parameters
         ----------
@@ -108,31 +110,31 @@ class Negative_preprocessing:
             Normalised dataframe.
 
         """
-        
+
         _case = 1
-        if type(data_input) != pd.core.frame.DataFrame:
+        #if type(data_input) != pd.core.frame.DataFrame:
+        if isinstance(data_input, pd.core.frame.DataFrame):
             data = deepcopy(self.data)
             _case = 0
         else:
             data = deepcopy(data_input)
-            
-        if features == None:
+
+        if features is None:
             features = data.columns
-        for i in range(len(features)):
-            feature = features[i]
+        for feature in features:
             data[feature] = (data[feature] - np.mean(data[feature])) / np.std(data[feature])
-        
+
         if _case == 0:
             self.data_normalised = data
         else:
             return data
-        
-        
-        
-    def undersampling(self, features, N_cluster, N_init=100, Max_iter=500, iqr_reject_range=1.5, outlier_cluster_radius=0.6):
-        """
-        Select representative data points from the dataframe.
-        ------
+
+
+
+    def undersampling(self, features, n_cluster, n_init=100, max_iter=500, iqr_reject_range=1.5, outlier_cluster_radius=0.6):
+        '''
+        Function to select a sample of points from a dataset which is representative
+        of the entire dataset that has been fed, finding the most different points.
         
         Method
         ------
@@ -156,12 +158,12 @@ class Negative_preprocessing:
         ----------
         features : list
             List of features to be considered in the selection process.
-        N_cluster : int
+        n_cluster : int
             Number of data points to be chosen from the common part.
-        N_init : int, optional
+        n_init : int, optional
             Number of runs for the K-means. The best run is chosen as the final 
             result. The default is 100.
-        Max_iter : int, optional
+        max_iter : int, optional
             Number of iterations in each run. The default is 500.
         iqr_reject_range : float, optional
             Determines the boundary between 'common' and 'outliers'. The 
@@ -174,9 +176,9 @@ class Negative_preprocessing:
         -------
         Selections are stored in the attribute self.undersampled_data
 
-        """
-        
-        
+        '''
+
+
         data = self.data[features]
         outlier_indices = np.array([])
         for feature in features:
@@ -184,23 +186,23 @@ class Negative_preprocessing:
             iqr = quartiles[1] - quartiles[0]
             new_outliers = np.where((data[feature] < quartiles[0]-iqr_reject_range*iqr)|(data[feature] > quartiles[1]+iqr_reject_range*iqr))[0]
             outlier_indices = np.unique(np.concatenate((outlier_indices, new_outliers)))
-        
+
         data_outliers = data.iloc[outlier_indices]
         data_outliers = data_outliers.reset_index(drop=True)
         self.outliers = data_outliers
         data_outliers_normalised = self.normalise(data_outliers, features)
-        
+
         data_common = data.drop(outlier_indices)
         data_common = data_common.reset_index(drop=True)
         self.common = data_common
         data_common_normalised = self.normalise(data_common, features)
-        
+
         print("K-means clustering...")
-        kmeans = KMeans(n_clusters=N_cluster, n_init=N_init, max_iter=Max_iter).fit(data_common_normalised)
+        kmeans = KMeans(n_clusters=n_cluster, n_init=n_init, max_iter=max_iter).fit(data_common_normalised)
         avgdistance = np.sqrt(kmeans.inertia_/len(data_common_normalised))
         r = outlier_cluster_radius * avgdistance
-        
-        
+
+
         common_pts_idx = []
         for clust in range(kmeans.n_clusters):
             cluster_pts_indices = np.where(kmeans.labels_ == clust)[0]
@@ -209,9 +211,8 @@ class Negative_preprocessing:
             #print(np.array([euclidean(data_common_normalised.iloc[idx], cluster_cen) for idx in cluster_pts_indices])/r)
 
             common_pts_idx.append(cluster_pts_indices[min_idx])
-    
 
-        
+
         print("Outliers clustering...")
         dbscan = DBSCAN(eps=r, min_samples=1, metric='euclidean').fit(data_outliers_normalised)
         oclusters = np.unique(dbscan.labels_)
@@ -223,26 +224,15 @@ class Negative_preprocessing:
                 continue
             ocluster_cen = np.mean(data_outliers_normalised.iloc[ocluster_pts_indices], axis=0)
             min_idx = np.argmin([euclidean(data_outliers_normalised.iloc[idx], ocluster_cen) for idx in ocluster_pts_indices])
-            
+
             outlier_pts_idx.append(ocluster_pts_indices[min_idx])
-    
+
         common_final_list = data_common.iloc[common_pts_idx]
         outlier_final_list = data_outliers.iloc[outlier_pts_idx]
         common_normalised_final = data_common_normalised.iloc[common_pts_idx]
         outlier_normalised_final = data_outliers_normalised.iloc[outlier_pts_idx]
-        
+
         self.undersampled_data = pd.concat([common_final_list, outlier_final_list], ignore_index=True)
         self.undersampled_data_common = common_final_list
         self.undersampled_data_outlier = outlier_final_list
         self.undersampled_data_normalised = pd.concat([common_normalised_final, outlier_normalised_final], ignore_index=True)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
