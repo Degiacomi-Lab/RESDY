@@ -88,6 +88,7 @@ class Measure(object):
             self.logger.addHandler(handler)
 
         self._setup_measures(features)
+        self.features = features
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
 
@@ -638,7 +639,7 @@ class Measure(object):
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
 
-                columns = ['PDB_Code', 'Chain', 'Resid']
+                columns = ['PDB_Code', 'Chain', 'Resid', 'Modified']
                 df_currentfile = pd.DataFrame(columns=columns)
 
 
@@ -650,19 +651,26 @@ class Measure(object):
                     self.wrong_pdb_file.append(f)
                     continue
 
-                df_idx, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
-                for i in idxs:
+                df_idx, idxs_lys = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
 
-                    #save only lysine entries from chain of interest
-                    #if M.data["chain"].values[i] not in chains:
-                    #    continue
-
-
+                for i in idxs_lys:
                     data = ({'PDB_Code': f.split(".")[0],
                         'Chain': M.data["chain"].values[i],
-                        'Resid': M.data["resid"].values[i]})
+                        'Resid': M.data["resid"].values[i],
+                        'Modified': False})
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
+                if self.include_modified:
+                    df_idx_lyn, idxs_lyn = M.atomselect('*', ['LYN'], ['CA'], get_index=True, use_resname=True)
+
+                    for i in idxs_lyn:
+                        data = ({'PDB_Code': f.split(".")[0],
+                            'Chain': M.data["chain"].values[i],
+                            'Resid': M.data["resid"].values[i],
+                            'Modified': True})
+
+                        df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                 print(f">> {len(df_currentfile)} lysines of interest found")
 
@@ -846,7 +854,7 @@ class Measure(object):
         if not self.PDB_only:
             return 'Function not callable.'
 
-        base_columns = ['PDB_Code', 'Chain', 'Resid']
+        base_columns = ['PDB_Code', 'Chain', 'Resid', 'Modified']
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
         print(f'Recovering measured data from file: {log_path}')
@@ -854,8 +862,9 @@ class Measure(object):
 
         test_lines = 0
         columns_all_set = False
-        potential_col_names = {'1': 'propka', '2': 'pkaANI', '3': 'sasa',
-                               '4': 'depth', '5': 'aev', '6': 'das'}
+        potential_col_names = {}
+        for i, feature in self.features:
+            potential_col_names[i] = feature
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
         curr_line = 0
@@ -929,7 +938,13 @@ class Measure(object):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
         parse errors, and return a dataframe containing all measurements not yielding an error.
+
+        Note this won't work with the include modified option as PROPKA can't calculate
+        pKa values for modified lysines (LYN)
         '''
+
+        if self.include_modified:
+            print('No pKa values will be produced for modified lysines due to PROPKA3\'s limitations.')
 
         code_for_df = os.path.basename(path).split(".")[0]
         error_file_name = os.path.join(self.pkaoutdir, f"{code_for_df}_propka_errors.txt")
@@ -964,9 +979,9 @@ class Measure(object):
         except Exception as e:
             raise Exception(f'Failed to find {pkafile} output file to read') from e
 
-        lys_number = list()
-        pkas = list()
-        chain = list()
+        lys_number = []
+        pkas = []
+        chain = []
         try:
             for line in propres:
                 if re.search('^   LYS' , line):
@@ -1055,7 +1070,25 @@ class Measure(object):
 
 
     def calculate_pkaANI(self, path):
+        '''
+        Calculate the pKa of a lysine within the given structure using pKaANI.
 
+        Method
+        ------
+        Call the pKaANI program to run on the PDB file given in the path that is called.
+        Analyse the log file produced from running the program to identify the pKa value
+        of the lysines.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that the pKa is being calculated for.
+
+        Returns
+        -------
+        df_pkaani -> dataframe
+            Dataframe containing the results of the pKaANI calculations for the give PDB file.
+        '''
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]
         test_path = pdb_path + '_pka.log'
@@ -1125,35 +1158,43 @@ class Measure(object):
 
         Returns
         -------
-
+        df_sasa -> dataframe
+            Dataframe containing the results of the SASA calculations for the give PDB file.
         '''
 
         try:
-            list_of_sasa = list()
-            list_of_resid = list()
-            list_of_chains = list()
+            list_of_sasa = []
+            list_of_resid = []
+            list_of_chains = []
 
             #read PDB file
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
-            df = M.data
 
             #Find the coordinates and index of all lysine residues in the protein.
             lys_coords, lys_idx = M.atomselect('*', ['LYS'], 'NZ', use_resname=True, get_index=True)
-            df = M.data
 
             #Find the chain and resid number of each lysine.
             list_of_resid = list(M.data['resid'][lys_idx])
             list_of_chains = list(M.data['chain'][lys_idx])
+            list_modified = [False] * len(lys_idx)
 
             #Find the coordinates and index of every atom in the molecule.
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
+            # Add in the details for modified lysines if include_modified is selected
+            if self.include_modified:
+                coords_nz_lyn, idx_nz_lyn = M.atomselect('*', ['LYN'], ['NZ'], get_index=True, use_resname=True)
+                lys_coords.extend(coords_nz_lyn)
+                lys_idx.extend(idx_nz_lyn)
+                list_of_resid.extend(list(M.data['resid'][idx_nz_lyn]))
+                list_of_chains.extend(list(M.data['chain'][idx_nz_lyn]))
+                list_modified.extend([True]*len(idx_nz_lyn))
+
         except Exception as e:
             raise Exception(f'SASA calc error: {e}') from e
 
-        #For each lysine it works out the distance between the lys NZ,
-        #and the each atom in the protein.
+        #For each lysine work out the distance between the lys NZ, and every atom in the protein.
         for j, lys_coord in enumerate(lys_coords):
             list_close_points = list()
 
@@ -1173,7 +1214,6 @@ class Measure(object):
                 S = M.get_subset(idxs=list_close_points)
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
-                #print([chain, resid])
 
                 #SASA is calculated for that lysine in the small molecule.
                 pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
@@ -1182,8 +1222,8 @@ class Measure(object):
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
                 list_of_sasa.append(x[0])
 
-            except:
-                print('Error obtaining SASA at index value ' + str(j))
+            except Exception as e:
+                print(f'Error obtaining SASA at index value {str(j)}, error: {e}')
                 list_of_sasa.append(None)
                 continue
 
@@ -1191,19 +1231,50 @@ class Measure(object):
         try:
             df_sasa = pd.DataFrame({'Chain': list_of_chains,
                                 'Resid': list_of_resid,
+                                'Modified': list_modified,
                                 'sasa': list_of_sasa})
 
         except Exception as e:
-            raise Exception(f'Error obtaining SASA data. {e}')
+            raise Exception(f'Error obtaining SASA data. {e}') from e
 
         return df_sasa
 
 
     def calculate_depth(self, path):
+        '''
+        Function to calculate the depth of a lysine from the surface of the protein.
+
+        Method
+        ------
+        Create BioBox molecule representation for the pdb file. Use PDBParser to get
+        the surface of the structure. Identify all the lysines within the structure and
+        use the residue_depth function to find the minimum depth from the surface for
+        each lysine.
+
+        Parameters
+        ----------
+        path -> string
+            the path of the pdb file to calculate the depths of all lysines
+
+        Returns
+        -------
+        df_depth -> dataframe
+            Dataframe containing the details of the lysines and their calculated depths
+        '''
 
         try:
             M = bb.Molecule(path)
-            pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
+            pos, idx_nz = M.atomselect("*", "LYS", "NZ", get_index=True)
+            lys_res_nums = list(M.data['resid'][idx_nz])
+            list_chains = list(M.data['chain'][idx_nz])
+            list_modified = [False] * len(idx_nz)
+
+            if self.include_modified:
+                coords_nz_lyn, idx_nz_lyn = M.atomselect('*', ['LYN'], ['NZ'], get_index=True, use_resname=True)
+                idx_nz.extend(idx_nz_lyn)
+                lys_res_nums.extend(list(M.data['resid'][idx_nz_lyn]))
+                list_chains.extend(list(M.data['chain'][idx_nz_lyn]))
+                list_modified.extend([True]*len(idx_nz_lyn))
         except Exception as e:
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
@@ -1216,22 +1287,26 @@ class Measure(object):
 
 
         results = []
-        for i in range(len(pos)):
-            chain = M.data.loc[idx[i], ["chain"]].values[0]
-            resid = M.data.loc[idx[i], ["resid"]].values[0]
+        for i, lys_nz_idx in enumerate(idx_nz):
+            # TODO GW 03.02.25 - change this to match the style of the other measures calculations
+            # I have added in the relevent lines, just need to uncomment and test that these give
+            # the same output here
+            chain = M.data.loc[lys_nz_idx, ["chain"]].values[0]
+            resid = M.data.loc[lys_nz_idx, ["resid"]].values[0]
+            modified = list_modified[i]
 
             mychain = structure[0][chain]
             myres = mychain[int(resid)]
 
             try:
-                #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
             except Exception as e:
                 raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
 
-            results.append([chain, resid, rd])
+            #results.append([list_chains[i], lys_res_nums[i], list_modified[i], rd])
+            results.append([chain, resid, list_modified[i], rd])
 
-        df_depth = pd.DataFrame(results, columns=["Chain", "Resid", "depth"])
+        df_depth = pd.DataFrame(results, columns=["Chain", "Resid", "Modified", "depth"])
 
         return df_depth
 
@@ -1285,6 +1360,14 @@ class Measure(object):
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            list_modified = [False] * len(idx_nz)
+
+            if self.include_modified:
+                coords_nz_lyn, idx_nz_lyn = M.atomselect('*', ['LYN'], ['NZ'], get_index=True, use_resname=True)
+                idx_nz.extend(idx_nz_lyn)
+                list_resids.extend(list(M.data['resid'][idx_nz_lyn]))
+                list_chains.extend(list(M.data['chain'][idx_nz_lyn]))
+                list_modified.extend([True]*len(idx_nz_lyn))
         except Exception as e:
             print(f'AEV Calculations: 1 - could not create atomic structure representation: {e}')
             return
@@ -1309,6 +1392,7 @@ class Measure(object):
                 S = M.get_subset(idxs=list_close_points)
                 chain = list_chains[j]
                 resid = list_resids[j]
+                modified = list_modified[j]
                 temp_atom_species = S.data['atomtype']
                 temp_coords = S.coordinates[0]  # take the coords from the molecule read in through biobox
                 temp_structure = Atoms(temp_atom_species, temp_coords)
@@ -1331,7 +1415,7 @@ class Measure(object):
                     print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}, error: {e}')
 
                 # 2.3: Append the new AEV to the output dataframe
-                aev_to_append = {'Chain': chain, 'Resid': resid, 'aev': aevs}
+                aev_to_append = {'Chain': chain, 'Resid': resid, 'Modified': modified, 'aev': aevs}
                 df_aevs = pd.concat([df_aevs, pd.DataFrame([aev_to_append])], ignore_index=True)
 
         except torch.cuda.OutOfMemoryError:
@@ -1354,7 +1438,8 @@ class Measure(object):
     def calculate_das(self, path):
         '''
         Calculate the Dynamically Accessible Surface (DAS) of the NZ atom in the lysine structure
-        This is effectively the number of positions that the NZ atom can take within the structure of the protein
+        This is effectively the number of positions that the NZ atom can take within the
+        structure of the protein.
 
         Method
         ------
@@ -1397,6 +1482,14 @@ class Measure(object):
             idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            list_modified = [False] * len(idx_nz)
+
+            if self.include_modified:
+                coords_nz_lyn, idx_nz_lyn = M.atomselect('*', ['LYN'], ['NZ'], get_index=True, use_resname=True)
+                idx_nz.extend(idx_nz_lyn)
+                lys_res_nums.extend(list(M.data['resid'][idx_nz_lyn]))
+                list_chains.extend(list(M.data['chain'][idx_nz_lyn]))
+                list_modified.extend([True]*len(idx_nz_lyn))
         except Exception as e:
             print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
 
@@ -1421,10 +1514,11 @@ class Measure(object):
                 das_output.append(None)
 
         # 3: Create dataframe to return
-        df_das = pd.DataFrame(columns=["Chain", "Resid", "das"])
+        df_das = pd.DataFrame(columns=['Chain', 'Resid', 'Modified', 'das'])
         try:
             df_das['Chain'] = list_chains
             df_das['Resid'] = lys_res_nums
+            df_das['Modified'] = list_modified
             df_das['das'] = das_output
         except Exception as e:
             print(f'DAS Calcualtion: 3 - Failed to create datafame to append to the overall dataframe: {e}')
