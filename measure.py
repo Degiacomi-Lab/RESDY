@@ -391,7 +391,8 @@ class Measure(object):
                         pd.reset_option('display.max_rows')
 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
-                ns.df = pd.concat([ns.df, df_currentfile], ignore_index=True)
+                if not df_currentfile.empty:
+                    ns.df = pd.concat([ns.df, df_currentfile], ignore_index=True)
 
 
     def recover_from_log(self, log_path):
@@ -704,7 +705,8 @@ class Measure(object):
                             print(f'Error in logging measurements: {e}')
 
                 #append temporary DataFrame with all measures on a single file to main DataFrame
-                self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
+                if not df_currentfile.empty:
+                    self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
                 if f.replace('.pdb', '') == pdb_code:
                     self.df_input.at[pdb_idx, 'completed'] = True
