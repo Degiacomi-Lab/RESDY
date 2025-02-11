@@ -855,32 +855,38 @@ class Measure(object):
         test_lines = 0
         columns_all_set = False
         potential_col_names = {'1': 'propka', '2': 'pkaANI', '3': 'sasa',
-                               '4': 'depth', '5': 'aev', '6': 'das'}
+                               '4': 'depth', '5': 'aev', '6': 'das',
+                               '7': 'Other'}
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
         curr_line = 0
 
         with open(log_path) as inf:
+            set_header_line = ''
+            dataframe_columns = []
             for line in inf:
                 curr_line += 1
                 # check if it is a header line, check if doesn't start with number or -
                 if line[0].isalpha() or line[0] == ' ':
                     # found a header line
-                    parts = line.split()
-                    # check that columns have been written to the log file correctly
-                    if columns_all_set:
-                        continue
-                    elif len(parts) <= 3 and not columns_all_set:
-                        print('Columns were not set correctly in the log file.')
-                        print(f'The first 6 columns are assumed to be: {base_columns}')
-                        continue
-                    elif len(parts) >= 3 and not columns_all_set:
-                        # if all seems correct with the writing
-                        # check that all the columns can be found in the current columns, if not, add in
-                        for part in parts:
-                            if part not in base_columns:
-                                base_columns.append(part)
-                        continue
+                    if line != set_header_line:
+                        parts = line.split()
+                        # check that columns have been written to the log file correctly
+                        if len(parts) <= 3 and not columns_all_set:
+                            print('Columns were not set correctly in the log file.')
+                            print(f'The first 6 columns are assumed to be: {base_columns}')
+                            continue
+                        elif len(parts) >= 3 and not columns_all_set:
+                            # if all seems correct with the writing
+                            # check that all the columns can be found in the current columns, if not, add in
+                            for part in parts:
+                                if part not in base_columns:
+                                    base_columns.append(part)
+                                if part not in dataframe_columns:
+                                    dataframe_columns.append(part)
+                                    if len(log_to_df) != 0:
+                                        log_to_df[part] = None
+                            continue
 
                 line_splitter_bool = all(a == '-' for a in line.strip())
                 if line_splitter_bool:
@@ -899,22 +905,38 @@ class Measure(object):
                 if len(parts) == 0:
                     continue
                 num_parts = len(parts)
-                if num_parts != len(base_columns):
+
+                # Case 1: Setting the columns when the columns have been messed up and aren't the
+                #         same as the data in the log file
+                if num_parts > len(base_columns):
                     while num_parts != len(base_columns):
                         print('Need to set a column header')
-                        print(f'Options for columns are: {potential_col_names}')
-                        print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
-                        new_header_val = input('Enter the number for the new column header: ')
-                        while True:
-                            if not new_header_val.isnumeric():
-                                new_header_val = input('Enter the number for the new column header: ')
-                            elif 1 <= int(new_header_val) <= len(potential_col_names):
-                                break
+                        if len(potential_col_names) != 0:
+                            print(f'Options for columns are: {potential_col_names}')
+                            print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
+                            new_header_val = input('Enter the number for the new column header: ')
+                            while True:
+                                if not new_header_val.isnumeric():
+                                    new_header_val = input('Enter the number for the new column header: ')
+                                elif 1 <= int(new_header_val) <= len(potential_col_names):
+                                    break
+                                else:
+                                    new_header_val = input('Enter the number for the new column header: ')
+                            if new_header_val == '7':
+                                new_header_name = input('Other selected, please enter a unique name for the column: ')
+                                base_columns.append(new_header_name)
                             else:
-                                new_header_val = input('Enter the number for the new column header: ')
-                        base_columns.append(potential_col_names[new_header_val])
+                                base_columns.append(potential_col_names[new_header_val])
+                                del potential_col_names[new_header_val]
+                        else:
+                            new_header = input(f'No more suggested columns available, please enter your column name for the column containing this value:  {parts[len(base_columns)]}')
+                            base_columns.append(new_header)
                     columns_all_set = True
                 data = dict(zip(base_columns, parts))
+                for col in dataframe_columns:
+                    if col not in data:
+                        data[col] = None
+
                 log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                 test_lines += 1
                 print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
@@ -984,6 +1006,7 @@ class Measure(object):
                         lys_number.append(int(line[0]))
                         chain.append(line[1])
                         pkas.append(float(line[2]))
+                        print([int(line[0]), ])
 
                     except Exception as e:
                         print(f"> Error {e}")
@@ -1219,10 +1242,8 @@ class Measure(object):
         for i in range(len(pos)):
             chain = M.data.loc[idx[i], ["chain"]].values[0]
             resid = M.data.loc[idx[i], ["resid"]].values[0]
-
             mychain = structure[0][chain]
             myres = mychain[int(resid)]
-
             try:
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
@@ -1232,7 +1253,6 @@ class Measure(object):
             results.append([chain, resid, rd])
 
         df_depth = pd.DataFrame(results, columns=["Chain", "Resid", "depth"])
-
         return df_depth
 
 
