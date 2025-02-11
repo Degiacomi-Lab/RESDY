@@ -855,7 +855,8 @@ class Measure(object):
         test_lines = 0
         columns_all_set = False
         potential_col_names = {'1': 'propka', '2': 'pkaANI', '3': 'sasa',
-                               '4': 'depth', '5': 'aev', '6': 'das'}
+                               '4': 'depth', '5': 'aev', '6': 'das',
+                               '7': 'Other'}
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
         curr_line = 0
@@ -910,17 +911,26 @@ class Measure(object):
                 if num_parts > len(base_columns):
                     while num_parts != len(base_columns):
                         print('Need to set a column header')
-                        print(f'Options for columns are: {potential_col_names}')
-                        print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
-                        new_header_val = input('Enter the number for the new column header: ')
-                        while True:
-                            if not new_header_val.isnumeric():
-                                new_header_val = input('Enter the number for the new column header: ')
-                            elif 1 <= int(new_header_val) <= len(potential_col_names):
-                                break
+                        if len(potential_col_names) != 0:
+                            print(f'Options for columns are: {potential_col_names}')
+                            print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
+                            new_header_val = input('Enter the number for the new column header: ')
+                            while True:
+                                if not new_header_val.isnumeric():
+                                    new_header_val = input('Enter the number for the new column header: ')
+                                elif 1 <= int(new_header_val) <= len(potential_col_names):
+                                    break
+                                else:
+                                    new_header_val = input('Enter the number for the new column header: ')
+                            if new_header_val == '7':
+                                new_header_name = input('Other selected, please enter a unique name for the column: ')
+                                base_columns.append(new_header_name)
                             else:
-                                new_header_val = input('Enter the number for the new column header: ')
-                        base_columns.append(potential_col_names[new_header_val])
+                                base_columns.append(potential_col_names[new_header_val])
+                                del potential_col_names[new_header_val]
+                        else:
+                            new_header = input(f'No more suggested columns available, please enter your column name for the column containing this value:  {parts[len(base_columns)]}')
+                            base_columns.append(new_header)
                     columns_all_set = True
                 data = dict(zip(base_columns, parts))
                 for col in dataframe_columns:
