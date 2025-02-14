@@ -1003,12 +1003,12 @@ class Measure(object):
                         if len(propka_lys_fails)>0:
                             idx = np.where((propka_lys_fails["Chain"] == line[1]) & (propka_lys_fails["Resid"].astype(int) == int(line[0])))
                             if len(idx[0])>0:
+                                print(f'Error associated with lysine {int(line[0])} on chain {line[1]} found in the log file at index {idx[0]} for pKa calculation. Value not taken through to measurements.')
                                 continue
 
                         lys_number.append(int(line[0]))
                         chain.append(line[1])
                         pkas.append(float(line[2]))
-                        print([int(line[0]), ])
 
                     except Exception as e:
                         print(f"> Error {e}")
