@@ -596,22 +596,28 @@ class Measure(object):
         Method
         ------
 
-        Parameters
-        ----------
-
         Example
         -------
         >> M.measure_PDB_only()
         '''
         if not self.PDB_only:
+            print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
             return 'Calling the wrong method.'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
         tstart_overall = time.time()
         num_pdb_files = len(self.df_input) + self.progress_index
 
+        # remove any potential duplicates from the input dataframe
+        self.df_input = self.df_input.drop_duplicates()
+        if 'completed' not in self.df_input.columns:
+            self.df_input['completed'] = False
+
         for pdb_idx, row in self.df_input.iterrows():
             pdb_code = row['PDB_Code']
+
+            if row['completed']:
+                continue
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
@@ -636,6 +642,7 @@ class Measure(object):
                 try:
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
                 except Exception as e:
+                    print(f'Failed to create biobox molecule for file {f} with error: {e}')
                     self.wrong_pdb_file.append(f)
                     continue
 
@@ -664,7 +671,7 @@ class Measure(object):
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
-                        print(f"ERROR: {e}")
+                        print(f"ERROR adding the measurements for file {f} to the dataframe: {e}")
                         continue
 
                 processing_time = round((time.time()-tstart), 2)
@@ -695,12 +702,17 @@ class Measure(object):
                 #append temporary DataFrame with all measures on a single file to main DataFrame
                 self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
+                if f.replace('.pdb', '') == pdb_code:
+                    self.df_input.at[pdb_idx, 'completed'] = True
+                    break
+
             try:
-                avg_time_per_file = (time.time() - tstart_overall) / ((pdb_idx - self.progress_index) + 1)
-                time_remaining = datetime.timedelta(seconds=int(round((num_pdb_files - (pdb_idx + 1)) * avg_time_per_file, 0)))
-                print(f'Progress analysing log file: {round(((pdb_idx + 1)/num_pdb_files)*100, 2)}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
-            except:
-                print('Broken progress updater')
+                avg_time_per_file = (time.time() - tstart_overall) / (pdb_idx + 1)
+                time_remaining = datetime.timedelta(seconds=int(round((len(self.df_input) - (pdb_idx + 1)) * avg_time_per_file, 0)))
+                perc_prog_measure = round(((pdb_idx + self.progress_index + 1)/num_pdb_files)*100, 2)
+                print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
+            except Exception as e:
+                print(f'>> Broken progress updater: {e} \r', end='', flush=True)
 
 
 
@@ -767,6 +779,8 @@ class Measure(object):
         #                    removed with remove duplicates later
 
         # 3. Update df_input to only have the files which haven't been analysed yet
+        if 'completed' not in self.df_input.columns:
+            self.df_input['completed'] = False
         old_len_df_input = len(self.df_input)
         idx_to_remove = []
         files = [a.split('/')[-1] for a in glob.glob(os.path.join(self.folder, "*pdb"))]
@@ -776,6 +790,7 @@ class Measure(object):
                 # case 1: exact match code and file - for measuring data from simulations mainly
                 if r['PDB_Code'] == recover_file:
                     idx_to_remove.append(i)
+                    self.df_input.at[i, 'completed'] = True
                     break
                 # case 2: PDB files renamed by curation that are not the PDB code alone
                 if recover_file in matched_pdb_files:
@@ -789,7 +804,7 @@ class Measure(object):
         self.df_input = self.df_input.drop(idx_to_remove)
         new_len_df_input = len(self.df_input)
         lines_df_input_removed = old_len_df_input - new_len_df_input
-
+        # TODO GW 16.01.25 - updated verison for this will use column of completed for everything here, change over to this rather than removing it from the df_input
         # 4. Restart the measure_dataframe() with the new file list
         files_left_to_calc = len(self.df_input) - len(self.pdb_only_files_to_ignore)
         print(f'>> {lines_df_input_removed} exact matches in PDB codes removed from the input list that have already been calculated.')
