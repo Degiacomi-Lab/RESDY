@@ -33,6 +33,17 @@ class Preprocessing:
 
         self.data_full = pd.concat([self.data, self.aev], axis=1)
 
+        # VIF variables
+        self.vif = pd.DataFrame()
+
+        # undersampling variables
+        self.outliers = pd.DataFrame()
+        self.common = pd.DataFrame()
+        self.undersampled_data = pd.DataFrame()
+        self.undersampled_data_common = pd.DataFrame()
+        self.undersampled_data_outlier = pd.DataFrame()
+        self.undersampled_data_normalised = pd.DataFrame()
+
 
     def clean(self, df, features):
         """
@@ -52,13 +63,13 @@ class Preprocessing:
             Number of rows in the cleaned dataframe.
 
         """
-        print("Original number of observations: ", len(df))
+        print(f"Original number of observations: {len(df)}")
         df_cleaned = df.dropna(subset=features)
-        print("Number of observations after removing rows containing NaN: ", len(df_cleaned))
+        print(f"Number of observations after removing rows containing NaN: {len(df_cleaned)}")
         df_cleaned = df_cleaned.drop_duplicates(subset=features)
         df_cleaned = df_cleaned.reset_index(drop=True)
         n_obs_cleaned = len(df_cleaned)
-        print("Number of observations after removing duplicates: ", n_obs_cleaned)
+        print(f"Number of observations after removing duplicates: {n_obs_cleaned}")
 
         return df_cleaned, n_obs_cleaned
 
@@ -91,7 +102,7 @@ class Preprocessing:
 
 
 
-    def normalise(self, data_input="data", features=None):
+    def _normalise(self, data_input="data", features=None):
         """
         Normalise all specified feature columns to mean zero, standard deviation 1.
 
@@ -112,7 +123,6 @@ class Preprocessing:
         """
 
         _case = 1
-        #if type(data_input) != pd.core.frame.DataFrame:
         if isinstance(data_input, pd.core.frame.DataFrame):
             data = deepcopy(self.data)
             _case = 0
@@ -131,7 +141,8 @@ class Preprocessing:
 
 
 
-    def undersampling(self, features, n_cluster, n_init=100, max_iter=500, iqr_reject_range=1.5, outlier_cluster_radius=0.6):
+    def undersampling(self, features, n_cluster, n_init=100, max_iter=500,
+                      iqr_reject_range=1.5, outlier_cluster_radius=0.6):
         '''
         Function to select a sample of points from a dataset which is representative
         of the entire dataset that has been fed, finding the most different points.
@@ -190,12 +201,12 @@ class Preprocessing:
         data_outliers = data.iloc[outlier_indices]
         data_outliers = data_outliers.reset_index(drop=True)
         self.outliers = data_outliers
-        data_outliers_normalised = self.normalise(data_outliers, features)
+        data_outliers_normalised = self._normalise(data_outliers, features)
 
         data_common = data.drop(outlier_indices)
         data_common = data_common.reset_index(drop=True)
         self.common = data_common
-        data_common_normalised = self.normalise(data_common, features)
+        data_common_normalised = self._normalise(data_common, features)
 
         print("K-means clustering...")
         kmeans = KMeans(n_clusters=n_cluster, n_init=n_init, max_iter=max_iter).fit(data_common_normalised)
