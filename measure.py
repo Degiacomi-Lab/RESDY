@@ -15,6 +15,8 @@ from Bio.Data.IUPACData import protein_letters_3to1_extended
 import pandas as pd
 import numpy as np
 import biobox as bb
+import melodia_py as mel
+import dill
 
 
 # AEV packages
@@ -157,6 +159,8 @@ class Measure(object):
                 self.measures.append([m, self.calculate_das])
             elif m == 'seqcharge':
                 self.measures.append([m, self.calculate_seqcharge])
+            elif m == 'melodia':
+                self.measures.append([m, self.calculate_melodia])
             else:
                 raise Exception(f"measure {m} unknown")
 
@@ -580,13 +584,16 @@ class Measure(object):
             idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
             if len(idx[0]) == 0:
                 continue
-
+            
             # this if statement allows you to add the lists of the aevs into the overall dataframe
             if col_name == 'aev':
                 target['aev'] = target['aev'].astype('object')
+            if col_name == 'melodia':
+               target.loc[:,'writhing'] = to_merge['writhing']
+               target.loc[:,'torsion'] = to_merge['torsion']
 
             target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
-
+        
         return target
 
 
@@ -1553,8 +1560,33 @@ class Measure(object):
         except Exception as e:
             print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
-        print(df_seqcharge)
+        #print(df_seqcharge)
         return df_seqcharge
+    
+    def calculate_melodia(self, path):
+
+        #Calculating geometry using melodia-py
+        try:
+                result1 = mel.geometry_from_structure_file(path)
+                if isinstance(result1, pd.Series):
+                    result1 = result1.to_frame().T
+        
+        except Exception as e:
+                print(f"Error processing file: {e}")
+        
+        #Formatting and filtering 
+        try: 
+            result1.rename({"chain": "Chain", "order": "Resid", "curvature": "melodia"}, axis="columns", inplace = True)
+            LYS = result1['name'] == 'LYS'
+            df_melodia = result1[LYS].copy()
+            df_melodia.reset_index(inplace=True, drop=True)
+            df_melodia.drop(labels= ['code', 'id', 'model', 'phi', 'psi', 'name', 'arc_length'], axis = 'columns', inplace=True)
+
+        except Exception as e: 
+            print(f'Unable to reformat correctly: {e}')
+
+        #print(df_melodia)
+        return df_melodia
 
 
 
