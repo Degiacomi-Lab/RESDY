@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
+from preprocessing import Preprocessing
 
 cwd = os.getcwd()
 pd.set_option('display.max_rows', 500)
@@ -207,12 +208,22 @@ class Model(object):
         '''
         match method:
             case 'vif':
+                # The columns_to_keep that is commented out is the oriignal set calculated by Phong
+                # over the negative dataset
+                '''
                 columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
                                    30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
                                    399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
                                    50,51,52,53,54,543,544,555,556,557,558,563,57,573,579,58,580,
                                    583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
                                    709,711,716,719,73,74,745,75,751,76,77,78,79,9]
+                '''
+
+                # use the preprocesing module to come up with exact columns to keep via VIF analysis
+                P = Preprocessing(self.X_final, self.features_to_include)
+                P.normalise()
+                P.vif()
+
                 self.top_n_features = ['AEV_' + str(a) for a in columns_to_keep]
             case 'sd':
                 # TODO work on X_all - will eventually change all these functions so that they are general rather than single use

@@ -1,10 +1,14 @@
 from copy import deepcopy
+from ast import literal_eval
 import numpy as np
 import pandas as pd
 from statsmodels.stats.outliers_influence import variance_inflation_factor as VIF
+from statsmodels.tools.tools import add_constant
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.spatial.distance import euclidean
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 scaler = StandardScaler()
@@ -63,6 +67,7 @@ class Preprocessing:
             Number of rows in the cleaned dataframe.
 
         """
+        # remove any features from measurements that
         print(f"Original number of observations: {len(df)}")
         df_cleaned = df.dropna(subset=features)
         print(f"Number of observations after removing rows containing NaN: {len(df_cleaned)}")
@@ -75,7 +80,7 @@ class Preprocessing:
 
 
 
-    def calculate_vif(self, data, features):
+    def calculate_vif(self, data, features, multi_vif=False):
         """
         Calculate Variance Inflation Factors (VIFs) of the features selected.
         This allows for the n most decorrelated features to be selected later to take
@@ -90,14 +95,99 @@ class Preprocessing:
 
         """
         #X = scaler.fit_transform(data[features])
-        data = data[features]
-        vals = []
-        for i in range(data.shape[1]):
-            vals.append(VIF(data.values, i))
-            if i % 10 == 0:
-                print(i)
+        if not multi_vif:
+            data = data[features]
+            data = add_constant(data)
+            if 'aev' in data.columns:
+                for i, r in data.iterrows():
+                    new_aev = literal_eval(r['aev'])
+                    data.at[i, 'aev'] = new_aev
+                df_out = pd.DataFrame(data['aev'].to_list())
+                df_out = df_out.add_prefix('AEV_')
+                for col in df_out.columns:
+                    col_vals = list(df_out[col])
+                    if col_vals.count(0) == len(col_vals):
+                        df_out = df_out.drop(col, axis=1)
+                data = pd.concat([data, df_out], axis=1)
+                data = data.drop('aev', axis=1)
 
-        self.vif = pd.DataFrame({'vif': vals}, index=data.columns)
+        #print(data)
+
+        data_correlation_matrix = data.corr()
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(data_correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
+        plt.title('Pairwise Correlation Matrix')
+        plt.show()
+
+        print(f'Number columns = {len(data.columns)}')
+
+        #data = data.assign(const=1)
+        vif_values = [VIF(data.values, i) for i in range(data.shape[1])]
+        
+        #vif_series = pd.Series([VIF(data.values, i) for i in range(data.shape[1])], index=data.columns)
+
+        if self.vif.empty:
+            self.vif['Parameter'] = data.columns
+            self.vif.set_index('Parameter')
+            new_col_header = 0
+        elif len(list(self.vif.columns)) != 0:
+            new_col_header = int(list(self.vif.columns)[-1]) + 1
+        else:
+            new_col_header = 0
+
+        tmp_vif_df = pd.DataFrame({'Parameter': data.columns,
+                                   new_col_header: vif_values},
+                                   columns=['Parameter', new_col_header])
+
+        self.vif = pd.merge(self.vif, tmp_vif_df, on='Parameter', how='left')
+
+
+
+    def calculate_diff_features(self, data):
+        '''
+        Function to calculate the most decorrelated features from the measurements through
+        VIF analysis. This will continuously call the VIF calculation until all the values
+        returned are less than 5 (the commonly used value for decorrelation)
+        '''
+
+        all_decorrelated = False
+
+        data = data[self.features]
+        data = add_constant(data)
+        print(data)
+        if 'aev' in data.columns:
+            for i, r in data.iterrows():
+                new_aev = literal_eval(r['aev'])
+                data.at[i, 'aev'] = new_aev
+            df_out = pd.DataFrame(data['aev'].to_list())
+            df_out = df_out.add_prefix('AEV_')
+            for col in df_out.columns:
+                col_vals = list(df_out[col])
+                if col_vals.count(0) == len(col_vals):
+                    df_out = df_out.drop(col, axis=1)
+            data = pd.concat([data, df_out], axis=1)
+            data = data.drop('aev', axis=1)
+
+        while not all_decorrelated:
+            # check for correlation and then change the data
+            print(data)
+            if not self.vif.empty:
+                latest_vals = list(self.vif[list(self.vif.columns)[-1]])
+                if all(x < 5 for x in latest_vals):
+                    all_decorrelated = True
+                
+                # remove the column with the highest vif
+                max_val_idx = self.vif[list(self.vif.columns)[-1]].idxmax()
+                max_col = self.vif['Parameter'].iloc[max_val_idx]
+                print(f'max_col: {max_col}, num cols:{len(list(data.columns))}')
+                data = data.drop(max_col, axis='columns')
+                print(f'num cols:{len(list(data.columns))}')
+
+            # calculate new set of vif values
+            self.calculate_vif(data, self.features, multi_vif=True)
+            print(self.vif)
+
+        print(self.vif)
 
 
 
