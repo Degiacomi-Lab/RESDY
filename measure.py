@@ -1562,30 +1562,59 @@ class Measure(object):
 
         #print(df_seqcharge)
         return df_seqcharge
-    
-    def calculate_melodia(self, path):
 
+
+    def calculate_melodia(self, path):
+        '''
+        Call the Melodia package to calculate data for the following structural features of
+        the lysines of interest within the structure: curvature, arc-length, phi, psi
+
+        Method
+        ------
+        Call melodia on the path of the pdb file that has been passed to the function and
+        create dataframe from the results. Process the dataframe to remove any of the 
+        calculated features that were not asked for.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that DAS is being calculated for.
+
+        Returns
+        -------
+        df_melodia : dataframe
+            Dataframe with information on chain, residue number and desired melodia output.
+            Outline for all features:
+            Chain   Resid   curvature   arc-length  phi psi
+            x           x           x            x    x   x
+
+        Example
+        -------
+        >> print(self.calculate_melodia(1ubq.pdb))
+        Chain   Resid    curvature  arc-length  phi psi
+        0
+        '''
         #Calculating geometry using melodia-py
         try:
-                result1 = mel.geometry_from_structure_file(path)
-                if isinstance(result1, pd.Series):
-                    result1 = result1.to_frame().T
-        
+            melodia_results = mel.geometry_from_structure_file(path)
+            if isinstance(melodia_results, pd.Series):
+                melodia_results = melodia_results.to_frame().T
+
         except Exception as e:
-                print(f"Error processing file: {e}")
-        
-        #Formatting and filtering 
-        try: 
-            result1.rename({"chain": "Chain", "order": "Resid", "curvature": "melodia"}, axis="columns", inplace = True)
-            LYS = result1['name'] == 'LYS'
-            df_melodia = result1[LYS].copy()
+            print(f'Melodia 1: Error processing input file - {path} with error: {e}')
+
+        #Formatting and filtering
+        try:
+            melodia_results.rename({"chain": "Chain", "order": "Resid", "curvature": "melodia"}, axis="columns", inplace = True)
+            lys_results = melodia_results['name'] == 'LYS'
+            df_melodia = melodia_results[lys_results].copy()
             df_melodia.reset_index(inplace=True, drop=True)
             df_melodia.drop(labels= ['code', 'id', 'model', 'phi', 'psi', 'name', 'arc_length'], axis = 'columns', inplace=True)
 
-        except Exception as e: 
-            print(f'Unable to reformat correctly: {e}')
+        except Exception as e:
+            print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
 
-        #print(df_melodia)
+
         return df_melodia
 
 
