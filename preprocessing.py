@@ -113,11 +113,13 @@ class Preprocessing:
 
         #print(data)
 
+        '''
         data_correlation_matrix = data.corr()
         plt.figure(figsize=(10, 8))
         sns.heatmap(data_correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
         plt.title('Pairwise Correlation Matrix')
         plt.show()
+        '''
 
         print(f'Number columns = {len(data.columns)}')
 
@@ -154,7 +156,6 @@ class Preprocessing:
 
         data = data[self.features]
         data = add_constant(data)
-        print(data)
         if 'aev' in data.columns:
             for i, r in data.iterrows():
                 new_aev = literal_eval(r['aev'])
@@ -170,22 +171,23 @@ class Preprocessing:
 
         while not all_decorrelated:
             # check for correlation and then change the data
-            print(data)
             if not self.vif.empty:
                 latest_vals = list(self.vif[list(self.vif.columns)[-1]])
+                latest_vals = [a for a in latest_vals if str(a) != 'nan']
                 if all(x < 5 for x in latest_vals):
                     all_decorrelated = True
                 
                 # remove the column with the highest vif
                 max_val_idx = self.vif[list(self.vif.columns)[-1]].idxmax()
                 max_col = self.vif['Parameter'].iloc[max_val_idx]
-                print(f'max_col: {max_col}, num cols:{len(list(data.columns))}')
+                #print(f'max_col: {max_col}, num cols:{len(list(data.columns))}')
+                #print(f'max val: {self.vif[list(self.vif.columns)[-1]].max()}')
                 data = data.drop(max_col, axis='columns')
-                print(f'num cols:{len(list(data.columns))}')
+                #print(f'num cols:{len(list(data.columns))}')
 
             # calculate new set of vif values
             self.calculate_vif(data, self.features, multi_vif=True)
-            print(self.vif)
+            #print(self.vif)
 
         print(self.vif)
 
