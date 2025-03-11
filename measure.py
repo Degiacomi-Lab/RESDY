@@ -15,6 +15,8 @@ from Bio.Data.IUPACData import protein_letters_3to1_extended
 import pandas as pd
 import numpy as np
 import biobox as bb
+import melodia_py as mel
+import dill
 
 
 # AEV packages
@@ -87,6 +89,7 @@ class Measure(object):
 
             self.logger.addHandler(handler)
 
+        self.features = features
         self._setup_measures(features)
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
@@ -131,7 +134,7 @@ class Measure(object):
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB_Code', 'Chain', 'Resid', 'propka', 'pkaANI', 'sasa', 'depth']
+            columns = ['PDB_Code', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns = columns)
 
     def _setup_measures(self, features):
@@ -142,6 +145,7 @@ class Measure(object):
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
         self.measures = []
+        melodia_added = False
         for m in features:
             if m == "propka":
                 self.measures.append([m, self.calculate_pka_propka])
@@ -157,6 +161,15 @@ class Measure(object):
                 self.measures.append([m, self.calculate_das])
             elif m == 'seqcharge':
                 self.measures.append([m, self.calculate_seqcharge])
+            elif m == 'melodia':
+                self.measures.append([m, self.calculate_melodia])
+                melodia_added = True
+                self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
+                self.features.remove('melodia')
+            elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
+                if not melodia_added:
+                    self.measures.append(['melodia', self.calculate_melodia])
+                    melodia_added = True
             else:
                 raise Exception(f"measure {m} unknown")
 
@@ -581,12 +594,19 @@ class Measure(object):
             if len(idx[0]) == 0:
                 continue
 
-            # this if statement allows you to add the lists of the aevs into the overall dataframe
+            # account for measurements that have special cases
+            # aevs - add the list of aevs in one column to the overall dataframe
             if col_name == 'aev':
                 target['aev'] = target['aev'].astype('object')
-
-            target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
-
+            # melodia - check over all the required features to add and add these back in to the overall dataframe
+            if col_name == 'melodia':
+                melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
+                for feature in self.features:
+                    if feature in melodia_features:
+                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
+            else:
+                target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
+        
         return target
 
 
@@ -671,7 +691,7 @@ class Measure(object):
                 for meas in self.measures:
                     print(f">> evaluating {meas[0]}...")
                     try:
-                        df_currentfile[meas[0]] = np.nan # create new column for measure
+                        #df_currentfile[meas[0]] = np.nan # create new column for measure  # change GW 11.03.25 - dont need this, new column created anyway, leaving in incase removing creates problems later
                         result = meas[1](f) # run measurement
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
@@ -1553,8 +1573,65 @@ class Measure(object):
         except Exception as e:
             print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
-        print(df_seqcharge)
+        #print(df_seqcharge)
         return df_seqcharge
+
+
+    def calculate_melodia(self, path):
+        '''
+        Call the Melodia package to calculate data for the following structural features of
+        the lysines of interest within the structure: curvature, arc-length, phi, psi
+
+        Method
+        ------
+        Call melodia on the path of the pdb file that has been passed to the function and
+        create dataframe from the results. Process the dataframe to remove any of the 
+        calculated features that were not asked for.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that DAS is being calculated for.
+
+        Returns
+        -------
+        df_melodia : dataframe
+            Dataframe with information on chain, residue number and desired melodia output.
+            Outline for all features:
+            Chain   Resid   curvature   writhing    torsion   arc-length  phi psi
+            x           x           x          x          x            x    x   x
+
+        Example
+        -------
+        >> print(self.calculate_melodia(1ubq.pdb))
+        Chain   Resid    curvature  writhing    torsion  arc-length  phi psi
+        0
+        '''
+        # Melodia 1 - Calculating geometry using melodia-py
+        try:
+            melodia_results = mel.geometry_from_structure_file(path)
+            if isinstance(melodia_results, pd.Series):
+                melodia_results = melodia_results.to_frame().T
+
+        except Exception as e:
+            print(f'Melodia 1: Error processing input file - {path} with error: {e}')
+
+        # Melodia 2 - Formatting and filtering
+        try:
+            #melodia_results.rename({"chain": "Chain", "order": "Resid", "curvature": "melodia"}, axis="columns", inplace = True)
+            melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
+            lys_results = melodia_results['name'] == 'LYS'
+            df_melodia = melodia_results[lys_results].copy()
+            df_melodia.reset_index(inplace=True, drop=True)
+            cols_to_drop = ['code', 'id', 'model', 'curvature', 'writhing', 'torsion', 'phi', 'psi', 'name', 'arc_length']
+            cols_to_drop = [col for col in cols_to_drop if col not in self.features]
+            df_melodia.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
+
+        except Exception as e:
+            print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
+
+        #print(df_melodia)
+        return df_melodia
 
 
 
