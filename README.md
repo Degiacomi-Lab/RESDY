@@ -110,6 +110,18 @@ There are different requirements for the methods for calculating different featu
             <td>no extra requirements</td>
             <td></td>
         </tr>
+        <tr>
+            <td>Sequence Charge<br></td>
+            <td>Biobox</td>
+            <td>Biopython</td>
+            <td>anaconda</td>
+        </tr>
+        <tr>
+            <td>Curvature, Writhing, Torsion, arc_length, phi, psi<br></td>
+            <td>Melodia</td>
+            <td><a href="https://github.com/rwmontalvao/Melodia_py">Melodia-py</a></td>
+            <td><a href="https://github.com/rwmontalvao/Melodia_py">GitHub Repository</a> or pip</td>
+        </tr>
     </tbody>
 </table>
 </div>
