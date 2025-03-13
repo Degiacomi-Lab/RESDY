@@ -1666,91 +1666,54 @@ class Measure(object):
         df_frustration : dataframe
             Dataframe with information on chain, residue number and desired output from Frustratometer.
             Outline for all features:
-            Chain   Resid   curvature   Frustration
-            x           x           x             x
+            Chain   Resid   frustration   density
+            x           x             x         x
 
         Example
         -------
         >> print(self.calculate_frustration(1ubq.pdb))
-        Chain   Resid   Frustration
-        0
+            PDB_Code    Chain   Resid   frustration     density
+        0       1ubq        A       6     -1.203796    4.006602
         '''
         # temp - modules required to add into readme - openmm, pdbfixer
         # Frustratometer 1 - create structure and AWSEM model
+        df_frustration = pd.DataFrame()
         try:
             M = bb.Molecule(path)
             idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            df_frustration['Chain'] = list_chains
+            df_frustration['Resid'] = lys_res_nums
 
-            # TODO would be good to surpress output to console here as logging the start unneccessarily 
+            # TODO would be good to surpress output to console here as logging the start unneccessarily
             frust_struc = frustratometer.Structure(path)
             model_single_resids = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
-            #model_mutational_resids = frustratometer.AWSEM(frust_struc)
-            #model_openawsem = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact = 10, distance_cutoff_contact = None)
         except Exception as e:
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
-            return None  # TODO need to create actual cutout here
-
+            df_frustration['frustration'] = None
+            df_frustration['density'] = None
+            return df_frustration
         # Frustratometer 2 - use model to calculate outputs
         try:
             single_residue_awsem_frustration = model_single_resids.frustration(kind='singleresidue')
-            #print('frustration')
-            #print(single_residue_awsem_frustration)
-            #plt.plot(single_residue_awsem_frustration)
-            #plt.show()
-
-            # Following commented out is mutational and does by swapping pairs, therefore not a scalar metric
-            # however this may be something we can do aggregation on if the other frustration stuff doesnt work
-            '''
-            mutational_awsem_frustration = model_mutational_resids.frustration(kind='mutational')
-            print(mutational_awsem_frustration)
-            plt.plot(mutational_awsem_frustration)
-            plt.show()
-            '''
-
-            # decoy fluctuations also a multi metric thing and would need aggregation to be usable as a scalar metric
-            # potentially use if current things dont help
-            '''
-            awsem_decoy_fluctuation = model_single_resids.decoy_fluctuation(kind='singleresidue')
-            print('fluctutation')
-            print(awsem_decoy_fluctuation)
-            plt.plot(awsem_decoy_fluctuation)
-            plt.show()
-            '''
-
             resid_densities = model_single_resids.rho_r
-            #print('densities')
-            #print(resid_densities)
-            #plt.plot(resid_densities)
-            #plt.show()
-
-            # currently the energy is showing no output but keeping code here just incase
-            '''
-            print('energy')
-            aswem_native_energy = model_openawsem.fields_energy()
-            plt.plot(aswem_native_energy)
-            plt.show()
-            '''
         except Exception as e:
             print(f'Frustratometer calculation 2 - failed to create frustratometer outputs: {e}')
 
         # Frustration 3 - extract lysine values from the outputs and append to output dataframe
-        df_frustration = pd.DataFrame()
         try:
             lys_frustration = []
             lys_density = []
             for lys in lys_res_nums:
                 lys_frustration.append(single_residue_awsem_frustration[lys-1])
                 lys_density.append(resid_densities[lys-1])
-            df_frustration['Chain'] = list_chains
-            df_frustration['Resid'] = lys_res_nums
             df_frustration['frustration'] = lys_frustration
             df_frustration['density'] = lys_density
         except Exception as e:
             print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
 
-        print(df_frustration)
+        #print(df_frustration)
         return df_frustration
 
 if __name__ == "__main__":
