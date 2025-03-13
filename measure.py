@@ -1710,6 +1710,13 @@ class Measure(object):
                 lys_density.append(resid_densities[lys-1])
             df_frustration['frustration'] = lys_frustration
             df_frustration['density'] = lys_density
+
+            try:
+                pdb_code = path.split('/')[-1]
+                cleaned_code_to_remove = pdb_code.split('.')[0] + '_cleaned.pdb'
+                os.remove(cleaned_code_to_remove)
+            except Exception as ef:
+                print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
         except Exception as e:
             print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
 
