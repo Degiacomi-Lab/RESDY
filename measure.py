@@ -180,6 +180,32 @@ class Measure(object):
             else:
                 raise Exception(f"measure {m} unknown")
 
+
+    def measure_data(self):
+        '''
+        Determine the appropriate measures function to call based on the combination of
+        running PDB_only and in parallel, reducing the number individual functions that
+        the user will have to call themselves.
+
+        Example
+        -------
+        M.measure_data()
+        '''
+        match (self.PDB_only, self.parallel):
+            case (False, False):
+                # not PDB only and not parallel
+                self.measure_dataframe()
+            case (False, True):
+                # not PDB only and parallel:
+                self.measure_dataframe()
+            case (True, False):
+                # PDB only and not parallel
+                self.measure_PDB_only()
+            case (True, True):
+                # PDB only and parallel
+                print('This setup does not currently have a method, please change the setup')
+
+
     def save_state(self, outname="measures.csv"):
         '''
         Function saves a csv file of all of the measurements calculated through measure_dataframe()
