@@ -197,7 +197,7 @@ class Measure(object):
                 self.measure_dataframe()
             case (False, True):
                 # not PDB only and parallel:
-                self.measure_dataframe()
+                self.measure_dataframe_parallel()
             case (True, False):
                 # PDB only and not parallel
                 self.measure_PDB_only()
@@ -228,7 +228,7 @@ class Measure(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
-    def measure_dataframe(self):
+    def measure_dataframe_parallel(self):
         '''
         TODO FINISH THIS
         Function to measure specified features for all the structure files curated earlier in the programme.
@@ -303,6 +303,149 @@ class Measure(object):
             except Exception as e_two:
                 print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
                 pass
+
+
+    def measure_dataframe(self):
+        '''
+        TODO FINISH THIS
+        Function to measure specified features for all the structure files curated earlier in the programme.
+        Will take a list of the required proteins, finds associated curated structures and runs the reequired measurement functions.
+        Results are saved to memory and a log file produced at the same time. (M.save_state() can be used to save the data to a csv)
+
+        Method
+        ------
+        Create list of files that have been curated into the self.outdir directory.
+        Iterate over the list of the files, check if structure file is
+
+        Parameters
+        ----------
+
+        Example
+        -------
+        >> M.measure_dataframe()
+        '''
+        # use a different method if handling pdb codes only
+        if self.PDB_only:
+            return 'Call PDB_only method instead'
+
+        if self.parallel:
+            return 'Call measure_dataframe_parallel instead'
+
+        files = glob.glob(os.path.join(self.folder, "*pdb"))
+        # remove the files which have pkaani in the name as these are output files from pkaani
+        files = [file for file in files if 'pkaani' not in file]
+        self.files_to_analyse = files
+
+        first_index = self.df_input.index[0]
+        total_structures = len(files)
+        current_structure = 0
+        overall_st = time.time()
+        print(f'Total number of structures to analyse: {total_structures}')
+
+        for i, r in self.df_input.iterrows():
+            pdb_code = r["PDB_Code"]
+            chains = r["Chains"].split("/")
+            method = r['Method']
+            res = r['Resolution']
+            uniprot_code = r["Uniprot_Entry"]
+            files_list = self.files_to_analyse
+
+            # calculate features values from all PDB files associated with specific DataFrame entry
+            for f in files_list:
+                # check the file for the required pbd code, if not there, skip
+                if pdb_code not in f:
+                    continue
+
+                print(f'Analysing structure {current_structure}/{total_structures}')
+                tstart = time.time()
+                print(f"\n> File: {f}")
+
+                # create temporary DataFrame for data of current file,
+                # to be then appended to main DataFrame self.df
+
+                columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+                df_currentfile = pd.DataFrame(columns=columns)
+
+                # append to temporary DataFrame all lysines in the file of interest
+                try:
+                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                except Exception as e:
+                    self.wrong_pdb_file.append(f)
+                    print(f'Failed to produce bb for pdb file with error: {e}')
+                    continue
+
+                _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                for i in idxs:
+
+                    #save only lysine entries from chain of interest
+                    if M.data["chain"].values[i] not in chains:
+                        continue
+
+                    data = ({'Uniprot_Entry': uniprot_code,
+                        'PDB_Code': f.split(".")[0],
+                        'Method': method,
+                        'Resolution': res,
+                        'Chain': M.data["chain"].values[i],
+                        'Resid': M.data["resid"].values[i]})
+
+                    df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
+                print(f">> {len(df_currentfile)} lysines of interest found")
+
+                # iterate over measures to carry out (according to self.measures)
+                for meas in self.measures:
+                    print(f">> evaluating {meas[0]}...")
+                    try:
+                        #df_currentfile[meas[0]] = np.nan # create new column for measure
+                        result = meas[1](f)
+                        df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
+
+                    except Exception as e:
+                        print(f"ERROR: {e}")
+                        continue
+
+                processing_time = round((time.time()-tstart), 2)
+                print(f">> file processed in {processing_time} seconds.")
+                #average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
+                #print(f'>> Time average per file: {average_time_per_file} seconds.')
+                #sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
+                #time_remaining_str = str(datetime.timedelta(seconds=sec_remaining))
+                #print(f'Predicted time remaining: {time_remaining_str}')
+
+                # document the data to a log file
+                if self.activate_log:
+                    if df_currentfile.empty is False:
+                        pd.set_option('display.max_colwidth', None,
+                                    'display.width', None,
+                                    'max_seq_items', None,
+                                    "display.max_rows", None)
+                        try:
+                            self.logger.info(df_currentfile)
+                            self.logger.info('--------------------------------------------------------------------------')
+                        except Exception as e:
+                            print(f'Error in logging: {e}')
+
+                        # reset the pandas display options back to default for regular displaying
+                        pd.reset_option('display.max_colwidth')
+                        pd.reset_option('display.width')
+                        pd.reset_option('max_seq_items')
+                        pd.reset_option('display.max_rows')
+
+                #append temporary DataFrame with all measures on a single file to main DataFrame
+                if not df_currentfile.empty:
+                    self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
+
+        # remove possible duplicated rows (if restarted)
+        try:
+            self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+        except Exception as e_one:
+            try:
+                print(f'Failed to remove duplicates from measurement dataframe, trying new method: {e_one}')
+                self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
+            except Exception as e_two:
+                print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
+                pass
+
 
 
     def _measure_file(self, file_details, lock, ns):
@@ -608,7 +751,7 @@ class Measure(object):
         self.df_input = self.df_input.drop(idx_to_remove)
         # 3. Restart the measure_dataframe() with the new file list
         print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
-        self.measure_dataframe()
+        self.measure_dataframe_parallel()
 
 
     def _combine_dataframes(self, target, to_merge, col_name):
@@ -1770,4 +1913,4 @@ if __name__ == "__main__":
 
     print("Measuring...")
     M = Measure(PDB.df)
-    M.measure_dataframe()
+    M.measure_dataframe_parallel()
