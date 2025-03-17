@@ -1712,9 +1712,10 @@ class Measure(object):
             df_frustration['Chain'] = list_chains
             df_frustration['Resid'] = lys_res_nums
 
-            # TODO would be good to surpress output to console here as logging the start unneccessarily
-            frust_struc = frustratometer.Structure(path)
-            model_single_resids = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
+            out_print_trap = io.StringIO()
+            with redirect_stdout(out_print_trap):
+                frust_struc = frustratometer.Structure(path)
+                model_single_resids = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
         except Exception as e:
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
             df_frustration['frustration'] = None
