@@ -761,10 +761,10 @@ class Measure(object):
         '''
         # e.g. self._combine_dataframes(df, result, meas[0])
 
-        for i in range(len(target)):
+        for i, r in target.iterrows():
 
-            chain_value = target.loc[i, "Chain"]
-            resid_value = target.loc[i, "Resid"]
+            chain_value = r["Chain"]
+            resid_value = r["Resid"]
 
             idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
             if len(idx[0]) == 0:
