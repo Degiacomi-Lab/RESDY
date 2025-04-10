@@ -327,6 +327,98 @@ class Analysis(object):
         print(f'Current num of rows: {len_two}')
         print(f'Num of rows removed: {len(df_to_remove)}')
 
+
+    def add_extra_measures(self, new_measure_filename, write_new_file = False, out_filename='measures_new.csv'):
+        '''
+        Function to add in extra measurements to the measures frame that has been
+        autoloaded into the analysis class on defining this. This will match up the
+        measurements in each case and hold in for the analysis. A new measures file
+        will be written with the new filename that has been passed into the function.
+
+        Parameters
+        ----------
+        new_measure_filename -> string
+            The name of the new measures file written of the combination of both
+            measures dataframe.
+        
+        write_new_file -> bool
+            True/False option for writing a new measures.csv file when the new data
+            has been added in. Auto set to False. 
+
+        out_filename -> string
+            The name of the new measures.csv file that you want to be produced. Auto
+            set to be measures_new.csv
+        '''
+
+        # Step 1: read in new dataframe, extract column names, check for overlap and
+        #         deal if is, otherwise add new column in
+        try:
+            new_df = pd.read_csv(new_measure_filename)
+            print(new_df)
+            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
+            new_measures_columns = [a for a in new_df.columns if a not in base_columns]
+            overlap_columns = [a for a in new_measures_columns if a in orig_measures_columns]
+            new_nonoverlap_columns = [a for a in new_measures_columns if a not in orig_measures_columns]
+            for column in overlap_columns:
+                proper_answer = False
+                print(f'Measurement {column} already present in the loaded dataframe, do you want to replace it?')
+
+                while not proper_answer:
+                    col_to_keep = input('Enter old or new for data to keep: ')
+                    match col_to_keep.lower():
+                        case 'new':
+                            print(f'Keeping new measurements for {column}')
+                            for i, r in self.df.iterrows():
+
+                                protein_code = r['PDB_Code']
+                                chain_value = r["Chain"]
+                                resid_value = r["Resid"]
+
+                                idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                                if len(idx[0]) == 0:
+                                    continue
+
+                                # account for measurements that have special cases
+                                # aevs - add the list of aevs in one column to the overall dataframe
+                                if column == 'aev':
+                                    self.df['aev'] = self.df['aev'].astype('object')
+                                else:
+                                    self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                            proper_answer = True
+                        case 'old':
+                            print(f'Keeping old measurements for {column}')
+                            proper_answer = True
+                        case _:
+                            print(f'{col_to_keep} was not recognised')
+            
+            for column in new_nonoverlap_columns:
+                for i, r in self.df.iterrows():
+
+                    protein_code = r['PDB_Code']
+                    chain_value = r["Chain"]
+                    resid_value = r["Resid"]
+
+                    idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                    if len(idx[0]) == 0:
+                        continue
+
+                    # account for measurements that have special cases
+                    # aevs - add the list of aevs in one column to the overall dataframe
+                    if column == 'aev':
+                        self.df['aev'] = self.df['aev'].astype('object')
+                    else:
+                        self.df.at[i, column] = new_df.loc[idx[0][0], column]
+
+        except Exception as e:
+            print(f'Failed to load in the new measures dataframe (name: {new_measure_filename}), error: {e}')
+
+
+        # Step 2: write new measures.csv file if required
+        if write_new_file:
+            self.df.to_csv(out_filename)
+
+
     # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
     def remove_not_important_residues(self, req_resid_table):
         print('>> Removing unrequired residues')
