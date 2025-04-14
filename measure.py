@@ -348,6 +348,7 @@ class Measure(object):
             method = r['Method']
             res = r['Resolution']
             uniprot_code = r["Uniprot_Entry"]
+            self.current_index = i
             files_list = self.files_to_analyse
 
             # calculate features values from all PDB files associated with specific DataFrame entry
@@ -1154,6 +1155,37 @@ class Measure(object):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
         parse errors, and return a dataframe containing all measurements not yielding an error.
+        
+        Method
+        ------
+        Check if propka has been run before on this protein, otherwise run PROPKA3 on the given
+        pdb file. Use the function _parse_propka_errors() to identify any lysines within the structure
+        that did not caclulate correctly before searching the output file, extracting the pka
+        values produced and writing them to df_propka to output.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that pKa is being calculated for with PROPKA3.
+
+        Returns
+        -------
+        df_propka : dataframe
+            Dataframe with information on chain, residue number and propka output. Outline:
+            Chain   Resid   propka
+            x       x       x
+
+        Example
+        -------
+        >> print(calculate_propka(1ubq.pdb))
+        Chain  Resid  propka
+        0     A      6   x
+        1     A     11   x
+        2     A     27   x
+        3     A     29   x
+        4     A     33   x
+        5     A     48   x
+        6     A     63   x
         '''
 
         code_for_df = os.path.basename(path).split(".")[0]
@@ -1179,7 +1211,7 @@ class Measure(object):
                 raise Exception(f'Failed to obtain pKa data (PROPKA): {e}') from e
 
         try:
-            propka_lys_fails = self.parse_propka_errors(error_file_name)
+            propka_lys_fails = self._parse_propka_errors(error_file_name)
         except Exception as e:
             raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
 
@@ -1225,8 +1257,8 @@ class Measure(object):
 
         try:
             df_propka = pd.DataFrame({'Resid':lys_number,
-                               'Chain': chain,
-                               'propka':pkas})
+                                      'Chain': chain,
+                                      'propka':pkas})
 
             df_propka.sort_values(by=['propka'], inplace=True)
             df_propka = df_propka.dropna()
@@ -1238,10 +1270,30 @@ class Measure(object):
         return df_propka
 
 
-    def parse_propka_errors(self, path):
+    def _parse_propka_errors(self, path):
         '''
         parse the PROPKA output file and appends unique chain and resid of any lysines mentioned a DataFrame.
         This list is returned to main and later the residues in it are removed from the df.
+        
+        Method
+        ------
+        Go over the propka errors output file that is produced when running. Identify the lines which
+        contain information about the lysines within the protein structure analysed that have errors
+        associated with them. Extract the chain and resid number from this and append to a dataframe
+        to return which contains a set of data on the lysines to remove from the read output pka values.
+
+        Parameters
+        ----------
+        path : string
+            The path of the errors output file from the PROPKA analysis of the pdb file of interest.
+
+        Returns
+        -------
+        dataframe
+            Dataframe with information on chain, residue number for lysines with calculation errors.
+            Outline:
+            Chain   Resid
+            x       x
         '''
 
         f = open(path, 'r')
@@ -1281,7 +1333,40 @@ class Measure(object):
 
 
     def calculate_pkaANI(self, path):
+        '''
+        A second method for calculating the pKa of the NZ atom of the lysines within the protein
+        structure, this time using the external program, pKaANI.
 
+        Method
+        ------
+        Call a subprocess to open the pkaani program with the desired pdb file given through path.
+        Find the log file produced from running this and search this to find the values produced
+        for LYS. Translate the data found within the log file to the dataframe to be returned.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that pKa is being calculated for with pKaANI.
+
+        Returns
+        -------
+        df_pkaani : dataframe
+            Dataframe with information on chain, residue number and pkaani output. Outline:
+            Chain   Resid   pkaani
+            x       x       x
+
+        Example
+        -------
+        >> print(calculate_pkaani(1ubq.pdb))
+        Chain  Resid  sasa
+        0     A      6   x
+        1     A     11   x
+        2     A     27   x
+        3     A     29   x
+        4     A     33   x
+        5     A     48   x
+        6     A     63   x
+        '''
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]
         test_path = pdb_path + '_pka.log'
@@ -1321,8 +1406,8 @@ class Measure(object):
 
         try:
             df_pkaani = pd.DataFrame({'Resid':lys_number,
-                         'Chain': chains,
-                         'pkaANI':pkas})
+                                      'Chain': chains,
+                                      'pkaANI':pkas})
 
             df_pkaani.sort_values(by=['pkaANI'], inplace=True)
             df_pkaani = df_pkaani.dropna()
@@ -1351,7 +1436,22 @@ class Measure(object):
 
         Returns
         -------
+        df_sasa : dataframe
+            Dataframe with information on chain, residue number and sasa output. Outline:
+            Chain   Resid   sasa
+            x       x       x
 
+        Example
+        -------
+        >> print(calculate_sasa(1ubq.pdb))
+        Chain  Resid  sasa
+        0     A      6   x
+        1     A     11   x
+        2     A     27   x
+        3     A     29   x
+        4     A     33   x
+        5     A     48   x
+        6     A     63   x
         '''
 
         try:
@@ -1426,7 +1526,42 @@ class Measure(object):
 
 
     def calculate_depth(self, path):
+        '''
+        Calculate the depth of the NZ atom from the surface of the protein within
+        the overall protein structure.
 
+        Method
+        ------
+        Identify all NZ atoms within the protein structure through biobox. Use the PDBparser
+        from biopython to calculate the surface of the protein. Loop over the identified positions
+        of all of the NZ atoms and use the residue_depth function contained in biopython
+        to extract the minimum distances from the surface for each of the lysines.
+
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that the depth of the lysines are being calculated for.
+
+        Returns
+        -------
+        df_depth : dataframe
+            Dataframe with information on chain, residue number and depth output. Outline:
+            Chain   Resid   depth
+            x       x       x
+
+        Example
+        -------
+        >> print(calculate_depth(1ubq.pdb))
+        Chain  Resid  depth
+        0     A      6   x
+        1     A     11   x
+        2     A     27   x
+        3     A     29   x
+        4     A     33   x
+        5     A     48   x
+        6     A     63   x
+        '''
         try:
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
@@ -1442,7 +1577,7 @@ class Measure(object):
 
 
         results = []
-        for i in range(len(pos)):
+        for i, coord in enumerate(pos):
             chain = M.data.loc[idx[i], ["chain"]].values[0]
             resid = M.data.loc[idx[i], ["resid"]].values[0]
             mychain = structure[0][chain]
@@ -1650,7 +1785,7 @@ class Measure(object):
             df_das['Resid'] = lys_res_nums
             df_das['das'] = das_output
         except Exception as e:
-            print(f'DAS Calcualtion: 3 - Failed to create datafame to append to the overall dataframe: {e}')
+            print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das
     
@@ -1859,6 +1994,7 @@ class Measure(object):
             with redirect_stdout(out_print_trap):
                 frust_struc = frustratometer.Structure(path)
                 model_single_resids = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
+            del out_print_trap
         except Exception as e:
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
             df_frustration['frustration'] = None
