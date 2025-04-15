@@ -420,7 +420,7 @@ class Analysis(object):
 
 
     # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
-    def remove_not_important_residues(self, req_resid_table):
+    def remove_not_important_residues(self, req_resid_table, outname='measures_cut.csv'):
         print('>> Removing unrequired residues')
         # duplicate the req_resid_table to allow to delete rows with testing
         test_table = req_resid_table
@@ -466,7 +466,7 @@ class Analysis(object):
         print(f'Original num of rows: {initial_full_data_rows}')
         print(f'Current num of rows: {final_full_data_rows}')
         print(f'Num of rows removed: {diff_rows}')
-        self.df.to_csv(os.path.join(self.outdir, "measures_cut.csv"), index_label=False, index=False)
+        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
     def subset(self, df, weight = 0.5, method = 'average', metrics=['propka', 'sasa', 'depth']):
 
