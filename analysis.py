@@ -18,12 +18,13 @@ from statsmodels.stats.multitest import multipletests
 #                    not pkaani, look into adding this in
 # TODO GW 13.09.24 - look into the GO term functions and see if these still actually
 #                    work with all the extra stuff added in
+# TODO GW 16.04.25 - removed dropna function on init, need to add in function which cleans the dataframe at the start instead. Dont want to blanket remove all null rows incase only null for some measurements and these arent being used
 
 
 class Analysis(object):
 
     def __init__(self, df,  outdir="result"):
-        self.df = df.dropna(subset=['propka', 'sasa'])
+        #self.df = df.dropna(subset=['propka', 'sasa'])
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
@@ -194,7 +195,9 @@ class Analysis(object):
 
         df_temp = self.df.drop_duplicates(subset=['Uniprot_Entry','Resid'])
         column_heads = list(self.df.columns.values)
-        potential_features = ['propka', 'pkaANI', 'depth', 'sasa', 'aev', 'das']
+        potential_features = ['propka', 'pkaANI', 'depth', 'sasa', 'aev', 'das', 'melodia', 'seqcharge',
+                              'frustration', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi',
+                              'psi', 'density']
         features_to_aggregate = [x for x in column_heads if x in potential_features]
 
         def calculate_stats(data, feature, df_query):
@@ -421,6 +424,28 @@ class Analysis(object):
 
     # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
     def remove_not_important_residues(self, req_resid_table, outname='measures_cut.csv'):
+        '''
+        Funciton to take the input file documenting which residues are required to
+        keep due to being of interest and remove anything from the dataframe that
+        isnt in this list. This is required due to the codebase calculating data
+        for every possible resid in the structure.
+
+        Method
+        ------
+        Extract the list of residues and taking data for these. Goes over the dataframe
+        and extracts any residues which are not present within the required residues.
+        Removes these from the dataframe and then writes a new dataframe with the
+        updated data.
+
+        Parameters
+        ----------
+        req_resid_table -> dataframe
+            Dataframe containing all the measured data inputted into the analysis class
+        
+        outname -> string
+            The name of the file to give in output for the new updated measures file.
+            Auto set to measures_cut.csv
+        '''
         print('>> Removing unrequired residues')
         # duplicate the req_resid_table to allow to delete rows with testing
         test_table = req_resid_table
