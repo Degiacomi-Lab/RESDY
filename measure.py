@@ -321,7 +321,7 @@ class Measure(object):
                 terminal_out_statements.append(f'Failed to produce bb for pdb file with error: {e}')
                 continue
 
-            _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+            _, idxs = M.atomselect("*", ["LYS", "LYE", "KCX"], ["CA"], get_index=True, use_resname=True)
             for i in idxs:
 
                 #save only lysine entries from chain of interest
@@ -651,24 +651,17 @@ class Measure(object):
                     self.wrong_pdb_file.append(f)
                     continue
 
-                df_idx, idxs_lys = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                df_idx, idxs = M.atomselect("*", ["LYS", "LYE", "KCX"], ["CA"], get_index=True, use_resname=True)
+                for i in idxs:
 
-                for i in idxs_lys:
+                    #save only lysine entries from chain of interest
+                    #if M.data["chain"].values[i] not in chains:
+                    #    continue
+
+
                     data = ({'PDB_Code': f.split(".")[0],
                         'Chain': M.data["chain"].values[i],
-                        'Resid': M.data["resid"].values[i],
-                        'Modified': False})
-
-                    df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                if self.include_modified:
-                    df_idx_lyn, idxs_lyn = M.atomselect('*', ['LYN'], ['CA'], get_index=True, use_resname=True)
-
-                    for i in idxs_lyn:
-                        data = ({'PDB_Code': f.split(".")[0],
-                            'Chain': M.data["chain"].values[i],
-                            'Resid': M.data["resid"].values[i],
-                            'Modified': True})
+                        'Resid': M.data["resid"].values[i]})
 
                         df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -1172,7 +1165,8 @@ class Measure(object):
             M.import_pdb(path, include_hetatm=True)
 
             #Find the coordinates and index of all lysine residues in the protein.
-            lys_coords, lys_idx = M.atomselect('*', ['LYS'], 'NZ', use_resname=True, get_index=True)
+            lys_coords, lys_idx = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)
+            df = M.data
 
             #Find the chain and resid number of each lysine.
             list_of_resid = list(M.data['resid'][lys_idx])
@@ -1216,7 +1210,7 @@ class Measure(object):
                 resid = list_of_resid[j]
 
                 #SASA is calculated for that lysine in the small molecule.
-                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
+                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ", "C03","C04","C05","C06","N07"],
                                             use_resname=False, get_index=True)
                 #print([pts_2, indx_2, S.data['radius']])
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
@@ -1264,17 +1258,7 @@ class Measure(object):
 
         try:
             M = bb.Molecule(path)
-            pos, idx_nz = M.atomselect("*", "LYS", "NZ", get_index=True)
-            lys_res_nums = list(M.data['resid'][idx_nz])
-            list_chains = list(M.data['chain'][idx_nz])
-            list_modified = [False] * len(idx_nz)
-
-            if self.include_modified:
-                coords_nz_lyn, idx_nz_lyn = M.atomselect('*', ['LYN'], ['NZ'], get_index=True, use_resname=True)
-                idx_nz.extend(idx_nz_lyn)
-                lys_res_nums.extend(list(M.data['resid'][idx_nz_lyn]))
-                list_chains.extend(list(M.data['chain'][idx_nz_lyn]))
-                list_modified.extend([True]*len(idx_nz_lyn))
+            pos, idx = M.atomselect("*", "*", ["NZ", 'N07'], get_index=True)
         except Exception as e:
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
@@ -1396,7 +1380,7 @@ class Measure(object):
                 temp_atom_species = S.data['atomtype']
                 temp_coords = S.coordinates[0]  # take the coords from the molecule read in through biobox
                 temp_structure = Atoms(temp_atom_species, temp_coords)
-                temp_idx_nz = S.atomselect("*", "LYS", "NZ", use_resname=True, get_index=True)[1]
+                temp_idx_nz = S.atomselect("*", ["LYS", "LYE", "KCX"], "NZ", use_resname=True, get_index=True)[1]
                 aevs = None
 
                 # 2.2: calculate the AEV for the subset of the protein and add this to the output dataframe
@@ -1479,7 +1463,7 @@ class Measure(object):
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             M = bb.Molecule(path)
-            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = [False] * len(idx_nz)
@@ -1565,7 +1549,7 @@ class Measure(object):
         # 1: Extract the overall sequence for the protein given
         try:
             M = bb.Molecule(path)
-            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
 
@@ -1629,6 +1613,141 @@ class Measure(object):
         return df_seqcharge
 
 
+    def calculate_melodia(self, path):
+        '''
+        Call the Melodia package to calculate data for the following structural features of
+        the lysines of interest within the structure: curvature, arc-length, phi, psi
+
+        Method
+        ------
+        Call melodia on the path of the pdb file that has been passed to the function and
+        create dataframe from the results. Process the dataframe to remove any of the 
+        calculated features that were not asked for.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that DAS is being calculated for.
+
+        Returns
+        -------
+        df_melodia : dataframe
+            Dataframe with information on chain, residue number and desired melodia output.
+            Outline for all features:
+            Chain   Resid   curvature   writhing    torsion   arc-length  phi psi
+            x           x           x          x          x            x    x   x
+
+        Example
+        -------
+        >> print(self.calculate_melodia(1ubq.pdb))
+        Chain   Resid    curvature  writhing    torsion  arc-length  phi psi
+        0
+        '''
+        # Melodia 1 - Calculating geometry using melodia-py
+        try:
+            melodia_results = mel.geometry_from_structure_file(path)
+            if isinstance(melodia_results, pd.Series):
+                melodia_results = melodia_results.to_frame().T
+
+        except Exception as e:
+            print(f'Melodia 1: Error processing input file - {path} with error: {e}')
+
+        # Melodia 2 - Formatting and filtering
+        try:
+            #melodia_results.rename({"chain": "Chain", "order": "Resid", "curvature": "melodia"}, axis="columns", inplace = True)
+            melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
+            melodia_results['name'].str.contains('LYS' or 'LYE' or 'KCX')
+            #lys_results = melodia_results['name'] == 'LYS'
+            #df_melodia = melodia_results[lys_results].copy()
+            melodia_results.reset_index(inplace=True, drop=True)
+            cols_to_drop = ['code', 'id', 'model', 'curvature', 'writhing', 'torsion', 'phi', 'psi', 'name', 'arc_length']
+            cols_to_drop = [col for col in cols_to_drop if col not in self.features]
+            melodia_results.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
+            df_melodia = melodia_results
+
+        except Exception as e:
+            print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
+
+        #print(df_melodia)
+        return df_melodia
+
+
+    def calculate_frustration(self, path):
+        '''
+        Use the Frustratometer package to identify the frustration metric for the lysines
+        of interest.
+
+        Method
+        ------
+        Load in protein structure into frustratometer before using AWSEM to create a model for
+        this with desired parameters. Use this model to calculate the 
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that DAS is being calculated for.
+
+        Returns
+        -------
+        df_frustration : dataframe
+            Dataframe with information on chain, residue number and desired output from Frustratometer.
+            Outline for all features:
+            Chain   Resid   frustration   density
+            x           x             x         x
+
+        Example
+        -------
+        >> print(self.calculate_frustration(1ubq.pdb))
+            PDB_Code    Chain   Resid   frustration     density
+        0       1ubq        A       6     -1.203796    4.006602
+        '''
+        # temp - modules required to add into readme - openmm, pdbfixer
+        # Frustratometer 1 - create structure and AWSEM model
+        df_frustration = pd.DataFrame()
+        try:
+            M = bb.Molecule(path)
+            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            lys_res_nums = list(M.data['resid'][idx_nz])
+            list_chains = list(M.data['chain'][idx_nz])
+            df_frustration['Chain'] = list_chains
+            df_frustration['Resid'] = lys_res_nums
+
+            # TODO would be good to surpress output to console here as logging the start unneccessarily
+            frust_struc = frustratometer.Structure(path)
+            model_single_resids = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
+        except Exception as e:
+            print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
+            df_frustration['frustration'] = None
+            df_frustration['density'] = None
+            return df_frustration
+        # Frustratometer 2 - use model to calculate outputs
+        try:
+            single_residue_awsem_frustration = model_single_resids.frustration(kind='singleresidue')
+            resid_densities = model_single_resids.rho_r
+        except Exception as e:
+            print(f'Frustratometer calculation 2 - failed to create frustratometer outputs: {e}')
+
+        # Frustration 3 - extract lysine values from the outputs and append to output dataframe
+        try:
+            lys_frustration = []
+            lys_density = []
+            for lys in lys_res_nums:
+                lys_frustration.append(single_residue_awsem_frustration[lys-1])
+                lys_density.append(resid_densities[lys-1])
+            df_frustration['frustration'] = lys_frustration
+            df_frustration['density'] = lys_density
+
+            try:
+                pdb_code = path.split('/')[-1]
+                cleaned_code_to_remove = pdb_code.split('.')[0] + '_cleaned.pdb'
+                os.remove(cleaned_code_to_remove)
+            except Exception as ef:
+                print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
+        except Exception as e:
+            print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
+
+        #print(df_frustration)
+        return df_frustration
 
 if __name__ == "__main__":
 
