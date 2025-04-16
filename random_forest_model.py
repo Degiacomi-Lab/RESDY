@@ -143,7 +143,8 @@ class Model(object):
         print([len(self.X_final[self.X_agg['class'] == 1]), len(self.X_final[self.X_agg['class'] == 0])])
         self.X_final = self.X_final.drop(['Uniprot_Entry', 'Resid', 'class'], axis=1)
         print(self.X_final.head())
-        self._reduce_aevs_after()
+        if 'aev' in self.features_to_include:
+            self._reduce_aevs_after()
         self._cut_columns()
 
         # create Y set - the classification set, 0 is negative, 1 is positive, positives go into the set first
@@ -265,6 +266,8 @@ class Model(object):
                 self._aggregate_avg_less_avgaev()
             case 'mixmatch':
                 self._aggregate_mixmatch()
+            case 'minmax':
+                self._aggregate_minmax()
             case _:
                 print('Aggregation method not recognised; using average values')
                 self._aggregate_avg()
@@ -482,8 +485,8 @@ class Model(object):
         '''
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        max_features = ['sasa', 'das']
-        min_features = ['propka', 'pkaANI', 'depth']
+        max_features = ['sasa', 'das', 'frustration', 'seqcharge', ]
+        min_features = ['propka', 'pkaANI', 'depth', 'density']
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
             resid = row['Resid']
@@ -553,6 +556,49 @@ class Model(object):
         else:
             self.X_agg = df_data_agg
 
+
+    def _aggregate_minmax(self):
+        '''
+        Aggregation method which will take the max and min values of the features and duplicate
+        the features to allow for this without having problems with the data overlapping and
+        biasing the output.
+        '''
+        print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
+        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
+        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        for idx, row in seperate_lys.iterrows():
+            entry = row['Uniprot_Entry']
+            resid = row['Resid']
+            class_val = row['class']
+            # create a subset of the dataframe of measurements where the uniprot and resid match
+            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
+            # calculate all the values of interest from the subset dataframe (df_query)
+            data = {'Uniprot_Entry': entry,
+                    'Resid' : resid,
+                    'class' : class_val}
+            for feature in self.features_to_include:
+                if feature == 'aev':
+                    list_aevs = df_query['aev'].tolist()
+                    aev_min = np.min(list_aevs, axis=0)
+                    data['aev'] = aev_min
+                else:
+                    temp_min = round(df_query[feature].min(),2)
+                    data[feature + '_min'] = temp_min
+                    temp_max = round(df_query[feature].max(),2)
+                    data[feature + '_max'] = temp_max
+
+            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
+
+        if 'aev' in self.features_to_include:
+            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
+            df_out = df_out.add_prefix('AEV_')
+            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
+            self.X_agg = self.X_agg.drop('aev', axis=1)
+            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
+            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
+        else:
+            self.X_agg = df_data_agg
+            self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
 
 
     # ------------------------------------------------------------------------------------
@@ -745,6 +791,7 @@ class Model(object):
 
 
         print(output)
+        self.avg_output = output.iloc[5].to_dict()
 
         if len(self.features_to_include) == 1 and 'aev' in self.features_to_include:
             self.graph_aev_importance(df_input_importance)
@@ -918,17 +965,47 @@ class Model(object):
         1  Num zero importance features    102
         '''
         sorted_df = df_input_importance.sort_values('Total', ascending=False)
+        self.sorted_df_importances = sorted_df['Total'].to_dict()
         index_positions = sorted_df.index.tolist()
         feature_pos = {}
         temp_features = dc(self.features_to_include)
-        temp_features.remove('aev')
+        if 'aev' in temp_features:
+            temp_features.remove('aev')
         for feature in temp_features:
             pos = index_positions.index(feature)
             feature_pos[f'{feature}_importance_rank'] = pos + 1
         zero_total_df = sorted_df[sorted_df['Total'] == 0]
         feature_pos['Num zero importance features'] = len(zero_total_df)
         feature_pos_df = pd.DataFrame(list(feature_pos.items()), columns=['Metric', 'Value'])
-        print(feature_pos_df)
+        print(feature_pos_df.sort_values('Value', ascending=True))
+
+
+    def multi_run_test(self, num_runs=1):
+        '''
+        Run the complete setup model multiple times to get an average of the results
+        including average importance rankings
+
+        Parameters
+        ----------
+        num_runs : int
+            The number of times to run the model
+
+        Example
+        -------
+        >> self.multi_run_test(num_runs=10)
+        '''
+        df_output = pd.DataFrame(columns=['Run', 'Accuracy', 'F1_Score', 'Precision', 'TN', 'FP', 'FN', 'TP', 'Sensitivity', 'Specificity'])
+        df_importance = pd.DataFrame()
+        for i in range(num_runs):
+            self.rf_five_fold_optimised()
+            df_output = pd.concat([df_output, pd.DataFrame([self.avg_output])], ignore_index=True)
+            df_importance = pd.concat([df_importance, pd.DataFrame([self.sorted_df_importances])], ignore_index=True)
+
+        df_output = df_output.drop(columns=['Run'])
+        df_output.loc['avg'] = df_output.mean()
+        df_importance.loc['avg'] = df_importance.mean()
+        print(df_output)
+        print(df_importance.T.sort_values('avg', ascending=False))
 
 
 # --------------------------------------------------------------------------------------------------
@@ -943,16 +1020,19 @@ if __name__ == "__main__":
                         'data/measures_cut_Synecho(hCit)_all_2.csv']
     #pos_measure_files = ['data/measures_cut_Synecho(hCit)_all_2.csv']
     neg_measure_files = ['data/measures_cut_KingAllNegative_all.csv']
-    features_to_include = ['aev']
+    pos_measure_files = ['April25_posOnly.csv']
+    neg_measure_files = ['April25_negONLY.csv']
+    features_to_include = ['propka', 'sasa', 'das', 'depth', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
     model = Model(pos_measures_files=pos_measure_files,
                 neg_measures_files=neg_measure_files,
                 features_to_include=features_to_include,
-                aggregation_method='min',
+                aggregation_method='minmax',
                 subtract_avg_aev=False,
                 num_aev_features_req=100)
     model.prepare_dataset()
     #print(model.X_final)
 
     #model.rf_ubq_test()
-    model.rf_five_fold()
-    model.rf_five_fold_optimised()
+    #model.rf_five_fold()
+    #model.rf_five_fold_optimised()
+    model.multi_run_test(num_runs=10)
