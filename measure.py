@@ -1834,10 +1834,35 @@ class Measure(object):
             list_chains = list(M.data['chain'][idx_nz])
 
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
-            sequence = ''.join([protein_letters_3to1_extended[a.capitalize()] for a in list(M.data['resname'][c_alpha_idxs])])
+
+            # TODO GW 16.04.25 - eventually will need to add in ability to use  letter codes and charges
+            #                    for the 3 lettter cases rather than the 1 letter cases which when using
+            #                    modified residues may run into problems
+
+            protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
+                                    'CYS': 'C', 'GLU': 'E', 'GLN': 'Q', 'GLY': 'G',
+                                    'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
+                                    'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S',
+                                    'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V',
+                                    'HIE': 'H', 'HID': 'H', 'HIP': 'H', 'LYN': 'K',
+                                    'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
+                                    'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
+                                    'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
+                                    }
+
+            def _catch(func, *args, handle=lambda e : e, **kwargs):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    print(f"Could not convert {e} to a 1 letter code: using 'X' instead")
+                    return 'X'
+
+            sequence = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(M.data['resname'][c_alpha_idxs])])
+
 
         except Exception as e:
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
+            return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
         # 2: Extract local sequences based on the overall chain, calculate charge score and add to output
         seqcharge_output = []
