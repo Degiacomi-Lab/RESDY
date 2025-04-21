@@ -201,7 +201,7 @@ class Analysis(object):
         column_heads = list(self.df.columns.values)
         potential_features = ['propka', 'pkaANI', 'depth', 'sasa', 'aev', 'das', 'melodia', 'seqcharge',
                               'frustration', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi',
-                              'psi', 'density']
+                              'psi', 'density', 'legolas']
         features_to_aggregate = [x for x in column_heads if x in potential_features]
 
         def calculate_stats(data, feature, df_query):

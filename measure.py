@@ -11,14 +11,11 @@ from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
-from Bio.Data.IUPACData import protein_letters_3to1_extended
-import frustratometer
 import pandas as pd
 import numpy as np
 import biobox as bb
-import melodia_py as mel
 import matplotlib.pyplot as plt
-import dill
+#import dill
 
 
 # AEV packages
@@ -34,6 +31,18 @@ try:
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
 except Exception as e:
     print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
+
+# Frustration packages
+try:
+    import frustratometer
+except Exception as e:
+    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
+
+# Melodia packages
+try:
+    import melodia_py as mel
+except Exception as e:
+    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
 
 class Measure(object):
@@ -64,7 +73,8 @@ class Measure(object):
         features -> list
             The list of measurements that you wish to use on the given structures. Select which
             of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth', 'aev',
-            'das', 'seqcharge'.
+            'das', 'seqcharge', 'melodia', 'frustration', 'density', 'legolas', 'writhing',
+            'curvature', 'torsion', 'arc_length', 'phi', 'psi'
         parallel -> bool
             Option to run the measurements in parallel.
         include_modified -> bool
@@ -116,6 +126,8 @@ class Measure(object):
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
 
+        self.legolas_loc = '/home/gweston/Documents/extra_packages/legolas-main/test'
+
         # Check that all files in DataFrame appear at least once in folder
         # find all AlphaFold entries
         files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
@@ -164,6 +176,8 @@ class Measure(object):
                 self.measures.append([m, self.calculate_das])
             elif m == 'seqcharge':
                 self.measures.append([m, self.calculate_seqcharge])
+            elif m == 'legolas':
+                self.measures.append([m, self.calculate_legolas])
             elif m in ['frustration', 'density']:
                 if not frustration_added:
                     self.measures.append(['frustration', self.calculate_frustration])
@@ -2053,6 +2067,80 @@ class Measure(object):
 
         #print(df_frustration)
         return df_frustration
+
+
+    def calculate_legolas(self, path):
+        '''
+        Calculate 15N nmr data using legolas
+        
+        Method
+        ------
+        Use biobox to extract the positions of the lysines within the the protein
+        structure given in the path. Then change directory to the path of legolas
+        and run legolas.py on the desired protein structure.
+
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that legolas is being calculated for.
+        
+        Example
+        -------
+        >> print(self.calculate_legolas(1ubq.pdb))
+            Chain  Resid  legolas
+        0     A      6   x
+        '''
+
+        # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
+        try:
+            M = bb.Molecule(path)
+            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            lys_res_nums = list(M.data['resid'][idx_nz])
+            list_chains = list(M.data['chain'][idx_nz])
+            modified_struc = False
+            if 'HIE' in list(M.data['resname']):
+                print('modifying the structure to change HIE to HIS')
+                M.data.loc[M.data['resname'] == 'HIE', 'resname'] = 'HIS'
+                M.write_pdb('temp_legolas.pdb')
+                modified_struc = True
+        except Exception as e:
+            print(f'Legolas: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
+
+        # 2: change location to legolas directory and run the legolas program on the specified pdb before changing back to working directory
+        try:
+            if modified_struc:
+                pdb_absolute_path = 'temp_legolas.pdb'
+                result_filename = 'temp_legolas_cs.csv'
+            else:
+                pdb_absolute_path = os.path.join(os.getcwd(), path)
+                result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'
+            legolas_prog = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
+            subprocess.run(['python', legolas_prog, pdb_absolute_path, '-atype', 'N'])
+            df_nmr = pd.read_csv(result_filename)
+            nmr_results_list = list(df_nmr['CHEMICAL_SHIFT'])
+            lys_nmr_vals = []
+            for idx in lys_res_nums:
+                lys_nmr_vals.append(nmr_results_list[idx])
+            os.remove(result_filename)
+            os.remove(result_filename.split('.')[0] + '.parquet')
+            if modified_struc:
+                os.remove('temp_legolas.pdb')
+
+        except Exception as e:
+            print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
+
+        # 3: Create dataframe to return
+        df_legolas = pd.DataFrame(columns=["Chain", "Resid", "legolas"])
+        try:
+            df_legolas['Chain'] = list_chains
+            df_legolas['Resid'] = lys_res_nums
+            df_legolas['legolas'] = lys_nmr_vals
+        except Exception as e:
+            print(f'Legolas: 3 - Failed to create datafame to append to the overall dataframe: {e}')
+
+        return df_legolas
 
 if __name__ == "__main__":
 

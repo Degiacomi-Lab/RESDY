@@ -136,6 +136,12 @@ There are different requirements for the methods for calculating different featu
             <td>pdbfixer</td>
             <td><a href="https://anaconda.org/conda-forge/pdbfixer">anaconda</a></td>
         </tr>
+        <tr>
+            <td>15N nmr shift<br></td>
+            <td>Legolas</td>
+            <td><a href="https://github.com/roitberg-group/legolas">Legolas</a></td>
+            <td>Follow instructions in the <a href="https://github.com/roitberg-group/legolas">GitHub repo</a> for Legolast to install. Then update the path within measures.py function for this to point to the correct location.</td>
+        </tr>
     </tbody>
 </table>
 </div>
