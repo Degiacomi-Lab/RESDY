@@ -2093,7 +2093,6 @@ class Measure(object):
             Chain  Resid  legolas
         0     A      6   x
         '''
-        # TODO GW 21.04.25 - add in the ability to check if legolas has previously been run on the file
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
