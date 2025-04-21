@@ -101,6 +101,10 @@ class Measure(object):
 
             self.logger.addHandler(handler)
 
+        self.outdir = outdir
+        self.df_input = df_input
+        self.folder = os.path.join(outdir, "curated")
+
         self.features = features
         self._setup_measures(features)
         pd.set_option("display.max_columns", None)
@@ -121,10 +125,6 @@ class Measure(object):
         self.parallel = parallel
         self.files_to_analyse = []
         self.parallel_items = {}
-
-        self.outdir = outdir
-        self.df_input = df_input
-        self.folder = os.path.join(outdir, "curated")
 
         self.legolas_loc = '/home/gweston/Documents/extra_packages/legolas-main/test'
 
@@ -178,6 +178,9 @@ class Measure(object):
                 self.measures.append([m, self.calculate_seqcharge])
             elif m == 'legolas':
                 self.measures.append([m, self.calculate_legolas])
+                self.legolas_output_path = os.path.join(self.outdir, 'legolas')
+                if not os.path.exists(self.legolas_output_path):
+                    os.mkdir(self.legolas_output_path)
             elif m in ['frustration', 'density']:
                 if not frustration_added:
                     self.measures.append(['frustration', self.calculate_frustration])
@@ -2090,6 +2093,7 @@ class Measure(object):
             Chain  Resid  legolas
         0     A      6   x
         '''
+        # TODO GW 21.04.25 - add in the ability to check if legolas has previously been run on the file
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
@@ -2097,12 +2101,19 @@ class Measure(object):
             idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            result_filename = os.path.join(self.legolas_output_path, path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv')
+            if os.path.exists(result_filename):
+                already_exists = True
+                print(f'Legolas: The file {result_filename} already exists, using this file')
+            else:
+                already_exists = False
             modified_struc = False
-            if 'HIE' in list(M.data['resname']):
-                print('modifying the structure to change HIE to HIS')
-                M.data.loc[M.data['resname'] == 'HIE', 'resname'] = 'HIS'
-                M.write_pdb('temp_legolas.pdb')
-                modified_struc = True
+            if not already_exists:
+                if 'HIE' in list(M.data['resname']):
+                    print('modifying the structure to change HIE to HIS')
+                    M.data.loc[M.data['resname'] == 'HIE', 'resname'] = 'HIS'
+                    M.write_pdb('temp_legolas.pdb')
+                    modified_struc = True
         except Exception as e:
             print(f'Legolas: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
@@ -2115,17 +2126,24 @@ class Measure(object):
             else:
                 pdb_absolute_path = os.path.join(os.getcwd(), path)
                 result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'
-            legolas_prog = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
-            subprocess.run(['python', legolas_prog, pdb_absolute_path, '-atype', 'N'])
+            if not already_exists:
+                legolas_prog = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
+                subprocess.run(['python', legolas_prog, pdb_absolute_path, '-atype', 'N'])
+            else:
+                result_filename = os.path.join(self.legolas_output_path, result_filename)
             df_nmr = pd.read_csv(result_filename)
             nmr_results_list = list(df_nmr['CHEMICAL_SHIFT'])
             lys_nmr_vals = []
             for idx in lys_res_nums:
                 lys_nmr_vals.append(nmr_results_list[idx])
-            os.remove(result_filename)
-            os.remove(result_filename.split('.')[0] + '.parquet')
-            if modified_struc:
-                os.remove('temp_legolas.pdb')
+            #os.remove(result_filename)
+            if not already_exists:
+                os.remove(result_filename.split('.')[0] + '.parquet')
+                os.rename(result_filename, path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv')
+                result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'
+                shutil.move(result_filename, self.legolas_output_path)
+                if modified_struc:
+                    os.remove('temp_legolas.pdb')
 
         except Exception as e:
             print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
