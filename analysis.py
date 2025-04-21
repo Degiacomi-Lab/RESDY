@@ -23,8 +23,12 @@ from statsmodels.stats.multitest import multipletests
 
 class Analysis(object):
 
-    def __init__(self, df,  outdir="result"):
+    def __init__(self, df, outdir="result", features_to_analyse = []):
         #self.df = df.dropna(subset=['propka', 'sasa'])
+        if features_to_analyse == []:
+            self.df = df
+        else:
+            self.df = df.dropna(subset=features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
