@@ -18,12 +18,17 @@ from statsmodels.stats.multitest import multipletests
 #                    not pkaani, look into adding this in
 # TODO GW 13.09.24 - look into the GO term functions and see if these still actually
 #                    work with all the extra stuff added in
+# TODO GW 16.04.25 - removed dropna function on init, need to add in function which cleans the dataframe at the start instead. Dont want to blanket remove all null rows incase only null for some measurements and these arent being used
 
 
 class Analysis(object):
 
-    def __init__(self, df,  outdir="result"):
-        self.df = df.dropna(subset=['propka', 'sasa'])
+    def __init__(self, df, outdir="result", features_to_analyse = []):
+        #self.df = df.dropna(subset=['propka', 'sasa'])
+        if features_to_analyse == []:
+            self.df = df
+        else:
+            self.df = df.dropna(subset=features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
@@ -194,7 +199,9 @@ class Analysis(object):
 
         df_temp = self.df.drop_duplicates(subset=['Uniprot_Entry','Resid'])
         column_heads = list(self.df.columns.values)
-        potential_features = ['propka', 'pkaANI', 'depth', 'sasa', 'aev', 'das']
+        potential_features = ['propka', 'pkaANI', 'depth', 'sasa', 'aev', 'das', 'melodia', 'seqcharge',
+                              'frustration', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi',
+                              'psi', 'density', 'legolas']
         features_to_aggregate = [x for x in column_heads if x in potential_features]
 
         def calculate_stats(data, feature, df_query):
@@ -327,8 +334,122 @@ class Analysis(object):
         print(f'Current num of rows: {len_two}')
         print(f'Num of rows removed: {len(df_to_remove)}')
 
+
+    def add_extra_measures(self, new_measure_filename, write_new_file = False, out_filename='measures_new.csv'):
+        '''
+        Function to add in extra measurements to the measures frame that has been
+        autoloaded into the analysis class on defining this. This will match up the
+        measurements in each case and hold in for the analysis. A new measures file
+        will be written with the new filename that has been passed into the function.
+
+        Parameters
+        ----------
+        new_measure_filename -> string
+            The name of the new measures file written of the combination of both
+            measures dataframe.
+        
+        write_new_file -> bool
+            True/False option for writing a new measures.csv file when the new data
+            has been added in. Auto set to False. 
+
+        out_filename -> string
+            The name of the new measures.csv file that you want to be produced. Auto
+            set to be measures_new.csv
+        '''
+
+        # Step 1: read in new dataframe, extract column names, check for overlap and
+        #         deal if is, otherwise add new column in
+        try:
+            new_df = pd.read_csv(new_measure_filename)
+            print(new_df)
+            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
+            new_measures_columns = [a for a in new_df.columns if a not in base_columns]
+            overlap_columns = [a for a in new_measures_columns if a in orig_measures_columns]
+            new_nonoverlap_columns = [a for a in new_measures_columns if a not in orig_measures_columns]
+            for column in overlap_columns:
+                proper_answer = False
+                print(f'Measurement {column} already present in the loaded dataframe, do you want to replace it?')
+
+                while not proper_answer:
+                    col_to_keep = input('Enter old or new for data to keep: ')
+                    match col_to_keep.lower():
+                        case 'new':
+                            print(f'Keeping new measurements for {column}')
+                            for i, r in self.df.iterrows():
+
+                                protein_code = r['PDB_Code']
+                                chain_value = r["Chain"]
+                                resid_value = r["Resid"]
+
+                                idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                                if len(idx[0]) == 0:
+                                    continue
+
+                                # account for measurements that have special cases
+                                # aevs - add the list of aevs in one column to the overall dataframe
+                                if column == 'aev':
+                                    self.df['aev'] = self.df['aev'].astype('object')
+                                else:
+                                    self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                            proper_answer = True
+                        case 'old':
+                            print(f'Keeping old measurements for {column}')
+                            proper_answer = True
+                        case _:
+                            print(f'{col_to_keep} was not recognised')
+            
+            for column in new_nonoverlap_columns:
+                for i, r in self.df.iterrows():
+
+                    protein_code = r['PDB_Code']
+                    chain_value = r["Chain"]
+                    resid_value = r["Resid"]
+
+                    idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                    if len(idx[0]) == 0:
+                        continue
+
+                    # account for measurements that have special cases
+                    # aevs - add the list of aevs in one column to the overall dataframe
+                    if column == 'aev':
+                        self.df['aev'] = self.df['aev'].astype('object')
+                    else:
+                        self.df.at[i, column] = new_df.loc[idx[0][0], column]
+
+        except Exception as e:
+            print(f'Failed to load in the new measures dataframe (name: {new_measure_filename}), error: {e}')
+
+
+        # Step 2: write new measures.csv file if required
+        if write_new_file:
+            self.df.to_csv(out_filename)
+
+
     # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
-    def remove_not_important_residues(self, req_resid_table):
+    def remove_not_important_residues(self, req_resid_table, outname='measures_cut.csv'):
+        '''
+        Funciton to take the input file documenting which residues are required to
+        keep due to being of interest and remove anything from the dataframe that
+        isnt in this list. This is required due to the codebase calculating data
+        for every possible resid in the structure.
+
+        Method
+        ------
+        Extract the list of residues and taking data for these. Goes over the dataframe
+        and extracts any residues which are not present within the required residues.
+        Removes these from the dataframe and then writes a new dataframe with the
+        updated data.
+
+        Parameters
+        ----------
+        req_resid_table -> dataframe
+            Dataframe containing all the measured data inputted into the analysis class
+        
+        outname -> string
+            The name of the file to give in output for the new updated measures file.
+            Auto set to measures_cut.csv
+        '''
         print('>> Removing unrequired residues')
         # duplicate the req_resid_table to allow to delete rows with testing
         test_table = req_resid_table
@@ -374,7 +495,7 @@ class Analysis(object):
         print(f'Original num of rows: {initial_full_data_rows}')
         print(f'Current num of rows: {final_full_data_rows}')
         print(f'Num of rows removed: {diff_rows}')
-        self.df.to_csv(os.path.join(self.outdir, "measures_cut.csv"), index_label=False, index=False)
+        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
     def subset(self, df, weight = 0.5, method = 'average', metrics=['propka', 'sasa', 'depth']):
 
