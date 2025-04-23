@@ -2090,8 +2090,14 @@ class Measure(object):
         Example
         -------
         >> print(self.calculate_legolas(1ubq.pdb))
-            Chain  Resid  legolas
-        0     A      6   x
+                             PDB_Code   Chain  Resid   legolas
+        0     data/curated/1UBQ-alt-1       A      6   121.614
+        1     data/curated/1UBQ-alt-1       A     11   121.192
+        2     data/curated/1UBQ-alt-1       A     27   118.507
+        3     data/curated/1UBQ-alt-1       A     29   119.557
+        4     data/curated/1UBQ-alt-1       A     33   117.238
+        5     data/curated/1UBQ-alt-1       A     48   119.989
+        6     data/curated/1UBQ-alt-1       A     63   121.946
         '''
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
@@ -2134,7 +2140,7 @@ class Measure(object):
             nmr_results_list = list(df_nmr['CHEMICAL_SHIFT'])
             lys_nmr_vals = []
             for idx in lys_res_nums:
-                lys_nmr_vals.append(nmr_results_list[idx])
+                lys_nmr_vals.append(nmr_results_list[(idx - 1)])
             #os.remove(result_filename)
             if not already_exists:
                 os.remove(result_filename.split('.')[0] + '.parquet')
