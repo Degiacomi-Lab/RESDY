@@ -221,6 +221,8 @@ class Measure(object):
             case (True, True):
                 # PDB only and parallel
                 print('This setup does not currently have a method, please change the setup')
+        
+        self._cleanup_calculation_files()
 
 
     def save_state(self, outname="measures.csv"):
@@ -1166,6 +1168,25 @@ class Measure(object):
         print('Data recovered from log file')
         print(f'Numer of measurements read: {len(log_to_df)}')
         return log_to_df
+
+
+    def _cleanup_calculation_files(self):
+        '''
+        Function to remove any temporary or result files created through the calculation
+        of the measurements within this class. While all are meant to have been moved
+        at the time of calculation, occasionally this fails and leaves some behind.
+        Note: please add specific subprocesses if need to add extra cleanup items into
+        this function.
+
+        Method
+        ------
+        Call subprocess calls to move specific sets of files to a specific directory.
+
+        Example
+        -------
+        >> M._cleanup_calculation_files()
+        '''
+        subprocess.run((['mv', '*_cs.csv', '*_cs.parquet', os.getcwd() + os.sep + 'legolas' + os.sep],), shell=True, check=False)
 
 
     def calculate_pka_propka(self, path):
