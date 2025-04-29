@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import glob
 import time
+from datetime import date
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -49,7 +50,7 @@ class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
-                 parallel=True, include_modified=False):
+                 parallel=False, include_modified=False, report_errors= True):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -83,6 +84,10 @@ class Measure(object):
             If True, lysines of types 'LYN' will be included in the measurements as well as all
             'LYS' residues. In either case, a column will be included stating if the measured
             residue is a modified one.
+        report_errors -> bool
+            Option to record any of the protein files which are giving errors when measures
+            calculations are being performed. This will write the file and the error to a separate
+            text document labelled "measures_errors_{date}.txt".
 
         '''
         self.activate_log = False
@@ -117,6 +122,19 @@ class Measure(object):
 
         # document failed pdb files
         self.wrong_pdb_file = []
+        self.report_errors = report_errors
+        if report_errors:
+            new_file_name = f'meaures_errors_{date.today()}.txt'
+            while os.path.exists(new_file_name):
+                if '_no' in new_file_name:
+                    error_file_num = int(new_file_name.split('_no')[-1].split('.')[0])
+                    new_file_name = f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt'
+                else:
+                    new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
+            with open(new_file_name, 'w') as error_f1:
+                error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
+        self.error_filename = new_file_name
+        print(self.error_filename)
 
         # modified lysine management
         self.include_modified = include_modified
@@ -223,6 +241,32 @@ class Measure(object):
                 print('This setup does not currently have a method, please change the setup')
         
         self._cleanup_calculation_files()
+
+
+    def _report_error_to_file(self, measurement_stage, path, error):
+        '''
+        Helper function to remove redundant code writing errors in the measurements to the
+        measurement error log file.
+        
+        Parameters
+        ----------
+        measurement_stage -> string
+            The stage of measurements that has caused the error with the file, eg propka 1
+        path -> string
+            The path of the pdb file that the measurement has been attempted on
+        error -> string
+            The error that has been produced at that step of the measurement when it has been
+            attempted to extract features from the pdb file
+        
+        Example
+        -------
+        self._report_error_to_file('propka 1', path, e)
+        '''
+        with open(self.error_filename, 'a') as e_f:
+            e_f.writelines('--------------------------------------------------------------------------\n')
+            e_f.writelines(f'{measurement_stage} calc error\n')
+            e_f.writelines(path + '\n')
+            e_f.writelines(error + '\n')
 
 
     def save_state(self, outname="measures.csv"):
@@ -1186,7 +1230,28 @@ class Measure(object):
         -------
         >> M._cleanup_calculation_files()
         '''
-        subprocess.run((['mv', '*_cs.csv', '*_cs.parquet', os.getcwd() + os.sep + 'legolas' + os.sep],), shell=True, check=False)
+        dir_files = [f for f in os.listdir() if os.path.isfile(os.path.join(os.getcwd(),f))]
+        nmr_cs_file = False
+        nmr_parquet_file = False
+        propka_pka_file = False
+        propka_error_file = False
+        for f in dir_files:
+            if f.endswith('_cs.csv'):
+                nmr_cs_file = True
+            elif f.endswith('_cs.parquet'):
+                nmr_parquet_file = True
+            elif f.endswith('.pka'):
+                propka_pka_file = True
+            elif f.endswith('_propka_errors.txt'):
+                propka_error_file = True
+        if nmr_cs_file:
+            subprocess.run(f'mv *_cs.csv {self.outdir}{os.sep}legolas{os.sep}', shell=True, check=False)
+        if nmr_parquet_file:
+            subprocess.run(f'mv *_cs.parquet {self.outdir}{os.sep}legolas{os.sep}', shell=True, check=False)
+        if propka_pka_file:
+            subprocess.run(f'mv *.pka {self.outdir}{os.sep}propkaoutput{os.sep}', shell=True, check=False)
+        if propka_error_file:
+            subprocess.run(f'mv *_propka_errors.txt {self.outdir}{os.sep}propkaoutput{os.sep}', shell=True, check=False)
 
 
     def calculate_pka_propka(self, path):
@@ -1246,17 +1311,20 @@ class Measure(object):
                 except:
                     pass
 
+                if self.report_errors: self._report_error_to_file('PROPKA 1', path, str(e))
                 raise Exception(f'Failed to obtain pKa data (PROPKA): {e}') from e
 
         try:
             propka_lys_fails = self._parse_propka_errors(error_file_name)
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('PROPKA 2', path, str(e))
             raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
 
         try:
             pkafile = code_for_df + '.pka'
             propres = open(pkafile)
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('PROPKA 3', path, str(e))
             raise Exception(f'Failed to find {pkafile} output file to read') from e
 
         lys_number = list()
@@ -1282,6 +1350,7 @@ class Measure(object):
                         pkas.append(float(line[2]))
 
                     except Exception as e:
+                        if self.report_errors: self._report_error_to_file('PROPKA 4', path, str(e))
                         print(f"> Error {e}")
                         continue
 
@@ -1291,6 +1360,7 @@ class Measure(object):
         except Exception as e:
             propres.close()
             shutil.move(pkafile, os.path.join(self.pkaoutdir, pkafile))
+            if self.report_errors: self._report_error_to_file('PROPKA 5', path, str(e))
             raise Exception(f'Failure parsing {code_for_df}.pka, error: {e}') from e
 
         try:
@@ -1303,6 +1373,7 @@ class Measure(object):
             df_propka = df_propka.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
 
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('PROPKA 6', path, str(e))
             raise Exception(f'Failed to construct pKa (PROPKA) dataframe. {e}') from e
 
         return df_propka
@@ -1414,14 +1485,17 @@ class Measure(object):
             except Exception as e:
                 print(e)
                 if "[Errno 2] No such file or directory: 'pkaani'" == str(e):
+                    if self.report_errors: self._report_error_to_file('pkaANI 1', path, str(e))
                     raise Exception(f'Error: Failed to obtain pkaANI data: {e}. Is pkaANI installed correctly? If so, reload environment and try again.')
                 else:
+                    if self.report_errors: self._report_error_to_file('pkaANI 1', path, str(e))
                     raise Exception(f"Failed to obtain pkaANI data through running pkaANI, error: {e}")
 
         try:
             log_file = pdb_path + '_pka.log'
             propres = open(log_file)
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('pkaANI 2', path, str(e))
             raise Exception(f'Failed to find pkaANI log file: {e}') from e
 
         lys_number = []
@@ -1440,6 +1514,7 @@ class Measure(object):
             propres.close()
         except Exception as e:
             propres.close()
+            if self.report_errors: self._report_error_to_file('pkaANI 3', path, str(e))
             raise Exception(f'Failure parsing pkaANI log file for: {code_for_df}_pka.log. {e}') from e
 
         try:
@@ -1451,6 +1526,7 @@ class Measure(object):
             df_pkaani = df_pkaani.dropna()
             df_pkaani = df_pkaani.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('pkaANI 4', path, str(e))
             raise Exception(f'Failed to construct pkaANI dataframe, error: {e}') from e
 
         return df_pkaani
@@ -1514,6 +1590,7 @@ class Measure(object):
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('SASA 1', path, str(e))
             raise Exception(f'SASA calc error: {e}') from e
 
         #For each lysine it works out the distance between the lys NZ,
@@ -1547,8 +1624,9 @@ class Measure(object):
                 list_of_sasa.append(x[0])
 
             except:
-                print('Error obtaining SASA at index value ' + str(j))
+                print(f'Error obtaining SASA at index value {str(j)}')
                 list_of_sasa.append(None)
+                if self.report_errors: self._report_error_to_file('Depth 1', path, f'Error obtaining SASA at index value {str(j)}')
                 continue
 
         #append results to a df which is given as output
@@ -1558,6 +1636,7 @@ class Measure(object):
                                 'sasa': list_of_sasa})
 
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('SASA 3', path, str(e))
             raise Exception(f'Error obtaining SASA data. {e}')
 
         return df_sasa
@@ -1604,6 +1683,7 @@ class Measure(object):
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Depth 1', path, str(e))
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
         try:
@@ -1611,6 +1691,7 @@ class Measure(object):
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Depth 2', path, str(e))
             raise Exception(f">> DEPTH error: could not get biopython structure - {e}")
 
 
@@ -1624,6 +1705,7 @@ class Measure(object):
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
             except Exception as e:
+                if self.report_errors: self._report_error_to_file('Depth 3', path, str(e))
                 raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
 
             results.append([chain, resid, rd])
@@ -1682,6 +1764,7 @@ class Measure(object):
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('AEV 1', path, str(e))
             print(f'AEV Calculations: 1 - could not create atomic structure representation: {e}')
             return
 
@@ -1724,6 +1807,7 @@ class Measure(object):
                     aevs = aevs[0,lys_nz_location,:]
                     aevs = aevs.tolist()
                 except Exception as e:
+                    if self.report_errors: self._report_error_to_file('AEV 1.1', path, str(e))
                     print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}, error: {e}')
 
                 # 2.3: Append the new AEV to the output dataframe
@@ -1733,13 +1817,16 @@ class Measure(object):
         except torch.cuda.OutOfMemoryError:
             # potential that calculating the AEVs could overload the gpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CUDA memory error with file: {path}, skipping')
+            if self.report_errors: self._report_error_to_file('AEV 2', path, 'CUDA memory error with file')
             return df_aevs
         except MemoryError:
             # potential that calculating the AEVs could overload the cpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CPU memory error with file: {path}, skipping')
+            if self.report_errors: self._report_error_to_file('AEV 2', path, 'CPU memory error with file')
             return df_aevs
         except Exception as e:
             print(f'AEV Calculations: 2 - could not create the AEVs for the protein for protein {path}, error: {e}')
+            if self.report_errors: self._report_error_to_file('AEV 2', path, str(e))
             return df_aevs
 
         # 4: if everything has worked, return the dataframe with the AEVs for the protein
@@ -1794,6 +1881,7 @@ class Measure(object):
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('DAS 1', path, e)
             print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
 
         # 2: Setup the Xlink module and create the half spheres
@@ -1801,6 +1889,7 @@ class Measure(object):
             XL = bb.Xlink(M)
             das_output = []
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('DAS 2', path, str(e))
             print(f'DAS Calculation: 2 - Failed to setup the Xlink biobox class: {e}')
 
         for i, lys_nz_idx in enumerate(idx_nz):
@@ -1813,6 +1902,7 @@ class Measure(object):
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))
             except Exception as e:
+                if self.report_errors: self._report_error_to_file('DAS 2', path, str(e))
                 print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms on lysine no {lys_res_nums[i]}: {e}')
                 das_output.append(None)
 
@@ -1823,6 +1913,7 @@ class Measure(object):
             df_das['Resid'] = lys_res_nums
             df_das['das'] = das_output
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('DAS 3', path, str(e))
             print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das
@@ -1899,6 +1990,7 @@ class Measure(object):
 
 
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Seqcharge 1', path, str(e))
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
             return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
@@ -1940,6 +2032,7 @@ class Measure(object):
                 seqcharge_output.append(count)
 
             except Exception as e:
+                if self.report_errors: self._report_error_to_file('Seqcharge 2', path, str(e))
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_res_idx}, error: {e}')
                 seqcharge_output.append(None)
 
@@ -1950,6 +2043,7 @@ class Measure(object):
             df_seqcharge['Resid'] = lys_res_nums
             df_seqcharge['seqcharge'] = seqcharge_output
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Seqcharge 3', path, str(e))
             print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         #print(df_seqcharge)
@@ -1993,6 +2087,7 @@ class Measure(object):
                 melodia_results = melodia_results.to_frame().T
 
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Melodia 1', path, str(e))
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
 
         # Melodia 2 - Formatting and filtering
@@ -2007,6 +2102,7 @@ class Measure(object):
             df_melodia.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
 
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Melodia 2', path, str(e))
             print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
 
         #print(df_melodia)
@@ -2062,12 +2158,15 @@ class Measure(object):
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
             df_frustration['frustration'] = None
             df_frustration['density'] = None
+            if self.report_errors: self._report_error_to_file('Frustratometer 1', path, str(e))
             return df_frustration
+
         # Frustratometer 2 - use model to calculate outputs
         try:
             single_residue_awsem_frustration = model_single_resids.frustration(kind='singleresidue')
             resid_densities = model_single_resids.rho_r
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Frustratometer 2', path, str(e))
             print(f'Frustratometer calculation 2 - failed to create frustratometer outputs: {e}')
 
         # Frustration 3 - extract lysine values from the outputs and append to output dataframe
@@ -2087,6 +2186,7 @@ class Measure(object):
             except Exception as ef:
                 print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('Frustratometer 3', path, str(e))
             print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
 
         #print(df_frustration)
@@ -2142,6 +2242,7 @@ class Measure(object):
                     modified_struc = True
         except Exception as e:
             print(f'Legolas: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
+            if self.report_errors: self._report_error_to_file('LEGOLAS 1', path, str(e))
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
 
         # 2: change location to legolas directory and run the legolas program on the specified pdb before changing back to working directory
@@ -2173,6 +2274,7 @@ class Measure(object):
 
         except Exception as e:
             print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
+            if self.report_errors: self._report_error_to_file('LEGOLAS 2', path, str(e))
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
 
         # 3: Create dataframe to return
@@ -2182,6 +2284,7 @@ class Measure(object):
             df_legolas['Resid'] = lys_res_nums
             df_legolas['legolas'] = lys_nmr_vals
         except Exception as e:
+            if self.report_errors: self._report_error_to_file('LEGOLAS 3', path, str(e))
             print(f'Legolas: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_legolas
