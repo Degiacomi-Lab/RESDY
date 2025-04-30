@@ -1252,6 +1252,13 @@ class Measure(object):
             subprocess.run(f'mv *.pka {self.outdir}{os.sep}propkaoutput{os.sep}', shell=True, check=False)
         if propka_error_file:
             subprocess.run(f'mv *_propka_errors.txt {self.outdir}{os.sep}propkaoutput{os.sep}', shell=True, check=False)
+        if self.report_errors:
+            with open(self.error_filename, 'r') as f:
+                for count, line in enumerate(f):
+                    pass
+            if count <= 2:
+                os.remove(self.error_filename)
+
 
 
     def calculate_pka_propka(self, path):
@@ -1977,7 +1984,8 @@ class Measure(object):
                                     'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
                                     'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
-                                    }
+                                    'KCX': 'X', 'LYE': 'X'}  
+            # KCX and LYE down as X so that they are not treated as positive K
 
             def _catch(func, *args, handle=lambda e : e, **kwargs):
                 try:
