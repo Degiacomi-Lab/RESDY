@@ -866,8 +866,8 @@ class Measure(object):
                     if feature in legolas_features:
                         if col_name == 'aev_legolas':
                             target['aev_legolas'] = target['aev_legolas'].astype('object')
-                        else:
-                            target.at[i, feature] = to_merge.loc[idx[0][0], feature]
+                        
+                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
         

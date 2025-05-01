@@ -361,7 +361,6 @@ class Analysis(object):
         #         deal if is, otherwise add new column in
         try:
             new_df = pd.read_csv(new_measure_filename)
-            print(new_df)
             base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
             new_measures_columns = [a for a in new_df.columns if a not in base_columns]
@@ -390,6 +389,8 @@ class Analysis(object):
                                 # aevs - add the list of aevs in one column to the overall dataframe
                                 if column == 'aev':
                                     self.df['aev'] = self.df['aev'].astype('object')
+                                elif column == 'aev_legolas':
+                                    self.df['aev_legolas'] = self.df['aev_legolas'].astype('object')
                                 else:
                                     self.df.at[i, column] = new_df.loc[idx[0][0], column]
                             proper_answer = True
@@ -413,9 +414,10 @@ class Analysis(object):
                     # account for measurements that have special cases
                     # aevs - add the list of aevs in one column to the overall dataframe
                     if column == 'aev':
-                        self.df['aev'] = self.df['aev'].astype('object')
-                    else:
-                        self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                        new_df['aev'] = new_df['aev'].astype('object')
+                    elif column == 'aev_legolas':
+                        new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
+                    self.df.at[i, column] = new_df.loc[idx[0][0], column]
 
         except Exception as e:
             print(f'Failed to load in the new measures dataframe (name: {new_measure_filename}), error: {e}')
