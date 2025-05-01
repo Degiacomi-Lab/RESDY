@@ -12,6 +12,7 @@ from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
+from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
@@ -111,6 +112,7 @@ class Measure(object):
         self.folder = os.path.join(outdir, "curated")
 
         self.features = features
+        self.legolas_aevs = True
         self._setup_measures(features)
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
@@ -146,6 +148,7 @@ class Measure(object):
 
         self.legolas_loc = '/home/gweston/Documents/extra_packages/legolas-main/test'
 
+
         # Check that all files in DataFrame appear at least once in folder
         # find all AlphaFold entries
         files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
@@ -179,6 +182,7 @@ class Measure(object):
         self.measures = []
         melodia_added = False
         frustration_added = False
+        legolas_added = False
         for m in features:
             if m == "propka":
                 self.measures.append([m, self.calculate_pka_propka])
@@ -196,9 +200,16 @@ class Measure(object):
                 self.measures.append([m, self.calculate_seqcharge])
             elif m == 'legolas':
                 self.measures.append([m, self.calculate_legolas])
+                legolas_added = True
+                if self.legolas_aevs:
+                    self.features.append('aev_legolas')
                 self.legolas_output_path = os.path.join(self.outdir, 'legolas')
                 if not os.path.exists(self.legolas_output_path):
                     os.mkdir(self.legolas_output_path)
+            elif m == 'aev_legolas':
+                if not legolas_added:
+                    self.measures.append(['legolas', self.calculate_legolas])
+                    legolas_added = True
             elif m in ['frustration', 'density']:
                 if not frustration_added:
                     self.measures.append(['frustration', self.calculate_frustration])
@@ -849,6 +860,14 @@ class Measure(object):
                 for feature in self.features:
                     if feature in frust_features:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
+            elif col_name == 'legolas':
+                legolas_features = ['legolas', 'aev_legolas']
+                for feature in self.features:
+                    if feature in legolas_features:
+                        if col_name == 'aev_legolas':
+                            target['aev_legolas'] = target['aev_legolas'].astype('object')
+                        else:
+                            target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
         
@@ -2279,6 +2298,41 @@ class Measure(object):
                 shutil.move(result_filename, self.legolas_output_path)
                 if modified_struc:
                     os.remove('temp_legolas.pdb')
+            
+            #  AEV section from this -if include_aev:
+            if self.legolas_aevs:
+                try:
+                    new_aev_filename = f'{path.split(f"{os.sep}")[-1].split(".")[0]}_legolasaev.txt'
+                    if already_exists:
+                        if os.path.exists(os.path.join(self.legolas_output_path, new_aev_filename)):
+                            with open(os.path.join(self.legolas_output_path, new_aev_filename)) as f:
+                                aevs = f.readlines()
+                        else:
+                            aevs = []
+                    elif os.path.exists('tmp_aevs_protein.txt'):
+                        with open('tmp_aevs_protein.txt', 'r') as f:
+                            aevs = f.readlines()
+                        os.rename('tmp_aevs_protein.txt', new_aev_filename)
+                        shutil.move(new_aev_filename, self.legolas_output_path)
+                    else:
+                        print('Legolas AEVs: tmp_aevs_protein.txt file not found')
+                        aevs = []
+                    
+                    
+                    lys_aevs = []
+                    for idx in lys_res_nums:
+                        #lys_aevs.append(literal_eval(aevs[(idx - 1)]))
+                        lys_aevs.append(aevs[(idx - 1)])
+                    
+                    
+                    if os.path.exists('tmp_aevs_protein.txt'):
+                        os.remove('tmp_aevs_protein.txt')
+                    #print(lys_aevs)
+                
+                except Exception as e:
+                    print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
+                    if self.report_errors: self._report_error_to_file('LEGOLAS AEV 1', path, str(e))
+                    
 
         except Exception as e:
             print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
@@ -2291,10 +2345,12 @@ class Measure(object):
             df_legolas['Chain'] = list_chains
             df_legolas['Resid'] = lys_res_nums
             df_legolas['legolas'] = lys_nmr_vals
+            if self.legolas_aevs:
+                df_legolas['aev_legolas'] = lys_aevs
         except Exception as e:
             if self.report_errors: self._report_error_to_file('LEGOLAS 3', path, str(e))
             print(f'Legolas: 3 - Failed to create datafame to append to the overall dataframe: {e}')
-
+        print(df_legolas)
         return df_legolas
 
 if __name__ == "__main__":
