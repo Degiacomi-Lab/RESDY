@@ -335,7 +335,7 @@ class Analysis(object):
         print(f'Num of rows removed: {len(df_to_remove)}')
 
 
-    def add_extra_measures(self, new_measure_filename, write_new_file = False, out_filename='measures_new.csv'):
+    def add_extra_measures(self, extra_measures_filename, write_new_file = False, out_filename='measures_new.csv'):
         '''
         Function to add in extra measurements to the measures frame that has been
         autoloaded into the analysis class on defining this. This will match up the
@@ -344,7 +344,7 @@ class Analysis(object):
 
         Parameters
         ----------
-        new_measure_filename -> string
+        extra_measures_filename -> string
             The name of the new measures file written of the combination of both
             measures dataframe.
         
@@ -360,7 +360,7 @@ class Analysis(object):
         # Step 1: read in new dataframe, extract column names, check for overlap and
         #         deal if is, otherwise add new column in
         try:
-            new_df = pd.read_csv(new_measure_filename)
+            new_df = pd.read_csv(extra_measures_filename)
             base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
             new_measures_columns = [a for a in new_df.columns if a not in base_columns]
@@ -420,7 +420,7 @@ class Analysis(object):
                     self.df.at[i, column] = new_df.loc[idx[0][0], column]
 
         except Exception as e:
-            print(f'Failed to load in the new measures dataframe (name: {new_measure_filename}), error: {e}')
+            print(f'Failed to load in the new measures dataframe (name: {extra_measures_filename}), error: {e}')
 
 
         # Step 2: write new measures.csv file if required
