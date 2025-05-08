@@ -30,7 +30,7 @@ class Model(object):
                  neg_measures_files,
                  features_to_include=['aev'],
                  aggregation_method='avg',
-                 subtract_avg_aev=True,
+                 subtract_avg_aev=False,
                  num_aev_features_req = 100):
         
         self.pos_measures_files = pos_measures_files
@@ -111,9 +111,15 @@ class Model(object):
         print([len(pos_data), len(neg_data)])
         self.X_all = pd.concat([pos_data, neg_data], ignore_index=True)
 
+        self.X_all.rename(columns={'aev_legolas': 'aev'}, inplace=True)
+        self.X_all.dropna(subset=self.features_to_include, inplace=True)
+
+        print(self.X_all.head())
+
         #remove any rows with rubbish depth measurements
-        df_suspicious = self.get_extreme_values(feature='depth', lower=0, upper=20)
-        self.remove_df(df_suspicious)
+        if 'depth' in self.features_to_include:
+            df_suspicious = self.get_extreme_values(feature='depth', lower=0, upper=20)
+            self.remove_df(df_suspicious)
 
         original_cols = self.X_all.columns.values
         cols_required = ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']
@@ -123,11 +129,12 @@ class Model(object):
             else:
                 print(f'Feature given as input is not available in all input files, will not be included: {feature}')
         self.X_all = self.X_all[cols_required]
+        self.y_all = list(self.X_all['class'])
 
         # prepare aevs
         if 'aev' in self.features_to_include:
             self._prepare_aevs()
-            #self._reduce_aevs()
+            #self._reduce_aevs_before()
         # aggregate based on aggregation method - will do both pos and neg data automatically
         self._aggregate()
 
@@ -212,6 +219,7 @@ class Model(object):
                 # The columns_to_keep that is commented out is the oriignal set calculated by Phong
                 # over the negative dataset
                 '''
+                # this columns_to_keep is the original set calculated with the original AEVs
                 columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
                                    30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
                                    399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
@@ -221,9 +229,8 @@ class Model(object):
                 '''
 
                 # use the preprocesing module to come up with exact columns to keep via VIF analysis
-                P = Preprocessing(self.X_final, self.features_to_include)
-                P.normalise()
-                P.vif()
+                P = Preprocessing(self.X_final, list(self.X_final.columns))
+                columns_to_keep = P.calculate_diff_features(self.X_final)
 
                 self.top_n_features = ['AEV_' + str(a) for a in columns_to_keep]
             case 'sd':
@@ -284,7 +291,8 @@ class Model(object):
     def _cut_columns(self):
         # first remove all the null columns
         num_cols_to_cut = sum((self.X_final != 0).any(axis=0))
-        print(f'{num_cols_to_cut} columns kept from the AEV input data')
+        #print([i for i, a in enumerate(list((self.X_final != 0).any(axis=0))) if a is False])
+        print(f'{num_cols_to_cut} columns kept from the AEV input data that are non zero')
         self.X_final = self.X_final.loc[:, (self.X_final != 0).any(axis=0)]
 
         # then remove the least important columns according to the method given
@@ -294,9 +302,10 @@ class Model(object):
             #self.top_n_features = [f'AEV_{x}' for x in self.top_n_features]
             current_feature_columns = self.X_final.columns.tolist()
             for feature in current_feature_columns:
+                #if 'AEV' in feature and int(feature.split('_')[-1]) not in self.top_n_features:
                 if 'AEV' in feature and feature not in self.top_n_features:
                     self.X_final = self.X_final.drop(feature, axis=1)
-        print(f'Final number of columns: {len(self.X_final.columns.tolist())}')
+        print(f'Final number of columns after reduction: {len(self.X_final.columns.tolist())}')
 
     def get_extreme_values(self, feature, lower = 1, upper = 14):
         '''
@@ -800,6 +809,171 @@ class Model(object):
         self.find_feature_importance_pos(df_input_importance)
 
 
+    def rf_five_fold_optimised_expanded(self):
+        '''
+        Function to perform a 5 fold test on the data that has been presented to the
+        model. A grid_search is performed before to optimise the RF model to the
+        data it will be trained on.
+        This one also takes the datasets that are produced throught the rf model and
+        expands them such that the training and test data include all the measurements
+        that are available without including individual lysines in both training and test
+
+        Method
+        ------
+        Takes the data that has been prepared using the earlier functions and uses a
+        grid_search from SciKitLearn to find the optimised RF model from a seiries of
+        trial runs on this. The SciKitLearn RandomForestClassifier is then used to get
+        an accurate reading of how the model has performed. This uses the standard setup
+        that it comes with without any optimisation. Metrics are calculated for each of
+        the models and reported both individually and as an average after all have been
+        completed. Functions for graphings the data are called to display this after.
+
+        Example
+        -------
+        model.rf_five_fold_optimised()
+        '''
+
+        # sort the data out for this
+        x_all_agg = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
+        print(x_all_agg[x_all_agg.duplicated(subset=['Uniprot_Entry', 'Resid'], keep=False)].sort_values(by=['Uniprot_Entry', 'Resid']))
+        x_all_agg = x_all_agg.drop_duplicates(subset=['Uniprot_Entry', 'Resid'], keep='first', inplace=False).dropna()
+        print(f'len of each; pos:{len(x_all_agg[x_all_agg["class"] == 1])}, neg: {len(x_all_agg[x_all_agg["class"] == 0])}')
+        
+
+
+        num_pos_data = len(x_all_agg[x_all_agg['class'] == 1])
+        print([num_pos_data, (len(x_all_agg) - num_pos_data)])
+        indices_random_neg_data = random.sample(range(num_pos_data, len(x_all_agg)), num_pos_data)
+        x_all_agg = pd.concat([x_all_agg[x_all_agg['class'] == 1], x_all_agg.iloc[indices_random_neg_data]])
+        y_all_agg = x_all_agg['class']
+
+        #define classifier
+        rf = RandomForestClassifier()
+
+        # define parameters and values to test
+        params = {
+            'max_depth': [2, 3, 5, 10, 20],
+            'min_samples_leaf': [5, 10, 20, 50, 100, 200],
+            'n_estimators': [10, 25, 30, 50, 100, 200]
+        }
+
+        # grid search over parameters space
+        grid_search = GridSearchCV(estimator=rf,
+                                param_grid=params,
+                                cv = 4,
+                                n_jobs=-1, verbose=1, scoring="accuracy")
+
+        grid_search.fit(x_all_agg.drop(['Uniprot_Entry', 'PDB_Code', 'Resid', 'class'], axis=1), y_all_agg)
+
+        # best estimator found with grid search
+        RF_best = grid_search.best_estimator_
+
+
+        def confusion_matrix_scorer(model, X, y):
+            y_pred = model.predict(X)
+            cm = metrics.confusion_matrix(y, y_pred)
+            return {'tn': cm[0, 0], 'fp': cm[0, 1],
+                    'fn': cm[1, 0], 'tp': cm[1, 1]}
+
+        scores = ['accuracy', 'f1', 'precision']
+        df_input_importance = pd.DataFrame()
+        kf = KFold(n_splits=5, shuffle=True, random_state=False)
+        for train, test in kf.split(x_all_agg, y_all_agg):
+            print(f'train: {len(train)}, test: {len(test)}, total: {len(train) + len(test)}')
+
+            # extend the indices into the full dataset
+            train_extended = []
+            test_extended = []
+            for i in train:
+                entry = x_all_agg.iloc[i]['Uniprot_Entry']
+                resid = x_all_agg.iloc[i]['Resid']
+                df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
+                train_extended += list(df_query.index)
+            for i in test:
+                entry = x_all_agg.iloc[i]['Uniprot_Entry']
+                resid = x_all_agg.iloc[i]['Resid']
+                df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
+                test_extended += list(df_query.index)
+
+            print(f'train: {len(train_extended)}, test: {len(test_extended)}, total: {len(train_extended) + len(test_extended)}')            
+            train_data_X = self.X_all.loc[train_extended].drop(['Uniprot_Entry', 'PDB_Code', 'Resid', 'class'], axis=1)
+            self.X_all['class'] = self.y_all
+            train_data_y = list(self.X_all.loc[train_extended]['class'])
+            print(f'Balance of training data: 1: {len([a for a in train_data_y if a == 1])}, 0: {len([a for a in train_data_y if a == 0])}')
+
+            #print(train_data_X)
+
+            RF_best.fit(train_data_X, train_data_y)
+
+            test_data_X = self.X_all.loc[test_extended].drop(['Uniprot_Entry', 'PDB_Code', 'Resid', 'class'], axis=1)
+            test_data_y = list(self.X_all.loc[test_extended]['class'])
+
+            '''
+            model_output = RF_best.predict(test_data_X, test_data_y, scoring=confusion_matrix_scorer, return_estimator = True)
+            accuracy_output = cross_val_score(RF_best, self.X_final, self.y, cv=kf, scoring='accuracy')
+            f1_output = cross_val_score(RF_best, self.X_final, self.y, cv=kf, scoring='f1')
+            precision = cross_val_score(RF_best, self.X_final, self.y, cv=kf, scoring='precision')
+            '''
+            test_y_pred = RF_best.predict(test_data_X)
+            acc = metrics.accuracy_score(test_data_y, test_y_pred)
+            print(f'Accuracy: {acc}')
+            '''
+            for idx,estimator in enumerate(model_output['estimator']):
+                feature_importances = pd.DataFrame(estimator.feature_importances_,
+                                                index = self.X_final.columns.values,
+                                                columns=[f'Run {idx + 1}'])
+                df_input_importance = pd.concat([df_input_importance, feature_importances], axis=1)
+            '''
+
+        df_input_importance['Total'] = df_input_importance.sum(axis=1)
+
+        '''
+        test_tn = self.add_average_sd(model_output['test_tn'].astype(float))
+        test_fp = self.add_average_sd(model_output['test_fp'].astype(float))
+        test_fn = self.add_average_sd(model_output['test_fn'].astype(float))
+        test_tp = self.add_average_sd(model_output['test_tp'].astype(float))
+        
+
+        # "Accuracy", "F1_Score", "Precision", "tn", "fp", "fn", "tp", "sensitivity", "specificity"
+        output = pd.DataFrame(["1", "2", "3", "4", "5", "Average", "s.d."], columns=["Run"])
+        accuracy_output = self.add_average_sd(accuracy_output)
+        f1_output = self.add_average_sd(f1_output)
+        precision = self.add_average_sd(precision)
+        output['Accuracy'] = accuracy_output
+        output['F1_Score'] = f1_output
+        output['Precision'] = precision
+        output['TN'] = test_tn
+        output['FP'] = test_fp
+        output['FN'] = test_fn
+        output['TP'] = test_tp
+
+        output['Sensitivity'] = ''
+        output['Specificity'] = ''
+
+        for i, r in output.iterrows():
+            if i < 5:
+                sensitivity = r['TP'] / (r['TP'] + r['FN'])
+                specificity = r['TN'] / (r['TN'] + r['FP'])
+                output.at[i, 'Sensitivity'] = sensitivity
+                output.at[i, 'Specificity'] = specificity
+
+        output.at[5, 'Sensitivity'] = statistics.fmean(output['Sensitivity'][:5])
+        output.at[6, 'Sensitivity'] = statistics.stdev(output['Sensitivity'][:5])
+        output.at[5, 'Specificity'] = statistics.fmean(output['Specificity'][:5])
+        output.at[6, 'Specificity'] = statistics.stdev(output['Specificity'][:5])
+
+
+        print(output)
+        self.avg_output = output.iloc[5].to_dict()
+
+        if len(self.features_to_include) == 1 and 'aev' in self.features_to_include:
+            self.graph_aev_importance(df_input_importance)
+        else:
+            self.graph_top_ten_importance(df_input_importance)
+        self.find_feature_importance_pos(df_input_importance)
+        '''
+
+
     def rf_ubq_test(self):
         '''
         Find the importance ranking of the non AEV features within the features used in the model
@@ -916,7 +1090,8 @@ class Model(object):
             #plt.savefig(f'testAEVimshow_{pdbCode}.png')
         fig.supylabel(f'Importance values of inputs from AEVs', ha='right')
         plt.subplots_adjust(wspace=0, hspace=0)
-        plt.show()
+        #plt.show()
+        plt.close()
 
     def graph_top_ten_importance(self, df_input_importance):
         '''
@@ -939,7 +1114,8 @@ class Model(object):
         #fig = ax.get_figure()
         ax.set_xlabel('Top Ten Features')
         ax.set_ylabel('Feature Importance')
-        plt.show()
+        #plt.show()
+        plt.close()
 
     def find_feature_importance_pos(self, df_input_importance):
         '''
@@ -971,6 +1147,10 @@ class Model(object):
         temp_features = dc(self.features_to_include)
         if 'aev' in temp_features:
             temp_features.remove('aev')
+        '''
+        if self.aggregation_method == 'minmax':
+            temp_features = [f'{feature}_min' for feature in temp_features] + [f'{feature}_max' for feature in temp_features]
+            '''
         for feature in temp_features:
             pos = index_positions.index(feature)
             feature_pos[f'{feature}_importance_rank'] = pos + 1
@@ -1006,23 +1186,83 @@ class Model(object):
         df_importance.loc['avg'] = df_importance.mean()
         print(df_output)
         print(df_importance.T.sort_values('avg', ascending=False))
+        return df_output, df_importance.T.sort_values('avg', ascending=False)
 
 
 # --------------------------------------------------------------------------------------------------
 # Testing section
 
 
+def create_comparison_between_datasets():
+    '''
+    Function to create a comparison between the different datasets that are available
+    for the model. This is to see the difference in performance between the different
+    datasets.
+
+    Example
+    -------
+    >> create_comparison_between_datasets()
+    '''
+    pos_measure_files = ['data/measures_cut_CannData_all_01.05.25.csv',
+                        'data/measures_cut_KingHighConf_all_01.05.25.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
+    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25.csv']
+    scores = []
+    rankings = []
+    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
+    model = Model(pos_measures_files=pos_measure_files,
+                neg_measures_files=neg_measure_files,
+                features_to_include=features_to_include,
+                aggregation_method='minmax',
+                subtract_avg_aev=False,
+                num_aev_features_req=100)
+    model.prepare_dataset()
+    multi_run_output, multi_run_importance = model.multi_run_test(num_runs=50)
+    scores.append(multi_run_output)
+    rankings.append(multi_run_importance)
+    
+    for file in pos_measure_files:
+        model = Model(pos_measures_files=[file],
+                    neg_measures_files=neg_measure_files,
+                    features_to_include=features_to_include,
+                    aggregation_method='minmax',
+                    subtract_avg_aev=False,
+                    num_aev_features_req=100)
+        model.prepare_dataset()
+        multi_run_output, multi_run_importance = model.multi_run_test(num_runs=50)
+        scores.append(multi_run_output)
+        rankings.append(multi_run_importance)
+    
+    # graph the outputs
+    sets_acc = pd.DataFrame()
+    set_names = ['All', 'CannData', 'KingHighConf', 'Ecoli(hCit)', 'Synecho(hCit)']
+    for i, df in enumerate(scores):
+        sets_acc = pd.concat([sets_acc, df['Accuracy']], axis=1)
+        sets_acc.rename(columns={'Accuracy': set_names[i]}, inplace=True)
+    
+    print(sets_acc)
+    plt.close()
+    fig, ax = plt.subplots()
+    sets_acc.boxplot()
+    plt.xlabel('Datasets')
+    plt.ylabel('Accuracy')
+    #column=sets_acc.columns, ax=ax
+    #plt.show()
+    plt.savefig('dataset_comparison_200.png')
+
 if __name__ == "__main__":
 
-    pos_measure_files = ['data/measures_cut_CannPositiveData_all.csv',
-                        'data/measures_cut_KingHighConfData_all.csv',
-                        'data/measures_cut_Ecoli(hCit)_all_3.csv',
-                        'data/measures_cut_Synecho(hCit)_all_2.csv']
+    '''
+    pos_measure_files = ['data/measures_cut_CannData_all_01.05.25.csv',
+                        'data/measures_cut_KingHighConf_all_01.05.25.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
     #pos_measure_files = ['data/measures_cut_Synecho(hCit)_all_2.csv']
-    neg_measure_files = ['data/measures_cut_KingAllNegative_all.csv']
-    pos_measure_files = ['April25_posOnly.csv']
-    neg_measure_files = ['April25_negONLY.csv']
-    features_to_include = ['propka', 'sasa', 'das', 'depth', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
+    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25.csv']
+    #pos_measure_files = ['data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
+    #neg_measure_files = ['April25_negONLY.csv']
+    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
     model = Model(pos_measures_files=pos_measure_files,
                 neg_measures_files=neg_measure_files,
                 features_to_include=features_to_include,
@@ -1035,4 +1275,8 @@ if __name__ == "__main__":
     #model.rf_ubq_test()
     #model.rf_five_fold()
     #model.rf_five_fold_optimised()
-    model.multi_run_test(num_runs=10)
+    #model.multi_run_test(num_runs=1)
+    model.rf_five_fold_optimised_expanded()
+    '''
+    create_comparison_between_datasets()
+

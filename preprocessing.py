@@ -29,13 +29,14 @@ class Preprocessing:
         self.df_cleaned, self.n_obs_cleaned = self.clean(df, features)
         self.data = self.df_cleaned[features]
 
-        self.aev = np.zeros((len(self.df_cleaned), 1008))
-        for i in range(self.n_obs_cleaned):
-            self.aev[i] = np.array(self.df_cleaned['aev'][i].strip("[]").split(","), dtype=float)
-        self.aev = pd.DataFrame(self.aev)
-        self.aev = self.aev.loc[:, (self.aev != 0).any(axis=0)]
+        if 'aev' in self.data.columns:
+            self.aev = np.zeros((len(self.df_cleaned), 1008))
+            for i in range(self.n_obs_cleaned):
+                self.aev[i] = np.array(self.df_cleaned['aev'][i].strip("[]").split(","), dtype=float)
+            self.aev = pd.DataFrame(self.aev)
+            self.aev = self.aev.loc[:, (self.aev != 0).any(axis=0)]
 
-        self.data_full = pd.concat([self.data, self.aev], axis=1)
+            self.data_full = pd.concat([self.data, self.aev], axis=1)
 
         # VIF variables
         self.vif = pd.DataFrame()
@@ -190,6 +191,9 @@ class Preprocessing:
             #print(self.vif)
 
         print(self.vif)
+        cut_df = self.vif[self.vif[list(self.vif.columns)[-1]] < 5]
+        cols_to_keep = list(cut_df['Parameter'])
+        return cols_to_keep
 
 
 

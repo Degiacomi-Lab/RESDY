@@ -137,6 +137,8 @@ seq_align/
 ubq_pred/
 *testing*
 *Testing*
+glycation/
+connexin26/
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb
 graph_measures_general.ipynb
