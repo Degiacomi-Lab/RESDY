@@ -802,10 +802,12 @@ class Model(object):
         print(output)
         self.avg_output = output.iloc[5].to_dict()
 
+        '''
         if len(self.features_to_include) == 1 and 'aev' in self.features_to_include:
             self.graph_aev_importance(df_input_importance)
         else:
             self.graph_top_ten_importance(df_input_importance)
+        '''
         self.find_feature_importance_pos(df_input_importance)
 
 
@@ -1109,6 +1111,7 @@ class Model(object):
         sorted_df = df_input_importance.sort_values('Total', ascending=False)
         top_ten = sorted_df.iloc[:10]
 
+        
         fig, ax = plt.subplots(layout='constrained')
         ax = top_ten.plot(kind='bar')
         #fig = ax.get_figure()
@@ -1203,14 +1206,14 @@ def create_comparison_between_datasets():
     -------
     >> create_comparison_between_datasets()
     '''
-    pos_measure_files = ['data/measures_cut_CannData_all_01.05.25.csv',
-                        'data/measures_cut_KingHighConf_all_01.05.25.csv',
-                        'data/measures_cut_Ecoli(hCit)_all_01.05.25.csv',
-                        'data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
-    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25.csv']
+    pos_measure_files = ['data/measures_cut_CannData_all_01.05.25_joined.csv',
+                        'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv']
+    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
     scores = []
     rankings = []
-    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
+    features_to_include = ['propka', 'depth', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
     model = Model(pos_measures_files=pos_measure_files,
                 neg_measures_files=neg_measure_files,
                 features_to_include=features_to_include,
@@ -1218,7 +1221,7 @@ def create_comparison_between_datasets():
                 subtract_avg_aev=False,
                 num_aev_features_req=100)
     model.prepare_dataset()
-    multi_run_output, multi_run_importance = model.multi_run_test(num_runs=50)
+    multi_run_output, multi_run_importance = model.multi_run_test(num_runs=500)
     scores.append(multi_run_output)
     rankings.append(multi_run_importance)
     
@@ -1230,7 +1233,7 @@ def create_comparison_between_datasets():
                     subtract_avg_aev=False,
                     num_aev_features_req=100)
         model.prepare_dataset()
-        multi_run_output, multi_run_importance = model.multi_run_test(num_runs=50)
+        multi_run_output, multi_run_importance = model.multi_run_test(num_runs=500)
         scores.append(multi_run_output)
         rankings.append(multi_run_importance)
     
@@ -1249,7 +1252,7 @@ def create_comparison_between_datasets():
     plt.ylabel('Accuracy')
     #column=sets_acc.columns, ax=ax
     #plt.show()
-    plt.savefig('dataset_comparison_200.png')
+    plt.savefig('dataset_comparison_500.png')
 
 if __name__ == "__main__":
 
