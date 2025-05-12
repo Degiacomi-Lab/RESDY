@@ -399,8 +399,11 @@ class Analysis(object):
                             proper_answer = True
                         case _:
                             print(f'{col_to_keep} was not recognised')
-            
+
+            num_lines_selfdf = len(self.df)
+
             for column in new_nonoverlap_columns:
+                print(f'\nAdding new measurement {column} to the dataframe \n')
                 for i, r in self.df.iterrows():
 
                     protein_code = r['PDB_Code']
@@ -418,6 +421,9 @@ class Analysis(object):
                     elif column == 'aev_legolas':
                         new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
                     self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                    print(f'Progress adding {column} data: {round(((i+1)/num_lines_selfdf)*100, 2)} %\r', end='', flush=True)
+
+            print(f'\nFinished adding extra measures data to dataframe')
 
         except Exception as e:
             print(f'Failed to load in the new measures dataframe (name: {extra_measures_filename}), error: {e}')
@@ -426,6 +432,7 @@ class Analysis(object):
         # Step 2: write new measures.csv file if required
         if write_new_file:
             self.df.to_csv(out_filename)
+            print(f'New measures file written with name: {out_filename}')
 
 
     # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
@@ -637,55 +644,89 @@ class Analysis(object):
                     # setup temporary list to house the metrics list after they have been calculated
                     metric_calculated_values_list_temp = []
 
+                    def calc_weighted_list(feature, pref):
+                        '''
+                        Function to calculate a weighted list for the metric of interest
+
+                        Parameters
+                        ----------
+                        feature -> str
+                            The feature of interest to calculate the data for
+                        pref -> str
+                            The preference for the feature, either 'max' or 'min'
+                        '''
+                        try:
+                            match pref:
+                                case 'min':
+                                    # preference for min val on feature -> invert list
+                                    feature_max = df[feature].max()
+                                    feature_list = [(feature_max-i) for i in df[feature].tolist()]
+                                case 'max':
+                                    # take list as is
+                                    feature_list = list(df[feature])
+                            # compute mean and std
+                            feature_avg, feature_std = np.mean(feature_list), np.std(feature_list)
+                            # standardise list
+                            feature_list_standardised = (feature_list - feature_avg) / feature_std
+                            # weight the list
+                            feature_list_weighted = feature_list_standardised * met_weight
+                            # append the list to the temporary list
+                            metric_calculated_values_list_temp.append(feature_list_weighted)
+                        except Exception as e:
+                            print(f'Failed to load the data for the metric: {feature}; {e}')
+
                     try:
                         for metric, met_weight in metric_and_weights:
                             match metric:
                                 case 'propka':
-                                    try:
-                                        # preference for lower pKa -> invert list
-                                        pka_max = df['propka'].max()
-                                        pka_list = [(pka_max-i) for i in df['propka'].tolist()]
-                                        # compute mean and std
-                                        pka_avg, pka_std = np.mean(pka_list), np.std(pka_list)
-                                        # standardise list
-                                        pka_list_standardised = (pka_list - pka_avg) / pka_std
-                                        # weight the list
-                                        pka_list_weighted = pka_list_standardised * met_weight
-                                        # append the list to the temporary list
-                                        metric_calculated_values_list_temp.append(pka_list_weighted)
-                                    except Exception as e:
-                                        print(f'Failed to load the data for the metric: propka; {e}')
+                                    calc_weighted_list('propka', 'min')
+                                case 'pkaani':
+                                    calc_weighted_list('pkaani', 'min')
                                 case 'sasa':
-                                    try:
-                                        # preference for highest sasa -> just take list
-                                        sasa_list = df['sasa'].tolist()
-                                        # compute mean and std
-                                        sasa_avg, sasa_std = np.mean(sasa_list), np.std(sasa_list)
-                                        # standardise list
-                                        sasa_list_standardised = (sasa_list - sasa_avg) / sasa_std
-                                        # weight the list
-                                        sasa_list_weighted = sasa_list_standardised * met_weight
-                                        # append the list to the temporary list
-                                        metric_calculated_values_list_temp.append(sasa_list_weighted)
-                                    except Exception as e:
-                                        print(f'Failed to load the data for the metric: sasa; {e}')
+                                    calc_weighted_list('sasa', 'max')
                                 case 'depth':
-                                    try:
-                                        # preference for lower depth -> invert list
-                                        depth_max = df['depth'].max()
-                                        depth_list = [(depth_max-i) for i in df['depth'].tolist()]
-                                        # compute mean and std
-                                        depth_avg, depth_std = np.mean(depth_list), np.std(depth_list)
-                                        # standardise list
-                                        depth_list_standardised = (depth_list - depth_avg) / depth_std
-                                        # weight the list
-                                        depth_list_weighted = depth_list_standardised * met_weight
-                                        # append the list to the temporary list
-                                        metric_calculated_values_list_temp.append(depth_list_weighted)
-                                    except Exception as e:
-                                        print(f'Failed to load the data for the metric: depth; {e}')
+                                    calc_weighted_list('depth', 'min')
+                                case 'das':
+                                    calc_weighted_list('das', 'max')
+                                case 'seqcharge':
+                                    calc_weighted_list('seqcharge', 'max')
+                                case 'curvature':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for curvature (enter "min" or "max"): ')
+                                    calc_weighted_list('curvature', pref)
+                                case 'writhing':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for writhing (enter "min" or "max"): ')
+                                    calc_weighted_list('writhing', pref)
+                                case 'torsion':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for torsion (enter "min" or "max"): ')
+                                    calc_weighted_list('torsion', pref)
+                                case 'arc_length':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for arc_length (enter "min" or "max"): ')
+                                    calc_weighted_list('arc_length', pref)
+                                case 'phi':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for phi (enter "min" or "max"): ')
+                                    calc_weighted_list('phi', pref)
+                                case 'psi':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for psi (enter "min" or "max"): ')
+                                    calc_weighted_list('psi', pref)
+                                case 'frustration':
+                                    calc_weighted_list('frustration', 'max')
+                                case 'density':
+                                    while pref not in ['min', 'max']:
+                                        pref = input('Bias towards min or max for writhing (enter "min" or "max"): ')
+                                    calc_weighted_list('density', pref)
+                                case 'leoglas':
+                                    calc_weighted_list('legolas', 'min')
+                                case 'aev' | 'aev_legolas':
+                                    print('aev and aev_legolas are not currently supported for this analysis. Please choose a differnet feature.')
+                                    return
                                 case _:
-                                    print('Make sure metrics entered are correct: accepted metrics are currently propka, sasa and depth')
+                                    print(f'Make sure metrics entered are correct: {metric} was not recognised')
                     except Exception as e:
                         print(f'Error loading data for the metrics provided: {e}')
 
