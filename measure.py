@@ -250,7 +250,32 @@ class Measure(object):
             case (True, True):
                 # PDB only and parallel
                 print('This setup does not currently have a method, please change the setup')
-        
+
+        self._cleanup_calculation_files()
+
+
+    def restart_measure_data(self):
+        '''
+        Determine the appropriate measures function to call based on the combination of
+        running PDB_only and in parallel, reducing the number individual functions that
+        the user will have to call themselves. Differnet to measure_data() as this will
+        restart the measurements from final previous point rather than starting again.
+
+        Example
+        -------
+        M.restart_measure_data()
+        '''
+        match (self.PDB_only, self.parallel):
+            case (False, False) | (False, True):
+                # (not PDB only and not parallel) or (not PDB only and parallel):
+                self.restart_measure()
+            case (True, False):
+                # PDB only and not parallel
+                self.restart_measure_pdb_only()
+            case (True, True):
+                # PDB only and parallel
+                print('This setup does not currently have a method, please change the setup')
+
         self._cleanup_calculation_files()
 
 
@@ -832,7 +857,10 @@ class Measure(object):
         self.df_input = self.df_input.drop(idx_to_remove)
         # 3. Restart the measure_dataframe() with the new file list
         print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
-        self.measure_dataframe_parallel()
+        if self.parallel:
+            self.measure_dataframe_parallel()
+        else:
+            self.measure_dataframe()
 
 
     def _combine_dataframes(self, target, to_merge, col_name):
