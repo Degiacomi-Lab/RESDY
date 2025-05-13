@@ -115,6 +115,7 @@ class Model(object):
         self.X_all.dropna(subset=self.features_to_include, inplace=True)
 
         print(self.X_all.head())
+        self._check_for_overlap()
 
         #remove any rows with rubbish depth measurements
         if 'depth' in self.features_to_include:
@@ -245,6 +246,28 @@ class Model(object):
                 top_n_features = list(df_std.index.values[:self.num_aev_features_req])
                 self.top_n_features = top_n_features
                 print('Top 100 aev features: ', self.top_n_features)
+
+
+    def _check_for_overlap(self):
+        '''
+        Function to check for overlap between the positive and negative parts of the dataset
+        If there are any overlaps, remove the data from the negative dataset.
+        '''
+
+        all_overlaps = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Resid'])
+
+        for i, r in self.X_all[self.X_all['class'] == 1].iterrows():
+            pdb = r['PDB_Code']
+            resid = r['Resid']
+            # create a subset of the dataframe of measurements where the uniprot and resid match
+            df_query = self.X_all[(self.X_all['PDB_Code'] == pdb) & (self.X_all['Resid'] == resid)]
+            if len(df_query) > 1:
+                #print(f'Overlap found: {pdb} {resid}')
+                all_overlaps = pd.concat([all_overlaps, df_query[['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]], ignore_index=True)
+                self.X_all = self.X_all.drop(index=df_query.index[1:])
+        
+        print(f'Number of overlaps: {len(all_overlaps)}')
+        #print(all_overlaps)
 
 
     def _aggregate(self):
@@ -1206,14 +1229,16 @@ def create_comparison_between_datasets():
     -------
     >> create_comparison_between_datasets()
     '''
-    pos_measure_files = ['data/measures_cut_CannData_all_01.05.25_joined.csv',
+    pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv',
                         'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
                         'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
                         'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv']
     neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
+    #pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv']
+    #neg_measure_files = ['measures_cut_CannDataNegatives_all_12.05.25_joined.csv']
     scores = []
     rankings = []
-    features_to_include = ['propka', 'depth', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
+    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
     model = Model(pos_measures_files=pos_measure_files,
                 neg_measures_files=neg_measure_files,
                 features_to_include=features_to_include,
@@ -1225,6 +1250,7 @@ def create_comparison_between_datasets():
     scores.append(multi_run_output)
     rankings.append(multi_run_importance)
     
+    set_names = ['All']
     for file in pos_measure_files:
         model = Model(pos_measures_files=[file],
                     neg_measures_files=neg_measure_files,
@@ -1236,10 +1262,13 @@ def create_comparison_between_datasets():
         multi_run_output, multi_run_importance = model.multi_run_test(num_runs=500)
         scores.append(multi_run_output)
         rankings.append(multi_run_importance)
-    
+        set_names.append(file.split('/')[-1].split('_')[0])
+
     # graph the outputs
     sets_acc = pd.DataFrame()
     set_names = ['All', 'CannData', 'KingHighConf', 'Ecoli(hCit)', 'Synecho(hCit)']
+
+    #set_names = ['All', 'CannData']
     for i, df in enumerate(scores):
         sets_acc = pd.concat([sets_acc, df['Accuracy']], axis=1)
         sets_acc.rename(columns={'Accuracy': set_names[i]}, inplace=True)
@@ -1247,12 +1276,13 @@ def create_comparison_between_datasets():
     print(sets_acc)
     plt.close()
     fig, ax = plt.subplots()
-    sets_acc.boxplot()
-    plt.xlabel('Datasets')
+    sets_acc.boxplot(grid=False)
+    plt.xlabel('Positive Datasets')
     plt.ylabel('Accuracy')
     #column=sets_acc.columns, ax=ax
     #plt.show()
-    plt.savefig('dataset_comparison_500.png')
+    plt.savefig('dataset_comparison_500_updatedgraph.png')
+    plt.savefig('dataset_comparison_500_updatedgraph.svg')
 
 if __name__ == "__main__":
 
