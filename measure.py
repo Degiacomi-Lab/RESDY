@@ -425,15 +425,21 @@ class Measure(object):
             self.current_index = i
             files_list = self.files_to_analyse
 
+            if i != 0:
+                avg_time_per_pdb = (time.time() - overall_st) / i
+                pred_time_remaining = avg_time_per_pdb * (len(self.df_input) - i)
+            else:
+                pred_time_remaining = 'undefined'
+            print(f'Analysing PDB code ({pdb_code}) {i}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
+
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files_list:
                 # check the file for the required pbd code, if not there, skip
                 if pdb_code not in f:
                     continue
 
-                print(f'Analysing structure {current_structure}/{total_structures}')
                 tstart = time.time()
-                print(f"\n> File: {f}")
+                print(f"\n> Calculating for measurements for file: {f}")
 
                 # create temporary DataFrame for data of current file,
                 # to be then appended to main DataFrame self.df
@@ -2350,7 +2356,7 @@ class Measure(object):
         except Exception as e:
             if self.report_errors: self._report_error_to_file('LEGOLAS 3', path, str(e))
             print(f'Legolas: 3 - Failed to create datafame to append to the overall dataframe: {e}')
-        print(df_legolas)
+        #print(df_legolas)
         return df_legolas
 
 if __name__ == "__main__":
