@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
+from sklearn.decomposition import PCA
 from preprocessing import Preprocessing
 
 cwd = os.getcwd()
@@ -67,9 +68,17 @@ class Model(object):
         -------
         >> model.prepare_aevs(df)
         '''
+        self.X_all.rename(columns={'aev': 'aev_old'}, inplace=True)
+        self.X_all['aev'] = 1
+        self.X_all['aev'] = self.X_all['aev'].astype('object')
+        
         for i, r in self.X_all.iterrows():
-            new_aev = literal_eval(r['aev'])
-            self.X_all.at[i, 'aev'] = new_aev
+            #new_aev = literal_eval(r['aev'].values[0])
+            print(literal_eval(r['aev_old'].values[0]))
+            self.X_all.at[i, 'aev'] = literal_eval(r['aev_old'].values[0])
+            #self.X_all.loc[[i], 'aev'] = pd.Series([new_aev], index=self.X_all.index[[i]])
+        
+        self.X_all.drop(['aev_old'], axis=1)
 
         if self.subtract_avg_aev:
             with open('aev_data_randomforestmodel/average_aevs_overall_noH.csv', 'r') as avg_aev_file:
@@ -111,7 +120,9 @@ class Model(object):
         print([len(pos_data), len(neg_data)])
         self.X_all = pd.concat([pos_data, neg_data], ignore_index=True)
 
-        self.X_all.rename(columns={'aev_legolas': 'aev'}, inplace=True)
+        if 'aev_legolas' in self.X_all.columns:
+            self.X_all.drop(columns=['aev'], inplace=True)
+            self.X_all.rename(columns={'aev_legolas': 'aev'}, inplace=True)
         self.X_all.dropna(subset=self.features_to_include, inplace=True)
 
         print(self.X_all.head())
@@ -133,14 +144,16 @@ class Model(object):
         self.y_all = list(self.X_all['class'])
 
         # prepare aevs
-        if 'aev' in self.features_to_include:
-            self._prepare_aevs()
+        #if 'aev' in self.features_to_include:
+        #    self._prepare_aevs()
             #self._reduce_aevs_before()
         # aggregate based on aggregation method - will do both pos and neg data automatically
         self._aggregate()
 
         # create X
         # prepare the random numbers to get a random subset of the negative dataset to balance out the data
+        print(self.X_agg)
+        self.X_agg.to_csv('X_agg.csv')
         num_pos_data = len(self.X_agg[self.X_agg['class'] == 1])
         print([num_pos_data, (len(self.X_agg) - num_pos_data)])
         indices_random_neg_data = random.sample(range(num_pos_data, len(self.X_agg)), num_pos_data)
@@ -151,9 +164,12 @@ class Model(object):
         print([len(self.X_final[self.X_agg['class'] == 1]), len(self.X_final[self.X_agg['class'] == 0])])
         self.X_final = self.X_final.drop(['Uniprot_Entry', 'Resid', 'class'], axis=1)
         print(self.X_final.head())
+
+        '''
         if 'aev' in self.features_to_include:
             self._reduce_aevs_after()
         self._cut_columns()
+        '''
 
         # create Y set - the classification set, 0 is negative, 1 is positive, positives go into the set first
         for i in range(num_pos_data):
@@ -191,7 +207,7 @@ class Model(object):
         print('Top 100 aev features: ', self.top_n_features)
 
 
-    def _reduce_aevs_after(self, method='vif'):
+    def _reduce_aevs_after(self, method='pca'):
         '''
         Model performs worse when more of the features of the AEV are taken through to training.
         Reduce the AEVs down to the required number of features based on one of the methods chosen
@@ -247,6 +263,28 @@ class Model(object):
                 self.top_n_features = top_n_features
                 print('Top 100 aev features: ', self.top_n_features)
 
+            case 'pca':
+                # Case where a PCA can be produced which captures 99% of the variance reducing the
+                # number of features to around 50 in testing
+                print('Calculating PCA...')
+
+                n_components = 0.99
+                pca = PCA(n_components=n_components)
+                aev_col_names = [a for a in self.X_final.columns if 'AEV_' in a]
+                aev_data = self.X_final[aev_col_names].values.tolist()
+                pca_data = pca.fit_transform(aev_data)
+
+                #classification_values = self.X_final['class'].values
+                variance_data = pca.explained_variance_ratio_
+                
+                print(f'PCA used {pca.n_components_} components to explain {n_components} variance.')
+                
+                self.X_final.drop(aev_col_names, axis=1)
+                df_out = pd.DataFrame(pca_data['aev'].to_list())
+                df_out = df_out.add_prefix('AEV_')
+                self.X_final = pd.concat([self.X_final, df_out], axis=1)
+                #self.X_final = self.X_final.drop('aev', axis=1)
+
 
     def _check_for_overlap(self):
         '''
@@ -298,6 +336,8 @@ class Model(object):
                 self._aggregate_mixmatch()
             case 'minmax':
                 self._aggregate_minmax()
+            case 'minmaxavg':
+                self._aggregate_minmaxavg()
             case _:
                 print('Aggregation method not recognised; using average values')
                 self._aggregate_avg()
@@ -309,6 +349,39 @@ class Model(object):
         data_set = np.append(data_set, average)
         data_set = np.append(data_set, sd)
         return data_set
+    
+    
+    def _prepare_pca(self):
+        '''
+        Short function to transform the AEV data using PCA to reduce the dimensions.
+        Changes the data in self.X_all ready for the aggregation to actually reduce
+        the dataset for training on
+        '''
+        # transform AEV data via PCA - TODO later on generalise this as an option
+        print('Calculating PCA...')
+
+        if 'aev' in self.features_to_include:
+            df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.X_all['aev']]))
+            df_aevs = df_aevs.add_prefix('AEV_')
+            self.X_all = pd.concat([self.X_all.reset_index(), df_aevs.reset_index()], axis=1)
+            self.X_all = self.X_all.drop(['index', 'aev'], axis=1)
+        #aev_data = [literal_eval(aev) for aev in list(self.X_all['aev'])]
+        n_components = 0.99
+        pca = PCA(n_components=n_components)
+        aev_col_names = [a for a in self.X_all.columns if 'AEV_' in a]
+        aev_data = self.X_all[aev_col_names].values.tolist()
+        pca_data = pca.fit_transform(aev_data)
+        print(pca_data.shape)
+
+        #classification_values = self.X_final['class'].values
+        variance_data = pca.explained_variance_ratio_
+        
+        print(f'PCA used {pca.n_components_} components to explain {n_components} variance.')
+        self.X_all.drop(aev_col_names, axis=1, inplace=True)
+        df_out = pd.DataFrame(pca_data)
+        df_out = df_out.add_prefix('AEV_')
+        self.X_all = pd.concat([self.X_all, df_out], axis=1)
+        print(self.X_all)
 
 
     def _cut_columns(self):
@@ -375,6 +448,9 @@ class Model(object):
     def _aggregate_avg(self):
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        
+        self._prepare_pca()
+
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
             resid = row['Resid']
@@ -396,6 +472,7 @@ class Model(object):
 
             df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
 
+        '''
         if 'aev' in self.features_to_include:
             df_out = pd.DataFrame(df_data_agg['aev'].to_list())
             df_out = df_out.add_prefix('AEV_')
@@ -404,11 +481,15 @@ class Model(object):
             #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
             #df_out = df_out.set_axis(aev_kept_cols, axis=1)
         else:
-            self.X_agg = df_data_agg
+        '''
+        self.X_agg = df_data_agg
 
     def _aggregate_max(self):
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        
+        self._prepare_pca()
+        
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
             resid = row['Resid']
@@ -430,6 +511,7 @@ class Model(object):
 
             df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
 
+        '''
         if 'aev' in self.features_to_include:
             df_out = pd.DataFrame(df_data_agg['aev'].to_list())
             df_out = df_out.add_prefix('AEV_')
@@ -438,11 +520,15 @@ class Model(object):
             #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
             #df_out = df_out.set_axis(aev_kept_cols, axis=1)
         else:
-            self.X_agg = df_data_agg
+        '''
+        self.X_agg = df_data_agg
 
     def _aggregate_min(self):
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        
+        self._prepare_pca()
+        
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
             resid = row['Resid']
@@ -464,6 +550,7 @@ class Model(object):
 
             df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
 
+        '''
         if 'aev' in self.features_to_include:
             df_out = pd.DataFrame(df_data_agg['aev'].to_list())
             df_out = df_out.add_prefix('AEV_')
@@ -472,7 +559,8 @@ class Model(object):
             #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
             #df_out = df_out.set_axis(aev_kept_cols, axis=1)
         else:
-            self.X_agg = df_data_agg
+        '''
+        self.X_agg = df_data_agg
 
     def _aggregate_avg_less_avgaev(self):
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
@@ -519,6 +607,9 @@ class Model(object):
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
         max_features = ['sasa', 'das', 'frustration', 'seqcharge', ]
         min_features = ['propka', 'pkaANI', 'depth', 'density']
+        
+        self._prepare_pca()
+
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
             resid = row['Resid']
@@ -529,20 +620,27 @@ class Model(object):
             data = {'Uniprot_Entry': entry,
                     'Resid' : resid,
                     'class' : class_val}
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.average(list_aevs, axis=0)
-                    data['aev'] = aev_avg
+            features = [a for a in self.X_all.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
+            for feature in features:
+                if 'AEV_' in feature:
+                    temp_avg = round(df_query[feature].mean(),2)
+                    data[feature + '_avg'] = temp_avg
                 else:
                     if feature in max_features:
-                        temp_agg = round(df_query[feature].max(),2)
+                        temp_max = round(df_query[feature].max(),2)
+                        data[feature + '_max'] = temp_max
                     elif feature in min_features:
-                        temp_agg = round(df_query[feature].min(),2)
-                    data[feature] = temp_agg
+                        temp_min = round(df_query[feature].min(),2)
+                        data[feature + '_min'] = temp_min
+                    else:
+                        temp_max = round(df_query[feature].max(),2)
+                        temp_min = round(df_query[feature].min(),2)
+                        data[feature + '_max'] = temp_max
+                        data[feature + '_min'] = temp_min
 
             df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
 
+        '''
         if 'aev' in self.features_to_include:
             df_out = pd.DataFrame(df_data_agg['aev'].to_list())
             df_out = df_out.add_prefix('AEV_')
@@ -551,7 +649,9 @@ class Model(object):
             #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
             #df_out = df_out.set_axis(aev_kept_cols, axis=1)
         else:
-            self.X_agg = df_data_agg
+        '''
+        self.X_agg = df_data_agg
+        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
 
     def _aggregate_random(self):
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
@@ -598,6 +698,9 @@ class Model(object):
         print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
         seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        
+        self._prepare_pca()
+
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
             resid = row['Resid']
@@ -608,11 +711,16 @@ class Model(object):
             data = {'Uniprot_Entry': entry,
                     'Resid' : resid,
                     'class' : class_val}
+            #features = [a for a in self.X_all.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
             for feature in self.features_to_include:
                 if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_min = np.min(list_aevs, axis=0)
-                    data['aev'] = aev_min
+                    df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
+                    min_row = df_query['sumaev'].idxmin()
+                    max_row = df_query['sumaev'].idxmax()
+                    for feat in [a for a in df_query.columns if 'AEV_' in a]:
+                        data[feat + '_min'] = round(df_query[feat].loc[min_row], 2)
+                        data[feat + '_max'] = round(df_query[feat].loc[max_row], 2)
+
                 else:
                     temp_min = round(df_query[feature].min(),2)
                     data[feature + '_min'] = temp_min
@@ -621,16 +729,63 @@ class Model(object):
 
             df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
 
+        '''
         if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
+            df_out = self.X_all[[a for a in self.X_all.columns if 'AEV_' in a]]
             self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
+            #self.X_agg = self.X_agg.drop('aev', axis=1)
             #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
             #df_out = df_out.set_axis(aev_kept_cols, axis=1)
         else:
-            self.X_agg = df_data_agg
-            self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
+        '''
+        self.X_agg = df_data_agg
+        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
+
+
+    def _aggregate_minmaxavg(self):
+        '''
+        Aggregation method which will take the max and min values of the features and duplicate
+        the features to allow for this without having problems with the data overlapping and
+        biasing the output.
+        '''
+        print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
+        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
+        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        
+        self._prepare_pca()
+
+        for idx, row in seperate_lys.iterrows():
+            entry = row['Uniprot_Entry']
+            resid = row['Resid']
+            class_val = row['class']
+            # create a subset of the dataframe of measurements where the uniprot and resid match
+            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
+            # calculate all the values of interest from the subset dataframe (df_query)
+            data = {'Uniprot_Entry': entry,
+                    'Resid' : resid,
+                    'class' : class_val}
+            features = [a for a in self.X_all.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
+            for feature in features:
+                temp_min = round(df_query[feature].min(),2)
+                temp_max = round(df_query[feature].max(),2)
+                temp_avg = round(df_query[feature].mean(),2)
+                data[feature + '_min'] = temp_min
+                data[feature + '_max'] = temp_max
+                data[feature + '_avg'] = temp_avg
+
+            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
+
+        '''
+        if 'aev' in self.features_to_include:
+            df_out = self.X_all[[a for a in self.X_all.columns if 'AEV_' in a]]
+            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
+            #self.X_agg = self.X_agg.drop('aev', axis=1)
+            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
+            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
+        else:
+        '''
+        self.X_agg = df_data_agg
+        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
 
 
     # ------------------------------------------------------------------------------------
@@ -1173,10 +1328,12 @@ class Model(object):
         temp_features = dc(self.features_to_include)
         if 'aev' in temp_features:
             temp_features.remove('aev')
+        
         '''
         if self.aggregation_method == 'minmax':
             temp_features = [f'{feature}_min' for feature in temp_features] + [f'{feature}_max' for feature in temp_features]
-            '''
+        '''
+            
         for feature in temp_features:
             pos = index_positions.index(feature)
             feature_pos[f'{feature}_importance_rank'] = pos + 1
@@ -1219,7 +1376,7 @@ class Model(object):
 # Testing section
 
 
-def create_comparison_between_datasets():
+def create_comparison_between_datasets(num_runs=5):
     '''
     Function to create a comparison between the different datasets that are available
     for the model. This is to see the difference in performance between the different
@@ -1229,6 +1386,8 @@ def create_comparison_between_datasets():
     -------
     >> create_comparison_between_datasets()
     '''
+
+    '''
     pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv',
                         'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
                         'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
@@ -1236,66 +1395,143 @@ def create_comparison_between_datasets():
     neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
     #pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv']
     #neg_measure_files = ['measures_cut_CannDataNegatives_all_12.05.25_joined.csv']
-    scores = []
+    scores_accuracy = pd.DataFrame()
+    scores_f1score = pd.DataFrame()
+    scores_sensitivity = pd.DataFrame()
+    scores_specificity = pd.DataFrame()
     rankings = []
     features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
-    model = Model(pos_measures_files=pos_measure_files,
-                neg_measures_files=neg_measure_files,
-                features_to_include=features_to_include,
-                aggregation_method='minmax',
-                subtract_avg_aev=False,
-                num_aev_features_req=100)
-    model.prepare_dataset()
-    multi_run_output, multi_run_importance = model.multi_run_test(num_runs=500)
-    scores.append(multi_run_output)
-    rankings.append(multi_run_importance)
-    
-    set_names = ['All']
-    for file in pos_measure_files:
-        model = Model(pos_measures_files=[file],
+
+    tmp_scores_accuracy = []
+    tmp_scores_f1score = []
+    tmp_scores_sensitivity = []
+    tmp_scores_specificity = []
+    tmp_rankings = []
+
+    for i in range(num_runs):
+        model = Model(pos_measures_files=pos_measure_files,
                     neg_measures_files=neg_measure_files,
                     features_to_include=features_to_include,
                     aggregation_method='minmax',
                     subtract_avg_aev=False,
                     num_aev_features_req=100)
         model.prepare_dataset()
-        multi_run_output, multi_run_importance = model.multi_run_test(num_runs=500)
-        scores.append(multi_run_output)
-        rankings.append(multi_run_importance)
-        set_names.append(file.split('/')[-1].split('_')[0])
+        multi_run_output, multi_run_importance = model.multi_run_test(num_runs=1)
+        print(multi_run_output['Accuracy'].loc['avg'])
+        tmp_scores_accuracy.append(multi_run_output['Accuracy'].loc['avg'])
+        tmp_scores_f1score.append(multi_run_output['F1_Score'].loc['avg'])
+        tmp_scores_sensitivity.append(multi_run_output['Sensitivity'].loc['avg'])
+        tmp_scores_specificity.append(multi_run_output['Specificity'].loc['avg'])
+        tmp_rankings.append(multi_run_importance)
+
+    print(tmp_scores_accuracy)
+    print(tmp_scores_f1score)
+    print(tmp_scores_sensitivity)
+    print(tmp_scores_specificity)
+
+    scores_accuracy = pd.concat([scores_accuracy, pd.DataFrame({'All': tmp_scores_accuracy})], axis=1)
+    scores_f1score = pd.concat([scores_f1score, pd.DataFrame({'All': tmp_scores_f1score})], axis=1)
+    scores_specificity = pd.concat([scores_specificity, pd.DataFrame({'All': tmp_scores_specificity})], axis=1)
+    scores_sensitivity = pd.concat([scores_sensitivity, pd.DataFrame({'All': tmp_scores_sensitivity})], axis=1)
+    rankings.append(tmp_rankings)
+
+    '''
+
+    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas', 'aev']
+    pos_measure_files = [['data/measures_cut_CannData_all_12.05.25.csv',
+                        'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv'],
+                        ['data/measures_cut_CannData_all_12.05.25.csv'],
+                        ['data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv']]
+    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
+    rankings = []
+    scores_accuracy = pd.DataFrame()
+    scores_f1score = pd.DataFrame()
+    scores_sensitivity = pd.DataFrame()
+    scores_specificity = pd.DataFrame()
+
+    set_names = ['Cann + King Data', 'Cann Data', 'King Data']
+    for a, file in enumerate(pos_measure_files):
+        tmp_scores_accuracy = []
+        tmp_scores_f1score = []
+        tmp_scores_sensitivity = []
+        tmp_scores_specificity = []
+        tmp_rankings = []
+        for i in range(num_runs):
+            model = Model(pos_measures_files=file,
+                        neg_measures_files=neg_measure_files,
+                        features_to_include=features_to_include,
+                        aggregation_method='minmax',
+                        subtract_avg_aev=False,
+                        num_aev_features_req=100)
+            model.prepare_dataset()
+            multi_run_output, multi_run_importance = model.multi_run_test(num_runs=1)
+            tmp_scores_accuracy.append(multi_run_output['Accuracy'].loc['avg'])
+            tmp_scores_f1score.append(multi_run_output['F1_Score'].loc['avg'])
+            tmp_scores_sensitivity.append(multi_run_output['Sensitivity'].loc['avg'])
+            tmp_scores_specificity.append(multi_run_output['Specificity'].loc['avg'])
+            tmp_rankings.append(multi_run_importance)
+        print(tmp_scores_accuracy)
+        print(tmp_scores_f1score)
+        print(tmp_scores_sensitivity)
+        print(tmp_scores_specificity)
+        #new_setname = file.split('/')[-1].split('_')[2]
+        new_setname = set_names[a]
+        scores_accuracy = pd.concat([scores_accuracy, pd.DataFrame({new_setname: tmp_scores_accuracy})], axis=1)
+        scores_f1score = pd.concat([scores_f1score, pd.DataFrame({new_setname: tmp_scores_f1score})], axis=1)
+        scores_specificity = pd.concat([scores_specificity, pd.DataFrame({new_setname: tmp_scores_specificity})], axis=1)
+        scores_sensitivity = pd.concat([scores_sensitivity, pd.DataFrame({new_setname: tmp_scores_sensitivity})], axis=1)
+        rankings.append(tmp_rankings)
+        set_names.append(new_setname)
 
     # graph the outputs
-    sets_acc = pd.DataFrame()
-    set_names = ['All', 'CannData', 'KingHighConf', 'Ecoli(hCit)', 'Synecho(hCit)']
+    #sets_acc = pd.DataFrame()
+    #set_names = ['All', 'CannData', 'KingHighConf', 'Ecoli(hCit)', 'Synecho(hCit)']
 
+    print(scores_accuracy)
+    print(scores_f1score)
+    print(scores_sensitivity)
+    print(scores_specificity)
+    '''
     #set_names = ['All', 'CannData']
-    for i, df in enumerate(scores):
+    for i, df in enumerate(scores_accuracy):
         sets_acc = pd.concat([sets_acc, df['Accuracy']], axis=1)
         sets_acc.rename(columns={'Accuracy': set_names[i]}, inplace=True)
     
     print(sets_acc)
-    plt.close()
-    fig, ax = plt.subplots()
-    sets_acc.boxplot(grid=False)
-    plt.xlabel('Positive Datasets')
-    plt.ylabel('Accuracy')
-    #column=sets_acc.columns, ax=ax
-    #plt.show()
-    plt.savefig('dataset_comparison_500_updatedgraph.png')
-    plt.savefig('dataset_comparison_500_updatedgraph.svg')
+    '''
+
+    def plot_comparison(set, metric):
+        plt.close()
+        fig, ax = plt.subplots()
+        set.boxplot(grid=False)
+        plt.xlabel('Positive Datasets')
+        plt.ylabel(metric)
+        #column=sets_acc.columns, ax=ax
+        #plt.show()
+        plt.savefig(f'dataset_comparison_3way_2_{num_runs}_{metric}_repreparedata.png')
+        plt.savefig(f'dataset_comparison_3way_2_{num_runs}_{metric}_repreparedata.svg')
+    
+    datasets = [scores_accuracy, scores_f1score, scores_sensitivity, scores_specificity]
+    metrics = ['Accuracy', 'F1_Score', 'Sensitivity', 'Specificity']
+    for dataset, metric in zip(datasets, metrics):
+        plot_comparison(dataset, metric)
 
 if __name__ == "__main__":
 
     '''
-    pos_measure_files = ['data/measures_cut_CannData_all_01.05.25.csv',
-                        'data/measures_cut_KingHighConf_all_01.05.25.csv',
-                        'data/measures_cut_Ecoli(hCit)_all_01.05.25.csv',
-                        'data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
+    pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv',
+                        'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv']
     #pos_measure_files = ['data/measures_cut_Synecho(hCit)_all_2.csv']
-    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25.csv']
+    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
     #pos_measure_files = ['data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
     #neg_measure_files = ['April25_negONLY.csv']
-    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
+    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas', 'aev']
     model = Model(pos_measures_files=pos_measure_files,
                 neg_measures_files=neg_measure_files,
                 features_to_include=features_to_include,
@@ -1307,9 +1543,9 @@ if __name__ == "__main__":
 
     #model.rf_ubq_test()
     #model.rf_five_fold()
-    #model.rf_five_fold_optimised()
+    model.rf_five_fold_optimised()
     #model.multi_run_test(num_runs=1)
-    model.rf_five_fold_optimised_expanded()
+    #model.rf_five_fold_optimised_expanded()
     '''
-    create_comparison_between_datasets()
+    create_comparison_between_datasets(3)
 

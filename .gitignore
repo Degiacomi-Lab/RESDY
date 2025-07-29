@@ -139,6 +139,9 @@ ubq_pred/
 *Testing*
 glycation/
 connexin26/
+model_output_graphs/
+measure_errors_*
+meaures_errors_*
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb
 graph_measures_general.ipynb
