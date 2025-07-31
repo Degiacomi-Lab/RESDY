@@ -285,7 +285,6 @@ def fragment(pdb, fasta, outfolder="."):
         if ">" in line:
             headers.append(line)
             chain_rawinfo = line.split("|")[1][6:].split(",")
-            #print(chain_rawinfo[0])
             #chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
             if len(chain_rawinfo[0]) == 1:
                 chain_info = chain_rawinfo
@@ -293,7 +292,6 @@ def fragment(pdb, fasta, outfolder="."):
                 chain_info = [str(chain_rawinfo[0].split('[')[0].strip())]
             else:
                 chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
-            #print(chain_info)
             fasta_chains.append(chain_info)
             if "sequence" in locals():
                 sequences.append(sequence)
@@ -316,7 +314,6 @@ def fragment(pdb, fasta, outfolder="."):
     #write FASTA files
     for i, header in enumerate(headers):
         for c in fasta_chains[i]:
-            print(c)
             if c not in chains:
                 raise Exception(f"chain mismatch between PDB and FASTA. {fasta_chains}, {chains}")
             fout = open(os.path.join(outfolder, f"chain{c}.fasta"), "w")
@@ -532,7 +529,6 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         fouts.append(foutname)
 
     # reassemble complex in final directory
-    #print("outdir: ", outdir)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 

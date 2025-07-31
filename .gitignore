@@ -137,6 +137,13 @@ seq_align/
 ubq_pred/
 *testing*
 *Testing*
+glycation/
+connexin26/
+ubq_pred/
+*.pdb
+Demo/conformations/
+Demo/curated/
+
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb
 graph_measures_general.ipynb
@@ -155,3 +162,5 @@ random_forest_model.py
 sequence_logo_creator*
 sequence_secondary_structure.py
 test_find_broken_curated_files.py
+model_output_graphs/
+Demo/
