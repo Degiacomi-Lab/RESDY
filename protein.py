@@ -19,14 +19,31 @@ from helper import get_download_tool, ShutUp
 
 
 class PDB(object):
+    '''
+    Class for taking an input dataframe of the proteins required to investigate, downloading
+    the proteins required from both the PDB and alphafold and cleaning the structures up
+    to ensure that these are all ready to be used within measurements for the prediction
+    model input. Cleaning is currently done using Modeller.
+    '''
 
     def __init__(self, outdir="result", gap=10, PDB_only=False):
-
-        self._setup(outdir, gap, PDB_only)
-
-
-    def _setup(self, outdir, gap, PDB_only):
-
+        '''
+        Initialise the PDB class.
+        
+        Parameters
+        ----------
+        outdir : string
+            The directory in which files should be downloaded and curated within
+        
+        gap : int
+            The maximum gap that is allowed in the sequence for a structure that has been
+            downloaded that patching will be done on. For structures with a gap in the
+            sequence greater than this, the structure will be removed.
+        
+        PDB_only : bool
+            Toggle for if you want to download a system from a list of PDB files (True)
+            or from a Uniprot dataframe (False) created from the Uniprot class. 
+        '''
         self.outdir = outdir
         self.PDB_only = PDB_only
 
@@ -221,9 +238,10 @@ class PDB(object):
             try:
 
                 fname = patcher.curate(f, fasta, outdir=self.curated_dir, gap=self.gap)
-                if len(replacement_dict)>0:
+                if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
+                    # TODO 30.07.25 - test this with replacing to new_replace_chains
 
                 test = True
 
@@ -339,8 +357,10 @@ class PDB(object):
 
     def clean(self, pdb):
         '''
-        Rename the protein's chains during the cleaning process so that they match the chain names given in the FASTA file.
-        This is required as pdb files name their chains using the 'auth' name and fasta with the normal chain name.
+        Rename the protein's chains during the cleaning process so that they match
+        the chain names given in the FASTA file.
+        This is required as pdb files name their chains using the 'auth' name and
+        fasta with the normal chain name.
         Therefore to avoid confusion we rename them all to what is used in the fasta file.
         '''
         try:
@@ -657,7 +677,9 @@ class PDB(object):
 
 
     def replace_chains(self, path, replacement_dict):
-
+        '''
+        
+        '''
         #First, the auth chain names are put in a list.
         auth_list = list(replacement_dict)
 
@@ -697,8 +719,23 @@ class PDB(object):
 
 
     def new_replace_chains(self, pdb, path, replacement_dict):
-        # New version of the replace chains which correctly produces pdb files afterwards for the patching,
-        # as the original left some protein in space
+        '''
+        New version of the replace chains which correctly produces pdb files afterwards
+        for the patching as the original left some proteins in space. 
+
+        Parameters
+        ----------
+        pdb : string
+            The name of the pdb file that the replacement is being done on
+
+        path : string
+            The path of the pdb file that the work is being done on
+
+        replacement_dict : dict
+            The dictionary which contains the information about which chains
+            need replacing 
+
+        '''
 
         # First, the auth chain names are put in a list.
         auth_list = list(replacement_dict)
@@ -706,8 +743,6 @@ class PDB(object):
         #The relevant file in conformations is then opened and rewritten.
         try:
             M = bb.Molecule(path)
-            print(M)
-            print(path)
             # find the indices of the atoms in the pdb file
             indices = M.atomselect('*', '*', '*', True, False)[1]
 
@@ -718,8 +753,6 @@ class PDB(object):
                 if row['chain'] in auth_list:
                     replacement_chain_name = replacement_dict.get(row['chain'])
                     M.data.at[index, 'chain'] = replacement_chain_name
-
-            #print(M.data)
 
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
             M.write_pdb(path_temp, index=indices, split_struc=True)

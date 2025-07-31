@@ -174,11 +174,22 @@ class Measure(object):
 
     def _setup_measures(self, features):
         '''
-        convert a list of features into a measuring protocol
+        Convert a list of features into a measuring protocol. If ['all'] given as input for
+        the features, this will convert the features list to a list containing all current
+        possible features.
+        
+        Parameters
+        ----------
+        features : list
+            The list of features that are required to measure over the set of proteins
         '''
 
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
+        if 'all' in features:
+            features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
+                        'melodia', 'aev_legolas', 'frustration', 'density', 'das']
+            self.features = features
         self.measures = []
         melodia_added = False
         frustration_added = False
@@ -258,7 +269,7 @@ class Measure(object):
         '''
         Determine the appropriate measures function to call based on the combination of
         running PDB_only and in parallel, reducing the number individual functions that
-        the user will have to call themselves. Differnet to measure_data() as this will
+        the user will have to call themselves. Different to measure_data() as this will
         restart the measurements from final previous point rather than starting again.
 
         Example
@@ -309,7 +320,7 @@ class Measure(object):
         '''
         Function saves a csv file of all of the measurements calculated through measure_dataframe()
         File automatically saved in the output directory that has been set
-         previously when setting up the measures class
+        previously when setting up the measures class
         Option to customise the name of the output file through outname parameter
 
         Parameters
@@ -331,7 +342,7 @@ class Measure(object):
         '''
         TODO FINISH THIS
         Function to measure specified features for all the structure files curated earlier in the programme.
-        Will take a list of the required proteins, finds associated curated structures and runs the reequired measurement functions.
+        Will take a list of the required proteins, finds associated curated structures and runs the required measurement functions.
         Results are saved to memory and a log file produced at the same time. (M.save_state() can be used to save the data to a csv)
 
         Method
@@ -408,7 +419,7 @@ class Measure(object):
         '''
         TODO FINISH THIS
         Function to measure specified features for all the structure files curated earlier in the programme.
-        Will take a list of the required proteins, finds associated curated structures and runs the reequired measurement functions.
+        Will take a list of the required proteins, finds associated curated structures and runs the required measurement functions.
         Results are saved to memory and a log file produced at the same time. (M.save_state() can be used to save the data to a csv)
 
         Method
@@ -1977,7 +1988,7 @@ class Measure(object):
             print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das
-    
+
 
     def calculate_seqcharge(self, path, num_add_aa=10):
         '''
@@ -2332,7 +2343,7 @@ class Measure(object):
                 shutil.move(result_filename, self.legolas_output_path)
                 if modified_struc:
                     os.remove('temp_legolas.pdb')
-            
+
             #  AEV section from this -if include_aev:
             if self.legolas_aevs:
                 try:
@@ -2351,22 +2362,22 @@ class Measure(object):
                     else:
                         print('Legolas AEVs: tmp_aevs_protein.txt file not found')
                         aevs = []
-                    
-                    
+
+
                     lys_aevs = []
                     for idx in lys_res_nums:
                         #lys_aevs.append(literal_eval(aevs[(idx - 1)]))
                         lys_aevs.append(aevs[(idx - 1)])
-                    
-                    
+
+
                     if os.path.exists('tmp_aevs_protein.txt'):
                         os.remove('tmp_aevs_protein.txt')
                     #print(lys_aevs)
-                
+
                 except Exception as e:
                     print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
                     if self.report_errors: self._report_error_to_file('LEGOLAS AEV 1', path, str(e))
-                    
+
 
         except Exception as e:
             print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
