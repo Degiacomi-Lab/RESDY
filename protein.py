@@ -44,6 +44,29 @@ class PDB(object):
             Toggle for if you want to download a system from a list of PDB files (True)
             or from a Uniprot dataframe (False) created from the Uniprot class. 
         '''
+        self._setup(outdir, gap, PDB_only)
+
+    
+
+    def _setup(self, outdir, gap, PDB_only):
+        '''
+        Setup function used within the main initalisation of the PDB class and
+        later load_state function to resetup the class with the new data.
+        
+        Parameters
+        ----------
+        outdir : string
+            The directory in which files should be downloaded and curated within
+        
+        gap : int
+            The maximum gap that is allowed in the sequence for a structure that has been
+            downloaded that patching will be done on. For structures with a gap in the
+            sequence greater than this, the structure will be removed.
+        
+        PDB_only : bool
+            Toggle for if you want to download a system from a list of PDB files (True)
+            or from a Uniprot dataframe (False) created from the Uniprot class. 
+        '''
         self.outdir = outdir
         self.PDB_only = PDB_only
 
