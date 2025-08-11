@@ -17,28 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
-
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
-
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
+from error_reporting import _report_error_to_file
 
 # Melodia packages
 try:
@@ -89,12 +68,11 @@ class Structure():
                 melodia_results = melodia_results.to_frame().T
 
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Melodia 1', path, str(e))
+            _report_error_to_file('Melodia 1', path, str(e))
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
 
         # Melodia 2 - Formatting and filtering
         try:
-            #melodia_results.rename({"chain": "Chain", "order": "Resid", "curvature": "melodia"}, axis="columns", inplace = True)
             melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
             lys_results = melodia_results['name'] == 'LYS'
             df_melodia = melodia_results[lys_results].copy()
@@ -104,7 +82,7 @@ class Structure():
             df_melodia.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
 
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Melodia 2', path, str(e))
+            _report_error_to_file('Melodia 2', path, str(e))
             print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
 
         #print(df_melodia)

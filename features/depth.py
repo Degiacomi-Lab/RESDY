@@ -17,40 +17,21 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
+from error_reporting import _report_error_to_file
 
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
+# Depth packages
 try:
     from Bio.PDB import PDBParser
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
 except Exception as e:
     print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
 
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
-# Melodia packages
-try:
-    import melodia_py as mel
-except Exception as e:
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
 class Depth():
     '''
     Class to house the different methods for calculating depth values for structures
     '''
-    
+
     def calculate_depth(self, path):
         '''
         Calculate the depth of the NZ atom from the surface of the protein within
@@ -92,7 +73,7 @@ class Depth():
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Depth 1', path, str(e))
+            _report_error_to_file('Depth 1', path, str(e))
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
         try:
@@ -100,7 +81,7 @@ class Depth():
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Depth 2', path, str(e))
+            _report_error_to_file('Depth 2', path, str(e))
             raise Exception(f">> DEPTH error: could not get biopython structure - {e}")
 
 
@@ -114,7 +95,7 @@ class Depth():
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
             except Exception as e:
-                if self.report_errors: self._report_error_to_file('Depth 3', path, str(e))
+                _report_error_to_file('Depth 3', path, str(e))
                 raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
 
             results.append([chain, resid, rd])

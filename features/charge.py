@@ -17,34 +17,8 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
+from error_reporting import _report_error_to_file
 
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
-
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
-# Melodia packages
-try:
-    import melodia_py as mel
-except Exception as e:
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
 class Charge():
     '''
@@ -123,7 +97,7 @@ class Charge():
 
 
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Seqcharge 1', path, str(e))
+            _report_error_to_file('Seqcharge 1', path, str(e))
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
             return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
@@ -165,7 +139,7 @@ class Charge():
                 seqcharge_output.append(count)
 
             except Exception as e:
-                if self.report_errors: self._report_error_to_file('Seqcharge 2', path, str(e))
+                _report_error_to_file('Seqcharge 2', path, str(e))
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_res_idx}, error: {e}')
                 seqcharge_output.append(None)
 
@@ -176,8 +150,7 @@ class Charge():
             df_seqcharge['Resid'] = lys_res_nums
             df_seqcharge['seqcharge'] = seqcharge_output
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Seqcharge 3', path, str(e))
+            _report_error_to_file('Seqcharge 3', path, str(e))
             print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
-        #print(df_seqcharge)
         return df_seqcharge

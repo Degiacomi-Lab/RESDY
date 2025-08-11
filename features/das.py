@@ -17,45 +17,19 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
-
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
-
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
-# Melodia packages
-try:
-    import melodia_py as mel
-except Exception as e:
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
+from error_reporting import _report_error_to_file
 
 class DAS():
     '''
     Class to house the different methods for calculating dynamically accessible surface
     area (das) values for structures
     '''
-    
+
     def calculate_das(self, path):
         '''
         Calculate the Dynamically Accessible Surface (DAS) of the NZ atom in the lysine structure
-        This is effectively the number of positions that the NZ atom can take within the structure of the protein
+        This is effectively the number of positions that the NZ atom can take within the structure
+        of the protein.
 
         Method
         ------
@@ -77,7 +51,7 @@ class DAS():
         df_das : dataframe
             Dataframe with information on chain, residue number and DAS output. Outline:
             Chain   Resid   das
-            x       x       [x]
+            x       x       x
 
         Example
         -------
@@ -99,7 +73,7 @@ class DAS():
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('DAS 1', path, e)
+            _report_error_to_file('DAS 1', path, e)
             print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
 
         # 2: Setup the Xlink module and create the half spheres
@@ -107,7 +81,7 @@ class DAS():
             XL = bb.Xlink(M)
             das_output = []
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('DAS 2', path, str(e))
+            _report_error_to_file('DAS 2', path, str(e))
             print(f'DAS Calculation: 2 - Failed to setup the Xlink biobox class: {e}')
 
         for i, lys_nz_idx in enumerate(idx_nz):
@@ -120,7 +94,7 @@ class DAS():
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))
             except Exception as e:
-                if self.report_errors: self._report_error_to_file('DAS 2', path, str(e))
+                _report_error_to_file('DAS 2', path, str(e))
                 print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms on lysine no {lys_res_nums[i]}: {e}')
                 das_output.append(None)
 
@@ -131,7 +105,7 @@ class DAS():
             df_das['Resid'] = lys_res_nums
             df_das['das'] = das_output
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('DAS 3', path, str(e))
+            _report_error_to_file('DAS 3', path, str(e))
             print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das

@@ -17,34 +17,8 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
+from error_reporting import _report_error_to_file
 
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
-
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
-# Melodia packages
-try:
-    import melodia_py as mel
-except Exception as e:
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
 class PKA():
     '''
@@ -108,20 +82,20 @@ class PKA():
                 except:
                     pass
 
-                if self.report_errors: self._report_error_to_file('PROPKA 1', path, str(e))
+                _report_error_to_file('PROPKA 1', path, str(e))
                 raise Exception(f'Failed to obtain pKa data (PROPKA): {e}') from e
 
         try:
             propka_lys_fails = self._parse_propka_errors(error_file_name)
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('PROPKA 2', path, str(e))
+            _report_error_to_file('PROPKA 2', path, str(e))
             raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
 
         try:
             pkafile = code_for_df + '.pka'
             propres = open(pkafile)
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('PROPKA 3', path, str(e))
+            _report_error_to_file('PROPKA 3', path, str(e))
             raise Exception(f'Failed to find {pkafile} output file to read') from e
 
         lys_number = list()
@@ -147,7 +121,7 @@ class PKA():
                         pkas.append(float(line[2]))
 
                     except Exception as e:
-                        if self.report_errors: self._report_error_to_file('PROPKA 4', path, str(e))
+                        _report_error_to_file('PROPKA 4', path, str(e))
                         print(f"> Error {e}")
                         continue
 
@@ -157,7 +131,7 @@ class PKA():
         except Exception as e:
             propres.close()
             shutil.move(pkafile, os.path.join(self.pkaoutdir, pkafile))
-            if self.report_errors: self._report_error_to_file('PROPKA 5', path, str(e))
+            _report_error_to_file('PROPKA 5', path, str(e))
             raise Exception(f'Failure parsing {code_for_df}.pka, error: {e}') from e
 
         try:
@@ -170,7 +144,7 @@ class PKA():
             df_propka = df_propka.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
 
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('PROPKA 6', path, str(e))
+            _report_error_to_file('PROPKA 6', path, str(e))
             raise Exception(f'Failed to construct pKa (PROPKA) dataframe. {e}') from e
 
         return df_propka
@@ -178,15 +152,17 @@ class PKA():
 
     def _parse_propka_errors(self, path):
         '''
-        parse the PROPKA output file and appends unique chain and resid of any lysines mentioned a DataFrame.
-        This list is returned to main and later the residues in it are removed from the df.
+        parse the PROPKA output file and appends unique chain and resid of any lysines
+        mentioned a DataFrame. This list is returned to main and later the residues in it
+        are removed from the df.
         
         Method
         ------
-        Go over the propka errors output file that is produced when running. Identify the lines which
-        contain information about the lysines within the protein structure analysed that have errors
-        associated with them. Extract the chain and resid number from this and append to a dataframe
-        to return which contains a set of data on the lysines to remove from the read output pka values.
+        Go over the propka errors output file that is produced when running. Identify the lines
+        which contain information about the lysines within the protein structure analysed that
+        have errors associated with them. Extract the chain and resid number from this and append
+        to a dataframe to return which contains a set of data on the lysines to remove from the
+        read output pka values.
 
         Parameters
         ----------
@@ -282,17 +258,17 @@ class PKA():
             except Exception as e:
                 print(e)
                 if "[Errno 2] No such file or directory: 'pkaani'" == str(e):
-                    if self.report_errors: self._report_error_to_file('pkaANI 1', path, str(e))
+                    _report_error_to_file('pkaANI 1', path, str(e))
                     raise Exception(f'Error: Failed to obtain pkaANI data: {e}. Is pkaANI installed correctly? If so, reload environment and try again.')
                 else:
-                    if self.report_errors: self._report_error_to_file('pkaANI 1', path, str(e))
+                    _report_error_to_file('pkaANI 1', path, str(e))
                     raise Exception(f"Failed to obtain pkaANI data through running pkaANI, error: {e}")
 
         try:
             log_file = pdb_path + '_pka.log'
             propres = open(log_file)
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('pkaANI 2', path, str(e))
+            _report_error_to_file('pkaANI 2', path, str(e))
             raise Exception(f'Failed to find pkaANI log file: {e}') from e
 
         lys_number = []
@@ -311,7 +287,7 @@ class PKA():
             propres.close()
         except Exception as e:
             propres.close()
-            if self.report_errors: self._report_error_to_file('pkaANI 3', path, str(e))
+            _report_error_to_file('pkaANI 3', path, str(e))
             raise Exception(f'Failure parsing pkaANI log file for: {code_for_df}_pka.log. {e}') from e
 
         try:
@@ -323,7 +299,7 @@ class PKA():
             df_pkaani = df_pkaani.dropna()
             df_pkaani = df_pkaani.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('pkaANI 4', path, str(e))
+            _report_error_to_file('pkaANI 4', path, str(e))
             raise Exception(f'Failed to construct pkaANI dataframe, error: {e}') from e
 
         return df_pkaani

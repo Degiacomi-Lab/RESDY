@@ -17,41 +17,15 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
+from error_reporting import _report_error_to_file
 
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
-
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
-# Melodia packages
-try:
-    import melodia_py as mel
-except Exception as e:
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
 class SASA():
     '''
     Class to house the different methods for calculating solvent accessible surface area
     (SASA) values for structures
     '''
-    
+
     def calculate_sasa(self, path):
         '''
         Calculate the solvent accessible surface area of the NZ atom within the lysine structure
@@ -110,7 +84,7 @@ class SASA():
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('SASA 1', path, str(e))
+            _report_error_to_file('SASA 1', path, str(e))
             raise Exception(f'SASA calc error: {e}') from e
 
         #For each lysine it works out the distance between the lys NZ,
@@ -146,7 +120,7 @@ class SASA():
             except:
                 print(f'Error obtaining SASA at index value {str(j)}')
                 list_of_sasa.append(None)
-                if self.report_errors: self._report_error_to_file('Depth 1', path, f'Error obtaining SASA at index value {str(j)}')
+                _report_error_to_file('Depth 1', path, f'Error obtaining SASA at index value {str(j)}')
                 continue
 
         #append results to a df which is given as output
@@ -156,7 +130,7 @@ class SASA():
                                 'sasa': list_of_sasa})
 
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('SASA 3', path, str(e))
+            _report_error_to_file('SASA 3', path, str(e))
             raise Exception(f'Error obtaining SASA data. {e}')
 
         return df_sasa

@@ -48,6 +48,10 @@ except Exception as e:
 
 
 class Measure(object):
+    '''
+    Class to handle functions used in calling feature functions and managing how these are
+    called and return a dataframe which contains the results after.
+    '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],

@@ -10,22 +10,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-#import dill
-
-
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
+from error_reporting import _report_error_to_file
 
 # Frustration packages
 try:
@@ -89,7 +74,7 @@ class Frustration():
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
             df_frustration['frustration'] = None
             df_frustration['density'] = None
-            if self.report_errors: self._report_error_to_file('Frustratometer 1', path, str(e))
+            _report_error_to_file('Frustratometer 1', path, str(e))
             return df_frustration
 
         # Frustratometer 2 - use model to calculate outputs
@@ -97,7 +82,7 @@ class Frustration():
             single_residue_awsem_frustration = model_single_resids.frustration(kind='singleresidue')
             resid_densities = model_single_resids.rho_r
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Frustratometer 2', path, str(e))
+            _report_error_to_file('Frustratometer 2', path, str(e))
             print(f'Frustratometer calculation 2 - failed to create frustratometer outputs: {e}')
 
         # Frustration 3 - extract lysine values from the outputs and append to output dataframe
@@ -117,8 +102,7 @@ class Frustration():
             except Exception as ef:
                 print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
         except Exception as e:
-            if self.report_errors: self._report_error_to_file('Frustratometer 3', path, str(e))
+            _report_error_to_file('Frustratometer 3', path, str(e))
             print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
 
-        #print(df_frustration)
         return df_frustration
