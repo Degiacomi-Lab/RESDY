@@ -18,6 +18,16 @@ import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
 #import dill
+#import features
+from features.aev import AEV
+from features.charge import Charge
+from features.das import DAS
+from features.depth import Depth
+from features.frustration import Frustration
+from features.nmr import NMR
+from features.pka import PKA
+from features.sasa import SASA
+from features.structure import Structure
 
 
 # AEV packages
@@ -198,23 +208,36 @@ class Measure(object):
         melodia_added = False
         frustration_added = False
         legolas_added = False
+        #TODO can this handle calculations where you actually want multiple methods for same feature calculating
         for m in features:
-            if m == "propka":
-                self.measures.append([m, self.calculate_pka_propka])
-            elif m == "pkaANI":
-                self.measures.append([m, self.calculate_pkaANI])
-            elif m == "sasa":
-                self.measures.append([m, self.calculate_sasa])
+            if m in ['propka', 'pkaANI']:
+                pka = PKA(outdir=self.outdir, calc_method=m)
+                self.measures.append([m, pka.calculate_pka])
+            elif m == 'pka':
+                print('Please enter which pKa calculation method you would like to use: ' \
+                      'propka or pkaANI')
+                while not input('propka or pkaANI:') in ['propka', 'pkaANI']:
+                    print('Please enter either propka or pkaANI')  #TODO this needs testing but should work
+                pka = PKA(outdir=self.outdir, calc_method='propka')
+                self.measures.append([m, pka.calculate_propka])
+            elif m == 'sasa':
+                sasa = SASA()
+                self.measures.append([m, sasa.calculate_sasa])
             elif m == "depth":
-                self.measures.append([m, self.calculate_depth])
+                depth = Depth()
+                self.measures.append([m, depth.calculate_depth])
             elif m == 'aev':
-                self.measures.append([m, self.calculate_aevs])
+                aev = AEV()
+                self.measures.append([m, aev.calculate_aevs])
             elif m == 'das':
-                self.measures.append([m, self.calculate_das])
+                das = DAS()
+                self.measures.append([m, das.calculate_das])
             elif m == 'seqcharge':
-                self.measures.append([m, self.calculate_seqcharge])
+                charge = Charge()
+                self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'legolas':
-                self.measures.append([m, self.calculate_legolas])
+                nmr = NMR()
+                self.measures.append([m, nmr.calculate_legolas])
                 legolas_added = True
                 if self.legolas_aevs:
                     self.features.append('aev_legolas')
@@ -223,20 +246,24 @@ class Measure(object):
                     os.mkdir(self.legolas_output_path)
             elif m == 'aev_legolas':
                 if not legolas_added:
-                    self.measures.append(['legolas', self.calculate_legolas])
+                    nmr = NMR()
+                    self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
                 if not frustration_added:
-                    self.measures.append(['frustration', self.calculate_frustration])
+                    frustration = Frustration()
+                    self.measures.append(['frustration', frustration.calculate_frustration])
                     frustration_added = True
             elif m == 'melodia':
-                self.measures.append([m, self.calculate_melodia])
+                structure = Structure()
+                self.measures.append([m, structure.calculate_melodia])
                 melodia_added = True
                 self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                 self.features.remove('melodia')
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 if not melodia_added:
-                    self.measures.append(['melodia', self.calculate_melodia])
+                    structure = Structure()
+                    self.measures.append(['melodia', structure.calculate_melodia])
                     melodia_added = True
             else:
                 raise Exception(f"measure {m} unknown")

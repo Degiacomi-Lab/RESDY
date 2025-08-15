@@ -25,7 +25,46 @@ class PKA():
     Class to house the different methods for calculating pKa values for structures
     '''
 
-    def calculate_pka_propka(self, path):
+    def __init__(self, outdir, calc_method='propka'):
+        '''
+        Setup the PKA class as required. Take input on the 
+
+        Parameters
+        ----------
+        outdir : string
+            The output directory of the measures calculations. Needed to create the
+            propkaoutput directory to store the output files from the PROPKA calculations.
+        calc_method : string
+            The method to use for caclulating pKa values. Default is set to 'propka'.
+            Current options are: propka, pKaANI
+        '''
+        self.pkaoutdir = os.path.join(outdir, "propkaoutput")
+        self.calc_method = calc_method
+        if not os.path.exists(self.pkaoutdir):
+            os.makedirs(self.pkaoutdir)
+
+    def calculate_pka(self, path):
+        '''
+        Take the preferred method of calculating the pKa values and call the appropriate
+        function from the method options available. Current methods available are:
+        - propka: Uses PROPKA3 program
+        - pKaANI: Uses the pKaANI program
+        
+        Parameters
+        ----------
+        path : string
+            The path of the pdb file that pKa is being calculated for
+        '''
+        match self.calc_method:
+            case 'propka':
+                self.calculate_propka(path)
+            case 'pKaANI':
+                self.calculate_pkaANI(path)
+            case _:
+                raise ValueError('Unknown pKa calculation method.' \
+                                 'Current options are: propka, pKaANI.')
+
+    def calculate_propka(self, path):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
         parse errors, and return a dataframe containing all measurements not yielding an error.
@@ -33,9 +72,9 @@ class PKA():
         Method
         ------
         Check if propka has been run before on this protein, otherwise run PROPKA3 on the given
-        pdb file. Use the function _parse_propka_errors() to identify any lysines within the structure
-        that did not caclulate correctly before searching the output file, extracting the pka
-        values produced and writing them to df_propka to output.
+        pdb file. Use the function _parse_propka_errors() to identify any lysines within the
+        structure that did not caclulate correctly before searching the output file, extracting
+        the pka values produced and writing them to df_propka to output.
 
         Parameters
         ----------
