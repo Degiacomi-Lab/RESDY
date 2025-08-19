@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 # Depth packages
 try:
@@ -73,7 +73,7 @@ class Depth():
             M = bb.Molecule(path)
             pos, idx = M.atomselect("*", "*", "NZ", get_index=True)
         except Exception as e:
-            _report_error_to_file('Depth 1', path, str(e))
+            report_error_to_file('Depth 1', path, str(e))
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
         try:
@@ -81,7 +81,7 @@ class Depth():
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
-            _report_error_to_file('Depth 2', path, str(e))
+            report_error_to_file('Depth 2', path, str(e))
             raise Exception(f">> DEPTH error: could not get biopython structure - {e}")
 
 
@@ -95,7 +95,7 @@ class Depth():
                 #dist = min_dist(pos[i], surface)
                 rd = residue_depth(myres, surface)
             except Exception as e:
-                _report_error_to_file('Depth 3', path, str(e))
+                report_error_to_file('Depth 3', path, str(e))
                 raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
 
             results.append([chain, resid, rd])

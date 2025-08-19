@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 class DAS():
     '''
@@ -73,7 +73,7 @@ class DAS():
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
         except Exception as e:
-            _report_error_to_file('DAS 1', path, e)
+            report_error_to_file('DAS 1', path, e)
             print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
 
         # 2: Setup the Xlink module and create the half spheres
@@ -81,7 +81,7 @@ class DAS():
             XL = bb.Xlink(M)
             das_output = []
         except Exception as e:
-            _report_error_to_file('DAS 2', path, str(e))
+            report_error_to_file('DAS 2', path, str(e))
             print(f'DAS Calculation: 2 - Failed to setup the Xlink biobox class: {e}')
 
         for i, lys_nz_idx in enumerate(idx_nz):
@@ -94,7 +94,7 @@ class DAS():
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))
             except Exception as e:
-                _report_error_to_file('DAS 2', path, str(e))
+                report_error_to_file('DAS 2', path, str(e))
                 print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms on lysine no {lys_res_nums[i]}: {e}')
                 das_output.append(None)
 
@@ -105,7 +105,7 @@ class DAS():
             df_das['Resid'] = lys_res_nums
             df_das['das'] = das_output
         except Exception as e:
-            _report_error_to_file('DAS 3', path, str(e))
+            report_error_to_file('DAS 3', path, str(e))
             print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das

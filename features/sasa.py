@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 
 class SASA():
@@ -84,7 +84,7 @@ class SASA():
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
-            _report_error_to_file('SASA 1', path, str(e))
+            report_error_to_file('SASA 1', path, str(e))
             raise Exception(f'SASA calc error: {e}') from e
 
         #For each lysine it works out the distance between the lys NZ,
@@ -120,7 +120,7 @@ class SASA():
             except:
                 print(f'Error obtaining SASA at index value {str(j)}')
                 list_of_sasa.append(None)
-                _report_error_to_file('Depth 1', path, f'Error obtaining SASA at index value {str(j)}')
+                report_error_to_file('Depth 1', path, f'Error obtaining SASA at index value {str(j)}')
                 continue
 
         #append results to a df which is given as output
@@ -130,7 +130,7 @@ class SASA():
                                 'sasa': list_of_sasa})
 
         except Exception as e:
-            _report_error_to_file('SASA 3', path, str(e))
+            report_error_to_file('SASA 3', path, str(e))
             raise Exception(f'Error obtaining SASA data. {e}')
 
         return df_sasa

@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 # Melodia packages
 try:
@@ -29,7 +29,26 @@ class Structure():
     '''
     Class to house the different methods for calculating structural measurement values
     for structures.
+
+    Parameters
+    ----------
+
     '''
+
+    def __init__(self, melodia_features=['all']):
+        '''
+        Initialise the Structure class
+        
+        Parameters
+        ----------
+        melodia_features : list
+            List of features which are calculated through melodia which has been requested
+            when the Measure class is initialised. Default is set to ['all'].
+        '''
+
+        self.melodia_features = melodia_features
+        if self.melodia_features == ['all']:
+            self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
 
     def calculate_melodia(self, path):
         '''
@@ -68,7 +87,7 @@ class Structure():
                 melodia_results = melodia_results.to_frame().T
 
         except Exception as e:
-            _report_error_to_file('Melodia 1', path, str(e))
+            report_error_to_file('Melodia 1', path, str(e))
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
 
         # Melodia 2 - Formatting and filtering
@@ -77,13 +96,13 @@ class Structure():
             lys_results = melodia_results['name'] == 'LYS'
             df_melodia = melodia_results[lys_results].copy()
             df_melodia.reset_index(inplace=True, drop=True)
-            cols_to_drop = ['code', 'id', 'model', 'curvature', 'writhing', 'torsion', 'phi', 'psi', 'name', 'arc_length']
-            cols_to_drop = [col for col in cols_to_drop if col not in self.features]
+            cols_to_drop = ['code', 'id', 'model', 'curvature', 'writhing',
+                            'torsion', 'phi', 'psi', 'name', 'arc_length']
+            cols_to_drop = [col for col in cols_to_drop if col not in self.melodia_features]
             df_melodia.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
 
         except Exception as e:
-            _report_error_to_file('Melodia 2', path, str(e))
+            report_error_to_file('Melodia 2', path, str(e))
             print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
 
-        #print(df_melodia)
         return df_melodia

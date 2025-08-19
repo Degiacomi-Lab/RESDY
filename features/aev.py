@@ -16,8 +16,7 @@ from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 
 # AEV packages
@@ -88,7 +87,7 @@ class AEV():
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
         except Exception as e:
-            _report_error_to_file('AEV 1', path, str(e))
+            report_error_to_file('AEV 1', path, str(e))
             print(f'AEV Calculations: 1 - could not create atomic structure representation: {e}')
             return
 
@@ -131,7 +130,7 @@ class AEV():
                     aevs = aevs[0,lys_nz_location,:]
                     aevs = aevs.tolist()
                 except Exception as e:
-                    _report_error_to_file('AEV 1.1', path, str(e))
+                    report_error_to_file('AEV 1.1', path, str(e))
                     print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}, error: {e}')
 
                 # 2.3: Append the new AEV to the output dataframe
@@ -141,16 +140,16 @@ class AEV():
         except torch.cuda.OutOfMemoryError:
             # potential that calculating the AEVs could overload the gpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CUDA memory error with file: {path}, skipping')
-            _report_error_to_file('AEV 2', path, 'CUDA memory error with file')
+            report_error_to_file('AEV 2', path, 'CUDA memory error with file')
             return df_aevs
         except MemoryError:
             # potential that calculating the AEVs could overload the cpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CPU memory error with file: {path}, skipping')
-            _report_error_to_file('AEV 2', path, 'CPU memory error with file')
+            report_error_to_file('AEV 2', path, 'CPU memory error with file')
             return df_aevs
         except Exception as e:
             print(f'AEV Calculations: 2 - could not create the AEVs for the protein for protein {path}, error: {e}')
-            _report_error_to_file('AEV 2', path, str(e))
+            report_error_to_file('AEV 2', path, str(e))
             return df_aevs
 
         # 4: if everything has worked, return the dataframe with the AEVs for the protein

@@ -205,6 +205,7 @@ class Measure(object):
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das']
             self.features = features
         self.measures = []
+        melodia_features = []
         melodia_added = False
         frustration_added = False
         legolas_added = False
@@ -236,17 +237,16 @@ class Measure(object):
                 charge = Charge()
                 self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'legolas':
-                nmr = NMR()
-                self.measures.append([m, nmr.calculate_legolas])
-                legolas_added = True
                 if self.legolas_aevs:
                     self.features.append('aev_legolas')
-                self.legolas_output_path = os.path.join(self.outdir, 'legolas')
-                if not os.path.exists(self.legolas_output_path):
-                    os.mkdir(self.legolas_output_path)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True)
+                else:
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=False)
+                self.measures.append([m, nmr.calculate_legolas])
+                legolas_added = True
             elif m == 'aev_legolas':
                 if not legolas_added:
-                    nmr = NMR()
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True)
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
@@ -255,14 +255,15 @@ class Measure(object):
                     self.measures.append(['frustration', frustration.calculate_frustration])
                     frustration_added = True
             elif m == 'melodia':
-                structure = Structure()
+                structure = Structure(melodia_features=['all'])
                 self.measures.append([m, structure.calculate_melodia])
                 melodia_added = True
                 self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                 self.features.remove('melodia')
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 if not melodia_added:
-                    structure = Structure()
+                    melodia_features += [m]
+                    structure = Structure(melodia_features=melodia_features)
                     self.measures.append(['melodia', structure.calculate_melodia])
                     melodia_added = True
             else:

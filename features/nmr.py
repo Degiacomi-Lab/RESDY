@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 
 # AEV packages
@@ -33,6 +33,27 @@ class NMR():
     '''
     Class to house the different methods for calculating 15N nmr values for structures
     '''
+
+    def __init__(self, outdir, legolas_aevs=False):
+        '''
+        Initialise the NMR class
+
+        Parameters
+        ----------
+        outdir : string
+            The output directory that measurements will be saved to.
+
+        legolas_aevs : bool
+            Toggle setting to indicate if you want the legolas programme to dump the AEVs from
+            the calculation of the 15N nmr values. Default is False.
+        '''
+
+        self.outdir = outdir
+        self.legolas_aevs = legolas_aevs
+
+        self.legolas_output_path = os.path.join(self.outdir, 'legolas')
+        if not os.path.exists(self.legolas_output_path):
+            os.mkdir(self.legolas_output_path)
 
     def calculate_legolas(self, path):
         '''
@@ -83,7 +104,7 @@ class NMR():
                     modified_struc = True
         except Exception as e:
             print(f'Legolas: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
-            _report_error_to_file('LEGOLAS 1', path, str(e))
+            report_error_to_file('LEGOLAS 1', path, str(e))
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
 
         # 2: change location to legolas directory and run the legolas program on the specified pdb before changing back to working directory
@@ -145,12 +166,12 @@ class NMR():
 
                 except Exception as e:
                     print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
-                    _report_error_to_file('LEGOLAS AEV 1', path, str(e))
+                    report_error_to_file('LEGOLAS AEV 1', path, str(e))
 
 
         except Exception as e:
             print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
-            _report_error_to_file('LEGOLAS 2', path, str(e))
+            report_error_to_file('LEGOLAS 2', path, str(e))
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
 
         # 3: Create dataframe to return
@@ -162,7 +183,7 @@ class NMR():
             if self.legolas_aevs:
                 df_legolas['aev_legolas'] = lys_aevs
         except Exception as e:
-            _report_error_to_file('LEGOLAS 3', path, str(e))
+            report_error_to_file('LEGOLAS 3', path, str(e))
             print(f'Legolas: 3 - Failed to create datafame to append to the overall dataframe: {e}')
         #print(df_legolas)
         return df_legolas

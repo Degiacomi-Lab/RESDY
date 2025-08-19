@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
-from error_reporting import _report_error_to_file
+from features.error_reporting import report_error_to_file
 
 
 class Charge():
@@ -97,7 +97,7 @@ class Charge():
 
 
         except Exception as e:
-            _report_error_to_file('Seqcharge 1', path, str(e))
+            report_error_to_file('Seqcharge 1', path, str(e))
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
             return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
@@ -139,7 +139,7 @@ class Charge():
                 seqcharge_output.append(count)
 
             except Exception as e:
-                _report_error_to_file('Seqcharge 2', path, str(e))
+                report_error_to_file('Seqcharge 2', path, str(e))
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_res_idx}, error: {e}')
                 seqcharge_output.append(None)
 
@@ -150,7 +150,7 @@ class Charge():
             df_seqcharge['Resid'] = lys_res_nums
             df_seqcharge['seqcharge'] = seqcharge_output
         except Exception as e:
-            _report_error_to_file('Seqcharge 3', path, str(e))
+            report_error_to_file('Seqcharge 3', path, str(e))
             print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_seqcharge
