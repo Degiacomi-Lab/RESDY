@@ -139,18 +139,7 @@ class Measure(object):
         # document failed pdb files
         self.wrong_pdb_file = []
         self.report_errors = report_errors
-        if report_errors:
-            new_file_name = f'meaures_errors_{date.today()}.txt'
-            while os.path.exists(new_file_name):
-                if '_no' in new_file_name:
-                    error_file_num = int(new_file_name.split('_no')[-1].split('.')[0])
-                    new_file_name = f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt'
-                else:
-                    new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
-            with open(new_file_name, 'w') as error_f1:
-                error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
-        self.error_filename = new_file_name
-        print(self.error_filename)
+        if self.report_errors: self._setup_report_errors_file()
 
         # modified lysine management
         self.include_modified = include_modified
@@ -159,9 +148,6 @@ class Measure(object):
         self.parallel = parallel
         self.files_to_analyse = []
         self.parallel_items = {}
-
-        self.legolas_loc = '/home/gweston/Documents/extra_packages/legolas-main/test'
-
 
         # Check that all files in DataFrame appear at least once in folder
         # find all AlphaFold entries
@@ -204,6 +190,7 @@ class Measure(object):
             features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das']
             self.features = features
+        if 'melodia' in self.features: self.features.append(self.features.pop(self.features.index('melodia')))
         self.measures = []
         melodia_features = []
         melodia_added = False
@@ -238,7 +225,8 @@ class Measure(object):
                 self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'legolas':
                 if self.legolas_aevs:
-                    self.features.append('aev_legolas')
+                    if 'aev_legolas' not in self.features:
+                        self.features.append('aev_legolas')
                     nmr = NMR(outdir=self.outdir, legolas_aevs=True)
                 else:
                     nmr = NMR(outdir=self.outdir, legolas_aevs=False)
@@ -268,6 +256,23 @@ class Measure(object):
                     melodia_added = True
             else:
                 raise Exception(f"measure {m} unknown")
+
+    def _setup_report_errors_file(self):
+        '''
+        Function to set up the file where errors produced through running the Measure
+        class will be written to such that they are easier to look over after running,
+        rather than trawling through output.
+        '''
+        new_file_name = f'meaures_errors_{date.today()}.txt'
+        while os.path.exists(new_file_name):
+            if '_no' in new_file_name:
+                error_file_num = int(new_file_name.split('_no')[-1].split('.')[0])
+                new_file_name = f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt'
+            else:
+                new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
+        with open(new_file_name, 'w') as error_f1:
+            error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
+        self.error_filename = new_file_name
 
 
     def measure_data(self):
