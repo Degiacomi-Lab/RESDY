@@ -181,10 +181,10 @@ class NMR():
             df_legolas['Resid'] = lys_res_nums
             df_legolas['legolas'] = lys_nmr_vals
             if self.legolas_aevs:
-                df_legolas['aev_legolas'] = lys_aevs
+                df_legolas['aev_legolas'] = str(lys_aevs)
         except Exception as e:
             report_error_to_file('LEGOLAS 3', path, str(e))
             print(f'Legolas: 3 - Failed to create datafame to append to the overall dataframe: {e}')
-        #print(df_legolas)
+
         return df_legolas
     

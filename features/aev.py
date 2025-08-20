@@ -34,7 +34,7 @@ class AEV():
     of lysines within the protein structure termed atomic environment vectors (AEVs). Potential AEV
     representations are currently:
     1. ANI-2x AEVs
-    2. LEGOLAS ANI-2x AEVs
+    2. LEGOLAS ANI-2x AEVs - currently calculated through the LEGOLAS nmr package as an add-on
     3. Coarse-grain representation AEVs 
     '''
     def calculate_aevs(self, path):
@@ -128,7 +128,7 @@ class AEV():
                     aevs = ANI.aev_computer((species, ani_coords)).aevs
                     lys_nz_location = list_close_points.index(idx_nz[j])
                     aevs = aevs[0,lys_nz_location,:]
-                    aevs = aevs.tolist()
+                    aevs = str(aevs.tolist())
                 except Exception as e:
                     report_error_to_file('AEV 1.1', path, str(e))
                     print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}, error: {e}')

@@ -441,14 +441,17 @@ class Measure(object):
                 print(result)
                 self.df = ns_measures.df
 
-        # remove possible duplicated rows (if restarted)
+        # remove possible duplicated rows in dataframe
         try:
-            self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+            self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
+            print('\n>> Removed duplicates from measurement dataframe.')
         except Exception as e_one:
             try:
-                self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
+                print(f'\n>> Failed to remove duplicates from measurement dataframe, trying new method: {e_one}')
+                self.df = self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+                print('>> Removed duplicates from measurement dataframe using new method.')
             except Exception as e_two:
-                print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
+                print(f'>> Failed to remove duplicates from measurement dataframe: {e_two}')
                 pass
 
 
@@ -555,7 +558,7 @@ class Measure(object):
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                     except Exception as e:
-                        print(f"ERROR: {e}")
+                        print(f"Error iterating measures, potential dataframe combination problem: {e}")
                         continue
 
                 processing_time = round((time.time()-tstart), 2)
@@ -589,17 +592,18 @@ class Measure(object):
                 if not df_currentfile.empty:
                     self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
-        # remove possible duplicated rows (if restarted)
+        # remove possible duplicated rows in dataframe
         try:
-            self.df = self.df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+            self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
+            print('\n>> Removed duplicates from measurement dataframe.')
         except Exception as e_one:
             try:
-                print(f'Failed to remove duplicates from measurement dataframe, trying new method: {e_one}')
-                self.df = self.df.loc[self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)]
+                print(f'\n>> Failed to remove duplicates from measurement dataframe, trying new method: {e_one}')
+                self.df = self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+                print('>> Removed duplicates from measurement dataframe using new method.')
             except Exception as e_two:
-                print(f'Failed to remove duplicates from measurement dataframe: {e_two}')
+                print(f'>> Failed to remove duplicates from measurement dataframe: {e_two}')
                 pass
-
 
 
     def _measure_file(self, file_details, lock, ns):
@@ -913,11 +917,24 @@ class Measure(object):
 
     def _combine_dataframes(self, target, to_merge, col_name):
         '''
+        Function to combine the dataframe produced by a measurement function into the
+        main dataframe containing all the measurements.
         target is a DataFrame to be filled with data, to_merge contains the data.
         Values to insert are indexed in both array by two columns: Chain and Resid.
-        '''
-        # e.g. self._combine_dataframes(df, result, meas[0])
 
+        Parameters
+        ----------
+        target : DataFrame
+            DataFrame to be filled with data.
+        to_merge : DataFrame
+            to_merge contains the new data to merge.
+        col_name : string
+            Name of the column which the new data is from.
+        
+        Example
+        -------
+        self._combine_dataframes(df, result, meas[0])
+        '''
         for i, r in target.iterrows():
 
             chain_value = r["Chain"]
@@ -928,9 +945,6 @@ class Measure(object):
                 continue
 
             # account for measurements that have special cases
-            # aevs - add the list of aevs in one column to the overall dataframe
-            if col_name == 'aev':
-                target['aev'] = target['aev'].astype('object')
             # melodia - check over all the required features to add and add these back in to the overall dataframe
             if col_name == 'melodia':
                 melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
@@ -946,13 +960,9 @@ class Measure(object):
                 legolas_features = ['legolas', 'aev_legolas']
                 for feature in self.features:
                     if feature in legolas_features:
-                        if col_name == 'aev_legolas':
-                            target['aev_legolas'] = target['aev_legolas'].astype('object')
-                        
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
-        
         return target
 
 
@@ -1331,6 +1341,7 @@ class Measure(object):
         -------
         >> M._cleanup_calculation_files()
         '''
+        print('\n>> Cleaning up leftover files from measures calculations...')
         dir_files = [f for f in os.listdir() if os.path.isfile(os.path.join(os.getcwd(),f))]
         nmr_cs_file = False
         nmr_parquet_file = False
@@ -1359,12 +1370,13 @@ class Measure(object):
                     pass
             if count <= 2:
                 os.remove(self.error_filename)
+        print('>> Unused file cleanup complete.')
 
 
 if __name__ == "__main__":
 
 
-    f1 = "Demo{os.sep}curated{os.sep}1M2E-alt-1.pdb"
+    file_one = "Demo{os.sep}curated{os.sep}1M2E-alt-1.pdb"
 
     from uniprot import Uniprot
     from protein import PDB
