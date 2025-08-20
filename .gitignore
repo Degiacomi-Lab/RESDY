@@ -139,11 +139,12 @@ ubq_pred/
 *Testing*
 glycation/
 connexin26/
+model_output_graphs/
+measure_errors_*
 ubq_pred/
 *.pdb
 Demo/conformations/
 Demo/curated/
-
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb
 graph_measures_general.ipynb
@@ -158,7 +159,6 @@ gw*
 # Temporary files to ignore
 analyse_charge_data.py
 3d_seq_logo_creator.py
-random_forest_model.py
 sequence_logo_creator*
 sequence_secondary_structure.py
 test_find_broken_curated_files.py
