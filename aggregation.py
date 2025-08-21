@@ -3,13 +3,10 @@ import random
 import statistics
 from ast import literal_eval
 from copy import deepcopy as dc
-#data handling
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import metrics
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 from sklearn.decomposition import PCA
@@ -24,13 +21,15 @@ class Aggregation:
     of measurements per lysine residue according to the aggregation method.
     '''
 
-    def __init__(self, df_measurements, aggregation_method='minmax', features_to_include=['all']):
+    def __init__(self, df_measurements, aggregation_method='minmax',
+                 features_to_include=['all'], aev_red_method='pca'):
         '''
         Initialisation of the Aggregation class.
         '''
         self.df_measurements = df_measurements
         self.aggregation_method = aggregation_method
         self.features_to_include = features_to_include
+        self.aev_red_method = aev_red_method
 
         if self.features_to_include == ['all']:
             self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid']]
@@ -71,7 +70,37 @@ class Aggregation:
                 return self._aggregate_minmax()
 
 
-    def _reduce_aevs_before(self):
+    def _reduce_aev_dimensions(self):
+        '''
+        Due to curse of dimenstionality the model performs worse when the AEVs are clouding the
+        data as it cannot work out which features are actually important. Therefore, this function
+        will call the required method to reduce the AEVs down to a specified number of features
+        depending on the method chosen. Method options:
+        - 'pca': Principal Component Analysis taking 99% of the variance within the data
+        - 'sd': Standard Deviation of the AEV
+        - 'vif': Variance Inflation Factor Correlation analysis to remove features which are correlated
+        - 'autoencoder': Autoencoder dimension reduction method, try and capture any non-linearity
+        - 'null': Remove all the columns within the AEVs which are always zero
+        '''
+
+        match self.aev_red_method:
+            case 'pca':
+                self._prepare_pca()
+            case 'sd':
+                self._prepare_aev_sd()
+            case 'vif':
+                self._prepare_vif_aev()
+            case 'autoencoder':
+                i = 1
+                # TODO: implement the autoencoder method here 21.08.25
+            case 'null':
+                self._cut_null_aev_columns()
+            case _:
+                print(f'>> AEV dimensionality reduction method: {self.aev_red_method}, was not recognised, using PCA method.')
+                self._prepare_pca()
+
+
+    def _prepare_aev_sd(self):
         '''
         Model performs worse when more of the features of the AEV are taken through to training.
         Reduce the AEVs down to the required number of features based on one of the methods
@@ -90,7 +119,7 @@ class Aggregation:
         -------
         >> self.reduce_aevs()
         '''
-        # TODO work on X_all - will eventually change all these functions so that they are general rather than single use
+        # TODO change this to be a general function for standard deviation
         temp_aevs_df = self.X_all['aev'].tolist()
         X_all_std = np.std(temp_aevs_df, axis=0)
         df_std = pd.DataFrame({'aev_std': X_all_std})
@@ -100,7 +129,27 @@ class Aggregation:
         print('Top 100 aev features: ', self.top_n_features)
 
 
-    def _reduce_aevs_after(self, method='pca'):
+    def _cut_null_aev_columns(self):
+        # first remove all the null columns
+        num_cols_to_cut = sum((self.X_final != 0).any(axis=0))
+        #print([i for i, a in enumerate(list((self.X_final != 0).any(axis=0))) if a is False])
+        print(f'{num_cols_to_cut} columns kept from the AEV input data that are non zero')
+        self.X_final = self.X_final.loc[:, (self.X_final != 0).any(axis=0)]
+
+        # then remove the least important columns according to the method given
+        # drop all the columns that were not required through the std deviation
+        print(f'Initial number of columns: {len(self.X_final.columns.tolist())}')
+        if 'aev' in self.features_to_include and len(self.top_n_features) != 0:
+            #self.top_n_features = [f'AEV_{x}' for x in self.top_n_features]
+            current_feature_columns = self.X_final.columns.tolist()
+            for feature in current_feature_columns:
+                #if 'AEV' in feature and int(feature.split('_')[-1]) not in self.top_n_features:
+                if 'AEV' in feature and feature not in self.top_n_features:
+                    self.X_final = self.X_final.drop(feature, axis=1)
+        print(f'Final number of columns after reduction: {len(self.X_final.columns.tolist())}')
+
+
+    def _prepare_vif_aev(self):
         '''
         Model performs worse when more of the features of the AEV are taken through to training.
         Reduce the AEVs down to the required number of features based on one of the methods chosen
@@ -124,25 +173,26 @@ class Aggregation:
         -------
         >> self.reduce_aevs()
         '''
-        match method:
-            case 'vif':
-                # The columns_to_keep that is commented out is the oriignal set calculated by Phong
-                # over the negative dataset
-                '''
-                # this columns_to_keep is the original set calculated with the original AEVs
-                columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
-                                   30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
-                                   399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
-                                   50,51,52,53,54,543,544,555,556,557,558,563,57,573,579,58,580,
-                                   583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
-                                   709,711,716,719,73,74,745,75,751,76,77,78,79,9]
-                '''
+        # The columns_to_keep that is commented out is the oriignal set calculated by Phong
+        # over the negative dataset
+        '''
+        # this columns_to_keep is the original set calculated with the original AEVs
+        columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
+                            30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
+                            399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
+                            50,51,52,53,54,543,544,555,556,557,558,563,57,573,579,58,580,
+                            583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
+                            709,711,716,719,73,74,745,75,751,76,77,78,79,9]
+        '''
 
-                # use the preprocesing module to come up with exact columns to keep via VIF analysis
-                P = Preprocessing(self.X_final, list(self.X_final.columns))
-                columns_to_keep = P.calculate_diff_features(self.X_final)
+        # use the preprocesing module to come up with exact columns to keep via VIF analysis
+        P = Preprocessing(self.X_final, list(self.X_final.columns))
+        columns_to_keep = P.calculate_diff_features(self.X_final)
 
-                self.top_n_features = ['AEV_' + str(a) for a in columns_to_keep]
+        self.top_n_features = ['AEV_' + str(a) for a in columns_to_keep]
+
+        '''
+        # This bit was kept in case it is needed for sorting out the sd function later on
             case 'sd':
                 # TODO work on X_all - will eventually change all these functions so that they are general rather than single use
                 aev_stds = {}
@@ -155,28 +205,7 @@ class Aggregation:
                 top_n_features = list(df_std.index.values[:self.num_aev_features_req])
                 self.top_n_features = top_n_features
                 print('Top 100 aev features: ', self.top_n_features)
-
-            case 'pca':
-                # Case where a PCA can be produced which captures 99% of the variance reducing the
-                # number of features to around 50 in testing
-                print('Calculating PCA...')
-
-                n_components = 0.99
-                pca = PCA(n_components=n_components)
-                aev_col_names = [a for a in self.X_final.columns if 'AEV_' in a]
-                aev_data = self.X_final[aev_col_names].values.tolist()
-                pca_data = pca.fit_transform(aev_data)
-
-                #classification_values = self.X_final['class'].values
-                variance_data = pca.explained_variance_ratio_
-                
-                print(f'PCA used {pca.n_components_} components to explain {n_components} variance.')
-                
-                self.X_final.drop(aev_col_names, axis=1)
-                df_out = pd.DataFrame(pca_data['aev'].to_list())
-                df_out = df_out.add_prefix('AEV_')
-                self.X_final = pd.concat([self.X_final, df_out], axis=1)
-                #self.X_final = self.X_final.drop('aev', axis=1)
+        '''
 
 
     def _prepare_pca(self):
@@ -209,7 +238,6 @@ class Aggregation:
         df_out = pd.DataFrame(pca_data)
         df_out = df_out.add_prefix('AEV_')
         self.df_measurements = pd.concat([self.df_measurements, df_out], axis=1)
-        print(self.df_measurements)
 
 
     def _aggregate_avg(self):
@@ -256,7 +284,7 @@ class Aggregation:
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
-        self._prepare_pca()
+        self._reduce_aev_dimensions()
 
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
@@ -296,7 +324,7 @@ class Aggregation:
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
-        self._prepare_pca()
+        self._reduce_aev_dimensions()
 
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
@@ -379,7 +407,7 @@ class Aggregation:
         max_features = ['sasa', 'das', 'frustration', 'seqcharge', ]
         min_features = ['propka', 'pkaANI', 'depth', 'density']
 
-        self._prepare_pca()
+        self._reduce_aev_dimensions()
 
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
@@ -468,11 +496,10 @@ class Aggregation:
         the features to allow for this without having problems with the data overlapping and
         biasing the output.
         '''
-        print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
-        self._prepare_pca()
+        self._reduce_aev_dimensions()
 
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
@@ -519,7 +546,7 @@ class Aggregation:
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
-        self._prepare_pca()
+        self._reduce_aev_dimensions()
 
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
