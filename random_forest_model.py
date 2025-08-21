@@ -15,6 +15,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 from sklearn.decomposition import PCA
 from preprocessing import Preprocessing
+from aggregation import Aggregation
 
 cwd = os.getcwd()
 pd.set_option('display.max_rows', 500)
@@ -33,7 +34,7 @@ class Model(object):
                  aggregation_method='avg',
                  subtract_avg_aev=False,
                  num_aev_features_req = 100):
-        
+
         self.pos_measures_files = pos_measures_files
         self.neg_measures_files = neg_measures_files
         self.X_all = pd.DataFrame()
@@ -71,13 +72,13 @@ class Model(object):
         self.X_all.rename(columns={'aev': 'aev_old'}, inplace=True)
         self.X_all['aev'] = 1
         self.X_all['aev'] = self.X_all['aev'].astype('object')
-        
+
         for i, r in self.X_all.iterrows():
             #new_aev = literal_eval(r['aev'].values[0])
             print(literal_eval(r['aev_old'].values[0]))
             self.X_all.at[i, 'aev'] = literal_eval(r['aev_old'].values[0])
             #self.X_all.loc[[i], 'aev'] = pd.Series([new_aev], index=self.X_all.index[[i]])
-        
+
         self.X_all.drop(['aev_old'], axis=1)
 
         if self.subtract_avg_aev:
@@ -90,7 +91,6 @@ class Model(object):
                 old_aev = r['aev']
                 new_aev = [(a - b) for a, b in zip(old_aev, average_lys_aev)]
                 self.X_all.at[i, 'aev'] = new_aev
-
 
 
     def prepare_dataset(self):
@@ -107,7 +107,6 @@ class Model(object):
         -------
         >> model.prepare(df)
         '''
-        # read in data
         pos_data = pd.DataFrame()
         neg_data = pd.DataFrame()
         for file in self.pos_measures_files:
@@ -117,7 +116,7 @@ class Model(object):
 
         pos_data['class'] = 1
         neg_data['class'] = 0
-        print([len(pos_data), len(neg_data)])
+        print(f'Len positve data: {len(pos_data)}, Len negative data: {len(neg_data)}')
         self.X_all = pd.concat([pos_data, neg_data], ignore_index=True)
 
         if 'aev_legolas' in self.X_all.columns:
@@ -125,10 +124,9 @@ class Model(object):
             self.X_all.rename(columns={'aev_legolas': 'aev'}, inplace=True)
         self.X_all.dropna(subset=self.features_to_include, inplace=True)
 
-        print(self.X_all.head())
         self._check_for_overlap()
 
-        #remove any rows with rubbish depth measurements
+        #remove any rows with rubbish depth measurements - can be expanded into other features if needed too
         if 'depth' in self.features_to_include:
             df_suspicious = self.get_extreme_values(feature='depth', lower=0, upper=20)
             self.remove_df(df_suspicious)
@@ -143,17 +141,13 @@ class Model(object):
         self.X_all = self.X_all[cols_required]
         self.y_all = list(self.X_all['class'])
 
-        # prepare aevs
-        #if 'aev' in self.features_to_include:
-        #    self._prepare_aevs()
-            #self._reduce_aevs_before()
-        # aggregate based on aggregation method - will do both pos and neg data automatically
-        self._aggregate()
+        agg = Aggregation(self.X_all, aggregation_method='minmax', features_to_include=['all'])
+        self.X_agg = agg.aggregate_data()
 
         # create X
         # prepare the random numbers to get a random subset of the negative dataset to balance out the data
         print(self.X_agg)
-        self.X_agg.to_csv('X_agg.csv')
+        #self.X_agg.to_csv('X_agg.csv')
         num_pos_data = len(self.X_agg[self.X_agg['class'] == 1])
         print([num_pos_data, (len(self.X_agg) - num_pos_data)])
         indices_random_neg_data = random.sample(range(num_pos_data, len(self.X_agg)), num_pos_data)
@@ -165,125 +159,12 @@ class Model(object):
         self.X_final = self.X_final.drop(['Uniprot_Entry', 'Resid', 'class'], axis=1)
         print(self.X_final.head())
 
-        '''
-        if 'aev' in self.features_to_include:
-            self._reduce_aevs_after()
-        self._cut_columns()
-        '''
 
         # create Y set - the classification set, 0 is negative, 1 is positive, positives go into the set first
         for i in range(num_pos_data):
             self.y.append(1)
         while len(self.y) < len(self.X_final):
             self.y.append(0)
-
-
-    def _reduce_aevs_before(self):
-        '''
-        Model performs worse when more of the features of the AEV are taken through to training.
-        Reduce the AEVs down to the required number of features based on one of the methods
-        chosen below. The first method is to use the standard deviation of the individual features
-        of the AEV to workout which features show variation and will be likely to be good choices
-        to take through to the model. This is currently setup to find the top 100 from the base
-        aevs fed in.
-        
-        Method
-        ------
-        Take the dataframe and perform a standard deviation over the AEVs, take the top
-        required number of structures in terms of standard deviation as the new input
-        dataframe going forward. 
-        
-        Example
-        -------
-        >> self.reduce_aevs()
-        '''
-        # TODO work on X_all - will eventually change all these functions so that they are general rather than single use
-        temp_aevs_df = self.X_all['aev'].tolist()
-        X_all_std = np.std(temp_aevs_df, axis=0)
-        df_std = pd.DataFrame({'aev_std': X_all_std})
-        df_std = df_std.sort_values(by=['aev_std'], ascending=False)
-        top_n_features = df_std.index.values[:self.num_aev_features_req]
-        self.top_n_features = top_n_features
-        print('Top 100 aev features: ', self.top_n_features)
-
-
-    def _reduce_aevs_after(self, method='pca'):
-        '''
-        Model performs worse when more of the features of the AEV are taken through to training.
-        Reduce the AEVs down to the required number of features based on one of the methods chosen
-        below. The first method is to use the standard deviation of the individual features of the
-        AEV to workout which features show variation and will be likely to be good choices to take
-        through to the model. This method does it after aggregation to ensure that the maximal
-        variance after aggregation is taken through into the model.
-        
-        Method
-        ------
-        Take the dataframe and perform a standard deviation over the AEVs, take the top
-        required number of structures in terms of standard deviation as the new input
-        dataframe going forward.
-
-        Parameters
-        ----------
-        method -> string
-            The method required for cutting down the columns of the AEV- takes either 'vif' or 'sd'
-        
-        Example
-        -------
-        >> self.reduce_aevs()
-        '''
-        match method:
-            case 'vif':
-                # The columns_to_keep that is commented out is the oriignal set calculated by Phong
-                # over the negative dataset
-                '''
-                # this columns_to_keep is the original set calculated with the original AEVs
-                columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
-                                   30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
-                                   399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
-                                   50,51,52,53,54,543,544,555,556,557,558,563,57,573,579,58,580,
-                                   583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
-                                   709,711,716,719,73,74,745,75,751,76,77,78,79,9]
-                '''
-
-                # use the preprocesing module to come up with exact columns to keep via VIF analysis
-                P = Preprocessing(self.X_final, list(self.X_final.columns))
-                columns_to_keep = P.calculate_diff_features(self.X_final)
-
-                self.top_n_features = ['AEV_' + str(a) for a in columns_to_keep]
-            case 'sd':
-                # TODO work on X_all - will eventually change all these functions so that they are general rather than single use
-                aev_stds = {}
-                for column in self.X_final.columns:
-                    if 'AEV' in column:
-                        aev_stds[column] = self.X_final[column].std(ddof=0)
-
-                df_std = pd.DataFrame({'aev_std': aev_stds})
-                df_std = df_std.sort_values(by=['aev_std'], ascending=False)
-                top_n_features = list(df_std.index.values[:self.num_aev_features_req])
-                self.top_n_features = top_n_features
-                print('Top 100 aev features: ', self.top_n_features)
-
-            case 'pca':
-                # Case where a PCA can be produced which captures 99% of the variance reducing the
-                # number of features to around 50 in testing
-                print('Calculating PCA...')
-
-                n_components = 0.99
-                pca = PCA(n_components=n_components)
-                aev_col_names = [a for a in self.X_final.columns if 'AEV_' in a]
-                aev_data = self.X_final[aev_col_names].values.tolist()
-                pca_data = pca.fit_transform(aev_data)
-
-                #classification_values = self.X_final['class'].values
-                variance_data = pca.explained_variance_ratio_
-                
-                print(f'PCA used {pca.n_components_} components to explain {n_components} variance.')
-                
-                self.X_final.drop(aev_col_names, axis=1)
-                df_out = pd.DataFrame(pca_data['aev'].to_list())
-                df_out = df_out.add_prefix('AEV_')
-                self.X_final = pd.concat([self.X_final, df_out], axis=1)
-                #self.X_final = self.X_final.drop('aev', axis=1)
 
 
     def _check_for_overlap(self):
@@ -303,44 +184,9 @@ class Model(object):
                 #print(f'Overlap found: {pdb} {resid}')
                 all_overlaps = pd.concat([all_overlaps, df_query[['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]], ignore_index=True)
                 self.X_all = self.X_all.drop(index=df_query.index[1:])
-        
+
         print(f'Number of overlaps: {len(all_overlaps)}')
         #print(all_overlaps)
-
-
-    def _aggregate(self):
-        '''
-        Match aggregation type up to the relevant aggregation function
-        
-        Method
-        ------
-        Uses the input parameter of aggregation_method and calls the relevant function.
-        If no cases match, assumes average and prints to terminal to state this.
-        
-        Example
-        -------
-        >> self._aggregate()
-        '''
-        match self.aggregation_method:
-            case 'avg':
-                self._aggregate_avg()
-            case 'random':
-                self._aggregate_random()
-            case 'max':
-                self._aggregate_max()
-            case 'min':
-                self._aggregate_min()
-            case 'average subtract aev':
-                self._aggregate_avg_less_avgaev()
-            case 'mixmatch':
-                self._aggregate_mixmatch()
-            case 'minmax':
-                self._aggregate_minmax()
-            case 'minmaxavg':
-                self._aggregate_minmaxavg()
-            case _:
-                print('Aggregation method not recognised; using average values')
-                self._aggregate_avg()
 
 
     def add_average_sd(self, data_set):
@@ -349,39 +195,6 @@ class Model(object):
         data_set = np.append(data_set, average)
         data_set = np.append(data_set, sd)
         return data_set
-    
-    
-    def _prepare_pca(self):
-        '''
-        Short function to transform the AEV data using PCA to reduce the dimensions.
-        Changes the data in self.X_all ready for the aggregation to actually reduce
-        the dataset for training on
-        '''
-        # transform AEV data via PCA - TODO later on generalise this as an option
-        print('Calculating PCA...')
-
-        if 'aev' in self.features_to_include:
-            df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.X_all['aev']]))
-            df_aevs = df_aevs.add_prefix('AEV_')
-            self.X_all = pd.concat([self.X_all.reset_index(), df_aevs.reset_index()], axis=1)
-            self.X_all = self.X_all.drop(['index', 'aev'], axis=1)
-        #aev_data = [literal_eval(aev) for aev in list(self.X_all['aev'])]
-        n_components = 0.99
-        pca = PCA(n_components=n_components)
-        aev_col_names = [a for a in self.X_all.columns if 'AEV_' in a]
-        aev_data = self.X_all[aev_col_names].values.tolist()
-        pca_data = pca.fit_transform(aev_data)
-        print(pca_data.shape)
-
-        #classification_values = self.X_final['class'].values
-        variance_data = pca.explained_variance_ratio_
-        
-        print(f'PCA used {pca.n_components_} components to explain {n_components} variance.')
-        self.X_all.drop(aev_col_names, axis=1, inplace=True)
-        df_out = pd.DataFrame(pca_data)
-        df_out = df_out.add_prefix('AEV_')
-        self.X_all = pd.concat([self.X_all, df_out], axis=1)
-        print(self.X_all)
 
 
     def _cut_columns(self):
@@ -442,354 +255,6 @@ class Model(object):
         print(f'Num of rows removed: {len(df_to_remove)}')
 
 
-
-    # ------------------------------------------------------------------------------------
-    #  Aggregation methods
-    def _aggregate_avg(self):
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        
-        self._prepare_pca()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.average(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_avg = round(df_query[feature].mean(),2)
-                    data[feature] = temp_avg
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        '''
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-        '''
-        self.X_agg = df_data_agg
-
-    def _aggregate_max(self):
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        
-        self._prepare_pca()
-        
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.max(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_max = round(df_query[feature].max(),2)
-                    data[feature] = temp_max
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        '''
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-        '''
-        self.X_agg = df_data_agg
-
-    def _aggregate_min(self):
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        
-        self._prepare_pca()
-        
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.min(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_min = round(df_query[feature].min(),2)
-                    data[feature] = temp_min
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        '''
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-        '''
-        self.X_agg = df_data_agg
-
-    def _aggregate_avg_less_avgaev(self):
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.average(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_avg = round(df_query[feature].mean(),2)
-                    data[feature] = temp_avg
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-            self.X_agg = df_data_agg
-
-    def _aggregate_mixmatch(self):
-        '''
-        This one will do the best case for each individual feature
-        Max sasa, das
-        Min propka, pkaANI, depth
-        Average AEV
-        '''
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        max_features = ['sasa', 'das', 'frustration', 'seqcharge', ]
-        min_features = ['propka', 'pkaANI', 'depth', 'density']
-        
-        self._prepare_pca()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            features = [a for a in self.X_all.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-            for feature in features:
-                if 'AEV_' in feature:
-                    temp_avg = round(df_query[feature].mean(),2)
-                    data[feature + '_avg'] = temp_avg
-                else:
-                    if feature in max_features:
-                        temp_max = round(df_query[feature].max(),2)
-                        data[feature + '_max'] = temp_max
-                    elif feature in min_features:
-                        temp_min = round(df_query[feature].min(),2)
-                        data[feature + '_min'] = temp_min
-                    else:
-                        temp_max = round(df_query[feature].max(),2)
-                        temp_min = round(df_query[feature].min(),2)
-                        data[feature + '_max'] = temp_max
-                        data[feature + '_min'] = temp_min
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        '''
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-        '''
-        self.X_agg = df_data_agg
-        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
-
-    def _aggregate_random(self):
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            idx_row_chosen = 0
-
-            if len(df_query) >= 1:
-                idx_row_chosen = random.sample(range(0, len(df_query)), 1)[0]
-
-            row_to_append = df_query[idx_row_chosen:idx_row_chosen+1]
-
-            for feature in self.features_to_include:
-                data[feature] = row_to_append[feature].iloc[0]
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-            self.X_agg = df_data_agg
-
-
-    def _aggregate_minmax(self):
-        '''
-        Aggregation method which will take the max and min values of the features and duplicate
-        the features to allow for this without having problems with the data overlapping and
-        biasing the output.
-        '''
-        print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        
-        self._prepare_pca()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            #features = [a for a in self.X_all.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
-                    min_row = df_query['sumaev'].idxmin()
-                    max_row = df_query['sumaev'].idxmax()
-                    for feat in [a for a in df_query.columns if 'AEV_' in a]:
-                        data[feat + '_min'] = round(df_query[feat].loc[min_row], 2)
-                        data[feat + '_max'] = round(df_query[feat].loc[max_row], 2)
-
-                else:
-                    temp_min = round(df_query[feature].min(),2)
-                    data[feature + '_min'] = temp_min
-                    temp_max = round(df_query[feature].max(),2)
-                    data[feature + '_max'] = temp_max
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        '''
-        if 'aev' in self.features_to_include:
-            df_out = self.X_all[[a for a in self.X_all.columns if 'AEV_' in a]]
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            #self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-        '''
-        self.X_agg = df_data_agg
-        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
-
-
-    def _aggregate_minmaxavg(self):
-        '''
-        Aggregation method which will take the max and min values of the features and duplicate
-        the features to allow for this without having problems with the data overlapping and
-        biasing the output.
-        '''
-        print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
-        seperate_lys = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        
-        self._prepare_pca()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.X_all[(self.X_all['Uniprot_Entry'] == entry) & (self.X_all['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            features = [a for a in self.X_all.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-            for feature in features:
-                temp_min = round(df_query[feature].min(),2)
-                temp_max = round(df_query[feature].max(),2)
-                temp_avg = round(df_query[feature].mean(),2)
-                data[feature + '_min'] = temp_min
-                data[feature + '_max'] = temp_max
-                data[feature + '_avg'] = temp_avg
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        '''
-        if 'aev' in self.features_to_include:
-            df_out = self.X_all[[a for a in self.X_all.columns if 'AEV_' in a]]
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            #self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-        '''
-        self.X_agg = df_data_agg
-        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
-
-
-    # ------------------------------------------------------------------------------------
-    # model testing
     def rf_five_fold(self):
         '''
         Function to perform a 5 fold test on the data that has been presented to the
@@ -1018,8 +483,6 @@ class Model(object):
         print(x_all_agg[x_all_agg.duplicated(subset=['Uniprot_Entry', 'Resid'], keep=False)].sort_values(by=['Uniprot_Entry', 'Resid']))
         x_all_agg = x_all_agg.drop_duplicates(subset=['Uniprot_Entry', 'Resid'], keep='first', inplace=False).dropna()
         print(f'len of each; pos:{len(x_all_agg[x_all_agg["class"] == 1])}, neg: {len(x_all_agg[x_all_agg["class"] == 0])}')
-        
-
 
         num_pos_data = len(x_all_agg[x_all_agg['class'] == 1])
         print([num_pos_data, (len(x_all_agg) - num_pos_data)])
@@ -1088,70 +551,11 @@ class Model(object):
             test_data_X = self.X_all.loc[test_extended].drop(['Uniprot_Entry', 'PDB_Code', 'Resid', 'class'], axis=1)
             test_data_y = list(self.X_all.loc[test_extended]['class'])
 
-            '''
-            model_output = RF_best.predict(test_data_X, test_data_y, scoring=confusion_matrix_scorer, return_estimator = True)
-            accuracy_output = cross_val_score(RF_best, self.X_final, self.y, cv=kf, scoring='accuracy')
-            f1_output = cross_val_score(RF_best, self.X_final, self.y, cv=kf, scoring='f1')
-            precision = cross_val_score(RF_best, self.X_final, self.y, cv=kf, scoring='precision')
-            '''
             test_y_pred = RF_best.predict(test_data_X)
             acc = metrics.accuracy_score(test_data_y, test_y_pred)
             print(f'Accuracy: {acc}')
-            '''
-            for idx,estimator in enumerate(model_output['estimator']):
-                feature_importances = pd.DataFrame(estimator.feature_importances_,
-                                                index = self.X_final.columns.values,
-                                                columns=[f'Run {idx + 1}'])
-                df_input_importance = pd.concat([df_input_importance, feature_importances], axis=1)
-            '''
 
         df_input_importance['Total'] = df_input_importance.sum(axis=1)
-
-        '''
-        test_tn = self.add_average_sd(model_output['test_tn'].astype(float))
-        test_fp = self.add_average_sd(model_output['test_fp'].astype(float))
-        test_fn = self.add_average_sd(model_output['test_fn'].astype(float))
-        test_tp = self.add_average_sd(model_output['test_tp'].astype(float))
-        
-
-        # "Accuracy", "F1_Score", "Precision", "tn", "fp", "fn", "tp", "sensitivity", "specificity"
-        output = pd.DataFrame(["1", "2", "3", "4", "5", "Average", "s.d."], columns=["Run"])
-        accuracy_output = self.add_average_sd(accuracy_output)
-        f1_output = self.add_average_sd(f1_output)
-        precision = self.add_average_sd(precision)
-        output['Accuracy'] = accuracy_output
-        output['F1_Score'] = f1_output
-        output['Precision'] = precision
-        output['TN'] = test_tn
-        output['FP'] = test_fp
-        output['FN'] = test_fn
-        output['TP'] = test_tp
-
-        output['Sensitivity'] = ''
-        output['Specificity'] = ''
-
-        for i, r in output.iterrows():
-            if i < 5:
-                sensitivity = r['TP'] / (r['TP'] + r['FN'])
-                specificity = r['TN'] / (r['TN'] + r['FP'])
-                output.at[i, 'Sensitivity'] = sensitivity
-                output.at[i, 'Specificity'] = specificity
-
-        output.at[5, 'Sensitivity'] = statistics.fmean(output['Sensitivity'][:5])
-        output.at[6, 'Sensitivity'] = statistics.stdev(output['Sensitivity'][:5])
-        output.at[5, 'Specificity'] = statistics.fmean(output['Specificity'][:5])
-        output.at[6, 'Specificity'] = statistics.stdev(output['Specificity'][:5])
-
-
-        print(output)
-        self.avg_output = output.iloc[5].to_dict()
-
-        if len(self.features_to_include) == 1 and 'aev' in self.features_to_include:
-            self.graph_aev_importance(df_input_importance)
-        else:
-            self.graph_top_ten_importance(df_input_importance)
-        self.find_feature_importance_pos(df_input_importance)
-        '''
 
 
     def rf_ubq_test(self):
@@ -1387,56 +791,6 @@ def create_comparison_between_datasets(num_runs=5):
     >> create_comparison_between_datasets()
     '''
 
-    '''
-    pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv',
-                        'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
-                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
-                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv']
-    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
-    #pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv']
-    #neg_measure_files = ['measures_cut_CannDataNegatives_all_12.05.25_joined.csv']
-    scores_accuracy = pd.DataFrame()
-    scores_f1score = pd.DataFrame()
-    scores_sensitivity = pd.DataFrame()
-    scores_specificity = pd.DataFrame()
-    rankings = []
-    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas']
-
-    tmp_scores_accuracy = []
-    tmp_scores_f1score = []
-    tmp_scores_sensitivity = []
-    tmp_scores_specificity = []
-    tmp_rankings = []
-
-    for i in range(num_runs):
-        model = Model(pos_measures_files=pos_measure_files,
-                    neg_measures_files=neg_measure_files,
-                    features_to_include=features_to_include,
-                    aggregation_method='minmax',
-                    subtract_avg_aev=False,
-                    num_aev_features_req=100)
-        model.prepare_dataset()
-        multi_run_output, multi_run_importance = model.multi_run_test(num_runs=1)
-        print(multi_run_output['Accuracy'].loc['avg'])
-        tmp_scores_accuracy.append(multi_run_output['Accuracy'].loc['avg'])
-        tmp_scores_f1score.append(multi_run_output['F1_Score'].loc['avg'])
-        tmp_scores_sensitivity.append(multi_run_output['Sensitivity'].loc['avg'])
-        tmp_scores_specificity.append(multi_run_output['Specificity'].loc['avg'])
-        tmp_rankings.append(multi_run_importance)
-
-    print(tmp_scores_accuracy)
-    print(tmp_scores_f1score)
-    print(tmp_scores_sensitivity)
-    print(tmp_scores_specificity)
-
-    scores_accuracy = pd.concat([scores_accuracy, pd.DataFrame({'All': tmp_scores_accuracy})], axis=1)
-    scores_f1score = pd.concat([scores_f1score, pd.DataFrame({'All': tmp_scores_f1score})], axis=1)
-    scores_specificity = pd.concat([scores_specificity, pd.DataFrame({'All': tmp_scores_specificity})], axis=1)
-    scores_sensitivity = pd.concat([scores_sensitivity, pd.DataFrame({'All': tmp_scores_sensitivity})], axis=1)
-    rankings.append(tmp_rankings)
-
-    '''
-
     features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas', 'aev']
     pos_measure_files = [['data/measures_cut_CannData_all_12.05.25.csv',
                         'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
@@ -1487,10 +841,6 @@ def create_comparison_between_datasets(num_runs=5):
         rankings.append(tmp_rankings)
         set_names.append(new_setname)
 
-    # graph the outputs
-    #sets_acc = pd.DataFrame()
-    #set_names = ['All', 'CannData', 'KingHighConf', 'Ecoli(hCit)', 'Synecho(hCit)']
-
     print(scores_accuracy)
     print(scores_f1score)
     print(scores_sensitivity)
@@ -1522,7 +872,6 @@ def create_comparison_between_datasets(num_runs=5):
 
 if __name__ == "__main__":
 
-    '''
     pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv',
                         'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
                         'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
@@ -1546,6 +895,5 @@ if __name__ == "__main__":
     model.rf_five_fold_optimised()
     #model.multi_run_test(num_runs=1)
     #model.rf_five_fold_optimised_expanded()
-    '''
-    create_comparison_between_datasets(3)
 
+    #create_comparison_between_datasets(3)
