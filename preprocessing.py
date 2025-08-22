@@ -22,6 +22,17 @@ class Preprocessing:
     '''
 
     def __init__(self, df, features=[]):
+        '''
+        Initialise the preprocessing class
+        
+        Parameters
+        ----------
+        df : DataFrame
+            The overall measures dataframe for the analysis to be completed on.
+        
+        features : list
+            The list of features to be considered within the analysis.
+        '''
         self.df = df
         self.n_obs = len(self.df)
         self.features = features
@@ -95,7 +106,6 @@ class Preprocessing:
             List of features to be considered for VIF calculations.
 
         """
-        #X = scaler.fit_transform(data[features])
         if not multi_vif:
             data = data[features]
             data = add_constant(data)
@@ -112,8 +122,6 @@ class Preprocessing:
                 data = pd.concat([data, df_out], axis=1)
                 data = data.drop('aev', axis=1)
 
-        #print(data)
-
         '''
         data_correlation_matrix = data.corr()
         plt.figure(figsize=(10, 8))
@@ -124,10 +132,7 @@ class Preprocessing:
 
         print(f'Number columns = {len(data.columns)}')
 
-        #data = data.assign(const=1)
         vif_values = [VIF(data.values, i) for i in range(data.shape[1])]
-        
-        #vif_series = pd.Series([VIF(data.values, i) for i in range(data.shape[1])], index=data.columns)
 
         if self.vif.empty:
             self.vif['Parameter'] = data.columns
@@ -151,6 +156,16 @@ class Preprocessing:
         Function to calculate the most decorrelated features from the measurements through
         VIF analysis. This will continuously call the VIF calculation until all the values
         returned are less than 5 (the commonly used value for decorrelation)
+
+        Parameters
+        ----------
+        data : DataFrame
+            The overall dataframe of measurements to be analysed.
+
+        Returns
+        -------
+        cols_to_keep : List
+            The list of the column names which are the most decorrelated
         '''
 
         all_decorrelated = False
@@ -177,25 +192,18 @@ class Preprocessing:
                 latest_vals = [a for a in latest_vals if str(a) != 'nan']
                 if all(x < 5 for x in latest_vals):
                     all_decorrelated = True
-                
+
                 # remove the column with the highest vif
                 max_val_idx = self.vif[list(self.vif.columns)[-1]].idxmax()
                 max_col = self.vif['Parameter'].iloc[max_val_idx]
-                #print(f'max_col: {max_col}, num cols:{len(list(data.columns))}')
-                #print(f'max val: {self.vif[list(self.vif.columns)[-1]].max()}')
                 data = data.drop(max_col, axis='columns')
-                #print(f'num cols:{len(list(data.columns))}')
 
             # calculate new set of vif values
             self.calculate_vif(data, self.features, multi_vif=True)
-            #print(self.vif)
 
-        print(self.vif)
         cut_df = self.vif[self.vif[list(self.vif.columns)[-1]] < 5]
         cols_to_keep = list(cut_df['Parameter'])
         return cols_to_keep
-
-
 
 
     def _normalise(self, data_input="data", features=None):
@@ -282,9 +290,7 @@ class Preprocessing:
         Returns
         -------
         Selections are stored in the attribute self.undersampled_data
-
         '''
-
 
         data = self.data[features]
         outlier_indices = np.array([])
