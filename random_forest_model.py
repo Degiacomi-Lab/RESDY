@@ -33,6 +33,7 @@ class Model(object):
                  features_to_include=['aev'],
                  aggregation_method='avg',
                  subtract_avg_aev=False,
+                 aev_red_method='pca',
                  num_aev_features_req = 100):
 
         self.pos_measures_files = pos_measures_files
@@ -46,6 +47,7 @@ class Model(object):
         self.aggregation_method = aggregation_method
         self.subtract_avg_aev = subtract_avg_aev
         self.top_n_features = 0
+        self.aev_red_method = aev_red_method
         self.num_aev_features_req = num_aev_features_req
 
 
@@ -141,7 +143,7 @@ class Model(object):
         self.X_all = self.X_all[cols_required]
         self.y_all = list(self.X_all['class'])
 
-        agg = Aggregation(self.X_all, aggregation_method='minmax', features_to_include=['all'])
+        agg = Aggregation(self.X_all, aggregation_method='minmax', features_to_include=['all'], aev_red_method=self.aev_red_method)
         self.X_agg = agg.aggregate_data()
 
         # create X
@@ -195,26 +197,6 @@ class Model(object):
         data_set = np.append(data_set, average)
         data_set = np.append(data_set, sd)
         return data_set
-
-
-    def _cut_columns(self):
-        # first remove all the null columns
-        num_cols_to_cut = sum((self.X_final != 0).any(axis=0))
-        #print([i for i, a in enumerate(list((self.X_final != 0).any(axis=0))) if a is False])
-        print(f'{num_cols_to_cut} columns kept from the AEV input data that are non zero')
-        self.X_final = self.X_final.loc[:, (self.X_final != 0).any(axis=0)]
-
-        # then remove the least important columns according to the method given
-        # drop all the columns that were not required through the std deviation
-        print(f'Initial number of columns: {len(self.X_final.columns.tolist())}')
-        if 'aev' in self.features_to_include and len(self.top_n_features) != 0:
-            #self.top_n_features = [f'AEV_{x}' for x in self.top_n_features]
-            current_feature_columns = self.X_final.columns.tolist()
-            for feature in current_feature_columns:
-                #if 'AEV' in feature and int(feature.split('_')[-1]) not in self.top_n_features:
-                if 'AEV' in feature and feature not in self.top_n_features:
-                    self.X_final = self.X_final.drop(feature, axis=1)
-        print(f'Final number of columns after reduction: {len(self.X_final.columns.tolist())}')
 
     def get_extreme_values(self, feature, lower = 1, upper = 14):
         '''
@@ -732,12 +714,10 @@ class Model(object):
         temp_features = dc(self.features_to_include)
         if 'aev' in temp_features:
             temp_features.remove('aev')
-        
-        '''
+
         if self.aggregation_method == 'minmax':
             temp_features = [f'{feature}_min' for feature in temp_features] + [f'{feature}_max' for feature in temp_features]
-        '''
-            
+
         for feature in temp_features:
             pos = index_positions.index(feature)
             feature_pos[f'{feature}_importance_rank'] = pos + 1
@@ -886,6 +866,7 @@ if __name__ == "__main__":
                 features_to_include=features_to_include,
                 aggregation_method='minmax',
                 subtract_avg_aev=False,
+                aev_red_method='sd',
                 num_aev_features_req=100)
     model.prepare_dataset()
     #print(model.X_final)
