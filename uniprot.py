@@ -10,9 +10,21 @@ import numpy as np
 
 
 class Uniprot(object):
+    '''
+    Class to handle the first step in the overall carbamylation prediction pipeline.
+    This will take in a spreadsheet with the column headers: 'Uniprot_Entry' and
+    'PDB_Code' (the latter is used to specify specific PDB structures, can be left
+    blank to extract all available structures for the given UNIPROT entry). The
+    class will extract information on the protein and return a list of structures
+    associated to take onto the next step: protein.py)
+    '''
 
-    def __init__(self, done_pdbs=[]):
-
+    def __init__(self):
+        '''
+        Initialise the Uniprot class. This class provides the methods to take a list
+        of uniprot codes and return a list of structures that can be extracted for use
+        in the overall model.
+        '''
         columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
         pd.reset_option('display.max_rows')
@@ -20,7 +32,22 @@ class Uniprot(object):
 
 
     def count_organism_proteins(self, code, reviewed_only=False):
+        '''
+        Contact the uniprot api to enquire about the number of proteins within a given
+        organism code. Possible to filter this to be just reviewed proteins.
 
+        Parameters
+        ----------
+        code -> string
+            The uniprot code for the organism of interest
+        reviewed_only -> bool
+            Tunable option to limit the proteins returned to just those that are reviewed
+
+        Returns
+        -------
+        total -> integer
+            The total number of proteins associated with the organism code
+        '''
         if reviewed_only:
             url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
         else:
@@ -37,7 +64,23 @@ class Uniprot(object):
 
 
     def get_organism_proteins(self, code, reviewed_only=False):
+        '''
+        Contacts the uniprot api to obtain the lists of proteins associated with
+        the given uniprot organism code. Possible to filter this to be just the
+        reviewed proteins here.
 
+        Parameters
+        ----------
+        code -> string
+            The uniprot code for the organism of interest
+        reviewed_only -> bool
+            Tunable option to limit the proteins returned to just those that are reviewed
+
+        Returns
+        -------
+        codes -> list
+            List of proteins associated with the organism code
+        '''
         if reviewed_only:
             url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
         else:
@@ -75,11 +118,21 @@ class Uniprot(object):
     def get_protein_data(self, uniprot_code, pdb_code_target="", chain_target=""):
         '''
         Download protein structures associated with a given UNIPROT code.
-        The protein is then cleaned (keep only protein atoms, remove hydrogens, MSE and KCX amino acids,
-        split alternative conformations in multiple PDBs)
         If a PDB code is also provided, only that PDB will be downloaded
         (e.g. useful for consistency check between UNIPROT and PDB)
         If a DataFrame df is provided, extracted structures will be appended to it
+
+
+        Parameters
+        ----------
+        uniprot_code -> string
+            The uniprot code for the organism of interest
+        pdb_code_target -> string
+            If a specific PDB is required, can be specified here, else all PDBs
+            will be obtained
+        chain_target -> string
+            If a specific chain is required, can be specified here, else all chains
+            will be obtained
         '''
 
         #check if there is uniprot information available for the protein
@@ -95,9 +148,9 @@ class Uniprot(object):
             #appends the AF structure to the df (if this isn't present it will be removed later).
             try:
 
-                AF_code = f'AF-{uniprot_code}-F1-model_v4'
+                af_code = f'AF-{uniprot_code}-F1-model_v6'
 
-                data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': AF_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
+                data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': af_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
             #search for available PDB structures
@@ -142,14 +195,21 @@ class Uniprot(object):
     def from_csv_file(self, csv_file):
         '''
         Parse a .csv file to find uniprot and pdb codes to pass into the pipeline.
-        If you want to just input uniprot codes put them in the first column and leave the second empty
-        If you want to input pdb codes put the uniprot code in the first column and pdb code in the second.
+        If you want to just input uniprot codes put them in the first column and
+        leave the second empty. If you want to input pdb codes put the uniprot code
+        in the first column and pdb code in the second.
+
+        Parameters
+        ----------
+        csv_file -> string
+            Path to the csv file containing the desired uniprot codes and optional
+            pdb codes
         '''
 
         #read .csv file.
         try:
             csv_df = pd.read_csv(csv_file)
-            print('.csv file successfully opened')
+            print('.csv input file of Uniprot codes successfully opened')
 
         except Exception as e:
             raise Exception(f'Failed to read {csv_file}: {e}') from e
@@ -172,7 +232,7 @@ class Uniprot(object):
                     self.get_protein_data(uniprot_code)
 
                 if pdb_code == 'AF':
-                    pdb_code = f'AF-{uniprot_code}-F1-model_v1'
+                    pdb_code = f'AF-{uniprot_code}-F1-model_v6'
 
                     d = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
@@ -187,24 +247,27 @@ class Uniprot(object):
 
     def filter_by_technique(self, list_of_techniques):
         '''
-        return the subset of entries obtained by certain methods (x-ray, NMR, EM, Predicted)
+        Return a subset of the proteins obtained from the search based on
+        the method in which the structure as obtained; options: x-ray, NMR,
+        EM, Predicted
+
+        Parameters
+        ----------
+        list_of_techniques -> list
+            The list of techniques to filter the proteins obtained by
+        
+        Returns
+        -------
+        Dataframe containing the subset of proteins
         '''
         return self.df[self.df['Method'].isin(list_of_techniques)]
 
-
-########################################################
 
 if __name__ == "__main__":
 
     UP = Uniprot()
 
-    if False:
-        UP.get_organism_proteins('UP000001811')
-
-    if True:
-        UP.get_protein_data("P09167")
-
-    if True:
-        UP.from_csv_file("inputs\\input_codes_4.csv")
-
+    #UP.get_organism_proteins('UP000001811')
+    UP.get_protein_data("P09167")
+    UP.from_csv_file("inputs\\input_codes_4.csv")
     print(UP.df)
