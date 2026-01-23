@@ -28,6 +28,7 @@ from features.nmr import NMR
 from features.pka import PKA
 from features.sasa import SASA
 from features.structure import Structure
+from features.flexibility import Flexibility
 
 
 # AEV packages
@@ -223,6 +224,9 @@ class Measure(object):
             elif m == 'seqcharge':
                 charge = Charge()
                 self.measures.append([m, charge.calculate_seqcharge])
+            elif m == 'flexibility':
+                flex = Flexibility()
+                self.measures.append([m, flex.calculate_flexibility])
             elif m == 'legolas':
                 if self.legolas_aevs:
                     if 'aev_legolas' not in self.features:
