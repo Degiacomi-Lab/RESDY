@@ -153,16 +153,13 @@ class NMR():
                         print('Legolas AEVs: tmp_aevs_protein.txt file not found')
                         aevs = []
 
-
                     lys_aevs = []
                     for idx in lys_res_nums:
-                        #lys_aevs.append(literal_eval(aevs[(idx - 1)]))
                         lys_aevs.append(aevs[(idx - 1)])
 
 
                     if os.path.exists('tmp_aevs_protein.txt'):
                         os.remove('tmp_aevs_protein.txt')
-                    #print(lys_aevs)
 
                 except Exception as e:
                     print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')

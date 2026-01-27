@@ -1,6 +1,7 @@
 import os
 import random
 import statistics
+import random
 from ast import literal_eval
 from copy import deepcopy as dc
 import numpy as np
@@ -45,6 +46,7 @@ class Aggregation:
             - 'minmax': Takes both the min and max values of each feature which duplicates the
                         the feature space allowing the model to use both as needed
             - 'minmaxavg': Takes the min, max and average of each feature, tripling feature space
+            - 'all': Takes all potential statistical features that have been coded to be calculated
         features_to_include : list, optional
             The list of features that are to be included in the aggregation. The default
             for this is taken to be all of them.
@@ -65,14 +67,15 @@ class Aggregation:
             The number of features to keep from the aevs when the standard deviation method is
             used. Defualt is set to 100.
         '''
-        self.df_measurements = df_measurements
+        self.df_measurements = df_measurements.dropna()
         self.aggregation_method = aggregation_method
         self.features_to_include = features_to_include
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
 
         if self.features_to_include == ['all']:
-            self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid']]
+            self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
+            self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'class']]
 
 
     def aggregate_data(self):
@@ -88,26 +91,29 @@ class Aggregation:
         -------
         >> self.aggregate_data()
         '''
+        df_stats = self._calculate_statistics()
         match self.aggregation_method:
             case 'avg':
-                return self._aggregate_avg()
+                return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'random':
-                return self._aggregate_random()
+                return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'rand' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'max':
-                return self._aggregate_max()
+                return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'max' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'min':
-                return self._aggregate_min()
+                return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'min' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'average subtract aev':
                 return self._aggregate_avg_less_avgaev()
             case 'mixmatch':
                 return self._aggregate_mixmatch()
             case 'minmax':
-                return self._aggregate_minmax()
+                return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'minmaxavg':
-                return self._aggregate_minmaxavg()
+                return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+            case 'all':
+                return df_stats
             case _:
                 print('Aggregation method not recognised; using minmax values')
-                return self._aggregate_minmax()
+                return df_stats.drop(a for a in df_stats.columns if a not in ['Uniprot_Entry', 'Resid', 'class'] or any(b in a for b in ['min', 'max']))
 
 
     def _reduce_aev_dimensions(self):
@@ -254,9 +260,18 @@ class Aggregation:
         print(f'>> PCA used {pca.n_components_} components to explain {n_components} variance. AEVs are now in reduced dimension format.')
 
 
-    def _aggregate_avg(self):
+    def _calculate_statistics(self):
+        '''
+        Function for creating a dataframe which includes all the potential statistics which
+        could then be used for aggregation later on. This can then be shortened as desired
+        based on which method of aggregation is required for this.
+        '''
+        print('>> Calculating statistics for measurements data provided...')
+        if 'class' not in self.df_measurements.columns:
+            self.df_measurements['class'] = -1  # set to -1 as unsure if pos or neg
+
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
         self._reduce_aev_dimensions()
 
@@ -264,85 +279,41 @@ class Aggregation:
             entry = row['Uniprot_Entry']
             resid = row['Resid']
             class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
+            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)].copy().reset_index()
             data = {'Uniprot_Entry': entry,
                     'Resid' : resid,
                     'class' : class_val}
-            df_query = df_query.copy()
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.average(list_aevs, axis=0)
-                    data['aev'] = aev_avg
+            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid']]
+            for feature in features:
+                if feature == 'aev' or feature == 'aev_legolas':
+                    df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
+                    min_row = df_query['sumaev'].idxmin()
+                    max_row = df_query['sumaev'].idxmax()
+                    rand_row = random.randrange(0, len(df_query))
+                    for feat in [a for a in df_query.columns if 'AEV_' in a]:
+
+                        data[feat + '_min'] = round(float(df_query[feat].loc[min_row]), 2)  # min value at this position in min AEV
+                        data[feat + '_max'] = round(float(df_query[feat].loc[max_row]), 2)  # max value at this position in max AEV
+                        data[feat + '_rand'] = round(df_query[feat].loc[rand_row], 2)
+
+                        data[feat + '_absmin'] = round(df_query[feat].min(), 2)  # min value of any AEV at this position in the AEV
+                        data[feat + '_absmax'] = round(df_query[feat].max(), 2)  # max value of any AEV at this position in the AEV
+                        data[feat + '_avg'] = round(df_query[feat].mean(), 2)
+                        data[feat + '_sd'] = round(df_query[feat].std(), 2)
+                        data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
+
                 else:
-                    temp_avg = round(df_query[feature].mean(),2)
-                    data[feature] = temp_avg
+                    data[feature + '_min'] = round(float(df_query[feature].min()), 2)
+                    data[feature + '_max'] = round(float(df_query[feature].max()), 2)
+                    data[feature + '_avg'] = round(df_query[feature].mean(),2)
+                    data[feature + '_sd'] = round(df_query[feature].std(),2)
+                    data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
+                    data[feature + '_rand'] = df_query[feature].iloc[random.randrange(0, len(df_query))]
 
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
+            df_stats = pd.concat([df_stats, pd.DataFrame([data])], ignore_index=True)
 
-        return df_data_agg
-
-    def _aggregate_max(self):
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-
-        self._reduce_aev_dimensions()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.max(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_max = round(df_query[feature].max(),2)
-                    data[feature] = temp_max
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        return df_data_agg
-
-    def _aggregate_min(self):
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-
-        self._reduce_aev_dimensions()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.min(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_min = round(df_query[feature].min(),2)
-                    data[feature] = temp_min
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        return df_data_agg
+        self.features_to_include = [a for a in list(df_stats.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
+        return df_stats
 
     def _aggregate_avg_less_avgaev(self):
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
@@ -427,121 +398,14 @@ class Aggregation:
         self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
         return df_data_agg
 
-    def _aggregate_random(self):
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            idx_row_chosen = 0
-
-            if len(df_query) >= 1:
-                idx_row_chosen = random.sample(range(0, len(df_query)), 1)[0]
-
-            row_to_append = df_query[idx_row_chosen:idx_row_chosen+1]
-
-            for feature in self.features_to_include:
-                data[feature] = row_to_append[feature].iloc[0]
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-            return df_data_agg
 
 
-    def _aggregate_minmax(self):
-        '''
-        Aggregation method which will take the max and min values of the features and duplicate
-        the features to allow for this without having problems with the data overlapping and
-        biasing the output.
-        '''
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-
-        self._reduce_aev_dimensions()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-            for feature in features:
-                if feature == 'aev':
-                    df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
-                    min_row = df_query['sumaev'].idxmin()
-                    max_row = df_query['sumaev'].idxmax()
-                    for feat in [a for a in df_query.columns if 'AEV_' in a]:
-                        data[feat + '_min'] = round(df_query[feat].loc[min_row], 2)
-                        data[feat + '_max'] = round(df_query[feat].loc[max_row], 2)
-
-                else:
-                    temp_min = round(df_query[feature].min(),2)
-                    data[feature + '_min'] = temp_min
-                    temp_max = round(df_query[feature].max(),2)
-                    data[feature + '_max'] = temp_max
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-
-        self.features_to_include = [a for a in list(df_data_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
-        return df_data_agg
-
-
-    def _aggregate_minmaxavg(self):
-        '''
-        Aggregation method which will take the max and min values of the features and duplicate
-        the features to allow for this without having problems with the data overlapping and
-        biasing the output.
-        '''
-        print('MinMax aggregation type only takes the min for aev, works for all other features: GW FIX ME!')
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-
-        self._reduce_aev_dimensions()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            features = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-            for feature in features:
-                temp_min = round(df_query[feature].min(),2)
-                temp_max = round(df_query[feature].max(),2)
-                temp_avg = round(df_query[feature].mean(),2)
-                data[feature + '_min'] = temp_min
-                data[feature + '_max'] = temp_max
-                data[feature + '_avg'] = temp_avg
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
-        return df_data_agg
+if __name__ == "__main__":
+    
+    test_dataframe_name = 'data/measures_cut_KingAllNegative_all_01.05.25_joined.csv'
+    test_measures_dataframe = pd.read_csv(test_dataframe_name)
+    print(test_measures_dataframe.head())
+    agg = Aggregation(test_measures_dataframe, aggregation_method='minmax', features_to_include=['all'], aev_red_method='pca')
+    test_agg_df = agg.aggregate_data()
+    print(test_agg_df)
+    #test_agg_df.to_csv('AllNegative_aggregated_minmaxavg.csv')

@@ -164,3 +164,5 @@ sequence_secondary_structure.py
 test_find_broken_curated_files.py
 model_output_graphs/
 Demo/
+Demo_test/
+feature_analysis_graphs/
