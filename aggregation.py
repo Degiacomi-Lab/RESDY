@@ -44,9 +44,10 @@ class Aggregation:
                           max is used for features where a high value is likely to be important
                           and min for features where less of it is required.
             - 'minmax': Takes both the min and max values of each feature which duplicates the
-                        the feature space allowing the model to use both as needed
+                        the feature space allowing the model to use both as needed (default)
             - 'minmaxavg': Takes the min, max and average of each feature, tripling feature space
             - 'all': Takes all potential statistical features that have been coded to be calculated
+            - 'choose': Allows the user to choose which statistic for the feature they want
         features_to_include : list, optional
             The list of features that are to be included in the aggregation. The default
             for this is taken to be all of them.
@@ -104,13 +105,20 @@ class Aggregation:
             case 'average subtract aev':
                 return self._aggregate_avg_less_avgaev()
             case 'mixmatch':
-                return self._aggregate_mixmatch()
+                max_features = ['sasa', 'das', 'frustration', 'seqcharge']
+                min_features = ['propka', 'pkaANI', 'depth', 'density', 'legolas']
+                max_feat_cols = [a for a in self.features_to_include if any(b in a for b in max_features) and 'max' in a]
+                min_feat_cols = [a for a in self.features_to_include if any(b in a for b in min_features) and 'min' in a]
+                avg_features = [a for a in [b for b in self.features_to_include if not any (c in b for c in max_features) and not any (c in b for c in min_features)] if 'avg' in a]
+                return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_features])
             case 'minmax':
                 return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'minmaxavg':
                 return df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'all':
                 return df_stats
+            case 'choose':
+                return self._aggregate_choose(df_stats)
             case _:
                 print('Aggregation method not recognised; using minmax values')
                 return df_stats.drop(a for a in df_stats.columns if a not in ['Uniprot_Entry', 'Resid', 'class'] or any(b in a for b in ['min', 'max']))
@@ -315,6 +323,56 @@ class Aggregation:
         self.features_to_include = [a for a in list(df_stats.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
         return df_stats
 
+    def _aggregate_choose(self, df_stats):
+        '''
+        Choose method of aggregation allowing the user to choose the statistics they require 
+        '''
+        max_features = []; min_features = []; avg_features = []; sd_features = []; range_features = []; rand_features = []
+        print('>> For the following list of features, please choosen which statistics you would like to include in the aggregation')
+        print('>> The following statistics can be chosen (enter word or number seperated by ;): all (1), max (2), min (3), avg (4), sd (5), range (6), random (7)')
+        for feat in list(set([a.split('_')[0] for a in self.features_to_include if 'max' in a])):
+            tmp_stats = input(f'>> Choose statistics for feature: {feat}')
+            try:
+                stats = [a.strip() for a in tmp_stats.split(';')]
+                for stat in stats:
+                    match stat:
+                        case 'all' | '1':
+                            if feat not in max_features: max_features.append(feat)
+                            if feat not in min_features: min_features.append(feat)
+                            if feat not in avg_features: avg_features.append(feat)
+                            if feat not in sd_features: sd_features.append(feat)
+                            if feat not in range_features: range_features.append(feat)
+                            if feat not in rand_features: rand_features.append(feat)
+                        case 'max' | '2':
+                            if feat not in max_features: max_features.append(feat)
+                        case 'min' | '3':
+                            if feat not in min_features: min_features.append(feat)
+                        case 'avg' | '4':
+                            if feat not in avg_features: avg_features.append(feat)
+                        case 'sd' | '5':
+                            if feat not in sd_features: sd_features.append(feat)
+                        case 'range' | '6':
+                            if feat not in range_features: range_features.append(feat)
+                        case 'random' | '7':
+                            if feat not in rand_features: rand_features.append(feat)
+                        case _:
+                            print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat}, using all metrics for {feat} instead')
+                            if feat not in max_features: max_features.append(feat)
+                            if feat not in min_features: min_features.append(feat)
+                            if feat not in avg_features: avg_features.append(feat)
+                            if feat not in sd_features: sd_features.append(feat)
+                            if feat not in range_features: range_features.append(feat)
+                            if feat not in rand_features: rand_features.append(feat)
+            except Exception as e:
+                print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat} with error {e}, using all metrics for {feat} instead')
+        max_feat_cols = [a for a in self.features_to_include if any(b in a for b in max_features) and 'max' in a]
+        min_feat_cols = [a for a in self.features_to_include if any(b in a for b in min_features) and 'min' in a]
+        avg_feat_cols = [a for a in self.features_to_include if any(b in a for b in avg_features) and 'avg' in a]
+        sd_feat_cols = [a for a in self.features_to_include if any(b in a for b in sd_features) and 'sd' in a]
+        range_feat_cols = [a for a in self.features_to_include if any(b in a for b in range_features) and 'range' in a]
+        rand_feat_cols = [a for a in self.features_to_include if any(b in a for b in rand_features) and 'rand' in a]
+        return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_feat_cols + sd_feat_cols + range_feat_cols + rand_feat_cols])
+
     def _aggregate_avg_less_avgaev(self):
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
@@ -350,54 +408,6 @@ class Aggregation:
         else:
             return df_data_agg
 
-    def _aggregate_mixmatch(self):
-        '''
-        This one will do the best case for each individual feature
-        Max sasa, das
-        Min propka, pkaANI, depth
-        Average AEV
-        '''
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        max_features = ['sasa', 'das', 'frustration', 'seqcharge', ]
-        min_features = ['propka', 'pkaANI', 'depth', 'density']
-
-        self._reduce_aev_dimensions()
-
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            features = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-            for feature in features:
-                if 'AEV_' in feature:
-                    temp_avg = round(df_query[feature].mean(),2)
-                    data[feature + '_avg'] = temp_avg
-                else:
-                    if feature in max_features:
-                        temp_max = round(df_query[feature].max(),2)
-                        data[feature + '_max'] = temp_max
-                    elif feature in min_features:
-                        temp_min = round(df_query[feature].min(),2)
-                        data[feature + '_min'] = temp_min
-                    else:
-                        temp_max = round(df_query[feature].max(),2)
-                        temp_min = round(df_query[feature].min(),2)
-                        data[feature + '_max'] = temp_max
-                        data[feature + '_min'] = temp_min
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        self.features_to_include = [a for a in list(self.X_agg.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
-        return df_data_agg
-
 
 
 if __name__ == "__main__":
@@ -405,7 +415,7 @@ if __name__ == "__main__":
     test_dataframe_name = 'data/measures_cut_KingAllNegative_all_01.05.25_joined.csv'
     test_measures_dataframe = pd.read_csv(test_dataframe_name)
     print(test_measures_dataframe.head())
-    agg = Aggregation(test_measures_dataframe, aggregation_method='minmax', features_to_include=['all'], aev_red_method='pca')
+    agg = Aggregation(test_measures_dataframe, aggregation_method='choose', features_to_include=['all'], aev_red_method='pca')
     test_agg_df = agg.aggregate_data()
     print(test_agg_df)
     #test_agg_df.to_csv('AllNegative_aggregated_minmaxavg.csv')
