@@ -11,6 +11,7 @@ from sklearn import metrics
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from preprocessing import Preprocessing
 
 
@@ -68,16 +69,38 @@ class Aggregation:
             The number of features to keep from the aevs when the standard deviation method is
             used. Defualt is set to 100.
         '''
-        self.df_measurements = df_measurements.dropna()
+        # Note: current preference for using aev_legolas as easier to obtain - change here if necessary
+        self.df_measurements = df_measurements
         self.aggregation_method = aggregation_method
         self.features_to_include = features_to_include
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
 
+        if 'aev_legolas' in self.df_measurements.columns:
+            if 'aev' in self.df_measurements.columns:
+                self.df_measurements.drop(columns=['aev'], inplace=True)
+            self.df_measurements.rename(columns={'aev_legolas': 'aev'}, inplace=True)
+
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
             self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'class']]
 
+        data_cols_entered = self.df_measurements.columns.values
+        cols_required = ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']
+        for feat in self.features_to_include:
+            if feat in data_cols_entered:
+                cols_required.append(feat)
+            else:
+                print(f'Feature given as input not available in all input files, will not be included: {feat}')
+        self.df_measurements = self.df_measurements[cols_required]
+
+        print(self.df_measurements.columns)
+        if 'method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
+        if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
+        print(len(self.df_measurements))
+        self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)  # TODO GW 29.01.26 - add somethign to let you know how mnay lines have been removed and if many of them are from one specific feature
+        print(self.df_measurements.columns)
+        print(len(self.df_measurements))
 
     def aggregate_data(self):
         '''
@@ -92,6 +115,7 @@ class Aggregation:
         -------
         >> self.aggregate_data()
         '''
+        self._data_tidying()
         df_stats = self._calculate_statistics()
         match self.aggregation_method:
             case 'avg':
@@ -122,6 +146,32 @@ class Aggregation:
             case _:
                 print('Aggregation method not recognised; using minmax values')
                 return df_stats.drop(a for a in df_stats.columns if a not in ['Uniprot_Entry', 'Resid', 'class'] or any(b in a for b in ['min', 'max']))
+
+    def _data_tidying(self):
+        '''
+        Go over the provided data and remove any poor data from this. 
+        '''
+        if 'depth' in self.df_measurements.columns:
+            self._remove_bad_data('depth', 0, 20)
+
+    def _remove_bad_data(self, feature, lower, upper):
+        '''
+        Easy function for removing bad rows of data from the aggregated data
+
+        Parameters
+        ----------
+        feature -> string
+            The feature to investigate bad values for
+        lower -> float
+            The lower bound of bad values to accept
+        upper -> float
+            The upper bound of bad values to accept
+        '''
+        df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) | (self.df_measurements[feature] > upper)]
+        len_one = len(self.df_measurements)
+        remove_list = df_suspicious.index.tolist()
+        self.df_measurements = self.df_measurements.drop(index = remove_list)
+        print(f'>> Removed {len(df_suspicious)} rows from the measurements data, new length {len(self.df_measurements)} (old length: {len_one} rows)')
 
 
     def _reduce_aev_dimensions(self):
@@ -412,10 +462,11 @@ class Aggregation:
 
 if __name__ == "__main__":
     
-    test_dataframe_name = 'data/measures_cut_KingAllNegative_all_01.05.25_joined.csv'
+    test_dataframe_name = 'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv'
     test_measures_dataframe = pd.read_csv(test_dataframe_name)
-    print(test_measures_dataframe.head())
-    agg = Aggregation(test_measures_dataframe, aggregation_method='choose', features_to_include=['all'], aev_red_method='pca')
+    #print(test_measures_dataframe.head())
+    print(len(test_measures_dataframe.dropna().drop_duplicates(subset=['Uniprot_Entry', 'Resid'])))
+    agg = Aggregation(test_measures_dataframe, aggregation_method='minmax', features_to_include=['all'], aev_red_method='pca')
     test_agg_df = agg.aggregate_data()
     print(test_agg_df)
     #test_agg_df.to_csv('AllNegative_aggregated_minmaxavg.csv')
