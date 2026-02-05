@@ -40,6 +40,7 @@ class Aggregation:
             - 'random': Take a random measurement out of all measurements for the lysine
             - 'max': Take the maximum value of each feature for the lysine
             - 'min': Take the minimum value of each feature for the lysine
+            - 'median': Take the median value of each feature for the lysine
             - 'average subtract aev': Take the average of all aev features except the aevs WHAT IS USED HERE
             - 'mixmatch': Takes the predicted metric which will work best for each feature. The
                           max is used for features where a high value is likely to be important
@@ -123,6 +124,8 @@ class Aggregation:
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'max' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'min':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'min' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+            case 'median':
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'med' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'average subtract aev':
                 self.df_agg = self._aggregate_avg_less_avgaev()
             case 'mixmatch':
@@ -355,6 +358,7 @@ class Aggregation:
 
                         data[feat + '_absmin'] = round(df_query[feat].min(), 2)  # min value of any AEV at this position in the AEV
                         data[feat + '_absmax'] = round(df_query[feat].max(), 2)  # max value of any AEV at this position in the AEV
+                        data[feat + '_med'] = round(df_query[feat].median(), 2)
                         data[feat + '_avg'] = round(df_query[feat].mean(), 2)
                         data[feat + '_sd'] = round(df_query[feat].std(), 2)
                         data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
@@ -362,6 +366,7 @@ class Aggregation:
                 else:
                     data[feature + '_min'] = round(float(df_query[feature].min()), 2)
                     data[feature + '_max'] = round(float(df_query[feature].max()), 2)
+                    data[feature + '_med'] = round(df_query[feature].median(), 2)
                     data[feature + '_avg'] = round(df_query[feature].mean(),2)
                     data[feature + '_sd'] = round(df_query[feature].std(),2)
                     data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
@@ -477,7 +482,7 @@ class Aggregation:
 if __name__ == "__main__":
     test_dataframe_name = 'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv'
     test_measures_dataframe = pd.read_csv(test_dataframe_name)
-    agg = Aggregation(test_measures_dataframe, aggregation_method='minmax', features_to_include=['all'], aev_red_method='pca')
+    agg = Aggregation(test_measures_dataframe, aggregation_method='median', features_to_include=['all'], aev_red_method='pca')
     test_agg_df = agg.aggregate_data()
     print(agg.df_agg)
     agg.save_state()
