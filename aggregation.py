@@ -381,7 +381,7 @@ class Aggregation:
         '''
         Choose method of aggregation allowing the user to choose the statistics they require 
         '''
-        max_features = []; min_features = []; avg_features = []; sd_features = []; range_features = []; rand_features = []
+        max_features = []; min_features = []; med_features = []; avg_features = []; sd_features = []; range_features = []; rand_features = []
         print('>> For the following list of features, please choosen which statistics you would like to include in the aggregation')
         print('>> The following statistics can be chosen (enter word or number seperated by ;): all (1), max (2), min (3), avg (4), sd (5), range (6), random (7)')
         for feat in list(set([a.split('_')[0] for a in self.features_to_include if 'max' in a])):
@@ -401,18 +401,21 @@ class Aggregation:
                             if feat not in max_features: max_features.append(feat)
                         case 'min' | '3':
                             if feat not in min_features: min_features.append(feat)
-                        case 'avg' | '4':
+                        case 'med' | '4':
+                            if feat not in min_features: med_features.append(feat)
+                        case 'avg' | '5':
                             if feat not in avg_features: avg_features.append(feat)
-                        case 'sd' | '5':
+                        case 'sd' | '6':
                             if feat not in sd_features: sd_features.append(feat)
-                        case 'range' | '6':
+                        case 'range' | '7':
                             if feat not in range_features: range_features.append(feat)
-                        case 'random' | '7':
+                        case 'random' | '8':
                             if feat not in rand_features: rand_features.append(feat)
                         case _:
                             print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat}, using all metrics for {feat} instead')
                             if feat not in max_features: max_features.append(feat)
                             if feat not in min_features: min_features.append(feat)
+                            if feat not in med_features: med_features.append(feat)
                             if feat not in avg_features: avg_features.append(feat)
                             if feat not in sd_features: sd_features.append(feat)
                             if feat not in range_features: range_features.append(feat)
@@ -421,11 +424,12 @@ class Aggregation:
                 print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat} with error {e}, using all metrics for {feat} instead')
         max_feat_cols = [a for a in self.features_to_include if any(b in a for b in max_features) and 'max' in a]
         min_feat_cols = [a for a in self.features_to_include if any(b in a for b in min_features) and 'min' in a]
+        med_feat_cols = [a for a in self.features_to_include if any(b in a for b in med_features) and 'med' in a]
         avg_feat_cols = [a for a in self.features_to_include if any(b in a for b in avg_features) and 'avg' in a]
         sd_feat_cols = [a for a in self.features_to_include if any(b in a for b in sd_features) and 'sd' in a]
         range_feat_cols = [a for a in self.features_to_include if any(b in a for b in range_features) and 'range' in a]
         rand_feat_cols = [a for a in self.features_to_include if any(b in a for b in rand_features) and 'rand' in a]
-        return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_feat_cols + sd_feat_cols + range_feat_cols + rand_feat_cols])
+        return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + med_feat_cols + avg_feat_cols + sd_feat_cols + range_feat_cols + rand_feat_cols])
 
     def _aggregate_avg_less_avgaev(self):
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
