@@ -1,5 +1,5 @@
 import re
-import os
+import os, sys
 import io
 import logging
 import datetime
@@ -24,6 +24,18 @@ class Charge():
     '''
     Class to house the different methods for calculating charge values for structures
     '''
+
+    def __init__(self, include_modified = False):
+        '''
+        Initialise the Charge class, include any global variables that are required from
+        measures in here.
+
+        Parameters
+        ----------
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
+        '''
+        self.include_modified = include_modified
     
     def calculate_seqcharge(self, path, num_add_aa=10):
         '''
@@ -64,9 +76,11 @@ class Charge():
         # 1: Extract the overall sequence for the protein given
         try:
             M = bb.Molecule(path)
-            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
 
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
 
@@ -82,9 +96,12 @@ class Charge():
                                     'HIE': 'H', 'HID': 'H', 'HIP': 'H', 'LYN': 'K',
                                     'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
-                                    'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
-                                    'KCX': 'X', 'LYE': 'X'}  
-            # KCX and LYE down as X so that they are not treated as positive K
+                                    'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k'}
+            # KCX and LYE down as X so that they are not treated as positive K when calculations arent including modified lysines
+            # however when including modified, need to consider these K for checking purposes, gets tricky when considering near lysines that are all modified...        
+            if self.include_modified: protein_letters_dict['KCX'] = 'K'; protein_letters_dict['LYE'] = 'K'
+            else: protein_letters_dict['KCX'] = 'X'; protein_letters_dict['LYE'] = 'X' 
+
 
             def _catch(func, *args, handle=lambda e : e, **kwargs):
                 try:
@@ -149,8 +166,17 @@ class Charge():
             df_seqcharge['Chain'] = list_chains
             df_seqcharge['Resid'] = lys_res_nums
             df_seqcharge['seqcharge'] = seqcharge_output
+            if self.include_modified: df_seqcharge['Modified'] = list_modified
         except Exception as e:
             report_error_to_file('Seqcharge 3', path, str(e))
             print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_seqcharge
+
+
+
+if __name__ == '__main__':
+    C = Charge(include_modified=True)
+    #print(C.calculate_seqcharge(path=f'1ubq.pdb'))
+    print(C.calculate_seqcharge(path=f'tmp_checking_pdb.pdb'))
+    #print(C.calculate_seqcharge(path=f'1nsk_AmberMod0000.pdb'))

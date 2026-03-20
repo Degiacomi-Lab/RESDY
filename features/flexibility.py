@@ -26,6 +26,18 @@ class Flexibility():
     for lysines within the protein structures.
     '''
 
+    def __init__(self, include_modified):
+        '''
+        Initialise the Flexibility class, include any global variables that are required from
+        measures in here.
+
+        Parameters
+        ----------
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
+        '''
+        self.include_modified = include_modified
+
     def calculate_flexibility(self, path):
         '''
         Calculate the flexibility of the lysine of interest within the protein structure.
@@ -66,9 +78,11 @@ class Flexibility():
 
         try:
             M = bb.Molecule(path)
-            pos_nz, idx_nz = M.atomselect('*', '*', 'NZ', get_index=True)
+            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
             report_error_to_file('Flex 1', path, e)
             print(f'Flex Calculation: 1 - Could not load and identify targets within the lysines for calculations: {e}')
@@ -89,8 +103,16 @@ class Flexibility():
             df_flex['Chain'] = list_chains
             df_flex['Resid'] = lys_res_nums
             df_flex['flexibility'] = avg_beta_output
+            if self.include_modified: df_flex['Modified'] = list_modified
         except Exception as e:
             report_error_to_file('Flex 3', path, e)
             print(f'Flex Calculation: 3 - Failed to create dataframe to append to overall measures dataframe: {e}')
 
         return df_flex
+
+
+if __name__ == '__main__':
+    flex = Flexibility(include_modified=True)
+    print(flex.calculate_flexibility(path=f'1ubq.pdb'))
+    #print(flex.calculate_flexibility(path=f'tmp_checking_pdb.pdb'))
+    #print(flex.calculate_flexibility(path=f'1nsk_AmberMod0000.pdb'))

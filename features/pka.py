@@ -25,9 +25,10 @@ class PKA():
     Class to house the different methods for calculating pKa values for structures
     '''
 
-    def __init__(self, outdir, calc_method='propka'):
+    def __init__(self, outdir, calc_method='propka', include_modified=False):
         '''
-        Setup the PKA class as required. Take input on the 
+        Setup the PKA class as required. Take input on which method to use and if to include
+        modified structures.
 
         Parameters
         ----------
@@ -37,8 +38,11 @@ class PKA():
         calc_method : string
             The method to use for caclulating pKa values. Default is set to 'propka'.
             Current options are: propka, pKaANI
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
         '''
         self.calc_method = calc_method
+        self.include_modified = include_modified
         if self.calc_method == 'propka':
             self.pkaoutdir = os.path.join(outdir, "propkaoutput")
             if not os.path.exists(self.pkaoutdir):

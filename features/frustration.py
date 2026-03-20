@@ -25,6 +25,18 @@ class Frustration():
     for structures.
     '''
 
+    def __init__(self, include_modified = False):
+        '''
+        Initialise the Frustration class, include any global variables that are required from
+        measures in here.
+
+        Parameters
+        ----------
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
+        '''
+        self.include_modified = include_modified
+
     def calculate_frustration(self, path):
         '''
         Use the Frustratometer package to identify the frustration metric for the lysines
@@ -59,11 +71,15 @@ class Frustration():
         df_frustration = pd.DataFrame()
         try:
             M = bb.Molecule(path)
-            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
+
             df_frustration['Chain'] = list_chains
             df_frustration['Resid'] = lys_res_nums
+            df_frustration['Modified'] = list_modified
 
             out_print_trap = io.StringIO()
             with redirect_stdout(out_print_trap):
@@ -106,3 +122,10 @@ class Frustration():
             print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
 
         return df_frustration
+
+
+if __name__ == '__main__':
+    frust = Frustration(include_modified=True)
+    #print(frust.calculate_frustration(path=f'1ubq.pdb'))
+    print(frust.calculate_frustration(path=f'tmp_checking_pdb.pdb'))
+    #print(frust.calculate_frustration(path=f'1nsk_AmberMod0000.pdb'))

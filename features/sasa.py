@@ -26,6 +26,18 @@ class SASA():
     (SASA) values for structures
     '''
 
+    def __init__(self, include_modified = False):
+        '''
+        Initialise the SASA class, include any global variables that are required from
+        measures in here.
+
+        Parameters
+        ----------
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
+        '''
+        self.include_modified = include_modified
+
     def calculate_sasa(self, path):
         '''
         Calculate the solvent accessible surface area of the NZ atom within the lysine structure
@@ -63,32 +75,24 @@ class SASA():
         '''
 
         try:
-            list_of_sasa = list()
-            list_of_resid = list()
-            list_of_chains = list()
+            list_of_sasa = []
 
-            #read PDB file
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
-            df = M.data
 
-            #Find the coordinates and index of all lysine residues in the protein.
-            lys_coords, lys_idx = M.atomselect('*', ['LYS'], 'NZ', use_resname=True, get_index=True)
-            df = M.data
+            if self.include_modified: lys_coords, lys_idx = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)
+            else: lys_coords, lys_idx = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)
 
-            #Find the chain and resid number of each lysine.
             list_of_resid = list(M.data['resid'][lys_idx])
             list_of_chains = list(M.data['chain'][lys_idx])
+            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][lys_idx]))
 
-            #Find the coordinates and index of every atom in the molecule.
-            all_coords, idx = M.atomselect('*','*','*', get_index=True)
+            all_coords, all_idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
             report_error_to_file('SASA 1', path, str(e))
-            raise Exception(f'SASA calc error: {e}') from e
+            print(f'SASA Calculation: 1 - Failed to extract lysine information from pdb file, error: {e}')
 
-        #For each lysine it works out the distance between the lys NZ,
-        #and the each atom in the protein.
         for j, lys_coord in enumerate(lys_coords):
             list_close_points = list()
 
@@ -99,38 +103,44 @@ class SASA():
                     z_dist = (lys_coord[2] - coord[2])**2
                     distance = np.sqrt(x_dist + y_dist + z_dist)
                     if distance < 15:
-                        list_close_points.append(idx[i])
-                except:
+                        list_close_points.append(all_idx[i])
+                except Exception as e:
                     continue
 
-            #if the atoms are close to the lys NZ they are included in a small .pdb structure.
             try:
                 S = M.get_subset(idxs=list_close_points)
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
-                #print([chain, resid])
 
                 #SASA is calculated for that lysine in the small molecule.
-                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
+                pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ", 'C03', 'C04', 'C05', 'C06', 'N07'],
                                             use_resname=False, get_index=True)
-                #print([pts_2, indx_2, S.data['radius']])
+
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
                 list_of_sasa.append(x[0])
 
-            except:
-                print(f'Error obtaining SASA at index value {str(j)}')
+            except Exception as e:
+                print(f'SASA Calculation: 2 - Error obtaining SASA at index value {str(j)} with error: {e}')
                 list_of_sasa.append(None)
-                report_error_to_file('Depth 1', path, f'Error obtaining SASA at index value {str(j)}')
+                report_error_to_file('SASA 2', path, f'Error obtaining SASA at index value {str(j)} with error: {e}')
                 continue
 
-        #append results to a df which is given as output
         try:
             df_sasa = pd.DataFrame({'Chain': list_of_chains,
                                 'Resid': list_of_resid,
                                 'sasa': list_of_sasa})
+            if self.include_modified: df_sasa['Modified'] = list_modified
 
         except Exception as e:
             report_error_to_file('SASA 3', path, str(e))
-            raise Exception(f'Error obtaining SASA data. {e}')
+            print(f'SASA Calculation: 3 - Failed to write extracted sasa information to dataframe, error: {e}')
 
         return df_sasa
+
+
+if __name__ == '__main__':
+    sasa = SASA(include_modified=True)
+    #print(sasa.calculate_sasa(path=f'1ubq.pdb'))
+    #print(sasa.calculate_sasa(path=f'1ubq_frame_0.pdb'))
+    print(sasa.calculate_sasa(path=f'1ubq_mod6_frame_0.pdb'))
+    #print(sasa.calculate_sasa(path=f'1nsk_AmberMod0000.pdb'))

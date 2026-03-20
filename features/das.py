@@ -25,6 +25,18 @@ class DAS():
     area (das) values for structures
     '''
 
+    def __init__(self, include_modified=False):
+        '''
+        Initialise the DAS class, include any global variables that are required from
+        measures in here.
+
+        Parameters
+        ----------
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
+        '''
+        self.include_modified = include_modified
+
     def calculate_das(self, path):
         '''
         Calculate the Dynamically Accessible Surface (DAS) of the NZ atom in the lysine structure
@@ -69,9 +81,11 @@ class DAS():
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             M = bb.Molecule(path)
-            idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
+            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
             report_error_to_file('DAS 1', path, e)
             print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
@@ -104,8 +118,17 @@ class DAS():
             df_das['Chain'] = list_chains
             df_das['Resid'] = lys_res_nums
             df_das['das'] = das_output
+            if self.include_modified: df_das['Modified'] = list_modified
         except Exception as e:
             report_error_to_file('DAS 3', path, str(e))
             print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das
+
+
+if __name__ == '__main__':
+    das = DAS(include_modified=True)
+    #print(das.calculate_das(path=f'unmodtest_0.pdb'))
+    #print(das.calculate_das(path=f'1ubq_frame_0.pdb'))
+    print(das.calculate_das(path=f'1ubq_mod6_frame_0.pdb'))
+    #print(das.calculate_das(path=f'1nsk_AmberMod0000.pdb'))

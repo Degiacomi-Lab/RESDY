@@ -29,13 +29,9 @@ class Structure():
     '''
     Class to house the different methods for calculating structural measurement values
     for structures.
-
-    Parameters
-    ----------
-
     '''
 
-    def __init__(self, melodia_features=['all']):
+    def __init__(self, melodia_features=['all'], include_modified=False):
         '''
         Initialise the Structure class
         
@@ -44,9 +40,12 @@ class Structure():
         melodia_features : list
             List of features which are calculated through melodia which has been requested
             when the Measure class is initialised. Default is set to ['all'].
+        include_modified : bool
+            Toggle to include residues which have been modified within the featurisation
         '''
 
         self.melodia_features = melodia_features
+        self.include_modified = include_modified
         if self.melodia_features == ['all']:
             self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
 
@@ -93,16 +92,26 @@ class Structure():
         # Melodia 2 - Formatting and filtering
         try:
             melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
-            lys_results = melodia_results['name'] == 'LYS'
+            lys_results = melodia_results['name'].isin(['LYS', 'LYE', 'KCX'])
             df_melodia = melodia_results[lys_results].copy()
             df_melodia.reset_index(inplace=True, drop=True)
+            list_modified = list(a in ['LYE', 'KCX'] for a in list(df_melodia['name']))
             cols_to_drop = ['code', 'id', 'model', 'curvature', 'writhing',
                             'torsion', 'phi', 'psi', 'name', 'arc_length']
             cols_to_drop = [col for col in cols_to_drop if col not in self.melodia_features]
             df_melodia.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
+            if self.include_modified: df_melodia['Modified'] = list_modified
 
         except Exception as e:
             report_error_to_file('Melodia 2', path, str(e))
             print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
 
         return df_melodia
+
+
+if __name__ == '__main__':
+    struc = Structure(include_modified=True)
+    #print(struc.calculate_melodia(path=f'1ubq.pdb'))
+    #print(struc.calculate_melodia(path=f'1ubq_frame_0.pdb'))
+    #print(struc.calculate_melodia(path=f'1ubq_mod6_frame_0.pdb'))
+    print(struc.calculate_melodia(path=f'1nsk_AmberMod0000.pdb'))

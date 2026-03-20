@@ -111,7 +111,6 @@ class Measure(object):
             self.activate_log = activate_log
             self.log_path = os.path.join(outdir, log_path)
 
-            # define a logger
             self.logger = logging.getLogger('MeasureLog')
             self.logger.setLevel(level = logging.DEBUG)
 
@@ -125,6 +124,10 @@ class Measure(object):
         self.outdir = outdir
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
+
+        # modified lysine management
+        self.include_mod = include_modified
+        self.mod_res_codes = ['LYN', 'KCX']
 
         self.features = features
         self.legolas_aevs = True
@@ -141,9 +144,6 @@ class Measure(object):
         self.wrong_pdb_file = []
         self.report_errors = report_errors
         if self.report_errors: self._setup_report_errors_file()
-
-        # modified lysine management
-        self.include_modified = include_modified
 
         # for parallel measurements
         self.parallel = parallel
@@ -184,70 +184,67 @@ class Measure(object):
         features : list
             The list of features that are required to measure over the set of proteins
         '''
-
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
         if 'all' in features:
             features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
-                        'melodia', 'aev_legolas', 'frustration', 'density', 'das']
+                        'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility']
             self.features = features
         if 'melodia' in self.features: self.features.append(self.features.pop(self.features.index('melodia')))
         self.measures = []
         melodia_features = []
-        melodia_added = False
-        frustration_added = False
-        legolas_added = False
+        melodia_added = False; frustration_added = False; legolas_added = False
         #TODO can this handle calculations where you actually want multiple methods for same feature calculating
         for m in features:
             if m in ['propka', 'pkaANI']:
-                pka = PKA(outdir=self.outdir, calc_method=m)
+                pka = PKA(outdir=self.outdir, calc_method=m, include_modified=self.include_mod)
                 self.measures.append([m, pka.calculate_pka])
             elif m == 'pka':
                 print('Please enter which pKa calculation method you would like to use: ' \
                       'propka or pkaANI')
                 while not input('propka or pkaANI:') in ['propka', 'pkaANI']:
                     print('Please enter either propka or pkaANI')  #TODO this needs testing but should work
-                pka = PKA(outdir=self.outdir, calc_method='propka')
+                pka = PKA(outdir=self.outdir, calc_method='propka', include_modified=self.include_mod)
                 self.measures.append([m, pka.calculate_propka])
             elif m == 'sasa':
-                sasa = SASA()
+                sasa = SASA(include_modified=self.include_mod)
                 self.measures.append([m, sasa.calculate_sasa])
             elif m == "depth":
-                depth = Depth()
+                depth = Depth(include_modified=self.include_mod)
                 self.measures.append([m, depth.calculate_depth])
             elif m == 'aev':
                 aev = AEV()
                 self.measures.append([m, aev.calculate_aevs])
             elif m == 'das':
-                das = DAS()
+                das = DAS(include_modified=self.include_mod)
                 self.measures.append([m, das.calculate_das])
             elif m == 'seqcharge':
-                charge = Charge()
+                charge = Charge(include_modified=self.include_mod)
                 self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'flexibility':
-                flex = Flexibility()
+                flex = Flexibility(include_modified=self.include_mod)
                 self.measures.append([m, flex.calculate_flexibility])
             elif m == 'legolas':
                 if self.legolas_aevs:
                     if 'aev_legolas' not in self.features:
                         self.features.append('aev_legolas')
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True, include_modified=self.include_mod)
                 else:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=False)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=False, include_modified=self.include_mod)
                 self.measures.append([m, nmr.calculate_legolas])
                 legolas_added = True
             elif m == 'aev_legolas':
                 if not legolas_added:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True, include_modified=self.include_mod)
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
                 if not frustration_added:
-                    frustration = Frustration()
+                    frustration = Frustration(include_modified=self.include_mod)
                     self.measures.append(['frustration', frustration.calculate_frustration])
                     frustration_added = True
             elif m == 'melodia':
-                structure = Structure(melodia_features=['all'])
+                structure = Structure(melodia_features=['all'], include_modified=self.include_mod)
                 self.measures.append([m, structure.calculate_melodia])
                 melodia_added = True
                 self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
@@ -255,7 +252,7 @@ class Measure(object):
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 if not melodia_added:
                     melodia_features += [m]
-                    structure = Structure(melodia_features=melodia_features)
+                    structure = Structure(melodia_features=melodia_features, include_modified=self.include_mod)
                     self.measures.append(['melodia', structure.calculate_melodia])
                     melodia_added = True
             else:
@@ -445,7 +442,6 @@ class Measure(object):
                 print(result)
                 self.df = ns_measures.df
 
-        # remove possible duplicated rows in dataframe
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
             print('\n>> Removed duplicates from measurement dataframe.')
@@ -471,22 +467,17 @@ class Measure(object):
         Create list of files that have been curated into the self.outdir directory.
         Iterate over the list of the files, check if structure file is
 
-        Parameters
-        ----------
 
         Example
         -------
         >> M.measure_dataframe()
         '''
-        # use a different method if handling pdb codes only
         if self.PDB_only:
-            return 'Call PDB_only method instead'
-
+            return 'General measurement method called, call PDB_only method instead'
         if self.parallel:
-            return 'Call measure_dataframe_parallel instead'
+            return 'Series measurement method called, call measure_dataframe_parallel instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
-        # remove the files which have pkaani in the name as these are output files from pkaani
         files = [file for file in files if 'pkaani' not in file]
         self.files_to_analyse = files
 
@@ -512,17 +503,12 @@ class Measure(object):
                 pred_time_remaining = 'undefined'
             print(f'Analysing PDB code ({pdb_code}) {i}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
 
-            # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files_list:
-                # check the file for the required pbd code, if not there, skip
                 if pdb_code not in f:
                     continue
 
                 tstart = time.time()
                 print(f"\n> Calculating for measurements for file: {f}")
-
-                # create temporary DataFrame for data of current file,
-                # to be then appended to main DataFrame self.df
 
                 columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
                 df_currentfile = pd.DataFrame(columns=columns)
@@ -596,7 +582,6 @@ class Measure(object):
                 if not df_currentfile.empty:
                     self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
-        # remove possible duplicated rows in dataframe
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
             print('\n>> Removed duplicates from measurement dataframe.')
@@ -640,14 +625,11 @@ class Measure(object):
         -------
         self._measure_file(file_details, files_list)
         '''
-
-        # decompose the file_details into variables
         uniprot_code, pdb_code, method, res, chains = file_details
         files_list = self.files_to_analyse
 
         # calculate features values from all PDB files associated with specific DataFrame entry
         for f in files_list:
-            # check the file for the required pbd code, if not there, skip
             if pdb_code not in f:
                 continue
 
@@ -657,13 +639,9 @@ class Measure(object):
             #print(f"\n> File: {f}")
             terminal_out_statements.append(f"\n> File: {f}")
 
-            # create temporary DataFrame for data of current file,
-            # to be then appended to main DataFrame self.df
-
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             df_currentfile = pd.DataFrame(columns=columns)
 
-            # append to temporary DataFrame all lysines in the file of interest
             try:
                 M = bb.Molecule(f) # sometimes bb does not work with a pdb file
             except Exception as e:
@@ -691,7 +669,6 @@ class Measure(object):
             #print(f">> {len(df_currentfile)} lysines of interest found")
             terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
 
-            # iterate over measures to carry out (according to self.measures)
             for meas in self.measures:
                 #print(f">> evaluating {meas[0]}...")
                 terminal_out_statements.append(f">> evaluating {meas[0]}...")
@@ -794,7 +771,6 @@ class Measure(object):
                 curr_line += 1
                 # check if it is a header line, check if doesn't start with number or -
                 if line[0].isalpha() or line[0] == ' ':
-                    # found a header line
                     parts = line.split()
                     # check that columns have been written to the log file correctly
                     if columns_all_set:
@@ -804,8 +780,7 @@ class Measure(object):
                         print(f'The first 6 columns are assumed to be: {base_columns}')
                         continue
                     elif len(parts) >= 6 and not columns_all_set:
-                        # if all seems correct with the writing
-                        # check that all the columns can be found in the current columns, if not, add in
+                        # if all seems correct with the writing check that all the columns can be found in the current columns, if not, add in
                         for part in parts:
                             if part not in base_columns:
                                 base_columns.append(part)
@@ -943,13 +918,14 @@ class Measure(object):
 
             chain_value = r["Chain"]
             resid_value = r["Resid"]
+            if self.include_mod: modified_value = r['Modified']
 
-            idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
+            if self.include_mod: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value) & (to_merge["Modified"].astype(bool) == modified_value))
+            else: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
             if len(idx[0]) == 0:
                 continue
 
             # account for measurements that have special cases
-            # melodia - check over all the required features to add and add these back in to the overall dataframe
             if col_name == 'melodia':
                 melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                 for feature in self.features:
@@ -972,14 +948,11 @@ class Measure(object):
 
     def measure_PDB_only(self):
         '''
-        TODO FINISH THIS
         Function to measure specified features for a set of pdb files. Takes a list of pdb files,
         finds associated curated structures and runs the required measurement functions.
-        Results are saved to memory and a log file produced at the same time.
+        Results are saved to memory and a log file produced at the same time if required. Timing
+        is kept to updated the predicted time remaining as it goes along.
         M.save_state() can be used to save the data to a csv.
-
-        Method
-        ------
 
         Example
         -------
@@ -987,13 +960,12 @@ class Measure(object):
         '''
         if not self.PDB_only:
             print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
-            return 'Calling the wrong method.'
+            return 'You have called the wrong method for measuring data, call the general measures function instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
         tstart_overall = time.time()
         num_pdb_files = len(self.df_input) + self.progress_index
 
-        # remove any potential duplicates from the input dataframe
         self.df_input = self.df_input.drop_duplicates()
         if 'completed' not in self.df_input.columns:
             self.df_input['completed'] = False
@@ -1016,14 +988,10 @@ class Measure(object):
                 tstart = time.time()
                 print(f"\n> File: {f}")
 
-                # create temporary DataFrame for data of current file,
-                # to be then appended to main DataFrame self.df
-
                 columns = ['PDB_Code', 'Chain', 'Resid']
+                if self.include_mod: columns.append('Modified')
                 df_currentfile = pd.DataFrame(columns=columns)
 
-
-                # append to temporary DataFrame all lysines in the file of interest
                 try:
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
                 except Exception as e:
@@ -1031,28 +999,30 @@ class Measure(object):
                     self.wrong_pdb_file.append(f)
                     continue
 
-                df_idx, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                if self.include_mod: df_idx, idxs = M.atomselect("*", ['LYS', 'LYE', 'KCX'], ["CA"], get_index=True, use_resname=True)
+                else: df_idx, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
                 for i in idxs:
 
                     #save only lysine entries from chain of interest
                     #if M.data["chain"].values[i] not in chains:
                     #    continue
 
-
+                    if M.data['resname'].values[i] in ['LYE', 'KCX']: mod_stat = True
+                    else: mod_stat = False
                     data = ({'PDB_Code': f.split(".")[0],
                         'Chain': M.data["chain"].values[i],
-                        'Resid': M.data["resid"].values[i]})
+                        'Resid': M.data["resid"].values[i],
+                        'Modified': mod_stat})
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
                 print(f">> {len(df_currentfile)} lysines of interest found")
 
-                # iterate over measures to carry out (according to self.measures)
                 for meas in self.measures:
                     print(f">> evaluating {meas[0]}...")
                     try:
                         #df_currentfile[meas[0]] = np.nan # create new column for measure  # change GW 11.03.25 - dont need this, new column created anyway, leaving in incase removing creates problems later
-                        result = meas[1](f) # run measurement
+                        result = meas[1](f)
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
@@ -1062,10 +1032,10 @@ class Measure(object):
                 processing_time = round((time.time()-tstart), 2)
                 print(f">> file processed in {processing_time} sec.")
 
-                # document the data to a log file
                 if self.activate_log:
                     if df_currentfile.empty is False:
                         try:
+                            # display settings for df are changed while writing and reverted after
                             pd.set_option('display.max_colwidth', None,
                                         'display.width', None,
                                         'max_seq_items', None,
@@ -1076,7 +1046,6 @@ class Measure(object):
                             except Exception as e:
                                 print(f'Error in logging: {e}')
 
-                            # reset the display options back to default for regular displaying
                             pd.reset_option('display.max_colwidth')
                             pd.reset_option('display.width')
                             pd.reset_option('max_seq_items')
@@ -1084,7 +1053,6 @@ class Measure(object):
                         except Exception as e:
                             print(f'Error in logging measurements: {e}')
 
-                #append temporary DataFrame with all measures on a single file to main DataFrame
                 if not df_currentfile.empty:
                     self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
@@ -1250,7 +1218,6 @@ class Measure(object):
                 curr_line += 1
                 # check if it is a header line, check if doesn't start with number or -
                 if line[0].isalpha() or line[0] == ' ':
-                    # found a header line
                     if line != set_header_line:
                         parts = line.split()
                         # check that columns have been written to the log file correctly
@@ -1259,8 +1226,7 @@ class Measure(object):
                             print(f'The first 6 columns are assumed to be: {base_columns}')
                             continue
                         elif len(parts) >= 3 and not columns_all_set:
-                            # if all seems correct with the writing
-                            # check that all the columns can be found in the current columns, if not, add in
+                            # if all seems correct with the writing check that all the columns can be found in the current columns, if not, add in
                             for part in parts:
                                 if part not in base_columns:
                                     base_columns.append(part)
@@ -1278,9 +1244,7 @@ class Measure(object):
                 parts = re.split(r'([\w.,\/-]+)|(\[.+?\])', line)
                 if len(parts) == 0:
                     continue
-                # remove None elemnts from matching and reduce all space values to ''
                 parts = [elmnt.strip() for elmnt in parts if elmnt is not None]
-                # remove '' elements from the list
                 parts = [elmnt for elmnt in parts if elmnt != '']
                 parts = parts[1:]
 
@@ -1288,8 +1252,7 @@ class Measure(object):
                     continue
                 num_parts = len(parts)
 
-                # Case 1: Setting the columns when the columns have been messed up and aren't the
-                #         same as the data in the log file
+                # Case 1: Setting the columns when the columns have been messed up and aren't the same as the data in the log file
                 if num_parts > len(base_columns):
                     while num_parts != len(base_columns):
                         print('Need to set a column header')
