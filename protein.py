@@ -228,12 +228,12 @@ class PDB(object):
             raise Exception(f'Error cleaning {pdb}: {e}') from e
 
 
-
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
         test = False
         for cnt, f in enumerate(files):
             mypath = os.path.split(f)[0]
             fasta = os.path.join(mypath, f"{pdb}.fasta")
+            print(fasta)
 
             try:
 
@@ -366,7 +366,6 @@ class PDB(object):
         try:
             replacement_dict = self.get_chain_replacement(pdb)
             path = os.path.join(self.raw_dir, f"{pdb}.pdb")
-            self.replace_selenocysteine(path, pdb)
             if len(replacement_dict) > 0:
                 self.new_replace_chains(pdb, path, replacement_dict)
                 #self.replace_chains(path, replacement_dict)
@@ -386,15 +385,23 @@ class PDB(object):
         # Write the clean file, including HETATMs (if they are metal ions),
         # all atoms and lines starting with TER and END.
         test_MSE = False
+        test_SEC = False
         test_KCX = False
         for line in read_file:
 
             # replace selenomethionine with methionine
-            if "MSE" in line:
+            if "MSE" in line and ('ATOM' in line or 'HETATM' in line):
                 line = line.replace("HETATM", "ATOM  ")
                 line = line.replace('MSE', 'MET')
                 line = line.replace('SE', ' S')
                 test_MSE = True
+
+            # replace selenocysteine with cysteine
+            if "SEC" in line and ('ATOM' in line or 'HETATM' in line):
+                #line = line.replace("HETATM", "ATOM  ")
+                line = line.replace('SEC', 'CYS')
+                line = line.replace('SE', ' S')
+                test_SEC = True
 
             #transform carboxylated lysine into a normal lysine
             if "KCX" in line:
@@ -404,7 +411,7 @@ class PDB(object):
 
                 else:
                     line = line.replace("HETATM", "ATOM  ")
-                    line = line.replace('KCX', 'LYS')  # TODO: change to investigate as changed 'MES' to 'LYS' - this should be 'LYS' but wasnt before for some reason
+                    line = line.replace('KCX', 'LYS')
 
                 test_KCX = True
 
@@ -416,7 +423,7 @@ class PDB(object):
                     write_file.write(line)
                     continue
 
-            #ignore hydrogen atoms
+            # write lines and ignore hydrogen atoms
             if line[:4] == 'ATOM':
                 if words[2] != 'H' and words[-1] != 'H':
                     write_file.write(line)
@@ -427,11 +434,11 @@ class PDB(object):
                 write_file.write(line)
                 continue
 
-        if test_MSE:
-            print(">> mutated MSE to MET")
-
-        if test_KCX:
-            print(">> mutated removed a lysine carboxylation")
+        if test_MSE: print(">> mutated MSE to MET")
+        if test_SEC:
+            print('>> mutated SEC to CYS')
+            self._adapt_fasta(pdb=pdb)
+        if test_KCX: print(">> mutated added to remove a lysine carboxylation")
 
         write_file.close()
         read_file.close()
@@ -678,7 +685,7 @@ class PDB(object):
 
     def replace_chains(self, path, replacement_dict):
         '''
-        
+        Old replace chains, left here incase useful when implementing the new_replace chains method
         '''
         #First, the auth chain names are put in a list.
         auth_list = list(replacement_dict)
@@ -788,6 +795,41 @@ class PDB(object):
 
         return
 
+    def _adapt_fasta(self, pdb):
+        '''
+        Short function called if selenocysteine found in the structure to adapt the
+        fasta file in order for modeller to be able to be called to fix the structure.
+
+        Parameters
+        ----------
+        pdb -> string
+            pdb code of the fasta file to change the data
+        '''
+        try:
+            fasta = os.path.join(self.raw_dir, f"{pdb}.fasta")
+            fin = open(fasta, "r")
+            fasta_headers = []
+            fasta_seqs = []
+            for line in fin:
+                if ">" in line:
+                    fasta_headers.append(line)
+                else:
+                    temp_sequence = line
+                    for i, res in enumerate(temp_sequence):
+                        if res == 'U':
+                            temp_sequence = temp_sequence[:i] + 'C' + temp_sequence[(i+1):]
+                    fasta_seqs.append(temp_sequence)
+
+            new_fasta = open(fasta, 'w')
+            for header, sequence in zip(fasta_headers, fasta_seqs):
+                new_fasta.write(header)
+                new_fasta.write(sequence)
+            new_fasta.close()
+
+        except Exception as e:
+            raise Exception(f'Failed to replace selenocysteine in fasta file: {e}') from e
+
+
     def rewrite_pdb(self, path):
         '''
         Short function to take a pdb file, load it into biobox as a molecule and
@@ -813,109 +855,10 @@ class PDB(object):
 
 
 
-    def replace_selenocysteine(self, path, pdb):
-        '''
-        Identify all the selenocysteine residues within the structure with cyteine in order
-        for the model to process this protein structure.
-
-        Parameters
-        ----------
-        path -> string
-            the path to the PDB file to sort
-
-        pdb -> string
-            the name of the PDB file
-        
-        Example
-        -------
-        >> self.replace_selenocysteine(path, pdb)
-        '''
-        # replace the U residues in the pdb file
-        try:
-            M = bb.Molecule(path)
-            indices = M.atomselect('*', '*', '*', True, False)[1]
-
-            for index, row in M.data.iterrows():
-                if row['resname'] == 'U':
-                    replacement_chain_name = 'C'
-                    M.data.at[index, 'resname'] = replacement_chain_name
-
-
-            path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
-            M.write_pdb(path_temp, index=indices, split_struc=True)
-
-            # take the new written file and insert in place where it would sit in the overall pdb file
-            lines = open(path, 'r').readlines()
-            start_atoms = False
-            first_lines = []
-            second_lines = []
-            for line in lines:
-                if line[:4]  == "ATOM" or line[:6] == 'HETATM' or line[:3] == 'TER':
-                    start_atoms = True
-                else:
-                    if start_atoms:
-                        second_lines.append(line)
-                    else:
-                        first_lines.append(line)
-
-            new_atom_lines = open(path_temp, 'r').readlines()
-            new_file_output = first_lines + new_atom_lines[1:-1] + second_lines
-
-            cleaned_file = open(path, 'w')
-            cleaned_file.writelines(new_file_output)
-            cleaned_file.close()
-
-            os.remove(path_temp)
-
-        except Exception as e:
-            raise Exception(f'Failed to replace selenocysteine in pdb file: {e}') from e
-
-
-        # replace the U residues in the fasta file
-        try:
-
-            fasta = os.path.join(self.raw_dir, f"{pdb}.fasta")
-
-            fin = open(fasta, "r")
-            headers = [] # fasta headers
-            sequences = [] #collection of sequences
-            for line in fin:
-                if ">" in line:
-                    headers.append(line)
-                else:
-                    temp_sequence = line
-                    for i, res in enumerate(temp_sequence):
-                        if res == 'U':
-                            temp_sequence = temp_sequence[:i] + 'C' + temp_sequence[(i+1):]
-                    sequences.append(temp_sequence)
-
-            new_fasta = open(fasta, 'w')
-            for header, sequence in zip(headers, sequences):
-                new_fasta.write(header)
-                new_fasta.write(sequence)
-            new_fasta.close()
-
-        except Exception as e:
-            raise Exception(f'Failed to replace selenocysteine in fasta file: {e}') from e
-
-
-
-
 if __name__ == "__main__":
 
     PDB = PDB()
-    if True:
-        PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
-        #PDB.clean_and_split_pdb('2MBH') # test splitting of models
-        #PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
-
-    if False:
-
-        from uniprot import Uniprot
-        UP = Uniprot()
-        UP.get_protein_data("P09167") # load strucutres for a single UNIPROT
-        UP.from_csv_file("inputs\\input_codes_4.csv") # add structures from a .csv file
-        print(UP.df)
-
-        PDB.gather_proteins(UP.df)
-        print(PDB.df)
+    #PDB.clean_and_split_pdb('1PAE') # test SEC to CYS mutation
+    PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
+    #PDB.clean_and_split_pdb('2MBH') # test splitting of models
+    #PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
