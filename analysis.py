@@ -418,7 +418,7 @@ class Analysis(object):
         print(f'Num of rows removed: {diff_rows}')
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
-    def relative_best_new(self, df, weights, features=['depth']):
+    def relative_best(self, df, weights, features=['depth']):
         '''
         Function to extract the best relative list of features for all combinations of uniprot
         entry and residues based on a given list of metrics to do the calculation over and

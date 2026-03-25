@@ -515,7 +515,7 @@ class Measure(object):
 
                 # append to temporary DataFrame all lysines in the file of interest
                 try:
-                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                    M = bb.Molecule(f)
                 except Exception as e:
                     self.wrong_pdb_file.append(f)
                     print(f'Failed to produce bb for pdb file with error: {e}')

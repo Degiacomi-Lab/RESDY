@@ -9,13 +9,16 @@ import subprocess
 import re
 import glob
 import fileinput
-import shutil
+import requests
+import Bio
 import pandas as pd
 import numpy as np
 import biobox as bb
 import alphafold as af # to load alphafold data
 import patcher # to patch PDB structures with missing regions
 from helper import get_download_tool, ShutUp
+from collections import OrderedDict
+from Bio.Align import PairwiseAligner
 
 
 class PDB(object):
@@ -95,8 +98,6 @@ class PDB(object):
         if outdir == "":
             outdir = os.path.dirname(fname)
 
-        self._setup(outdir, gap, PDB_only)
-
         try:
             self.df = pd.read_csv(fname)
             # remove duplicates from the dataframe to avoid extra uneccessary calculations
@@ -118,7 +119,7 @@ class PDB(object):
             except Exception as e:
                 return e
 
-        for index, row in uniprot_df.iterrows():
+        for idx, row in uniprot_df.iterrows():
 
             pdb_code = row["PDB_Code"]
 
@@ -143,7 +144,6 @@ class PDB(object):
                         continue
 
                 try:
-                    # possible bug fixed
                     af.download_AF_struc(pdb_code,outfolder=self.outdir)
                 except Exception as e:
                     print(f">> FAILED: {e}")
@@ -173,7 +173,7 @@ class PDB(object):
                     print(">> FAILED: structure not found in AlphaFold database")
                     try:
                         os.remove(af_filename)
-                    except:
+                    except Exception as e:
                         pass
 
             else:
@@ -181,7 +181,7 @@ class PDB(object):
                     method_obtained = row["Method"]
                     resolution = row["Resolution"]
                     chains = row["Chains"]
-                except:
+                except Exception as e:
                     pass
                 if skip_if_found:
                     files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
@@ -196,7 +196,8 @@ class PDB(object):
 
                 # load, clean, and split it in alternate conformations
                 try:
-                    self.clean_and_split_pdb(pdb_code)
+                    if self.PDB_only: self.clean_and_split_pdb(pdb_code)
+                    else: self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
                     if not self.PDB_only:
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
                     else:
@@ -208,14 +209,13 @@ class PDB(object):
                     continue
 
 
-    def clean_and_split_pdb(self, pdb):
+    def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[]):
         '''
         Download a pdb, and return a collection of cleaned and splitted alternative conformations
         The results are saved into files: [outfolder]/conformations/*PDB code*-clean.pdb.
         '''
 
         try:
-
             #download and clean the structure
             self.download_pdb(pdb)
             replacement_dict = self.clean(pdb)
@@ -243,6 +243,10 @@ class PDB(object):
                     self.replace_chains(fname, reverse_replacement_dict)
                     # TODO 30.07.25 - test this with replacing to new_replace_chains
 
+                # TODO 24.03.26 - this is only possible with structures that have a uniprot code associated in order to get the sequence to align to - find way to make work with pdb_only
+                if not self.PDB_only:
+                    self._align_resnum_uniprot(uniprot_code, fname, chains)
+
                 test = True
 
             except Exception as e:
@@ -251,7 +255,6 @@ class PDB(object):
 
         if not test:
             raise Exception("Patching failed for all conformers")
-
 
         return
 
@@ -438,7 +441,7 @@ class PDB(object):
         if test_SEC:
             print('>> mutated SEC to CYS')
             self._adapt_fasta(pdb=pdb)
-        if test_KCX: print(">> mutated added to remove a lysine carboxylation")
+        if test_KCX: print(">> mutation added to remove a lysine carboxylation")
 
         write_file.close()
         read_file.close()
@@ -605,6 +608,76 @@ class PDB(object):
             os.remove(f)
 
         return
+
+
+    def _align_resnum_uniprot(self, uniprot_code, pdb_code, chains):
+        '''
+        Function to align the residue numbers within the pdb file with the canonical
+        sequence available from the Uniprot website
+
+        Parameters
+        ----------
+        pdb_code -> string
+            Code for the pdb structure of interest.
+        '''
+        tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
+        fasta_text = requests.get(tmp_url).text
+        uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
+        M = bb.Molecule(pdb_code)
+        c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
+        subset_data = M.data.iloc[c_alpha_idxs]
+
+        protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
+                                'CYS': 'C', 'GLU': 'E', 'GLN': 'Q', 'GLY': 'G',
+                                'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
+                                'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S',
+                                'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V',
+                                'HIE': 'H', 'HID': 'H', 'HIP': 'H', 'LYN': 'K',
+                                'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
+                                'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
+                                'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
+                                'KCX': 'K', 'LYE': 'K'}
+
+        pdb_seqs = {}
+        for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+            tmp_data = subset_data[subset_data['chain'] == chain]
+            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in list(protein_letters_dict.keys()) else 'X' for a in list(tmp_data['resname'])])
+
+        align_shift_dict = {}
+
+        for chain in chains:
+            try:
+                aligner = PairwiseAligner()
+                alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
+                dash_locs = [i for i, aa in enumerate(alignment[1]) if aa =='-']
+                for idx, loc in enumerate(dash_locs):
+                    align_shift_dict[loc - (idx)] = idx + 1
+            except Exception as e:
+                print(f'Failed alignment of pdb {pdb_code} with error: {e}')
+
+        old_res_count = 1
+        old_res_curr_num = -1
+        curr_chain = 'XXXX'
+        for i, r in M.data.iterrows():
+            if r['chain'] in chains:
+                if old_res_curr_num == -1: old_res_curr_num = r['resid']
+                if curr_chain == 'XXXX': curr_chain = r['chain']
+                shift = 0
+                res_num = r['resid']
+                if len(list(align_shift_dict.keys())) != 0:
+                    for bound in list(align_shift_dict.keys()):
+                        if res_num > bound:
+                            shift = align_shift_dict[bound]
+                if old_res_curr_num != r['resid']:
+                    old_res_count += 1
+                    old_res_curr_num = r['resid']
+                if curr_chain != r['chain']:
+                    curr_chain = r['chain']
+                    old_res_count = 1
+                M.data.at[i, 'resid'] = old_res_count + shift
+
+        #print(M.data)
+        M.write_pdb(pdb_code)
 
 
     def get_chain_replacement(self, pdb_code):
@@ -859,6 +932,10 @@ if __name__ == "__main__":
 
     PDB = PDB()
     #PDB.clean_and_split_pdb('1PAE') # test SEC to CYS mutation
-    PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
+    #PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
     #PDB.clean_and_split_pdb('2MBH') # test splitting of models
     #PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
+    PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
+
+
+    #PDB._align_resnum_uniprot('P50030', f'result{os.sep}curated{os.sep}3DBJ-alt-1.pdb', chains=['A', 'C', 'E', 'G'])
