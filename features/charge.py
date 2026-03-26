@@ -18,6 +18,7 @@ import numpy as np
 import biobox as bb
 import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
+from collections import OrderedDict
 
 
 class Charge():
@@ -72,7 +73,6 @@ class Charge():
         Chain   Resid  seqcharge
         0     A      95         -3
         '''
-
         # 1: Extract the overall sequence for the protein given
         try:
             M = bb.Molecule(path)
@@ -83,6 +83,7 @@ class Charge():
             list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
 
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
+            subset_data = M.data.iloc[c_alpha_idxs]
 
             # TODO GW 16.04.25 - eventually will need to add in ability to use  letter codes and charges
             #                    for the 3 lettter cases rather than the 1 letter cases which when using
@@ -102,7 +103,6 @@ class Charge():
             if self.include_modified: protein_letters_dict['KCX'] = 'K'; protein_letters_dict['LYE'] = 'K'
             else: protein_letters_dict['KCX'] = 'X'; protein_letters_dict['LYE'] = 'X' 
 
-
             def _catch(func, *args, handle=lambda e : e, **kwargs):
                 try:
                     return func(*args, **kwargs)
@@ -110,8 +110,10 @@ class Charge():
                     print(f"Could not convert {e} to a 1 letter code: using 'X' instead")
                     return 'X'
 
-            sequence = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(M.data['resname'][c_alpha_idxs])])
-
+            pdb_seqs = {}
+            for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                tmp_data = subset_data[subset_data['chain'] == chain]
+                pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
         except Exception as e:
             report_error_to_file('Seqcharge 1', path, str(e))
@@ -120,11 +122,13 @@ class Charge():
 
         # 2: Extract local sequences based on the overall chain, calculate charge score and add to output
         seqcharge_output = []
-        for i, lys_res_idx in enumerate(lys_res_nums):
+        df_seqcharge = pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
+
+        for idx, (lys_chain, lys_num) in enumerate(zip(list_chains, lys_res_nums)):
             try:
-                # get the index of the start position of the residues to work out the shift
-                shift_val = int(M.data['resid'].iloc[0]) - 1
-                seq_lys_index = lys_res_idx - shift_val - 1
+                seq = pdb_seqs[lys_chain]
+                chain_shift_val = int(M.data[M.data['chain'] == lys_chain]['resid'].iloc[0]) - 1
+                seq_lys_index = lys_num - chain_shift_val - 1
 
                 start_idx = seq_lys_index - num_add_aa
                 end_idx = seq_lys_index + num_add_aa + 1
@@ -135,14 +139,14 @@ class Charge():
                     start_null = - start_idx
                     start_idx = 0
 
-                if end_idx >= len(sequence):
+                if end_idx >= len(seq):
                     end_null = - end_idx
-                    end_idx = len(sequence)
+                    end_idx = len(seq)
 
-                seq = ('-' * start_null) + sequence[start_idx:end_idx] + ('-' * end_null)
+                seq = ('-' * start_null) + seq[start_idx:end_idx] + ('-' * end_null)
                 seq_split = list(seq)
                 if seq_split[10] != 'K':
-                    print(f'A lysine was not found at the desired position {lys_res_idx+1} read in for PDB file {path}; sequence -> {seq}')
+                    print(f'A lysine was not found at the desired position {lys_num+1} on chain {lys_chain} read in for PDB file {path}; sequence -> {seq}')
                     continue
 
                 pos_aa = ['K', 'H', 'R']
@@ -155,21 +159,19 @@ class Charge():
                         count -= 1
                 seqcharge_output.append(count)
 
+                if self.include_modified:
+                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count, 'Modified': list_modified[idx]}])], ignore_index=True)
+                else:
+                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count}])], ignore_index=True)
+
             except Exception as e:
                 report_error_to_file('Seqcharge 2', path, str(e))
-                print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_res_idx}, error: {e}')
+                print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_num}, error: {e}')
                 seqcharge_output.append(None)
-
-        # 3: Create dataframe to return
-        df_seqcharge = pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
-        try:
-            df_seqcharge['Chain'] = list_chains
-            df_seqcharge['Resid'] = lys_res_nums
-            df_seqcharge['seqcharge'] = seqcharge_output
-            if self.include_modified: df_seqcharge['Modified'] = list_modified
-        except Exception as e:
-            report_error_to_file('Seqcharge 3', path, str(e))
-            print(f'SeqCharge Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
+                if self.include_modified:
+                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None, 'Modified': list_modified[idx]}])], ignore_index=True)
+                else:
+                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None}])], ignore_index=True)
 
         return df_seqcharge
 
