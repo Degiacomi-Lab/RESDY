@@ -115,6 +115,7 @@ class Aggregation:
         '''
         self._data_tidying()
         df_stats = self._calculate_statistics()
+        print(df_stats.columns.values)
         match self.aggregation_method:
             case 'avg':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
@@ -136,9 +137,9 @@ class Aggregation:
                 avg_features = [a for a in [b for b in self.features_to_include if not any (c in b for c in max_features) and not any (c in b for c in min_features)] if 'avg' in a]
                 self.df_agg = df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_features])
             case 'minmax':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'ESM'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'minmaxavg':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg', 'ESM'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'all':
                 self.df_agg = df_stats
             case 'choose':
@@ -208,6 +209,12 @@ class Aggregation:
                 case _:
                     print(f'>> AEV dimensionality reduction method: {self.aev_red_method}, was not recognised, using PCA method.')
                     self._prepare_pca()
+        if 'esm' in self.features_to_include:
+            df_esm = pd.DataFrame(list([literal_eval(esm) for esm in self.df_measurements['esm']]))
+            df_esm = df_esm.add_prefix('ESM_')
+            self.df_measurements = pd.concat([self.df_measurements.reset_index(), df_esm.reset_index()], axis=1)
+            self.df_measurements = self.df_measurements.drop(['index', 'esm'], axis=1)
+
 
 
     def _prepare_aev_sd(self):
@@ -333,7 +340,8 @@ class Aggregation:
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
-        self._reduce_aev_dimensions()
+        if 'aev' in self.features_to_include or 'esm' in self.features_to_include or 'aev_legolas' in self.features_to_include:
+            self._reduce_aev_dimensions()
 
         for idx, row in seperate_lys.iterrows():
             entry = row['Uniprot_Entry']
@@ -362,6 +370,9 @@ class Aggregation:
                         data[feat + '_avg'] = round(df_query[feat].mean(), 2)
                         data[feat + '_sd'] = round(df_query[feat].std(), 2)
                         data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
+                elif feature == 'esm':
+                    for feat in [a for a in df_query.columns if 'ESM_' in a]:
+                        data[feat] = df_query[feat].loc[0]
 
                 else:
                     data[feature + '_min'] = round(float(df_query[feature].min()), 2)

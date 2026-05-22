@@ -121,7 +121,6 @@ class Charge():
             return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
         # 2: Extract local sequences based on the overall chain, calculate charge score and add to output
-        seqcharge_output = []
         df_seqcharge = pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
         for idx, (lys_chain, lys_num) in enumerate(zip(list_chains, lys_res_nums)):
@@ -157,7 +156,6 @@ class Charge():
                         count += 1
                     elif aa in neg_aa:
                         count -= 1
-                seqcharge_output.append(count)
 
                 if self.include_modified:
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count, 'Modified': list_modified[idx]}])], ignore_index=True)
@@ -167,7 +165,6 @@ class Charge():
             except Exception as e:
                 report_error_to_file('Seqcharge 2', path, str(e))
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_num}, error: {e}')
-                seqcharge_output.append(None)
                 if self.include_modified:
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None, 'Modified': list_modified[idx]}])], ignore_index=True)
                 else:
