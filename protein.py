@@ -188,6 +188,9 @@ class PDB(object):
                     if pdb_code in files:
                         print(f">> curated {pdb_code} PDB found, continuing...")
                         if not self.PDB_only:
+                            matched_curated_files = [os.path.basename(c) for c in glob.glob(os.path.join(self.curated_dir, "*pdb")) if pdb_code in c]
+                            for file in matched_curated_files:
+                                self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
                             data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
                         else:
                             data = {'PDB_Code': pdb_code}
@@ -196,11 +199,11 @@ class PDB(object):
 
                 # load, clean, and split it in alternate conformations
                 try:
-                    if self.PDB_only: self.clean_and_split_pdb(pdb_code)
-                    else: self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
                     if not self.PDB_only:
+                        self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': chains}
                     else:
+                        self.clean_and_split_pdb(pdb_code)
                         data = {'PDB_Code': pdb_code}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -214,7 +217,6 @@ class PDB(object):
         Download a pdb, and return a collection of cleaned and splitted alternative conformations
         The results are saved into files: [outfolder]/conformations/*PDB code*-clean.pdb.
         '''
-
         try:
             #download and clean the structure
             self.download_pdb(pdb)
@@ -240,7 +242,8 @@ class PDB(object):
                 fname = patcher.curate(f, fasta, outdir=self.curated_dir, gap=self.gap)
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
-                    self.replace_chains(fname, reverse_replacement_dict)
+                    #self.replace_chains(fname, reverse_replacement_dict)
+                    self.new_replace_chains(fname, reverse_replacement_dict)
                     # TODO 30.07.25 - test this with replacing to new_replace_chains
 
                 # TODO 24.03.26 - this is only possible with structures that have a uniprot code associated in order to get the sequence to align to - find way to make work with pdb_only
@@ -370,7 +373,7 @@ class PDB(object):
             replacement_dict = self.get_chain_replacement(pdb)
             path = os.path.join(self.raw_dir, f"{pdb}.pdb")
             if len(replacement_dict) > 0:
-                self.new_replace_chains(pdb, path, replacement_dict)
+                self.new_replace_chains(path, replacement_dict)
                 #self.replace_chains(path, replacement_dict)
 
         except Exception as e:
@@ -617,8 +620,13 @@ class PDB(object):
 
         Parameters
         ----------
+        uniprot_code -> string
+            Uniprot code for pdb file of interest
         pdb_code -> string
-            Code for the pdb structure of interest.
+            Code for the pdb structure of interest
+        chains -> list
+            List of the chains within the pdb structure that match the uniprot code
+            within the pdb file
         '''
         tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
         fasta_text = requests.get(tmp_url).text
@@ -678,6 +686,7 @@ class PDB(object):
 
         #print(M.data)
         M.write_pdb(pdb_code)
+        print(f'Chains aligned to canonical uniprot sequence for pdb {pdb_code}')
 
 
     def get_chain_replacement(self, pdb_code):
@@ -759,6 +768,7 @@ class PDB(object):
     def replace_chains(self, path, replacement_dict):
         '''
         Old replace chains, left here incase useful when implementing the new_replace chains method
+        This now isnt called, left incase problems arise with new method 19.05.26
         '''
         #First, the auth chain names are put in a list.
         auth_list = list(replacement_dict)
@@ -798,20 +808,27 @@ class PDB(object):
         return
 
 
-    def new_replace_chains(self, pdb, path, replacement_dict):
+    def _check_curated_structure(self, pdb, uniprot='', chains=[]):
+        '''
+        Call the required functions that may be needed if a curated pdb file is already found.
+        Potential for this to be needed if a pdb is curated for a uniprot code but pdb file also
+        contains chains from another uniprot code which may not have been corrected fully. This
+        is non-exhaustive and as other checks are added, may need to be included here.
+        '''
+        self._align_resnum_uniprot(uniprot, pdb, chains)
+
+
+    def new_replace_chains(self, path, replacement_dict):
         '''
         New version of the replace chains which correctly produces pdb files afterwards
         for the patching as the original left some proteins in space. 
 
         Parameters
         ----------
-        pdb : string
-            The name of the pdb file that the replacement is being done on
-
-        path : string
+        path -> string
             The path of the pdb file that the work is being done on
 
-        replacement_dict : dict
+        replacement_dict -> dict
             The dictionary which contains the information about which chains
             need replacing 
 
@@ -826,14 +843,13 @@ class PDB(object):
             # find the indices of the atoms in the pdb file
             indices = M.atomselect('*', '*', '*', True, False)[1]
 
-
             # transform to data lists and change the chain names
-
             for index, row in M.data.iterrows():
                 if row['chain'] in auth_list:
                     replacement_chain_name = replacement_dict.get(row['chain'])
                     M.data.at[index, 'chain'] = replacement_chain_name
 
+            pdb = path.split(os.sep)[-1].split('.')[0]
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
             M.write_pdb(path_temp, index=indices, split_struc=True)
 
@@ -900,6 +916,7 @@ class PDB(object):
             new_fasta.close()
 
         except Exception as e:
+            print(f'Failed to replace selenocysteine in fasta file: {e}')
             raise Exception(f'Failed to replace selenocysteine in fasta file: {e}') from e
 
 
@@ -924,7 +941,7 @@ class PDB(object):
 
         except Exception as e:
             os.remove(path)
-        raise Exception(f'Failed rewriting pdb file. {e}')
+            print(f'Failed rewriting pdb file with error: {e}')
 
 
 
@@ -934,8 +951,9 @@ if __name__ == "__main__":
     #PDB.clean_and_split_pdb('1PAE') # test SEC to CYS mutation
     #PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
     #PDB.clean_and_split_pdb('2MBH') # test splitting of models
-    #PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
-    PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
+    PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
+    PDB.clean_and_split_pdb('4WNC', 'P04406') # test splitting rotamers
+    #PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
 
 
     #PDB._align_resnum_uniprot('P50030', f'result{os.sep}curated{os.sep}3DBJ-alt-1.pdb', chains=['A', 'C', 'E', 'G'])

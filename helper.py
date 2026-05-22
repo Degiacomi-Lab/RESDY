@@ -19,8 +19,8 @@ def get_download_tool():
 
     else:
         return None
-    
-    
+
+
 class ShutUp(object):
     def __enter__(self):
         self._stdout = sys.stdout

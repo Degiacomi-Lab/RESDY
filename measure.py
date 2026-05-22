@@ -29,6 +29,7 @@ from features.pka import PKA
 from features.sasa import SASA
 from features.structure import Structure
 from features.flexibility import Flexibility
+from features.ensemble import Ensemble
 
 
 # AEV packages
@@ -188,7 +189,8 @@ class Measure(object):
         # functions must return a dataframe [chain, resid, measure]
         if 'all' in features:
             features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
-                        'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility']
+                        'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
+                        'esm', 'rmsf']
             self.features = features
         if 'melodia' in self.features: self.features.append(self.features.pop(self.features.index('melodia')))
         self.measures = []
@@ -255,6 +257,12 @@ class Measure(object):
                     structure = Structure(melodia_features=melodia_features, include_modified=self.include_mod)
                     self.measures.append(['melodia', structure.calculate_melodia])
                     melodia_added = True
+            elif m == 'esm':
+                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod)
+                self.measures.append(['esm', ensemble.calculate_esm])
+            elif m == 'rmsf':
+                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod)
+                self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
                 raise Exception(f"measure {m} unknown")
 
