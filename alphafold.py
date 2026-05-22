@@ -1,10 +1,9 @@
 import csv
 import os
-import sys
 import re
 import subprocess
-from helper import get_download_tool
 from csv import writer
+from helper import get_download_tool
 
 def download_AF_struc(pdb, outfolder="result"):
     '''
@@ -26,7 +25,7 @@ def download_AF_struc(pdb, outfolder="result"):
 
     Example
     -------
-    >> download_AF_struc('AF-P0CG48-F1-model_v4', outfolder='test_plddt')
+    >> download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='test_plddt')
     '''
 
     oldcwd = os.getcwd()
