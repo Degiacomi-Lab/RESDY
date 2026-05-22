@@ -8,6 +8,7 @@ import subprocess
 import glob
 import time
 from datetime import date
+from datetime import timedelta
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -241,10 +242,16 @@ class Measure(object):
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
+                # GW 06.08.25 - temporarily disabled frustration and density calculations as using Frustratometer currently overloads the memory.
+                print('>> Frustration and density metrics are not currently possible due to memory issues in the frustratometer package.')
+                print('>> Metric not added to the measures list.')
+                '''
                 if not frustration_added:
                     frustration = Frustration(include_modified=self.include_mod)
                     self.measures.append(['frustration', frustration.calculate_frustration])
                     frustration_added = True
+                '''
+                self.features.remove(m)
             elif m == 'melodia':
                 structure = Structure(melodia_features=['all'], include_modified=self.include_mod)
                 self.measures.append([m, structure.calculate_melodia])
@@ -506,7 +513,7 @@ class Measure(object):
 
             if i != 0:
                 avg_time_per_pdb = (time.time() - overall_st) / i
-                pred_time_remaining = avg_time_per_pdb * (len(self.df_input) - i)
+                pred_time_remaining = str(timedelta(seconds=round(avg_time_per_pdb * (len(self.df_input) - i), 0)))
             else:
                 pred_time_remaining = 'undefined'
             print(f'Analysing PDB code ({pdb_code}) {i}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
@@ -601,6 +608,8 @@ class Measure(object):
             except Exception as e_two:
                 print(f'>> Failed to remove duplicates from measurement dataframe: {e_two}')
                 pass
+        
+        print('Finished measuring the dataframe of proteins required.')
 
 
     def _measure_file(self, file_details, lock, ns):

@@ -145,6 +145,8 @@ ubq_pred/
 *.pdb
 Demo/conformations/
 Demo/curated/
+Demo/propkaoutput/
+
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb
 graph_measures_general.ipynb
