@@ -1,5 +1,6 @@
 # File to house the generalised useage for calling a model for prediction on the aggregated data
 
+import random
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
@@ -29,6 +30,8 @@ class Prediction:
         self.neg_aggregated_data = neg_aggregated_data
         self.aggregated_data = aggregated_data
         self.df_agg = pd.DataFrame()
+        self.df_prepped = pd.DataFrame()
+        self.y = []
 
         self._collate_data()
         if not self._check_aggregation_status():
@@ -109,7 +112,8 @@ class Prediction:
         '''
         match prediction_model:
             case 'pulearning':
-                PUlearn = PUlearning(self.df_agg)
+                PUlearn = PUlearning(self.df_agg, self.y)
+                PUlearn.basic_pulearn()
     
     def produce_pca_2d(self):
         '''
@@ -119,6 +123,7 @@ class Prediction:
         '''
         X = self.df_agg.drop(['Uniprot_Entry', 'Resid', 'class'], axis=1)
         y = self.df_agg['class']
+        print(y)
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         pca = PCA(n_components=2)
@@ -132,8 +137,31 @@ class Prediction:
         plt.title("PCA Aggregated Data")
         legend_elements = [Line2D([0], [0], color=(0.408, 0.141, 0.427), lw=4, label='Carbamylated'),
                            Line2D([0], [0], color=(1, 0.498, 0.055), lw=4, label='Not Carbamylated')]
-        plt.legend(handles=legend_elements, loc='upper right', frameon=True)
+        plt.legend(handles=legend_elements, loc='best', frameon=True)
+        plt.savefig('pca_allfeatures_2d.svg')
         plt.show()
+
+    def _prepare_dataset(self):
+        '''
+        Prepare the dataset from the aggregated dataset to a general form for model input.
+        Remove any overlap between the datasets to avoid any problems with prediction.
+        Remove part of the negative dataset to set to match the number of positives within
+        the dataset. Remove the unnecessary columns.
+        '''
+        all_overlaps = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Resid'])
+        for i, r in self.df_agg[self.df_agg['class'] == 1].iterrows():
+            pdb = r['PDB_Code']
+            resid = r['Resid']
+            df_query = self.df_agg[(self.df_agg['PDB_Code'] == pdb) & (self.df_agg['Resid'] == resid)]
+            if len(df_query) > 1:
+                all_overlaps = pd.concat([all_overlaps, df_query[['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]], ignore_index=True)
+                self.df_agg = self.df_agg.drop(index=df_query.index[1:])  # drop all duplicates after the first occurance
+        print(f'Number of overlaps: {len(all_overlaps)}')
+        num_pos_data = len(self.df_agg[self.df_agg['class'] == 1])
+        indices_random_neg_data = random.sample(range(num_pos_data, len(self.df_agg)), num_pos_data)
+        self.df_prepped = pd.concat([self.df_agg[self.df_agg['class'] == 1], self.df_agg.iloc[indices_random_neg_data]])
+        self.y = self.df_prepped['class']
+        self.df_prepped = self.df_prepped.drop(['Uniprot_Entry', 'Resid', 'class'], axis=1)
     
     def produce_pca_3d(self):
         '''
@@ -158,7 +186,8 @@ class Prediction:
         plt.title("PCA Aggregated Data")
         legend_elements = [Line2D([0], [0], color=(0.408, 0.141, 0.427), lw=4, label='Carbamylated'),
                            Line2D([0], [0], color=(1, 0.498, 0.055), lw=4, label='Not Carbamylated')]
-        plt.legend(handles=legend_elements, loc='upper right', frameon=True)
+        plt.legend(handles=legend_elements, loc='best', frameon=True)
+        plt.savefig('pca_allfeatures.svg')
         plt.show()
 
 
@@ -184,3 +213,4 @@ if __name__ == '__main__':
     prediction = Prediction(aggregated_data=df_col_agg)
     #print(prediction.df_agg.isna().any(axis=1))
     prediction.produce_pca_3d()
+    #prediction.predict_carbamates(prediction_model='pulearning')
