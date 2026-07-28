@@ -37,7 +37,6 @@ class Analysis(object):
         features_to_analyse -> list
             List of features which should be analysed over
         '''
-        #self.df = df.dropna(subset=['propka', 'sasa'])
         if features_to_analyse == []:
             self.df = df
         else:
@@ -45,7 +44,6 @@ class Analysis(object):
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
-        #self.df_sub = pd.DataFrame(columns = ['Uniprot_Entry','Resid','propka','sasa', 'depth'])
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
 
         self.GO_dict = {} # code as the key
@@ -71,7 +69,6 @@ class Analysis(object):
         '''
         List the subset of UNIPROT codes associated with a GO Term
         '''
-
         if code == '' and name == '':
             return 'Insufficient input!'
         elif code == '' and name != '':
@@ -93,7 +90,6 @@ class Analysis(object):
         '''
         List all the GO Terms associated with a UNIPROT code
         '''
-
         GO_list = list()
         for code, uni_list in self.GO_dict.items():
             if uniprot_entry in uni_list:
@@ -109,7 +105,8 @@ class Analysis(object):
         print(f'Searching for {index}/{total} protein.')
         try:
             url_2 = f'https://www.uniprot.org/uniprot/{uniprot_code}.txt'
-            html_2 = urllib.request.urlopen(url_2)
+            with urllib.request.urlopen(url_2, timeout=10) as response:
+                html_2 = response.read()
         except Exception as e:
             print(f'Failed to obtain UNIPROT data for {uniprot_code}. {e}')
 
@@ -129,7 +126,6 @@ class Analysis(object):
                         else:
                             self.GO_dict[GO_code].append(uniprot_code)
 
-                        # construct name2code dict
                         if GO_word not in self.name_to_code.keys():
                             self.name_to_code[GO_word] = GO_code
 
@@ -150,12 +146,10 @@ class Analysis(object):
         '''
         Basic plot, show either a histogram or a boxplot
         '''
-
         try:
             plt.clf()
         except Exception:
             pass
-
 
         if not uniprot_entry and not resid:
             try:
@@ -180,7 +174,7 @@ class Analysis(object):
                     return
 
                 else:
-                    if resid not in self.df[self.df['Uniprot_Entry'==uniprot_entry]]['Resid'].unique():
+                    if resid not in self.df[self.df['Uniprot_Entry'] == uniprot_entry]['Resid'].unique():
                         print('Wrong Resid.')
                         return
 
@@ -347,7 +341,6 @@ class Analysis(object):
             print(f'New measures file written with name: {out_filename}')
 
 
-    # function added by GW 09.11.23 to remove all measures that were done on residues that aren't in a set of data
     def remove_not_important_residues(self, req_resid_table, outname='measures_cut.csv'):
         '''
         Function to take the input file documenting which residues are required to
@@ -372,13 +365,14 @@ class Analysis(object):
             Auto set to measures_cut.csv
         '''
         print('>> Removing unrequired residues')
-        # duplicate the req_resid_table to allow to delete rows with testing
+        # Remove duplicated data from the measurements
         test_table = req_resid_table
         initial_data_one = len(self.df)
         self.df = self.df.drop_duplicates()
         duplicate_rows_removed = initial_data_one - len(self.df)
         print(f'Removed {duplicate_rows_removed} rows of duplicates')
         initial_full_data_rows = len(self.df)
+
         # remove rows which have a UNIPROT code which isnt required
         uniprot_codes = test_table['Uniprot_Entry'].drop_duplicates().tolist()
         entries_to_remove = []
@@ -388,13 +382,10 @@ class Analysis(object):
         self.df = self.df.drop(index=entries_to_remove)
         uniprot_rows_removed = initial_full_data_rows - len(self.df)
         print(f'Removed {uniprot_rows_removed} rows of Uniprot codes which were not mentioned in the required residues file')
-        # iterate over each set of residues of a protein
+
         while len(test_table) > 0:
-            # prints the number of rows left in the hits sheet updating how far through you are
             print("Number of rows left: " + str(len(test_table)))
-            # read in the uniprot code at the top of the hits sheet
             test_uniprot = test_table["Uniprot_Entry"][test_table.first_valid_index()]
-            # print out which one you are finding, mainly just for checking
             print("test_uniprot: " + str(test_uniprot))
             # find all the desired residues from the particular uniprot code and put into a list
             # automatically removes duplicates from this (doesn't retain order)
@@ -417,6 +408,7 @@ class Analysis(object):
         print(f'Current num of rows: {final_full_data_rows}')
         print(f'Num of rows removed: {diff_rows}')
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
+
 
     def relative_best(self, df, weights, features=['depth']):
         '''
@@ -544,7 +536,7 @@ class Analysis(object):
             if uni in self.GO_dict[GO_code]:
                 bp_list += 1
 
-        bp_not_list = len(self.GO_dict[GO_code]) - bp_list
+        bp_not_list = len([p for p in reference if GO_code in self.GO_dict[p]]) - bp_list
         not_bp_list = len(my_list) - bp_list
 
         not_bp_not_list = 0
@@ -557,18 +549,18 @@ class Analysis(object):
         return table
 
 
-    def enrichment_analysis(self, pka_range, sasa_range, uniprot_cnt_cutoff=1):
+    def enrichment_analysis(self, feature_one = ['propka', 7, 11], feature_two = ['sasa', 0, 10], uniprot_cnt_cutoff=1):
         '''
         Analyse prevalence of GO-terms in sub-regions of the SASA vs pKa graph
         '''
 
         # get all the uniprot codes inside the range and the reference uniprot code list
-        pka_l, pka_u = pka_range[0], pka_range[1]
-        sasa_l, sasa_u = sasa_range[0], sasa_range[1]
-        selected_df = self.df_sub[(self.df_sub['propka'] >= pka_l) & (self.df_sub['propka'] <= pka_u)]
-        selected_df = selected_df[(selected_df['sasa'] >= sasa_l) & (selected_df['sasa'] <= sasa_u)]
-        my_list = selected_df['Uniprot_Entry'].unique()
-        reference = self.df_sub['Uniprot_Entry'].unique()
+        feat_one, feat_one_low, feat_one_upper = str(feature_one[0]), float(feature_one[1]), float(feature_one[2])
+        feat_two, feat_two_low, feat_two_upper = str(feature_two[0]), float(feature_two[1]), float(feature_two[2])
+        selected_df = self.df_sub[(self.df_sub[feat_one] >= feat_one_low) & (self.df_sub[feat_one] <= feat_one_upper)]
+        selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
+        uniprot_selected = selected_df['Uniprot_Entry'].unique()
+        uniprot_reference = self.df_sub['Uniprot_Entry'].unique()
 
         # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
         GO_bacgou = [code for code in list(self.GO_dict.keys()) if len(self.GO_dict[code]) >= uniprot_cnt_cutoff]
@@ -577,8 +569,7 @@ class Analysis(object):
 
         # for each GO Term, compute a contingency table
         for GO_code in GO_bacgou:
-            # compute contigency table
-            table = self.get_contingency_table(GO_code, my_list, reference)
+            table = self.get_contingency_table(GO_code, uniprot_selected, uniprot_reference)
             # compute p values and store them into the dictionary
             oddsratio, pvalue = fisher_exact(table, alternative='greater')
             p_val_dict[GO_code] = pvalue
@@ -591,22 +582,15 @@ class Analysis(object):
         y=multipletests(pvals=p_val_list, alpha=0.05, method="fdr_bh")
         out_dict = {}
 
-        if sum(y[0]) != 0: # if there is enrichment
-            for i in range(len(y[0])):
-                if y[0][i]: # get p-values below 0.05
-                    go_code = list(p_val_dict.items())[i][0]
-                    raw_p = p_val_list[i]
-                    adj_p = y[1][i]
-                    out_dict[go_code] = (raw_p, adj_p, self.get_contingency_table(go_code, my_list, reference))
-        else:
-            for i in range(len(y[0])): # if no enrichment at all, still output the p values
-                go_code = list(p_val_dict.items())[i][0]
-                raw_p = p_val_list[i]
-                adj_p = y[1][i]
-                out_dict[go_code] = (raw_p, adj_p, self.get_contingency_table(go_code, my_list, reference))
+        # no matter enrichment, output p values to the dictionary
+        for i in range(len(y[0])):
+            go_code = list(p_val_dict.items())[i][0]
+            raw_p = p_val_list[i]
+            adj_p = y[1][i]
+            out_dict[go_code] = (raw_p, adj_p, self.get_contingency_table(go_code, uniprot_selected, uniprot_reference))
 
         df = pd.DataFrame(columns = ['GO ID', 'GO Term', 'raw p value', 'FDR',
-                             'num in the region', 'num in the bkgd'])
+                                    'num in the region', 'num in the bkgd'])
         for data in out_dict.items():
             id = data[0]
             term = self.code_to_name[id]
@@ -622,7 +606,7 @@ class Analysis(object):
             reg = str(n2) + '/' + str(d2)
 
             dt = {'GO ID':id, 'GO Term':term, 'raw p value':r_p, 'FDR':fdr,
-                             'num in the bkgd':bkgd, 'num in the region':reg}
+                'num in the bkgd':bkgd, 'num in the region':reg}
             df_dictionary = pd.DataFrame([dt])
             df = pd.concat([df, df_dictionary], ignore_index=True)
 
@@ -632,5 +616,5 @@ class Analysis(object):
 if __name__ == '__main__':
     df_test = pd.read_csv(f'data{os.sep}measures_CannData_all_12.05.25.csv')
     analysis = Analysis(df_test, outdir='result')
-    analysis.relative_best_new(analysis.df, weights=0.5, features=['depth', 'sasa', 'phi', 'das'])
+    analysis.relative_best(analysis.df, weights=0.5, features=['depth', 'sasa', 'phi', 'das'])
     print(analysis.df_sub)

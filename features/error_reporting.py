@@ -1,5 +1,5 @@
 '''
-File for generalised reporting of errors from feature calculations.
+File for general reporting of errors from feature calculations.
 Errors are written out into the text file 'measures_errors_{date}_{x}.txt' where
 date is the date which the measures has been run and x is the run number that day.
 '''
@@ -26,11 +26,10 @@ def report_error_to_file(measurement_stage, path, error, error_filename='measure
     
     Example
     -------
-    self._report_error_to_file('propka 1', path, e)
+    report_error_to_file('propka 1', path, e, 'measure_errors.txt')
     '''
-    if error_filename != 'measure_errors.txt':
-        with open(error_filename, 'a') as e_f:
-            e_f.writelines('----------------------------------------------------------------------\n')
-            e_f.writelines(f'{measurement_stage} calc error\n')
-            e_f.writelines(path + '\n')
-            e_f.writelines(error + '\n')
+    with open(error_filename, 'a', encoding='utf-8') as e_f:
+        e_f.writelines('----------------------------------------------------------------------\n')
+        e_f.writelines(f'{measurement_stage} calc error\n')
+        e_f.writelines(path + '\n')
+        e_f.writelines(error + '\n')

@@ -26,7 +26,11 @@ class Flexibility():
     for lysines within the protein structures.
     '''
 
-    def __init__(self, include_modified):
+    def __init__(self, include_modified, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                                        'modified_codes': ['LYE', 'KCX'],
+                                                        'atom_select_names_nonmod': ['NZ'],
+                                                        'atom_select_names_modified': ['NZ', 'N07']},
+                 error_filename = 'measure_errors.txt'):
         '''
         Initialise the Flexibility class, include any global variables that are required from
         measures in here.
@@ -35,8 +39,18 @@ class Flexibility():
         ----------
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
+        aa_properties -> dict
+            Properties of the amino acid of interest to investigate modification sites for.
+            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
+            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
+        error_filename : str
+            Name of the text file passed through from overall measures to write any errors from
+            calculating features out to.
         '''
         self.include_modified = include_modified
+        self.aa_properties = aa_properties
+        self.error_filename = error_filename
 
     def calculate_flexibility(self, path):
         '''
@@ -78,13 +92,13 @@ class Flexibility():
 
         try:
             M = bb.Molecule(path)
-            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
-            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
-            report_error_to_file('Flex 1', path, e)
+            report_error_to_file('Flex 1', path, e, self.error_filename)
             print(f'Flex Calculation: 1 - Could not load and identify targets within the lysines for calculations: {e}')
 
         try:
@@ -95,7 +109,7 @@ class Flexibility():
                 avg_beta = sum(tmp_lys_beta_vals) / len(tmp_lys_beta_vals)
                 avg_beta_output.append(avg_beta)
         except Exception as e:
-            report_error_to_file('Flex 2', path, e)
+            report_error_to_file('Flex 2', path, e, self.error_filename)
             print(f'Flex Calculation: 2 - Failed to obtain the beta values and create an average for the lysine of interest at position {lys_res}: {e}')
 
         try:
@@ -105,7 +119,7 @@ class Flexibility():
             df_flex['flexibility'] = avg_beta_output
             if self.include_modified: df_flex['Modified'] = list_modified
         except Exception as e:
-            report_error_to_file('Flex 3', path, e)
+            report_error_to_file('Flex 3', path, e, self.error_filename)
             print(f'Flex Calculation: 3 - Failed to create dataframe to append to overall measures dataframe: {e}')
 
         return df_flex

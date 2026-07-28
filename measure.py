@@ -3,8 +3,6 @@ import os
 import io
 import logging
 import datetime
-import shutil
-import subprocess
 import glob
 import time
 from datetime import date
@@ -13,13 +11,9 @@ from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
-#import dill
-#import features
 from features.aev import AEV
 from features.charge import Charge
 from features.das import DAS
@@ -68,6 +62,7 @@ class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
+                 residue_of_interest='LYS',
                  parallel=False, include_modified=False, report_errors= True):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
@@ -84,7 +79,7 @@ class Measure(object):
             The name of the directory where the measurement output will be written to.
         activate_log -> bool
             By default a log is produced for the measurements, the option here enables a more
-            detailed log of the measurements work for debugging. TODO Check this
+            detailed log of the measurements work for debugging.
         log_path -> string
             The name of the output file which contains the log of the measurements.
             This file can be used to create the measurement csv file through using the
@@ -94,20 +89,22 @@ class Measure(object):
             of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth', 'aev',
             'das', 'seqcharge', 'melodia', 'frustration', 'density', 'legolas', 'writhing',
             'curvature', 'torsion', 'arc_length', 'phi', 'psi'
+        residue_of_interest -> string
+            3 letter code of the residue to measure features over
         parallel -> bool
             Option to run the measurements in parallel.
         include_modified -> bool
             Option to include lysines that have been seen to be modified in the measurements
             analysis. If False, only lysines of type 'LYS' will be included in the measurements.
-            If True, lysines of types 'LYN' will be included in the measurements as well as all
+            If True, lysines of types 'LYE' will be included in the measurements as well as all
             'LYS' residues. In either case, a column will be included stating if the measured
             residue is a modified one.
         report_errors -> bool
             Option to record any of the protein files which are giving errors when measures
             calculations are being performed. This will write the file and the error to a separate
             text document labelled "measures_errors_{date}.txt".
-
         '''
+
         self.activate_log = False
         if activate_log:
             self.activate_log = activate_log
@@ -129,8 +126,8 @@ class Measure(object):
 
         # modified lysine management
         self.include_mod = include_modified
-        self.mod_res_codes = ['LYN', 'KCX']
 
+        self.aa_properties = self._match_resid_codes(residue_of_interest)
         self.features = features
         self.legolas_aevs = True
         self._setup_measures(features)
@@ -145,7 +142,7 @@ class Measure(object):
         # document failed pdb files
         self.wrong_pdb_file = []
         self.report_errors = report_errors
-        if self.report_errors: self._setup_report_errors_file()
+        if self.report_errors: self.error_filename = self._setup_report_errors_file()
 
         # for parallel measurements
         self.parallel = parallel
@@ -175,6 +172,7 @@ class Measure(object):
             columns = ['PDB_Code', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns = columns)
 
+
     def _setup_measures(self, features):
         '''
         Convert a list of features into a measuring protocol. If ['all'] given as input for
@@ -200,45 +198,47 @@ class Measure(object):
         #TODO can this handle calculations where you actually want multiple methods for same feature calculating
         for m in features:
             if m in ['propka', 'pkaANI']:
-                pka = PKA(outdir=self.outdir, calc_method=m, include_modified=self.include_mod)
+                pka = PKA(outdir=self.outdir, calc_method=m, include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, pka.calculate_pka])
             elif m == 'pka':
-                print('Please enter which pKa calculation method you would like to use: ' \
-                      'propka or pkaANI')
+                print('Please enter which pKa calculation method you would like to use: propka or pkaANI')
                 while not input('propka or pkaANI:') in ['propka', 'pkaANI']:
-                    print('Please enter either propka or pkaANI')  #TODO this needs testing but should work
+                    print('Please enter either propka or pkaANI')
                 pka = PKA(outdir=self.outdir, calc_method='propka', include_modified=self.include_mod)
                 self.measures.append([m, pka.calculate_propka])
             elif m == 'sasa':
-                sasa = SASA(include_modified=self.include_mod)
+                sasa = SASA(include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, sasa.calculate_sasa])
             elif m == "depth":
-                depth = Depth(include_modified=self.include_mod)
+                depth = Depth(include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, depth.calculate_depth])
             elif m == 'aev':
-                aev = AEV()
+                aev = AEV(error_filename=self.error_filename)
                 self.measures.append([m, aev.calculate_aevs])
             elif m == 'das':
-                das = DAS(include_modified=self.include_mod)
+                das = DAS(include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, das.calculate_das])
             elif m == 'seqcharge':
-                charge = Charge(include_modified=self.include_mod)
+                charge = Charge(include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'flexibility':
-                flex = Flexibility(include_modified=self.include_mod)
+                flex = Flexibility(include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, flex.calculate_flexibility])
             elif m == 'legolas':
                 if self.legolas_aevs:
                     if 'aev_legolas' not in self.features:
                         self.features.append('aev_legolas')
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True, include_modified=self.include_mod)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
+                              include_modified=self.include_mod, error_filename=self.error_filename)
                 else:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=False, include_modified=self.include_mod)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=False,
+                              include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, nmr.calculate_legolas])
                 legolas_added = True
             elif m == 'aev_legolas':
                 if not legolas_added:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True, include_modified=self.include_mod)
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
+                              include_modified=self.include_mod, error_filename=self.error_filename)
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
@@ -247,13 +247,13 @@ class Measure(object):
                 print('>> Metric not added to the measures list.')
                 '''
                 if not frustration_added:
-                    frustration = Frustration(include_modified=self.include_mod)
+                    frustration = Frustration(include_modified=self.include_mod, error_filename=self.error_filename)
                     self.measures.append(['frustration', frustration.calculate_frustration])
                     frustration_added = True
                 '''
                 self.features.remove(m)
             elif m == 'melodia':
-                structure = Structure(melodia_features=['all'], include_modified=self.include_mod)
+                structure = Structure(melodia_features=['all'], include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, structure.calculate_melodia])
                 melodia_added = True
                 self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
@@ -261,17 +261,91 @@ class Measure(object):
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 if not melodia_added:
                     melodia_features += [m]
-                    structure = Structure(melodia_features=melodia_features, include_modified=self.include_mod)
+                    structure = Structure(melodia_features=melodia_features, include_modified=self.include_mod, error_filename=self.error_filename)
                     self.measures.append(['melodia', structure.calculate_melodia])
                     melodia_added = True
             elif m == 'esm':
-                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod)
+                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append(['esm', ensemble.calculate_esm])
             elif m == 'rmsf':
-                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod)
+                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
                 raise Exception(f"measure {m} unknown")
+
+
+    def _match_resid_codes(self, res_code):
+        '''
+        Adding in the function required for the codebase to have the potential to be used
+        with residues other than lysines. Matches up a 3 letter code given as input to
+        measures to a list of all the 3 letter codes associated for the non-modified
+        amino acid (eg different charged states) and modified codes for
+        self.include_modified options. If a rogue 3 letter code is given, it defaults to
+        carbamylation data.
+        potential TODO change this to not default to carbamylation work and stop codebase instead
+        TODO GW 23/07/26 - add in checking for which residue is being taken through to measurements to check which programmes can actually be run
+        PROPKA - ASP, GLU, HIS, CYS, TYR, LYS, ARG
+        pkaANI - ASP, GLU, HIS, TYR, LYS
+        
+        Parameters
+        ----------
+        res_code -> string
+            3 letter code of the residue to match up other 3 letter codes for
+        '''
+        match res_code:
+            case 'LYS':
+                aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                 'modified_codes': ['LYE', 'KCX'],
+                                 'atom_select_names_nonmod': ['NZ'],
+                                 'atom_select_names_modified': ['NZ', 'N07']}
+            case 'CYS':
+                aa_properties = {'non_modified_codes': ['CYS'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'ARG':
+                aa_properties = {'non_modified_codes': ['ARG'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'SER':
+                aa_properties = {'non_modified_codes': ['SER'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'THR':
+                aa_properties = {'non_modified_codes': ['THR'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'TYR':
+                aa_properties = {'non_modified_codes': ['TYR'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'ASN':
+                aa_properties = {'non_modified_codes': ['ASN'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'ASP':
+                aa_properties = {'non_modified_codes': ['ASP'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case 'GLU':
+                aa_properties = {'non_modified_codes': ['GLU'],
+                                'modified_codes': [],
+                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_modified': []}
+            case _:
+                aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                'modified_codes': ['LYE', 'KCX'],
+                                'atom_select_names_nonmod': ['NZ'],
+                                'atom_select_names_modified': ['NZ', 'N07']}
+
+        return aa_properties
+
 
     def _setup_report_errors_file(self):
         '''
@@ -288,7 +362,7 @@ class Measure(object):
                 new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
         with open(new_file_name, 'w') as error_f1:
             error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
-        self.error_filename = new_file_name
+        return new_file_name
 
 
     def measure_data(self):
@@ -519,7 +593,7 @@ class Measure(object):
             print(f'Analysing PDB code ({pdb_code}) {i}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
 
             for f in files_list:
-                if pdb_code not in f:
+                if pdb_code.lower() != f.split('-')[0].lower():
                     continue
 
                 tstart = time.time()
@@ -647,7 +721,7 @@ class Measure(object):
 
         # calculate features values from all PDB files associated with specific DataFrame entry
         for f in files_list:
-            if pdb_code not in f:
+            if pdb_code.lower() != f.split('-')[0].lower():
                 continue
 
             terminal_out_statements = []
@@ -996,9 +1070,8 @@ class Measure(object):
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
 
-                if pdb_code not in f:
+                if pdb_code.lower() != f.split('-')[0].lower():
                     continue
-
                 if f in self.pdb_only_files_to_ignore:
                     continue
 
@@ -1327,27 +1400,24 @@ class Measure(object):
         '''
         print('\n>> Cleaning up leftover files from measures calculations...')
         dir_files = [f for f in os.listdir() if os.path.isfile(os.path.join(os.getcwd(),f))]
-        nmr_cs_file = False
-        nmr_parquet_file = False
-        propka_pka_file = False
-        propka_error_file = False
+        nmr_cs_file = [], nmr_parquet_file = [], propka_pka_file = [], propka_error_file = []
         for f in dir_files:
             if f.endswith('_cs.csv'):
-                nmr_cs_file = True
+                nmr_cs_file.append(f)
             elif f.endswith('_cs.parquet'):
-                nmr_parquet_file = True
+                nmr_parquet_file.append(f)
             elif f.endswith('.pka'):
-                propka_pka_file = True
+                propka_pka_file.append(f)
             elif f.endswith('_propka_errors.txt'):
-                propka_error_file = True
+                propka_error_file.append(f)
         if nmr_cs_file:
-            subprocess.run(f'mv *_cs.csv {self.outdir}{os.sep}legolas{os.sep}', shell=True, check=False)
+            for f_mv in nmr_cs_file: os.rename(f_mv, os.path.join(self.outdir, 'legolas', f_mv))
         if nmr_parquet_file:
-            subprocess.run(f'mv *_cs.parquet {self.outdir}{os.sep}legolas{os.sep}', shell=True, check=False)
+            for f_mv in nmr_parquet_file: os.rename(f_mv, os.path.join(self.outdir, 'legolas', f_mv))
         if propka_pka_file:
-            subprocess.run(f'mv *.pka {self.outdir}{os.sep}propkaoutput{os.sep}', shell=True, check=False)
+            for f_mv in propka_pka_file: os.rename(f_mv, os.path.join(self.outdir, 'propkaoutput', f_mv))
         if propka_error_file:
-            subprocess.run(f'mv *_propka_errors.txt {self.outdir}{os.sep}propkaoutput{os.sep}', shell=True, check=False)
+            for f_mv in propka_error_file: os.rename(f_mv, os.path.join(self.outdir, 'propkaoutput', f_mv))
         if self.report_errors:
             with open(self.error_filename, 'r') as f:
                 for count, line in enumerate(f):

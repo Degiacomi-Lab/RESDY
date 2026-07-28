@@ -18,14 +18,19 @@ try:
 except Exception as e:
     print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
 
-
+pd.set_option('display.max_rows', 200)
 class Frustration():
     '''
     Class to house the different methods for calculating frustration metric values
     for structures.
     '''
 
-    def __init__(self, include_modified = False):
+    def __init__(self, include_modified = False,
+                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                'modified_codes': ['LYE', 'KCX'],
+                                'atom_select_names_nonmod': ['NZ'],
+                                'atom_select_names_modified': ['NZ', 'N07']},
+                 error_filename = 'measure_errors.txt'):
         '''
         Initialise the Frustration class, include any global variables that are required from
         measures in here.
@@ -34,8 +39,18 @@ class Frustration():
         ----------
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
+        aa_properties -> dict
+            Properties of the amino acid of interest to investigate modification sites for.
+            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
+            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
+        error_filename : str
+            Name of the text file passed through from overall measures to write any errors from
+            calculating features out to.
         '''
         self.include_modified = include_modified
+        self.aa_properties = aa_properties
+        self.error_filename = error_filename
 
     def calculate_frustration(self, path):
         '''
@@ -63,23 +78,26 @@ class Frustration():
         Example
         -------
         >> print(self.calculate_frustration(1ubq.pdb))
-            PDB_Code    Chain   Resid   frustration     density
-        0       1ubq        A       6     -1.203796    4.006602
+            resid chain  Modified  frustration   density
+        5       6     A     False    -1.180647  4.474738
+        10     11     A     False    -1.277059  1.951710
+        26     27     A     False    -0.584062  4.216964
+        28     29     A     False    -0.721478  3.747545
+        32     33     A     False    -0.706590  2.437673
+        47     48     A     False    -0.974550  3.083861
+        62     63     A     False    -0.532853  1.358850
         '''
-        # temp - modules required to add into readme - openmm, pdbfixer
+        # temp - TODO modules required to add into readme - openmm, pdbfixer
         # Frustratometer 1 - create structure and AWSEM model
         df_frustration = pd.DataFrame()
         try:
             M = bb.Molecule(path)
-            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
-            lys_res_nums = list(M.data['resid'][idx_nz])
-            list_chains = list(M.data['chain'][idx_nz])
-            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
-
-            df_frustration['Chain'] = list_chains
-            df_frustration['Resid'] = lys_res_nums
-            df_frustration['Modified'] = list_modified
+            M_ca = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+            if self.include_modified: idx_res_interest = M_ca.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'CA', use_resname=True, get_index=True)[1]
+            else: idx_res_interest = M_ca.atomselect('*', self.aa_properties['non_modified_codes'], 'CA', use_resname=True, get_index=True)[1]
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M_ca.data['resname']))
+            df_frustration = M_ca.data[['resid', 'chain', 'resname']]
+            df_frustration = df_frustration.assign(**{'Modified': list_modified})
 
             out_print_trap = io.StringIO()
             with redirect_stdout(out_print_trap):
@@ -90,26 +108,17 @@ class Frustration():
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
             df_frustration['frustration'] = None
             df_frustration['density'] = None
-            report_error_to_file('Frustratometer 1', path, str(e))
+            report_error_to_file('Frustratometer 1', path, str(e), self.error_filename)
             return df_frustration
 
-        # Frustratometer 2 - use model to calculate outputs
+        # Frustratometer 2 - use model to calculate outputs and sort output dataframe
         try:
             single_residue_awsem_frustration = model_single_resids.frustration(kind='singleresidue')
             resid_densities = model_single_resids.rho_r
-        except Exception as e:
-            report_error_to_file('Frustratometer 2', path, str(e))
-            print(f'Frustratometer calculation 2 - failed to create frustratometer outputs: {e}')
-
-        # Frustration 3 - extract lysine values from the outputs and append to output dataframe
-        try:
-            lys_frustration = []
-            lys_density = []
-            for lys in lys_res_nums:
-                lys_frustration.append(single_residue_awsem_frustration[lys-1])
-                lys_density.append(resid_densities[lys-1])
-            df_frustration['frustration'] = lys_frustration
-            df_frustration['density'] = lys_density
+            df_frustration = df_frustration.assign(**{'frustration': single_residue_awsem_frustration,
+                                                        'density': resid_densities})
+            df_frustration_res_interest = df_frustration.iloc[idx_res_interest].drop(columns=['resname'])
+            if not self.include_modified: df_frustration_res_interest = df_frustration_res_interest.drop(columns=['Modified'])
 
             try:
                 pdb_code = path.split('/')[-1]
@@ -118,14 +127,14 @@ class Frustration():
             except Exception as ef:
                 print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
         except Exception as e:
-            report_error_to_file('Frustratometer 3', path, str(e))
-            print(f'Frustratometer calculation 3 - failed to append data to return dataframe: {e}')
+            report_error_to_file('Frustratometer 2', path, str(e), self.error_filename)
+            print(f'Frustratometer calculation 2 - failed to extract frustratometer outputs or to append data to return dataframe: {e}')
 
-        return df_frustration
+        return df_frustration_res_interest
 
 
 if __name__ == '__main__':
     frust = Frustration(include_modified=True)
-    #print(frust.calculate_frustration(path=f'1ubq.pdb'))
-    print(frust.calculate_frustration(path=f'tmp_checking_pdb.pdb'))
-    #print(frust.calculate_frustration(path=f'1nsk_AmberMod0000.pdb'))
+    print(frust.calculate_frustration(path=f'data{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    #print(frust.calculate_frustration(path=f'data{os.sep}curated{os.sep}1NSK-alt-1.pdb'))
+    #print(frust.calculate_frustration(path=f'2I1V-alt-1.pdb'))

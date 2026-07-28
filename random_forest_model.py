@@ -14,6 +14,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 from sklearn.decomposition import PCA
+from sklearn.svm import SVC
+from pulearn import BaggingPuClassifier
 from preprocessing import Preprocessing
 from aggregation import Aggregation
 
@@ -28,16 +30,19 @@ class Model(object):
     Class for the random forest model which we are producing on the dataset to see how good the data is
     '''
 
-    def __init__(self, pos_measures_files,
-                 neg_measures_files,
+    def __init__(self,
+                 overall_aggregated_data=None,
+                 pos_aggregated_data=None,
+                 neg_aggregated_data=None,
                  features_to_include=['aev'],
                  aggregation_method='avg',
                  subtract_avg_aev=False,
                  aev_red_method='pca',
                  num_aev_features_req = 100):
 
-        self.pos_measures_files = pos_measures_files
-        self.neg_measures_files = neg_measures_files
+        self.overall_aggregated_data = overall_aggregated_data
+        self.pos_aggregated_data = pos_aggregated_data
+        self.neg_aggregated_data = neg_aggregated_data
         self.X_all = pd.DataFrame()
         self.X_agg = pd.DataFrame()
         self.X_final = pd.DataFrame()
@@ -111,9 +116,9 @@ class Model(object):
         '''
         pos_data = pd.DataFrame()
         neg_data = pd.DataFrame()
-        for file in self.pos_measures_files:
+        for file in self.pos_aggregated_data:
             pos_data = pd.concat([pos_data, pd.read_csv(file)], ignore_index=True)
-        for file in self.neg_measures_files:
+        for file in self.neg_aggregated_data:
             neg_data = pd.concat([neg_data, pd.read_csv(file)], ignore_index=True)
 
         pos_data['class'] = 1
@@ -172,7 +177,9 @@ class Model(object):
     def _check_for_overlap(self):
         '''
         Function to check for overlap between the positive and negative parts of the dataset
-        If there are any overlaps, remove the data from the negative dataset.
+        If there are any overlaps, remove the data from the negative dataset (positives are done
+        first in the dataset so removing anything after the first occurance automatically
+        does this)
         '''
 
         all_overlaps = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Resid'])
@@ -180,15 +187,12 @@ class Model(object):
         for i, r in self.X_all[self.X_all['class'] == 1].iterrows():
             pdb = r['PDB_Code']
             resid = r['Resid']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
             df_query = self.X_all[(self.X_all['PDB_Code'] == pdb) & (self.X_all['Resid'] == resid)]
             if len(df_query) > 1:
-                #print(f'Overlap found: {pdb} {resid}')
                 all_overlaps = pd.concat([all_overlaps, df_query[['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]], ignore_index=True)
-                self.X_all = self.X_all.drop(index=df_query.index[1:])
+                self.X_all = self.X_all.drop(index=df_query.index[1:])  # drop all duplicates after the first occurance
 
         print(f'Number of overlaps: {len(all_overlaps)}')
-        #print(all_overlaps)
 
 
     def add_average_sd(self, data_set):
@@ -365,7 +369,6 @@ class Model(object):
         # best estimator found with grid search
         RF_best = grid_search.best_estimator_
 
-
         scores = ['accuracy', 'f1', 'precision']
         kf = KFold(n_splits=5, shuffle=True, random_state=False)
 
@@ -459,7 +462,7 @@ class Model(object):
         -------
         model.rf_five_fold_optimised()
         '''
-
+        # TODO note this function still needs a lot of work due to extreme variation in output from this
         # sort the data out for this
         x_all_agg = self.X_all.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         print(x_all_agg[x_all_agg.duplicated(subset=['Uniprot_Entry', 'Resid'], keep=False)].sort_values(by=['Uniprot_Entry', 'Resid']))
@@ -526,8 +529,6 @@ class Model(object):
             train_data_y = list(self.X_all.loc[train_extended]['class'])
             print(f'Balance of training data: 1: {len([a for a in train_data_y if a == 1])}, 0: {len([a for a in train_data_y if a == 0])}')
 
-            #print(train_data_X)
-
             RF_best.fit(train_data_X, train_data_y)
 
             test_data_X = self.X_all.loc[test_extended].drop(['Uniprot_Entry', 'PDB_Code', 'Resid', 'class'], axis=1)
@@ -543,7 +544,6 @@ class Model(object):
     def rf_ubq_test(self):
         '''
         Find the importance ranking of the non AEV features within the features used in the model
-
 
         Returns
         ----------
@@ -589,7 +589,6 @@ class Model(object):
         ubq_data = ubq_data.drop(cols_to_remove, axis=1)
 
         # create the model and test on ubq data
-
         clf = RandomForestClassifier(n_estimators=100)
         clf.fit(self.X_final, self.y)
         y_pred = clf.predict(ubq_data)
@@ -641,7 +640,6 @@ class Model(object):
                 else:
                     plot_y.append(-0.002)
                 plot_x.append(idcol)
-            #print((plot_x, plot_y))
             axs[plot_no].bar(x=plot_x, height=plot_y, label=f'Run {i + 1}', color=(0.408, 0.141, 0.427))
             #axs[plotNo].set_ylabel(f'Time Progression (TimeStep : {frameStep}ns)')
             #axs[plotNo].set_title(f'Lysine No: {lys_res_nos[i]}', y=1, pad=-20)
@@ -651,7 +649,6 @@ class Model(object):
 
 
             plot_no += 1
-
             #pdbCode = testStructure.split('.')[0]
             #plt.savefig(f'testAEVimshow_{pdbCode}.png')
         fig.supylabel(f'Importance values of inputs from AEVs', ha='right')
@@ -678,7 +675,6 @@ class Model(object):
         
         fig, ax = plt.subplots(layout='constrained')
         ax = top_ten.plot(kind='bar')
-        #fig = ax.get_figure()
         ax.set_xlabel('Top Ten Features')
         ax.set_ylabel('Feature Importance')
         #plt.show()
@@ -756,6 +752,8 @@ class Model(object):
         return df_output, df_importance.T.sort_values('avg', ascending=False)
 
 
+
+
 # --------------------------------------------------------------------------------------------------
 # Testing section
 
@@ -795,8 +793,8 @@ def create_comparison_between_datasets(num_runs=5):
         tmp_scores_specificity = []
         tmp_rankings = []
         for i in range(num_runs):
-            model = Model(pos_measures_files=file,
-                        neg_measures_files=neg_measure_files,
+            model = Model(pos_aggregated_data=file,
+                        neg_aggregated_data=neg_measure_files,
                         features_to_include=features_to_include,
                         aggregation_method='minmax',
                         subtract_avg_aev=False,
@@ -834,6 +832,72 @@ def create_comparison_between_datasets(num_runs=5):
     print(sets_acc)
     '''
 
+def create_comparison_between_datasets_pulearning(num_runs=5):
+    '''
+    Function to create a comparison between the different datasets that are available
+    for the model. This is to see the difference in performance between the different
+    datasets.
+
+    Example
+    -------
+    >> create_comparison_between_datasets()
+    '''
+
+    features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas', 'aev']
+    pos_measure_files = [['data/measures_cut_CannData_all_12.05.25.csv',
+                        'data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv'],
+                        ['data/measures_cut_CannData_all_12.05.25.csv'],
+                        ['data/measures_cut_KingHighConf_all_01.05.25_joined.csv',
+                        'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv',
+                        'data/measures_cut_Synecho(hCit)_all_01.05.25_joined.csv']]
+    neg_measure_files = ['data/measures_cut_KingAllNegative_all_01.05.25_joined.csv']
+    rankings = []
+    scores_accuracy = pd.DataFrame()
+    scores_f1score = pd.DataFrame()
+    scores_sensitivity = pd.DataFrame()
+    scores_specificity = pd.DataFrame()
+
+    set_names = ['Cann + King Data', 'Cann Data', 'King Data']
+    for a, file in enumerate(pos_measure_files):
+        tmp_scores_accuracy = []
+        tmp_scores_f1score = []
+        tmp_scores_sensitivity = []
+        tmp_scores_specificity = []
+        tmp_rankings = []
+        for i in range(num_runs):
+            model = Model(pos_aggregated_data=file,
+                        neg_aggregated_data=neg_measure_files,
+                        features_to_include=features_to_include,
+                        aggregation_method='minmax',
+                        subtract_avg_aev=False,
+                        num_aev_features_req=100)
+            model.prepare_dataset()
+            multi_run_output, multi_run_importance = model.multi_run_test(num_runs=1)
+            tmp_scores_accuracy.append(multi_run_output['Accuracy'].loc['avg'])
+            tmp_scores_f1score.append(multi_run_output['F1_Score'].loc['avg'])
+            tmp_scores_sensitivity.append(multi_run_output['Sensitivity'].loc['avg'])
+            tmp_scores_specificity.append(multi_run_output['Specificity'].loc['avg'])
+            tmp_rankings.append(multi_run_importance)
+        print(tmp_scores_accuracy)
+        print(tmp_scores_f1score)
+        print(tmp_scores_sensitivity)
+        print(tmp_scores_specificity)
+        #new_setname = file.split('/')[-1].split('_')[2]
+        new_setname = set_names[a]
+        scores_accuracy = pd.concat([scores_accuracy, pd.DataFrame({new_setname: tmp_scores_accuracy})], axis=1)
+        scores_f1score = pd.concat([scores_f1score, pd.DataFrame({new_setname: tmp_scores_f1score})], axis=1)
+        scores_specificity = pd.concat([scores_specificity, pd.DataFrame({new_setname: tmp_scores_specificity})], axis=1)
+        scores_sensitivity = pd.concat([scores_sensitivity, pd.DataFrame({new_setname: tmp_scores_sensitivity})], axis=1)
+        rankings.append(tmp_rankings)
+        set_names.append(new_setname)
+
+    print(scores_accuracy)
+    print(scores_f1score)
+    print(scores_sensitivity)
+    print(scores_specificity)
+
     def plot_comparison(set, metric):
         plt.close()
         fig, ax = plt.subplots()
@@ -861,16 +925,14 @@ if __name__ == "__main__":
     #pos_measure_files = ['data/measures_cut_Synecho(hCit)_all_01.05.25.csv']
     #neg_measure_files = ['April25_negONLY.csv']
     features_to_include = ['propka', 'sasa', 'das', 'seqcharge', 'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'legolas', 'aev']
-    model = Model(pos_measures_files=pos_measure_files,
-                neg_measures_files=neg_measure_files,
+    model = Model(pos_aggregated_data=pos_measure_files,
+                neg_aggregated_data=neg_measure_files,
                 features_to_include=features_to_include,
-                aggregation_method='minmax',
+                aggregation_method='all',
                 subtract_avg_aev=False,
-                aev_red_method='sd',
+                aev_red_method='pca',
                 num_aev_features_req=100)
     model.prepare_dataset()
-    #print(model.X_final)
-
     #model.rf_ubq_test()
     #model.rf_five_fold()
     model.rf_five_fold_optimised()

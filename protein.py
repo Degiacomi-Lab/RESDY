@@ -131,8 +131,8 @@ class PDB(object):
 
     def gather_proteins(self, uniprot_df, skip_if_found=True, gap=10):
         '''
-        iterate over lines of a DataFrame containing PDB structure information.
-        download every stucture, and curate it if necessary
+        Iterate over lines of a DataFrame containing PDB structure information.
+        Download every stucture, and curate it if necessary
         '''
         if self.PDB_only:
             try:
@@ -304,15 +304,10 @@ class PDB(object):
         -------
         >> self.download_pdb('1ubq')
         '''
-        cwd = os.getcwd()
-
-        # check if the file has already been downloaded
         files=glob.glob(os.path.join(self.raw_dir, "*pdb"))
         test_file = os.path.join(self.raw_dir, f'{pdb}.pdb')
         if test_file not in files:
-            #go into [[outfolder]/conformations and downloads the .pdb file.
-            print(f"> downloading PDB {pdb}")
-            os.chdir(self.raw_dir)
+            print(f">> Downloading PDB {pdb}")
             tool = get_download_tool()
             try:
                 if tool == "curl":
@@ -323,12 +318,13 @@ class PDB(object):
                 else:
                     raise RuntimeError("You don't have a commandline tool for downloading files")
 
+                response = requests.get(url=f'https://alphafold.ebi.ac.uk/files/{pdb}.pdb', timeout=20)
+                response.raise_for_status()
                 subprocess.check_call(line, shell=True)
-                os.chdir(cwd)
+                os.rename(os.path.join(os.getcwd(), f'{pdb}.pdb'), os.path.join(self.raw_dir, f'{pdb}.pdb'))
 
             except Exception as e:
                 print(f'Error downloading file. {e}')
-                os.chdir(cwd)
         else:
             print(f'PDB file ({pdb}) has previously been downloaded, using previous copy.')
 
@@ -352,36 +348,29 @@ class PDB(object):
         -------
         >> self.download_fasta('1ubq')
         '''
-        cwd = os.getcwd()
-
         tool = get_download_tool()
-        # check if the file has already been downloaded
         files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
         if pdb not in files:
             try:
-
-                print(f"> downloading FASTA for {pdb}")
-                os.chdir(self.raw_dir)
-
-                web_url = f'https://www.rcsb.org/fasta/entry/{pdb}/download'
-                name = pdb + '.fasta'
+                print(f">> downloading FASTA for {pdb}")
 
                 if tool == "curl":
-                    line = f"curl -s -o {name} {web_url}"
+                    line = f"curl -s -o {pdb}.fasta https://www.rcsb.org/fasta/entry/{pdb}/download"
                 elif tool == "wget":
-                    line = f"wget -O {name} {web_url}"
+                    line = f"wget -O {pdb}.fasta https://www.rcsb.org/fasta/entry/{pdb}/download"
                 else:
                     raise RuntimeError("You don't have a commandline tool for downloading files")
 
+                response = requests.get(url=f'https://alphafold.ebi.ac.uk/files/{pdb}.pdb', timeout=20)
+                response.raise_for_status()
                 subprocess.check_call(line, shell=True)
-                os.chdir(cwd)
+                os.rename(os.path.join(os.getcwd(), f'{pdb}.fasta'), os.path.join(self.raw_dir, f'{pdb}.fasta'))
 
             except Exception as e:
-                os.chdir(cwd)
+                print(f'>> Failed downloading FASTA sequence for chain name comparison for {pdb}, error: {e}')
                 raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{e}') from e
         else:
             print(f'Fasta file for {pdb} previously downloaded, using previous copy.')
-
 
 
     def clean(self, pdb):
@@ -435,7 +424,7 @@ class PDB(object):
             #transform carboxylated lysine into a normal lysine
             if "KCX" in line:
 
-                if ("CX" in line) or ("OQ1" in line) or ("OQ2" in line):
+                if (line[12:16] == 'CX') or (line[12:16] == 'OQ1') or (line[12:16] == 'OQ2'):
                     continue
 
                 else:
@@ -444,22 +433,20 @@ class PDB(object):
 
                 test_KCX = True
 
-            words = line.split()
-
             #neglect HETATM atoms, unless they are metal ions
-            if line[:6] == 'HETATM':    
-                if words[3] in list_of_metals:
+            if line[:6] == 'HETATM':
+                if line[76:78].strip().upper() in list_of_metals:
                     write_file.write(line)
                     continue
 
             # write lines and ignore hydrogen atoms
             if line[:4] == 'ATOM':
-                if words[2] != 'H' and words[-1] != 'H':
+                if line[76:78].strip() != 'H':
                     write_file.write(line)
                     continue
 
             #same terminal statements
-            if words[0] == 'END' or words[0] == 'TER' or words[0] == 'ENDMDL':
+            if line[:3] == 'END' or line[:3] == 'TER' or line[0:6] == 'ENDMDL':
                 write_file.write(line)
                 continue
 
@@ -481,7 +468,7 @@ class PDB(object):
 
     def split_struc_nmr(self, pdb):
         '''
-        write a new file for each alternate NMR structure.
+        Write a new file for each alternate NMR structure.
         '''
 
         #define the name format which will be followed for each file.
@@ -490,30 +477,26 @@ class PDB(object):
 
         path = os.path.join(self.raw_dir, f"{pdb}-clean.pdb")
 
-        #Next it opens the file produced from the cleaning script and opens a new file to write in.
+        # Open the cleaned file, search over the data to find 'ENDMDL' statements to work out the number of structures available
         f = open(path)
-        endmdls = list()
+        endmdl_instances = []
 
-        #Next it searches to see if there are any 'ENDMDL' statements in the folder (i.e. if there are multiple models).
         for line in f:
             if re.search('ENDMDL', line):
-                endmdls.append(line)
-
+                endmdl_instances.append(line)
         f.close()
 
         #If there are no 'ENDMDL' statements the clean file is renamed to suit the new format.
-        if len(endmdls) == 0:
-
+        if not endmdl_instances:
             path_rename = os.path.join(self.raw_dir, name)
             if os.path.exists(path_rename):
                 os.remove(path_rename)
-
             os.rename(path, path_rename)
 
         #If there are 'ENDMDL' statements a new file is written for each model.
-        elif len(endmdls) != 0:
+        elif endmdl_instances:
 
-            print("> Alternate model(s) found. Splitting...")
+            print(">> Alternate model(s) found. Splitting...")
 
             #First it opens the clean file in the conformations folder and opens a new folder to write in
             f = open(path)
@@ -528,27 +511,26 @@ class PDB(object):
                 try:
                     line = str(line)
 
-                    if re.search('END ', line):
+                    if re.search('^END\s*$', line):
                         f.close()
+                        f_write.write(line)
                         f_write.close()
                         os.remove(path)
                         os.remove(path_rename)
                         break
 
+                    elif re.search('ENDMDL', line):
+                        f_write.write(line)
+                        f_write.close()
+                        number = number + 1
+                        name = pdb + '-alt-' + str(number) + '.pdb'
+
+                        path_rename = os.path.join(self.raw_dir, name)
+                        f_write = open(path_rename, 'w')
+
                     else:
-
-                        if re.search('ENDMDL', line):
-                            f_write.write(line)
-                            f_write.close()
-                            number = number + 1
-                            name = pdb + '-alt-' + str(number) + '.pdb'
-
-                            path_rename = os.path.join(self.raw_dir, name)
-                            f_write = open(path_rename, 'w')
-
-                        else:
-                            f_write.write(line)
-                except:
+                        f_write.write(line)
+                except Exception as e:
                     continue
 
             f_write.close()
@@ -561,12 +543,9 @@ class PDB(object):
         '''
         Writes a new file for each alternative amino acid conformation present.
         '''
-
         #Get a list of all the .pdb files present in [outdir]/conformations
         #and select those that belong to the pdb we are interested in.
         list_of_files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*.pdb"))
-
-
 
         for f in list_of_files:
 
@@ -578,7 +557,7 @@ class PDB(object):
 
                 read_file = open(f)
                 for line in read_file:
-                    if (line[:4] == 'ATOM') and (line[15] == ABC):  # TODO NEED TO ENSURE THIS WORKS FOR ALL FILE WITH NEW ROUTINES
+                    if (line[:4] == 'ATOM') and (line[16] == ABC):  # TODO NEED TO ENSURE THIS WORKS FOR ALL FILE WITH NEW ROUTINES
                         ABC_dict[ABC] = 1
 
             list_of_values = ABC_dict.values()
@@ -605,12 +584,12 @@ class PDB(object):
                         read = open(f)
                         for line in read:
 
-                            if (line[:4] == 'ATOM') and (line[15] == target_letter):
-                                newline = line[:15] + ' ' + line[16:]
+                            if (line[:4] == 'ATOM') and (line[16] == target_letter):
+                                newline = line[:16] + ' ' + line[17:]
                                 f_write.write(newline)
                                 continue
 
-                            if (line[:4] == 'ATOM') and (line[15] in non_target_letters):
+                            if (line[:4] == 'ATOM') and (line[16] in non_target_letters):
                                 continue
 
                             if (line[:4] == 'ATOM') or (line[:6] == 'HETATM') or (line[:3] == 'TER'):
@@ -667,7 +646,7 @@ class PDB(object):
                                 'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                 'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
                                 'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
-                                'KCX': 'K', 'LYE': 'K'}
+                                'KCX': 'K', 'LYE': 'K', 'LYSN': 'K'}
 
         pdb_seqs = {}
         for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
@@ -683,31 +662,29 @@ class PDB(object):
                 dash_locs = [i for i, aa in enumerate(alignment[1]) if aa =='-']
                 for idx, loc in enumerate(dash_locs):
                     align_shift_dict[loc - (idx)] = idx + 1
+                old_res_count = 1
+                old_res_curr_num = -1
+                curr_chain = 'XXXX'
+                for i, r in M.data.iterrows():
+                    if r['chain'] == chain:
+                        if old_res_curr_num == -1: old_res_curr_num = r['resid']
+                        if curr_chain == 'XXXX': curr_chain = r['chain']
+                        shift = 0
+                        res_num = r['resid']
+                        if len(list(align_shift_dict.keys())) != 0:
+                            for bound in list(align_shift_dict.keys()):
+                                if res_num > bound:
+                                    shift = align_shift_dict[bound]
+                        if old_res_curr_num != r['resid']:
+                            old_res_count += 1
+                            old_res_curr_num = r['resid']
+                        if curr_chain != r['chain']:
+                            curr_chain = r['chain']
+                            old_res_count = 1
+                        M.data.at[i, 'resid'] = old_res_count + shift
             except Exception as e:
-                print(f'Failed alignment of pdb {pdb_code} with error: {e}')
+                print(f'Failed alignment of pdb {pdb_code}, chain {chain}, with error: {e}')
 
-        old_res_count = 1
-        old_res_curr_num = -1
-        curr_chain = 'XXXX'
-        for i, r in M.data.iterrows():
-            if r['chain'] in chains:
-                if old_res_curr_num == -1: old_res_curr_num = r['resid']
-                if curr_chain == 'XXXX': curr_chain = r['chain']
-                shift = 0
-                res_num = r['resid']
-                if len(list(align_shift_dict.keys())) != 0:
-                    for bound in list(align_shift_dict.keys()):
-                        if res_num > bound:
-                            shift = align_shift_dict[bound]
-                if old_res_curr_num != r['resid']:
-                    old_res_count += 1
-                    old_res_curr_num = r['resid']
-                if curr_chain != r['chain']:
-                    curr_chain = r['chain']
-                    old_res_count = 1
-                M.data.at[i, 'resid'] = old_res_count + shift
-
-        #print(M.data)
         M.write_pdb(pdb_code)
         print(f'Chains aligned to canonical uniprot sequence for pdb {pdb_code}')
 
@@ -808,7 +785,6 @@ class PDB(object):
                             if chain_name in auth_list:
                                 replacement_chain_name = replacement_dict.get(chain_name)
                                 if line[25] != ' ':
-                                    #line = line[:21] + replacement_chain_name + ' ' + line[22:]
                                     line = line[:21] + replacement_chain_name + line[22:]
                                 else:
                                     line = line[:21] + replacement_chain_name + line[22:]
@@ -971,11 +947,12 @@ class PDB(object):
 if __name__ == "__main__":
 
     PDB = PDB()
+    PDB.clean_and_split_pdb('13LD') # test KCX to LYS mutation
     #PDB.clean_and_split_pdb('1PAE') # test SEC to CYS mutation
     #PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
     #PDB.clean_and_split_pdb('2MBH') # test splitting of models
-    PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
-    PDB.clean_and_split_pdb('4WNC', 'P04406') # test splitting rotamers
+    #PDB.clean_and_split_pdb('1U8F') # test splitting rotamers
+    #PDB.clean_and_split_pdb('4WNC', 'P04406') # test splitting rotamers
     #PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
 
 

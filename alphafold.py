@@ -2,7 +2,7 @@ import csv
 import os
 import re
 import subprocess
-from csv import writer
+import requests
 from helper import get_download_tool
 
 def download_AF_struc(pdb, outfolder="result"):
@@ -28,12 +28,9 @@ def download_AF_struc(pdb, outfolder="result"):
     >> download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='test_plddt')
     '''
 
-    oldcwd = os.getcwd()
-    mypath = os.path.join(outfolder, "curated")
-    if not os.path.exists(mypath):
-        os.makedirs(mypath)
-
-    os.chdir(mypath)
+    download_path = os.path.join(outfolder, "curated")
+    if not os.path.exists(download_path):
+        os.makedirs(download_path)
 
     print(f"> downloading AlphaFold structure {pdb}")
 
@@ -46,13 +43,15 @@ def download_AF_struc(pdb, outfolder="result"):
         else:
             raise RuntimeError("You don't have a commandline tool for downloading files")
 
+        response = requests.get(url=f'https://alphafold.ebi.ac.uk/files/{pdb}.pdb', timeout=20)
+        response.raise_for_status()
         subprocess.check_call(line, shell=True)
+        os.rename(os.path.join(os.getcwd(), f'{pdb}.pdb'), os.path.join(download_path, f'{pdb}.pdb'))
 
     except Exception as e:
-        os.chdir(oldcwd)
+        print(f'>> AF structure not found for {pdb}, error: {e}')
         raise Exception(f'AF structure not found for {pdb}: {e}') from e
 
-    os.chdir(oldcwd)
     return
 
 def find_af_plddt(af_code_full, outfolder="result"):
@@ -92,63 +91,51 @@ def find_af_plddt(af_code_full, outfolder="result"):
     AF-P0CG48-F1-model_v4; Resid No. A27; PLDDT: 94.28
     ...
     '''
-
+    cols = ['Uniprot_Entry', 'Chain', 'Resid', 'PLDDT']
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
         with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w', newline='') as plddt_out_file:
             plddt_writer = csv.writer(plddt_out_file)
-            plddt_writer.writerow(["Uniprot_Entry", "Resid", "PLDDT"])
+            plddt_writer.writerow(['Uniprot_Entry', 'Chain', 'Resid', 'PLDDT'])
 
     plddt_out_file = open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'a', newline='')
-    plddt_writer = csv.writer(plddt_out_file)
+    plddt_writer = csv.DictWriter(plddt_out_file, fieldnames=cols)
 
+    print(f'>> Finding plddt for AF structure {af_code_full}')
 
-    print('> Finding plddt')
-
-    # open .pdb file in assembled folder
-    # columns = ['resid', 'chain', 'plddt']
     dict_plddt = dict()
 
     try:
         f = open(os.path.join(outfolder, "curated", af_code_full + ".pdb"), "r")
 
-        # parse the file to find plddt value.
+        # parse the file to find plddt values
         for line in f:
             try:
-                if re.search('CA  LYS', line):
-                    strline = str(line)
-                    data = strline.split()
-                    if len(data[4]) > 1:
-                        resid = (data[4])[1:]
-                        plddt = data[9]
-                        chain = (data[4])[0]
-                    elif len(data[4]) == 1:
-                        data = strline.split()
-                        resid = data[5]
-                        plddt = data[10]
-                        chain = data[4]
-                        chain_resid = chain + resid
+                if re.search(r'CA\s\sLYS', line):
+                    line = str(line)
+                    chain = line[21]
+                    resid = line[22:26]
+                    plddt = line[60:66]
+                    chain_resid = chain + resid
 
-                    # append to dictionary which is later merged into the main dataframe.
                     dict_plddt.update({chain_resid: plddt})
 
-                    # print out what has been found for checking while the output is running
-                    print(af_code_full + "; Resid No. " + str(chain_resid) + "; PLDDT: " + plddt)
-
-                    # write the same output to the output file
-                    plddt_writer.writerow([af_code_full, str(chain_resid), str(plddt)])
+                    print(af_code_full + "; Chain: " + str(chain_resid[0]) + "; Resid: " + str(chain_resid[1:]) + "; PLDDT: " + plddt)
+                    plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': plddt})
 
             except Exception as e:
                 print(f"Error {e}")
-                plddt_writer.writerow([af_code_full, str(chain_resid), f"Error {e}"])
+                plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
                 continue
-
 
     except Exception as e:
         print(f'Failed to obtain PLDDT data for {af_code_full}; error: {e}')
-        plddt_writer.writerow([af_code_full, str(chain_resid), f"Error {e}"])
-        f.close()
-        return dict_plddt
+        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
 
     f.close()
     plddt_out_file.close()
     return dict_plddt
+
+
+if __name__ == '__main__':
+    download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='result')
+    find_af_plddt('AF-P0CG48-F1-model_v6', outfolder='result')
