@@ -152,7 +152,7 @@ plotProduction.py
 gw*
 
 # OS Specific
-.DS_Store
+.DS_Storez
 .idea
 
 
@@ -167,3 +167,12 @@ Demo/
 Demo_test/
 feature_analysis_graphs/
 *_test/
+.vscode/
+*pnas*
+pred_tracking*
+feature_ranking*
+temp*
+test*
+measures_*
+*.svg
+*.png

@@ -26,17 +26,31 @@ class Charge():
     Class to house the different methods for calculating charge values for structures
     '''
 
-    def __init__(self, include_modified = False):
+    def __init__(self, include_modified = False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                                                'modified_codes': ['LYE', 'KCX'],
+                                                                'atom_select_names_nonmod': ['NZ'],
+                                                                'atom_select_names_modified': ['NZ', 'N07']},
+                 error_filename = 'measure_errors.txt'):
         '''
         Initialise the Charge class, include any global variables that are required from
         measures in here.
 
         Parameters
         ----------
-        include_modified : bool
+        include_modified -> bool
             Toggle to include residues which have been modified within the featurisation
+        aa_properties -> dict
+            Properties of the amino acid of interest to investigate modification sites for.
+            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
+            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
+        error_filename : str
+            Name of the text file passed through from overall measures to write any errors from
+            calculating features out to.
         '''
         self.include_modified = include_modified
+        self.aa_properties = aa_properties
+        self.error_filename = error_filename
     
     def calculate_seqcharge(self, path, num_add_aa=10):
         '''
@@ -76,18 +90,19 @@ class Charge():
         # 1: Extract the overall sequence for the protein given
         try:
             M = bb.Molecule(path)
-            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
-            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
 
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
             subset_data = M.data.iloc[c_alpha_idxs]
 
             # TODO GW 16.04.25 - eventually will need to add in ability to use  letter codes and charges
-            #                    for the 3 lettter cases rather than the 1 letter cases which when using
+            #                    for the 3 letter cases rather than the 1 letter cases which when using
             #                    modified residues may run into problems
+            # would just change to not convert to classic 1 letter code sequence and take list of residues and map charges onto this to sum
 
             protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
                                     'CYS': 'C', 'GLU': 'E', 'GLN': 'Q', 'GLY': 'G',
@@ -97,8 +112,9 @@ class Charge():
                                     'HIE': 'H', 'HID': 'H', 'HIP': 'H', 'LYN': 'K',
                                     'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
-                                    'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k'}
-            # KCX and LYE down as X so that they are not treated as positive K when calculations arent including modified lysines
+                                    'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
+                                    'LYSN': 'K'}
+            # KCX, LYE and LYSN (neutral lysine from gromacs) down as X so that they are not treated as positive K when calculations aren't including modified lysines
             # however when including modified, need to consider these K for checking purposes, gets tricky when considering near lysines that are all modified...        
             if self.include_modified: protein_letters_dict['KCX'] = 'K'; protein_letters_dict['LYE'] = 'K'
             else: protein_letters_dict['KCX'] = 'X'; protein_letters_dict['LYE'] = 'X' 
@@ -116,7 +132,7 @@ class Charge():
                 pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
         except Exception as e:
-            report_error_to_file('Seqcharge 1', path, str(e))
+            report_error_to_file('Seqcharge 1', path, str(e), self.error_filename)
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
             return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
@@ -139,7 +155,7 @@ class Charge():
                     start_idx = 0
 
                 if end_idx >= len(seq):
-                    end_null = - end_idx
+                    end_null = end_idx - len(seq)
                     end_idx = len(seq)
 
                 seq = ('-' * start_null) + seq[start_idx:end_idx] + ('-' * end_null)
@@ -163,7 +179,7 @@ class Charge():
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count}])], ignore_index=True)
 
             except Exception as e:
-                report_error_to_file('Seqcharge 2', path, str(e))
+                report_error_to_file('Seqcharge 2', path, str(e), self.error_filename)
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_num}, error: {e}')
                 if self.include_modified:
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None, 'Modified': list_modified[idx]}])], ignore_index=True)
@@ -177,5 +193,5 @@ class Charge():
 if __name__ == '__main__':
     C = Charge(include_modified=True)
     #print(C.calculate_seqcharge(path=f'1ubq.pdb'))
-    print(C.calculate_seqcharge(path=f'tmp_checking_pdb.pdb'))
+    print(C.calculate_seqcharge(path=f'1NSK-alt-1.pdb'))
     #print(C.calculate_seqcharge(path=f'1nsk_AmberMod0000.pdb'))

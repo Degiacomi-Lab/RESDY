@@ -3,13 +3,14 @@ import sys, os
 
 
 def get_download_tool():
-    """Get the name of the tool used for commandline download
+    '''
+    Get the name of the tool used for commandline download
+    
     Returns:
     --------
-        tool_name : string
-            Name of the tool currently wget and curl supported if fails None returned
-
-    """
+    tool_name : string
+        Name of the tool currently wget and curl supported if fails None returned
+    '''
 
     if shutil.which('wget') is not None:
         return 'wget'
@@ -19,7 +20,6 @@ def get_download_tool():
 
     else:
         return None
-
 
 class ShutUp(object):
     def __enter__(self):

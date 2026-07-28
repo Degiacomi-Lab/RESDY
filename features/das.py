@@ -25,7 +25,11 @@ class DAS():
     area (das) values for structures
     '''
 
-    def __init__(self, include_modified=False):
+    def __init__(self, include_modified=False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                                                'modified_codes': ['LYE', 'KCX'],
+                                                                'atom_select_names_nonmod': ['NZ'],
+                                                                'atom_select_names_modified': ['NZ', 'N07']},
+                 error_filename = 'measure_errors.txt'):
         '''
         Initialise the DAS class, include any global variables that are required from
         measures in here.
@@ -34,8 +38,18 @@ class DAS():
         ----------
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
+        aa_properties -> dict
+            Properties of the amino acid of interest to investigate modification sites for.
+            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
+            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
+        error_filename : str
+            Name of the text file passed through from overall measures to write any errors from
+            calculating features out to.
         '''
         self.include_modified = include_modified
+        self.aa_properties = aa_properties
+        self.error_filename = error_filename
 
     def calculate_das(self, path):
         '''
@@ -81,13 +95,13 @@ class DAS():
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             M = bb.Molecule(path)
-            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
-            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
+            list_modified = list(a in  self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
-            report_error_to_file('DAS 1', path, e)
+            report_error_to_file('DAS 1', path, str(e), self.error_filename)
             print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
 
         # 2: Setup the Xlink module and create the half spheres
@@ -95,7 +109,7 @@ class DAS():
             XL = bb.Xlink(M)
             das_output = []
         except Exception as e:
-            report_error_to_file('DAS 2', path, str(e))
+            report_error_to_file('DAS 2', path, str(e), self.error_filename)
             print(f'DAS Calculation: 2 - Failed to setup the Xlink biobox class: {e}')
 
         for i, lys_nz_idx in enumerate(idx_nz):
@@ -108,7 +122,7 @@ class DAS():
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))
             except Exception as e:
-                report_error_to_file('DAS 2', path, str(e))
+                report_error_to_file('DAS 2', path, str(e), self.error_filename)
                 print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms on lysine no {lys_res_nums[i]}: {e}')
                 das_output.append(None)
 
@@ -120,7 +134,7 @@ class DAS():
             df_das['das'] = das_output
             if self.include_modified: df_das['Modified'] = list_modified
         except Exception as e:
-            report_error_to_file('DAS 3', path, str(e))
+            report_error_to_file('DAS 3', path, str(e), self.error_filename)
             print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
 
         return df_das

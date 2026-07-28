@@ -96,7 +96,7 @@ class Aggregation:
                 print(f'Feature given as input not available in all input files, will not be included: {feat}')
         self.df_measurements = self.df_measurements[cols_required]
 
-        if 'method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
+        if 'Method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
         if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
         self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)  # TODO GW 29.01.26 - add somethign to let you know how mnay lines have been removed and if many of them are from one specific feature
 
@@ -115,7 +115,6 @@ class Aggregation:
         '''
         self._data_tidying()
         df_stats = self._calculate_statistics()
-        print(df_stats.columns.values)
         match self.aggregation_method:
             case 'avg':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])

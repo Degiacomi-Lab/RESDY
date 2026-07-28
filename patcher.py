@@ -1,8 +1,9 @@
-# Download files, patch them if necessary, and save result in folder "clean" (ready to be used as training set)
-# 2 logfiles saved:
-# - gap_data.txt (reports on how many missing residues the protein had)
-# - patch_data.txt (reports on which files had to be patched with modeller, and whether the operation was successful)
-
+'''
+Download files, patch them if necessary, and save result in folder "clean"
+2 logfiles saved:
+- gap_data.txt (reports on how many missing residues the protein had)
+- patch_data.txt (reports on which files had to be patched with modeller, and whether the operation was successful)
+'''
 import fileinput
 import glob
 import os
@@ -134,7 +135,6 @@ def _trim_align(align_file):
     sec_1 = P1_pos[0]
     sec_2 = P1_pos[1]
 
-
     #remove empty lines and split into 2 blocks: seq and structure
     AA_struc = ''.join([str(elem.rstrip("\n").rstrip("*")) for elem in f1[sec_1+2:sec_2]])
 
@@ -227,7 +227,6 @@ def _patch_model(fbasename, seq_name):
 
     return pdb_out
 
-############################################
 
 def analyze_protein(M):
     '''
@@ -271,27 +270,27 @@ def fragment(pdb, fasta, outfolder="."):
     chains = np.unique(M.data["chain"].values)
     gap_count = []
     for c in chains:
-        _, idxs = M.atomselect([c], "*", "*", get_index=True)
-        M2 = M.get_subset(idxs)
-        M2.write_pdb(os.path.join(outfolder, f"chain{c}.pdb"))
-        gap_count.append(analyze_protein(M2))
+        _, idxs = M.atomselect([c], '*', '*', get_index=True)
+        M_two = M.get_subset(idxs)
+        M_two.write_pdb(os.path.join(outfolder, f"chain{c}.pdb"))
+        gap_count.append(analyze_protein(M_two))
 
     #split FASTA
-    fin = open(fasta, "r")
-    headers = [] # fasta headers
-    fasta_chains = [] #chains associated with header
-    sequences = [] #collection of sequences
+    fin = open(fasta, 'r')
+    fasta_headers = []
+    fasta_chains = []
+    sequences = []
     for line in fin:
         if ">" in line:
-            headers.append(line)
-            chain_rawinfo = line.split("|")[1][6:].split(",")
-            #chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
-            if len(chain_rawinfo[0]) == 1:
-                chain_info = chain_rawinfo
-            elif '[' in chain_rawinfo[0]:
-                chain_info = [str(chain_rawinfo[0].split('[')[0].strip())]
+            fasta_headers.append(line)
+            chain_raw_info = line.split("|")[1][6:].split(",")
+            #chain_info = [chain_raw_info[i].strip()[0] for i in range(len(chain_raw_info))]
+            if len(chain_raw_info[0]) == 1:
+                chain_info = chain_raw_info
+            elif '[' in chain_raw_info[0]:
+                chain_info = [str(chain_raw_info[0].split('[')[0].strip())]
             else:
-                chain_info = [chain_rawinfo[i].strip()[0] for i in range(len(chain_rawinfo))]
+                chain_info = [chain_raw_info[i].strip()[0] for i in range(len(chain_raw_info))]
             fasta_chains.append(chain_info)
             if "sequence" in locals():
                 sequences.append(sequence)
@@ -299,7 +298,6 @@ def fragment(pdb, fasta, outfolder="."):
             sequence = []
 
         else:
-
             #replace non-canonical aminoacids in FASTA sequence
             if "KCX" in line:
                 line = line.replace('(KCX)', 'K')
@@ -312,7 +310,7 @@ def fragment(pdb, fasta, outfolder="."):
     fin.close()
 
     #write FASTA files
-    for i, header in enumerate(headers):
+    for i, header in enumerate(fasta_headers):
         for c in fasta_chains[i]:
             if c not in chains:
                 raise Exception(f"chain mismatch between PDB and FASTA. {fasta_chains}, {chains}")
@@ -360,7 +358,6 @@ def fragment(pdb, fasta, outfolder="."):
     # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format
     # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesnt convert all double letter chain names to A
     # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
-
     # find the double chain name files and store in list to iterate through when converting the single character names
     all_files = os.listdir(outfolder)
     doubleletter_pdb_files = []
@@ -372,9 +369,17 @@ def fragment(pdb, fasta, outfolder="."):
                 doubleletter_pdb_files.append(file)
 
     # iterate through the files and for each one replace the chain name with a single letter lowercase version of the chain name: eg. CA would go to c
+    used_sl_chain_names = []
     for file in doubleletter_pdb_files:
         db_chain_name = file.split('.')[0][5:]
-        sl_chain_name = db_chain_name.lower()[0]
+        if db_chain_name.lower()[0] not in used_sl_chain_names:
+            sl_chain_name = db_chain_name.lower()[0]
+        elif db_chain_name.lower()[1] not in used_sl_chain_names:
+            sl_chain_name = db_chain_name.lower()[1]
+        else:
+            numb_chains = [int(a) for a in used_sl_chain_names if a.isdigit()]
+            if numb_chains: str(sl_chain_name = max(numb_chains) + 1)
+            else: sl_chain_name = '0'
 
         try:
             temp_file_path = os.path.join(outfolder, file)
@@ -386,9 +391,7 @@ def fragment(pdb, fasta, outfolder="."):
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
                             new_chain_name = ' ' + sl_chain_name
                             line = line[:20] + new_chain_name + ' ' + line[23:]
-
                             print(line, end ='')
-
                         else:
                             print(line, end='')
                     except:
@@ -398,9 +401,7 @@ def fragment(pdb, fasta, outfolder="."):
         except Exception as e:
             raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. {e}')
 
-
     return np.array(gap_count)
-
 
 
 def reassemble(pdbs, labels, outname, outdir):
@@ -414,7 +415,6 @@ def reassemble(pdbs, labels, outname, outdir):
         chainname = pdb_file.split('.')[0].split('/')[-1].split('_')[0][5:]
         if len(chainname) > 1:
             dbletter = True
-
 
         try:
             if dbletter:
@@ -434,7 +434,6 @@ def reassemble(pdbs, labels, outname, outdir):
         #If the protein fails, print error message with the error
         except Exception as e:
             raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. {e}')
-
 
     # Take all the files in pdbs and turn each into a biobox Molecule object and append this to a list of monomers
     # create a biobox multimer from the list of monomors and write a new pdb file combining all these
@@ -488,12 +487,10 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     # divide structure in individual chains
     gap_count = fragment(pdb, fasta, tmpfolder)
 
-
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
     if largest>gap:
         raise Exception(f"large gap detected ({largest} residues)")
-
 
     #launch modeller on each individual chain
     files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
@@ -509,7 +506,6 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         else:
             with ShutUp:
                 foutname = autopatch(fbasename, 10)
-
 
         if foutname == "":
             raise Exception("Autopatching failed.")
@@ -537,7 +533,6 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
 
     #possible bug here (fixed by sorting the lists alphabetically)
     chains = sorted(chains)
-
     fouts = sorted(fouts, key=lambda x: x.split('_')[-2][-1])
 
     #possible bug here (fixed by sorting the lists alphabetically)
@@ -547,508 +542,6 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     shutil.rmtree(tmpfolder)
 
     return outname
-
-
-'''
-def correct_resid(pdb, chain):
-    #
-    #Fix any resid numbering issues that arise as a result of the autopatcher.
-    #
-    
-    #opens each patched file in clean.
-    cleanfiles = np.array(glob.glob(os.path.join("curate_PDB", "clean", "*.pdb")))
-
-    for cleanfile in cleanfiles:
-        name = pdb + '_' + chain + '_patched'
-        
-        if (cleanfile[17:-4]) == name:
-            print('> fixing patched file resid')
-            try:
-                #Next it gets the first resid.
-                M = bb.Molecule()
-                M.import_pdb(cleanfile)
-                cleandf = M.data
-                cleanresid = cleandf.at[0, 'resid']
-
-                #Next it opens the corresponding raw file.
-                rawfiles = np.array(glob.glob(os.path.join("curate_PDB", "raw", "*.pdb")))
-                for rawfile in rawfiles:
-                    name2 = pdb + '_' + chain
-
-                    #It opens it in biobox and gets the first resid
-                    if rawfile[15:-4] == name2:
-                        S = bb.Molecule()
-                        S.import_pdb(rawfile)
-                        rawdf = S.data
-                        rawresid = rawdf.at[0, 'resid']
-                        
-                        #If they aren't the same, it shifts every resid in the patched file so they match and writes a new pdb file.
-                        if cleanresid != rawresid:
-
-                            cleandf['resid'] = cleandf['resid'] + rawresid - 1
-                            M.write_pdb(cleanfile)
-                        else:
-                            return
-                        
-            except Exception as e:
-                raise Exception('Failed correcting resid. %s'%e)
-                
-    return
-'''        
-
-'''
-def patch_structure(pdb, chain, download=True, download_fasta=True, gap_cutoff=8):
-        
-        #load PDB file of choice, and return a biobox structure.
-        #if needed (outfile != ""), save the cleaned file in a new PDB. 
-        
-    
-        # if folders containing raw (downloaded) and clean (ready for training) PDBs, create them
-        if not os.path.exists("curate_PDB"):
-                os.mkdir("curate_PDB")
-
-        if not os.path.exists(os.path.join("curate_PDB", "raw")):
-                os.mkdir(os.path.join("curate_PDB", "raw"))
-
-        if not os.path.exists(os.path.join("curate_PDB", "clean")):
-                os.mkdir(os.path.join("curate_PDB", "clean"))
-
-        # load PDBs and save only chain of interest (pdbcode_chainname.pdb)
-        # replace False with True to launch download from PDB databank
-        if download:
-       
-                # data columns stored in data are:
-                #NAME FAMILY GROUPS PDB CHAIN ALTERNATE_MODEL SPECIES LIGAND PDB_IDENTIFIER ALLOSTERIC_NAME ALLOSTERIC_PDB DFG AC_HELIX
-        
-                # get PDBs (chain reported in database)
-                fin = "%s.pdb"%pdb
-                fout = "%s_%s.pdb"%(pdb, chain)
-                oldpwd = os.getcwd()
-                
-                conf_file = open(os.path.join("curate_PDB", "conformations", fin))                
-                raw_file = open(os.path.join("curate_PDB", "raw", fin), 'w')
-                for line in conf_file:
-                        raw_file.write(line)
-                        
-                raw_file.close()
-
-                # if file does not exist, download file, and get the subset out
-                # (only the chain indicated in KLIFS database)
-                if not os.path.exists(fout):
-
-                    try:
-                            M = bb.Molecule()
-                            pdb_location = os.path.join("curate_PDB", "raw", fin)
-                            M.import_pdb(pdb_location, include_hetatm=True)
-                            _, idxs = M.atomselect(chain, "*", "*", get_index=True)
-                            path = os.path.join("curate_PDB", "raw", fout)
-          
-                            M.write_pdb(path, index=idxs, split_struc=False)
-          
-                    except Exception as e:
-                            raise Exception("File %s: %s"%(fin, e))
-    
-                # remove the downloaded PDB file (we already saved the chain subset we need)
-                os.remove(os.path.join("curate_PDB", "raw", fin))
-
-        # download FASTA sequences of proteins of interest in "raw" folder (not *alt files)
-        if download_fasta:
-                for f in glob.glob(os.path.join("curate_PDB", "raw", "*pdb")):
-
-                    try:
-
-                        file_name = f[15:19]
-                        chain = f[-5]
-
-                        if "PATCHED" in f:
-                            continue
-
-                        file_name_url = file_name + '.' + chain
-                        file_name_fasta = file_name + '_' + chain + '.fasta'
-                        web_url = "https://www.rcsb.org/fasta/chain/" + file_name_url + '/download'
-                        
-                    
-                        os.chdir(os.path.join("curate_PDB", "raw"))
-                        if sys.platform == "win32":
-                            line = "curl -s -o " + file_name_fasta + " " + web_url
-                        else:
-                            line = "wget -O " + file_name_fasta + " " + web_url
-                        
-                        if os.path.exists(file_name_fasta):
-                            os.remove(file_name_fasta)
-                        
-                        subprocess.check_call(line, shell=True)
-
-                        new_name = (fin[:-4]) + '_' + chain + '.fasta'
-                        
-                        os.rename(file_name_fasta, new_name)
-                    
-                        os.chdir(oldpwd)
-                        clean_fasta(new_name)
-                        
-                    except:
-                        os.chdir(oldpwd)
-                        pass
-            
-        # clean and analyze downloaded structures: report on gaps and missing residues
-        # note: cleaned files are not saved (pass an additional parameter to the load_and_clean function to write them out
-        if True:#not os.path.exists("gap_data.txt"):
-                print("> Sequence gap analysis")
-                # result will contain output, 4 numbers per protein:
-                #sequence gap cnt., sequence missing residues cnt., sequence max gap size, geometric gap count (using M.guess_chain_split())
-                result = []
-                files = np.array(glob.glob(os.path.join("curate_PDB", "raw", "*pdb")))
-                patchstat = [] # 0 = not needed, 1 = successful, 2 = failed
-
-                for k, f in enumerate(files):
-
-                        if "PATCHED" in f:
-                                continue
-
-                        success = True
-                        fout = os.path.basename(f)
-                        print("> working on %s"%fout.split(".")[0])
-
-                        # load protein and assess its structure
-                        cnt, mol = analyze_protein(f)
-                        print(">> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt[3], cnt[0], cnt[1], cnt[2]))
-
-                        # if a small amount of geometric gaps are present (or C-N atomcount mismatch), send the structure to patching, and re-analyze result
-                        if cnt[3] > 0 or cnt[3] == -1 or cnt[0] > 0:
-                                # call patching code in autopatch module
-
-                                f_patched = autopatch(f.split(".")[0], gap_cutoff)
-                                # test if patching has been successful (empty string returned = failure)
-                                if f_patched != "":
-                                        cnt2, mol2 = analyze_protein(f_patched)
-                                        print(">> geom.gaps: %s. seq.gaps: %s. seq.missing resid: %s. seq.largest gap: %s"%(cnt2[3], cnt2[0], cnt2[1], cnt2[2]))
-                                        # use data of patched molecule, save patched molecule, edit output name to indicate molecule is patched
-                                        cnt = cnt2[:]
-                                        mol = deepcopy(mol2)
-                                        fout = "%s_patched.pdb"%fout.split(".")[0]
-                                        patchstat.append(1)
-                                        #pdbchain = pdb + chain
-
-                                else:
-                                        print(">> Patching failed, keeping original results in file %s"%f)
-                                        patchstat.append(2)
-                                        success = False
-
-                        elif cnt[3] == 0:
-                                print(">> Patching not needed")
-                                patchstat.append(0) # if no gap is present
-
-                        else:
-                                print(">> Patching not applicable (molecule loading failed)")
-                                patchstat.append(2) # if protein loading failed
-                                success = False
-
-                        result.append(cnt)
-
-                        # write clean PDB in "clean" folder (unless protein loading failed)
-                        try:
-                                if success:
-                                        foutname = os.path.join("curate_PDB","clean", fout)
-                                        print(">> Saving patched protein in %s"%foutname)
-                                        mol.write_pdb(foutname, split_struc=False)
-                                        
-                                else:
-                                        print(">> protein not saved (patching failed)")
-                        except:
-                                print(">> protein not saved (writing error)")
-                                continue
-
-                list_of_files = files.tolist()
-
-                for f in list_of_files:
-                        if re.search('PATCHED', f):
-                                list_of_files.remove(f)
-
-                files = np.array(list_of_files)
-
-                result = np.array(result)
-                patchstat = np.array(patchstat)
-
-                # report on whether patching was needed and, if so, successful
-                outdata = np.concatenate((np.array([files]).T, result), axis=1)
-
-                np.savetxt("gap_data.txt", outdata, fmt="%s")
-                np.savetxt("patch_data.txt", patchstat)
-
-        else:
-                # load precalculated gap and patch data for statistics
-                indata = np.loadtxt("gap_data.txt", dtype=str)
-                files = indata[:, 0]
-                result = indata[:, 1:].astype(int)
-                patchstat = np.loadtxt("patch_data.txt")
-
-        return np.max(result[:, 2])
-    
-'''
-'''
-def assemble_multimer(gap_dict, pdb_code, list_chains):
-    
-    #get_data break the protein up into chains.
-    #This code reassembles the protein into a multimer from the chains in the clean folder given the pdb code and chains the protein consists of.
-    
-    
-    #makes sure there is an assembled folder.
-    #rc.rename_chains(pdb_code)
-    if not os.path.exists("assembled"):
-        os.mkdir("assembled")
-
-    list_to_remove = []
-    print('> Assembling')
-    
-    try:
-        name_of_assembly = pdb_code + '_assembled.pdb'
-        Multi = bb.Multimer()
-
-        #opens the pdb file for each chain and appends to Multi
-        for chain in list_chains:
-            name_of_pdb_file = pdb_code + '_' + chain + '.pdb'
-            patched_pdb_file = pdb_code + '_' + chain + '_' + 'patched.pdb'
-            
-            M = bb.Molecule()
-            
-            try:
-                path = os.path.join("curate_PDB", "clean", patched_pdb_file)
-                M.import_pdb(path, include_hetatm=True)
-                Multi.append(M, chain)
-
-            except:
-                try:
-                    path = os.path.join("curate_PDB", "clean", name_of_pdb_file)
-                    M.import_pdb(path, include_hetatm=True)
-                    Multi.append(M, chain)
-
-                except Exception as e:
-                    print("%s"%e)
-                    continue
-
-        #write Multi as a single .pdb file
-        path = os.path.join("assembled", name_of_assembly)
-        Multi.write_pdb(path)
-        list_to_remove = check_missing_chains(gap_dict, pdb_code, list_chains)
-
-        with fileinput.FileInput(path, inplace = True) as f:
-            for line in f:
-                line = line.replace("TER","")
-                print(line, end ='') 
-
-    except Exception as e:
-        raise Exception("failed to assemble. %s"%e)
-
-    return list_to_remove
-'''
-'''
-def check_missing_chains(gap_dict, pdb_code, list_chains):
-    
-    #These next two modules (as well as one in rename_chains) sort out issues that arise when a chain fails the autopatcher.
-    #In particular they do two things:
-    #- Make sure the chain naming is correct.
-    #- Mark any points that are close to the missing chains to be removed.
-    
-
-    clean_chains = []
-    failed_chains =[]
-
-    #Firstly the chains that passed the autopatch (i.e. those in the clean folder) are appended to a list.
-    for f in glob.glob(os.path.join("curate_PDB","clean","*.pdb")):
-
-        try:
-            if f[-12:] == '_patched.pdb':
-                clean_chain = f[-13]
-            else:
-                clean_chain = f[-5]
-            clean_chains.append(clean_chain)
-
-        except Exception as e:
-            print('>> Issue identifying missing chains. %s'%e)
-            continue
-
-    #If any chain is not in clean but is in the original protein it is appended to another list (failed_chains)
-    for chain in list_chains:
-        if chain not in clean_chains:
-            failed_chains.append(chain)
-
-    #If any chains have failed, rename_chains_assembled and note_residues_near_missing _chain sort out chain naming issues and remove residues close to the missing chains respectively.
-    if len(failed_chains) != 0:
-        print('>> Fixing chain issue....')
-        try:
-            rename_chains_assembled(failed_chains, list_chains)
-            list_to_remove = note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains)
-        except Exception as e:
-            print('Error dealing with chain failure- chain labelling may be incorrect in data. %s'%e)
-            return
-        #print('Chain issue fixed.')
-    
-    else:
-        print('>> no missing chains!')
-        list_to_remove = list()
-
-    return list_to_remove
-'''
-'''
-def rename_chains_assembled(failed_chains, list_chains):
-    
-    #Rename the chains in an assembled structure.
-    #This is needed as if any of the chains fail the autopatch, the naming of any chains further down the alphabet shifts.
-    #For example if the original chains were ABC and B failed then in the assembled the naming would be AB whereas this program renames B to C.
-    
-    
-    #create a copy of the list of chains (a list of all the chains including those which have failed).
-    dict_replacements = dict()
-    list_chains_updated = list_chains.copy()
-
-    for chain in list_chains:
-
-       #If any chain has failed, it is removed from the updated copy.
-        if chain in failed_chains:
-
-            list_chains_updated.remove(chain)
-
-    #Next, it checks if the position of any chains has changed in the updated list.
-    for chain in list_chains_updated:
-        
-        new_index = list_chains_updated.index(chain)
-        replacing = list_chains[new_index]
-
-        #If it has, the dictionary is updated to include the chain name to be replaced and the chain name which is going to replace it.
-        if replacing != chain:
-            dict_replacements[replacing] = chain
-
-
-    replace_list = list(dict_replacements.keys())
-
-    #It then goes and opens the assembled file.
-    files = list((glob.glob(os.path.join("assembled", "*.pdb"))))
-    for file in files:
-        
-        #It then rewrites the file with the replacement chain name.
-        try:
-            with fileinput.FileInput(file, inplace = True) as f:
-                for line in f:
-                    try:
-                        if (line[:4] == 'ATOM') or (line[:3] == 'TER'):
-                            chain_name = line[21]
-                            if chain_name in replace_list:
-                                replacement_chain_name = dict_replacements.get(chain_name)
-                                line = line[:21] + replacement_chain_name + line[22:]
-                                print(line, end ='')
-                            else:
-                                print(line, end = '')
-                        else:
-                            print(line, end='')
-                    except:
-                        print(line, end='')
-
-        except Exception as e:
-            print('>> %s'%e)
-                  
-    return
-'''
-
-'''
-def note_residues_near_missing_chain(gap_dict, pdb_code, failed_chains):
-    
-    #Works as follows:
-    #- Opens pdb file in curate_PDB/conformations/ with Biobox
-    #- Check each lysine to see if they are near failed chain.
-    #- If they are add chain_resid to list (list_to_remove)
-    #- Later in main those in list_to_remove are removed from the results.
-    
-    
-    path = os.path.join("curate_PDB", "conformations", pdb_code)
-    list_of_chains = list()
-    list_of_resid = list()
-    list_to_remove = []
-    
-    print('> Breaking up molecule...')
-    try:
-
-        #open file in biobox
-        M = bb.Molecule()
-        M.import_pdb(path, include_hetatm=True)
-        df = M.data
-
-        #note of all the lysine index/coordinates
-        lys_coords, lys_idx = M.atomselect('*','LYS', 'CA', use_resname=True, get_index=True)
-
-        #note of each lysines chain and resid.
-        for entry in lys_idx:
-            chain = df.at[entry, 'chain']
-            list_of_chains.append(chain)
-
-        for entry in lys_idx:
-            resid = df.at[entry, 'resid']
-            list_of_resid.append(resid)
-
-        #get coordinates and index for all atoms
-        all_coords, idx = M.atomselect('*','*','*', get_index=True)
-
-    except Exception as e:
-        raise Exception('Failed identifying residues near missing chain %s'%e)
-
-    #goes through all the lysines
-    for failedchain in failed_chains:
-        gapsize = gap_dict.get(failedchain)
-        gapsize = int(gapsize)
-        cutoff = 0.5*gapsize + 3.5
-
-        for j in range(len(lys_coords)):
-
-            #Does not bother if they are on a chain which failed the autopatch
-            #as they won't be in the final structure anyway.
-            chain_lys = list_of_chains[j]
-            if chain_lys == failed_chains:
-                continue
-            
-            else:
-
-                try:
-                    #Work out the distance between all the atoms and each lysine.
-                    for i in range(len(all_coords)):
-                        x_dist = (((lys_coords[j])[0] - (all_coords[i])[0])**2)
-                        y_dist = (((lys_coords[j])[1] - (all_coords[i])[1])**2)
-                        z_dist = (((lys_coords[j])[2] - (all_coords[i])[2])**2)
-                        distance = np.sqrt(x_dist + y_dist + z_dist)
-
-                        #If the distance is less than 10 A AND the atoms chain is one of the failed chains,
-                        #the lysine's Chain_Resid is appended to the list_to_remove.
-                        if distance < cutoff:
-                            index_of_aa = idx[i]
-                            aa_chain = df.at[index_of_aa, 'chain']
-
-                            if aa_chain in failed_chains:
-                                chain_resid = str(list_of_chains[j]) + str(list_of_resid[j])
-                                list_to_remove.append(chain_resid)
-
-                except Exception as e:
-                    print('> Error %s'%e)
-        
-    return list_to_remove
-'''
-'''
-def clean_fasta(fname):
-    #clean the fasta file, getting rid of any non-canonical AAs that may cause an issue.
-    
-    #open the fasta file
-    #path = os.path.join("curate_PDB","raw", new_name)
-    #rewrite it replacing the amino acids that may cause an issue.
-    with fileinput.FileInput(fname, inplace = True) as f:
-        for line in f:
-            if("KCX" in line):
-                line = line.replace('(KCX)', 'K')
-                print(line, end = '')
-            if("MSE" in line):
-                line = line.replace('(MSE)', 'M')
-                print(line, end = '')
-            else:
-                print(line, end = '')
-
-    return
-'''
 
 ##############################################################################
 

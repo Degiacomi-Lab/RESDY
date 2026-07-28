@@ -19,7 +19,7 @@ import biobox as bb
 import torch
 import matplotlib.pyplot as plt
 from collections import OrderedDict
-#from features.error_reporting import report_error_to_file
+from features.error_reporting import report_error_to_file
 
 try: 
     import esm
@@ -33,7 +33,12 @@ class Ensemble():
     set of given structures
     '''
 
-    def __init__(self, df_proteins, include_modified = False):
+    def __init__(self, df_proteins, include_modified = False,
+                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                'modified_codes': ['LYE', 'KCX'],
+                                'atom_select_names_nonmod': ['NZ'],
+                                'atom_select_names_modified': ['NZ', 'N07']},
+                 error_filename = 'measure_errors.txt'):
         '''
         Initialise the Charge class, include any global variables that are required from
         measures in here.
@@ -45,10 +50,31 @@ class Ensemble():
             structures correspond to the uniprot codes. 
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
+        aa_properties -> dict
+            Properties of the amino acid of interest to investigate modification sites for.
+            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
+            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
+        error_filename : str
+            Name of the text file passed through from overall measures to write any errors from
+            calculating features out to.
         '''
         self.df_proteins = df_proteins
         self.include_modified = include_modified
-    
+        self.aa_properties = aa_properties
+        self.error_filename = error_filename
+
+        # Prepare model parameters
+        
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.esm2_model_650M, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+        self.esm2_model_650M = self.esm2_model_650M.to(device=self.device)
+        self.batch_converter = self.alphabet.get_batch_converter()
+        self.esm2_model_650M.eval()
+        self.esm_proj_linear = torch.nn.Linear(1280, 512).to(device=self.device)
+        self.lstm_module = torch.nn.LSTM(512, 256, 2, batch_first=True, bidirectional=True).to(device=self.device)
+        
+
     def calculate_rmsf(self, path, df_subset):
         '''
         Calculate the root mean square fluctuation of the lysines within the protein
@@ -116,16 +142,16 @@ class Ensemble():
         # 1: Extract the sequence sections from the given protein structure
         try:
             M = bb.Molecule(path)
-            if self.include_modified: idx_nz = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)[1]
+            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
-            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][idx_nz]))
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
 
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
             subset_data = M.data.iloc[c_alpha_idxs]
 
-            # for purposes of esm - needs to be asigned to original 20 AA codes
+            # for purposes of esm - needs to be assigned to original 20 AA codes
             # similar residues listed as normal equivalent, anything else labelled as X
             # (may need <unk> tag for esm instead)
             protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
@@ -137,7 +163,7 @@ class Ensemble():
                                     'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'P', 'PTHR': 'T',
                                     'PTYR': 'Y', 'MELYS': 'K', 'MEARG': 'R', 'ACLYS': 'K',
-                                    'KCX': 'K', 'LYE': 'K'}
+                                    'KCX': 'K', 'LYE': 'K', 'LSYN': 'K'}
 
             def _catch(func, *args, handle=lambda e : e, **kwargs):
                 try:
@@ -152,18 +178,13 @@ class Ensemble():
                 pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
         except Exception as e:
-            #report_error_to_file('Ensemble - ESM 1', path, str(e))
+            report_error_to_file('Ensemble - ESM 1', path, str(e), self.error_filename)
             print(f'Ensemble ESM Calculation: 1 - could not extract the sequence from the protein file given: {e}')
-            return pd.DataFrame(columns=["Chain", "Resid", "esm"])
+            return pd.DataFrame(columns=['Chain', 'Resid', 'esm'])
 
 
         # 2: Extract local sequences based on the overall chain, submit sections to esm, record to dataframe
-        df_esm = pd.DataFrame(columns=["Chain", "Resid", "esm"])
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        esm2_model_650M, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
-        esm2_model_650M = esm2_model_650M.to(device)
-        batch_converter = alphabet.get_batch_converter()
-        esm2_model_650M.eval()
+        df_esm = pd.DataFrame(columns=['Chain', 'Resid', 'esm'])
 
         for idx, (lys_chain, lys_num) in enumerate(zip(list_chains, lys_res_nums)):
             try:
@@ -187,21 +208,17 @@ class Ensemble():
                 seq = ('X' * start_null) + seq[start_idx:end_idx] + ('X' * end_null)
 
                 data = [("1", seq)]
-                batch_labels, batch_strings, batch_tokens = batch_converter(data)
-                batch_tokens = batch_tokens.to(device)
+                batch_labels, batch_strings, batch_tokens = self.batch_converter(data)
+                batch_tokens = batch_tokens.to(device=self.device)
                 with torch.no_grad():
-                    results = esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=True)
+                    results = self.esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=True)
                 seq_encode_tokens = results["representations"][33]
                 #seq_encode_tokens = seq_encode_tokens.to('cpu')
-                #print(seq_encode_tokens.shape)
 
-                
-                esm_proj_linear = torch.nn.Linear(1280, 512).to(device)
-                esm_linear = esm_proj_linear(seq_encode_tokens)# [1, 43, 512]
-                lstm_module = torch.nn.LSTM(512, 256, 2, batch_first=True, bidirectional=True).to(device)
-                hidden_n = torch.zeros(4, esm_linear.size(0), 256).to(device)
-                cell_n = torch.zeros(4, esm_linear.size(0), 256).to(device)
-                seq_lstm, _ = lstm_module(esm_linear, (hidden_n, cell_n))
+                esm_linear = self.esm_proj_linear(seq_encode_tokens)# [1, 43, 512]
+                hidden_n = torch.zeros(4, esm_linear.size(0), 256).to(device=self.device)
+                cell_n = torch.zeros(4, esm_linear.size(0), 256).to(device=self.device)
+                seq_lstm, _ = self.lstm_module(esm_linear, (hidden_n, cell_n))
                 seq_out = seq_lstm.mean(dim=1, keepdim=True)
                 seq_out = seq_out.to('cpu')
 
@@ -211,7 +228,7 @@ class Ensemble():
                     df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': str(seq_out.tolist()[0][0])}])], ignore_index=True)
 
             except Exception as e:
-                #report_error_to_file('Ensemble ESM 2', path, str(e))
+                report_error_to_file('Ensemble ESM 2', path, str(e), self.error_filename)
                 print(f'Ensemble ESM Calculation 2: Failed to encode sequence for uniprot: {path}, chain: {lys_chain}, resid: {lys_num}, error: {e}')
                 if self.include_modified:
                     df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': None, 'Modified': list_modified[idx]}])], ignore_index=True)
@@ -225,8 +242,9 @@ if __name__ == '__main__':
     
     df_prot = pd.DataFrame()
     E = Ensemble(df_proteins=df_prot, include_modified=False)
-    df_esm = E.calculate_esm(path=f'1UBQ-alt-1.pdb')
+    df_esm = E.calculate_esm(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb')
+    print(df_esm)
 
-    df_esm.to_pickle('testing_esm_csv.pkl')  #  pickle used if keeping tensors in output dataframe, csv fine if taking list through as can literal_eval
-    df_esm_csv = pd.read_pickle('testing_esm_csv.pkl')
-    print(df_esm_csv)
+    #df_esm.to_pickle('testing_esm_csv.pkl')  #  pickle used if keeping tensors in output dataframe, csv fine if taking list through as can literal_eval
+    #df_esm_csv = pd.read_pickle('testing_esm_csv.pkl')
+    #print(df_esm_csv)

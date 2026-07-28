@@ -26,7 +26,11 @@ class SASA():
     (SASA) values for structures
     '''
 
-    def __init__(self, include_modified = False):
+    def __init__(self, include_modified = False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                                                'modified_codes': ['LYE', 'KCX'],
+                                                                'atom_select_names_nonmod': ['NZ'],
+                                                                'atom_select_names_modified': ['NZ', 'N07']},
+                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the SASA class, include any global variables that are required from
         measures in here.
@@ -35,8 +39,18 @@ class SASA():
         ----------
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
+        aa_properties -> dict
+            Properties of the amino acid of interest to investigate modification sites for.
+            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
+            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
+        error_filename : str
+            Name of the text file passed through from overall measures to write any errors from
+            calculating features out to.
         '''
         self.include_modified = include_modified
+        self.aa_properties = aa_properties
+        self.error_filename = error_filename
 
     def calculate_sasa(self, path):
         '''
@@ -80,32 +94,23 @@ class SASA():
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
 
-            if self.include_modified: lys_coords, lys_idx = M.atomselect('*', ['LYS', 'LYE', 'KCX'], ['NZ', 'N07'], use_resname=True, get_index=True)
-            else: lys_coords, lys_idx = M.atomselect('*', 'LYS', 'NZ', use_resname=True, get_index=True)
+            if self.include_modified: lys_coords, lys_idx = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)
+            else: lys_coords, lys_idx = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)
 
             list_of_resid = list(M.data['resid'][lys_idx])
             list_of_chains = list(M.data['chain'][lys_idx])
-            list_modified = list(a in ['KCX', 'LYE'] for a in list(M.data['resname'][lys_idx]))
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][lys_idx]))
 
             all_coords, all_idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
-            report_error_to_file('SASA 1', path, str(e))
+            report_error_to_file('SASA 1', path, str(e), self.error_filename)
             print(f'SASA Calculation: 1 - Failed to extract lysine information from pdb file, error: {e}')
 
         for j, lys_coord in enumerate(lys_coords):
-            list_close_points = list()
 
-            for i, coord in enumerate(all_coords):
-                try:
-                    x_dist = (lys_coord[0] - coord[0])**2
-                    y_dist = (lys_coord[1] - coord[1])**2
-                    z_dist = (lys_coord[2] - coord[2])**2
-                    distance = np.sqrt(x_dist + y_dist + z_dist)
-                    if distance < 15:
-                        list_close_points.append(all_idx[i])
-                except Exception as e:
-                    continue
+            coords_euc_dists = np.linalg.norm(all_coords - lys_coord, axis=1)
+            list_close_points = [a for a, x in enumerate(coords_euc_dists < 15) if x]
 
             try:
                 S = M.get_subset(idxs=list_close_points)
@@ -113,6 +118,7 @@ class SASA():
                 resid = list_of_resid[j]
 
                 #SASA is calculated for that lysine in the small molecule.
+                # TODO GW 23.07.26 - update this to be general to other AA as element codes are LYS specific here
                 pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ", 'C03', 'C04', 'C05', 'C06', 'N07'],
                                             use_resname=False, get_index=True)
 
@@ -122,7 +128,7 @@ class SASA():
             except Exception as e:
                 print(f'SASA Calculation: 2 - Error obtaining SASA at index value {str(j)} with error: {e}')
                 list_of_sasa.append(None)
-                report_error_to_file('SASA 2', path, f'Error obtaining SASA at index value {str(j)} with error: {e}')
+                report_error_to_file('SASA 2', path, f'Error obtaining SASA at index value {str(j)} with error: {e}', self.error_filename)
                 continue
 
         try:
@@ -132,7 +138,7 @@ class SASA():
             if self.include_modified: df_sasa['Modified'] = list_modified
 
         except Exception as e:
-            report_error_to_file('SASA 3', path, str(e))
+            report_error_to_file('SASA 3', path, str(e), self.error_filename)
             print(f'SASA Calculation: 3 - Failed to write extracted sasa information to dataframe, error: {e}')
 
         return df_sasa
@@ -141,6 +147,6 @@ class SASA():
 if __name__ == '__main__':
     sasa = SASA(include_modified=True)
     #print(sasa.calculate_sasa(path=f'1ubq.pdb'))
-    #print(sasa.calculate_sasa(path=f'1ubq_frame_0.pdb'))
-    print(sasa.calculate_sasa(path=f'1ubq_mod6_frame_0.pdb'))
+    #print(sasa.calculate_sasa(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    print(sasa.calculate_sasa(path=f'result{os.sep}curated{os.sep}6XZ7-alt1A.pdb'))
     #print(sasa.calculate_sasa(path=f'1nsk_AmberMod0000.pdb'))

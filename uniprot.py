@@ -120,7 +120,9 @@ class Uniprot(object):
         Download protein structures associated with a given UNIPROT code.
         If a PDB code is also provided, only that PDB will be downloaded
         (e.g. useful for consistency check between UNIPROT and PDB)
-        If a DataFrame df is provided, extracted structures will be appended to it
+        If a DataFrame df is provided, extracted structures will be appended to it.
+        Extracts the name for AF structure, contacts AF API and finds latest version,
+        if any problems in finding the latest version, uses v6.
 
 
         Parameters
@@ -147,8 +149,16 @@ class Uniprot(object):
 
             #appends the AF structure to the df (if this isn't present it will be removed later).
             try:
-
-                af_code = f'AF-{uniprot_code}-F1-model_v6'
+                # get latest AF structure details for the uniprot code
+                try:
+                    af_details_response = requests.get(f'https://alphafold.ebi.ac.uk/api/prediction/{uniprot_code}?include_complexes=false', timeout=10)
+                    if not af_details_response.ok:
+                        af_details_response.raise_for_status()
+                    af_data = af_details_response.json()
+                    af_code = f'AF-{uniprot_code}-F1-model_v{str(af_data["latestVersion"])}'
+                except Exception as e:
+                    print(f'>> Failed to obtain information about AF structure for uniprot code {uniprot_code} with error {e}, using v6 for AF code.')
+                    af_code = f'AF-{uniprot_code}-F1-model_v6'
 
                 data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': af_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -269,5 +279,5 @@ if __name__ == "__main__":
 
     #UP.get_organism_proteins('UP000001811')
     UP.get_protein_data("P09167")
-    UP.from_csv_file("inputs\\input_codes_4.csv")
+    #UP.from_csv_file("inputs\\input_codes_4.csv")
     print(UP.df)
