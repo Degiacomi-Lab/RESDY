@@ -1,4 +1,4 @@
-# File to house the generalised useage for calling a model for prediction on the aggregated data
+# File to house the generalised usage for calling a model for prediction on the aggregated data
 
 import random
 import pandas as pd
@@ -205,7 +205,7 @@ if __name__ == '__main__':
         df_neg = pd.concat([df_neg, pd.read_csv(file)], ignore_index=True)
     df_pos['class'] = 1; df_neg['class'] = 0
     print(f'Len positve data: {len(df_pos)}, Len negative data: {len(df_neg)}')
-    df_collated = pd.concat([df_neg, df_pos], ignore_index=True)
+    df_collated = pd.concat([df_pos, df_neg], ignore_index=True)
     agg_col = Aggregation(df_collated, aggregation_method='minmax', features_to_include=features_to_include, aev_red_method='pca')
     df_col_agg = agg_col.aggregate_data()
     num_pos_data = len(df_col_agg[df_col_agg['class'] == 1])

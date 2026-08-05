@@ -51,6 +51,8 @@ class Charge():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
     
     def calculate_seqcharge(self, path, num_add_aa=10):
         '''
@@ -89,9 +91,12 @@ class Charge():
         '''
         # 1: Extract the overall sequence for the protein given
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
+
             if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
+
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
@@ -132,7 +137,7 @@ class Charge():
                 pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
         except Exception as e:
-            report_error_to_file('Seqcharge 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Seqcharge 1', path, str(e), self.error_filename)
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
             return pd.DataFrame(columns=["Chain", "Resid", "seqcharge"])
 
@@ -160,7 +165,7 @@ class Charge():
 
                 seq = ('-' * start_null) + seq[start_idx:end_idx] + ('-' * end_null)
                 seq_split = list(seq)
-                if seq_split[10] != 'K':
+                if seq_split[num_add_aa] != 'K':
                     print(f'A lysine was not found at the desired position {lys_num+1} on chain {lys_chain} read in for PDB file {path}; sequence -> {seq}')
                     continue
 
@@ -179,7 +184,7 @@ class Charge():
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count}])], ignore_index=True)
 
             except Exception as e:
-                report_error_to_file('Seqcharge 2', path, str(e), self.error_filename)
+                if self.record_errors: report_error_to_file('Seqcharge 2', path, str(e), self.error_filename)
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_num}, error: {e}')
                 if self.include_modified:
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None, 'Modified': list_modified[idx]}])], ignore_index=True)

@@ -67,6 +67,8 @@ class NMR():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
 
         self.legolas_output_path = os.path.join(self.outdir, 'legolas')
         if not os.path.exists(self.legolas_output_path):
@@ -102,7 +104,9 @@ class NMR():
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
+
             result_filename = os.path.join(self.legolas_output_path, path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv')
             if os.path.exists(result_filename):
                 already_exists = True
@@ -126,7 +130,7 @@ class NMR():
 
         except Exception as e:
             print(f'Legolas: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
-            report_error_to_file('LEGOLAS 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('LEGOLAS 1', path, str(e), self.error_filename)
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
 
         # 2: change location to legolas directory and run the legolas program on the specified pdb before changing back to working directory
@@ -140,12 +144,16 @@ class NMR():
             if not already_exists:
                 # Note: if you are not GW and running this, you will need to change this path to your own installation path!!
                 legolas_prog = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
-                subprocess.run(['python', legolas_prog, pdb_absolute_path, '-atype', 'N'])
+                subprocess.run(['python', legolas_prog, pdb_absolute_path, '-atype', 'N'], check=True)
             else:
                 result_filename = os.path.join(self.legolas_output_path, result_filename)
             df_nmr = pd.read_csv(result_filename)
-            df_legolas = pd.concat([df_legolas, df_nmr.loc[:, ~df_nmr.columns.str.contains('^Unnamed')]], axis=1)
-            #print(df_legolas_new)
+            
+            legolas_res_key = {'0': 'ALA', '1': 'ARG', '2': 'ASN', '3': 'ASP', '4': 'CYS',
+                               '5': 'GLU', '6': 'GLN', '7': 'GLY', '8': 'HIS', '9': 'ILE',
+                               '10': 'LEU', '11': 'LYS', '12': 'MET', '13': 'PHE', '14': 'PRO',
+                               '15': 'SER', '16': 'THR', '17': 'TRP', '18': 'TYR', '19': 'VAL',
+                               '20': 'HOH', '21': 'DOD'}
 
             if not already_exists:
                 os.remove(result_filename.split('.')[0] + '.parquet')
@@ -174,27 +182,38 @@ class NMR():
                         aevs = []
 
                     if aevs != []:
-                        df_legolas = df_legolas.assign(**{'legolas_aev': [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]})
+                        df_legolas = df_legolas.assign(**{'aev_legolas': [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]})
 
                     if os.path.exists('tmp_aevs_protein.txt'):
                         os.remove('tmp_aevs_protein.txt')
 
                 except Exception as e:
                     print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
-                    report_error_to_file('LEGOLAS AEV 1', path, str(e))
-            
-            df_legolas = df_legolas.iloc[idx_n_res_interest].drop(columns=['resname', 'ATOM_TYPE', 'RESIDUE_ID', 'CHEMICAL_SHIFT_STD']).rename(columns={'CHEMICAL_SHIFT': 'legolas', 'chain': 'Chain', 'resid': 'Resid'})
+                    if self.record_errors: report_error_to_file('LEGOLAS AEV 1', path, str(e), self.error_filename)
+
+            if len(df_legolas) != len(df_nmr):
+                rows_to_drop = []
+                for i, r in df_legolas.iterrows():
+                    # LEGOLAS only calculates backbone 15N NMR => exactly 1 measurement per residue, any mismatches are gaps in sequence
+                    if r['resname'] != legolas_res_key[df_nmr['RESIDUE_ID'].iloc[i]]:
+                        rows_to_drop.append(i)
+                df_legolas = df_legolas.drop(index=rows_to_drop).reset_index(drop=True)
+            df_legolas = pd.concat([df_legolas, df_nmr.loc[:, ~df_nmr.columns.str.contains('^Unnamed')]], axis=1)
+
+            print(df_legolas)
+            df_legolas = df_legolas.iloc[idx_n_res_interest].drop(columns=['resname', 'ATOM_TYPE', 'RESIDUE_ID', 'CHEMICAL_SHIFT_STD'])
+            df_legolas = df_legolas.rename(columns={'CHEMICAL_SHIFT': 'legolas', 'chain': 'Chain', 'resid': 'Resid'})
 
         except Exception as e:
             print(f'Legolas 2: Failed to run the legolas program and extract the 15N nmr shifts for the protein: {e}')
-            report_error_to_file('LEGOLAS 2', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('LEGOLAS 2', path, str(e), self.error_filename)
             return pd.DataFrame(columns=['Chain', 'Resid', 'legolas'])
 
-        return df_legolas
+        return df_legolas.reset_index(drop=True)
 
 
 if __name__ == '__main__':
     nmr = NMR(outdir='result', legolas_aevs=True, include_modified=False)
-    #print(nmr.calculate_legolas(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    print(nmr.calculate_legolas(path=f'2I1V-alt-1.pdb'))
+    print(nmr.calculate_legolas(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    #print(nmr.calculate_legolas(path=f'2I1V-alt-1.pdb'))
     #print(nmr.calculate_legolas(path=f'1nsk_AmberMod0000.pdb'))

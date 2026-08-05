@@ -52,6 +52,7 @@ class Analysis(object):
         self.code_to_name = None
 
         self.outdir = outdir
+        self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
 
 
     # GW 05.12.24 function potentially unused - remove?
@@ -106,12 +107,12 @@ class Analysis(object):
         try:
             url_2 = f'https://www.uniprot.org/uniprot/{uniprot_code}.txt'
             with urllib.request.urlopen(url_2, timeout=10) as response:
-                html_2 = response.read()
+                html_2 = response.read().decode('utf-8')
         except Exception as e:
             print(f'Failed to obtain UNIPROT data for {uniprot_code}. {e}')
 
         try:
-            for line in html_2:
+            for line in html_2.splitlines():
                 line = str(line)
                 find_go = re.findall('GO; GO', line)
                 if len(find_go) > 0:
@@ -282,6 +283,8 @@ class Analysis(object):
                     match col_to_keep.lower():
                         case 'new':
                             print(f'Keeping new measurements for {column}')
+                            if column in ['aev', 'aev_legolas']:
+                                self.df[column] = self.df[column].astype('object')
                             for i, r in self.df.iterrows():
 
                                 protein_code = r['PDB_Code']
@@ -292,14 +295,8 @@ class Analysis(object):
                                 if len(idx[0]) == 0:
                                     continue
 
-                                # account for measurements that have special cases
-                                # aevs - add the list of aevs in one column to the overall dataframe
-                                if column == 'aev':
-                                    self.df['aev'] = self.df['aev'].astype('object')
-                                elif column == 'aev_legolas':
-                                    self.df['aev_legolas'] = self.df['aev_legolas'].astype('object')
-                                else:
-                                    self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                                self.df.at[i, column] = new_df.loc[idx[0][0], column]
+
                             proper_answer = True
                         case 'old':
                             print(f'Keeping old measurements for {column}')
@@ -366,7 +363,7 @@ class Analysis(object):
         '''
         print('>> Removing unrequired residues')
         # Remove duplicated data from the measurements
-        test_table = req_resid_table
+        df_req_res = req_resid_table
         initial_data_one = len(self.df)
         self.df = self.df.drop_duplicates()
         duplicate_rows_removed = initial_data_one - len(self.df)
@@ -374,7 +371,7 @@ class Analysis(object):
         initial_full_data_rows = len(self.df)
 
         # remove rows which have a UNIPROT code which isnt required
-        uniprot_codes = test_table['Uniprot_Entry'].drop_duplicates().tolist()
+        uniprot_codes = df_req_res['Uniprot_Entry'].drop_duplicates().tolist()
         entries_to_remove = []
         for i, r in self.df.iterrows():
             if r['Uniprot_Entry'] not in uniprot_codes:
@@ -383,24 +380,28 @@ class Analysis(object):
         uniprot_rows_removed = initial_full_data_rows - len(self.df)
         print(f'Removed {uniprot_rows_removed} rows of Uniprot codes which were not mentioned in the required residues file')
 
-        while len(test_table) > 0:
-            print("Number of rows left: " + str(len(test_table)))
-            test_uniprot = test_table["Uniprot_Entry"][test_table.first_valid_index()]
+        while len(df_req_res) > 0:
+            print("Number of rows left: " + str(len(df_req_res)))
+            test_uniprot = df_req_res["Uniprot_Entry"][df_req_res.first_valid_index()]
             print("test_uniprot: " + str(test_uniprot))
+
             # find all the desired residues from the particular uniprot code and put into a list
             # automatically removes duplicates from this (doesn't retain order)
-            desired_residues = list(set(test_table[test_table["Uniprot_Entry"].str.contains(test_uniprot)]["Resid"].tolist()))
+            desired_residues = list(set(df_req_res[df_req_res["Uniprot_Entry"] == test_uniprot]["Resid"].tolist()))
+
             # search the measures spreadsheet for all rows containing the desired uniprot code
-            search_uniprot = self.df[self.df["Uniprot_Entry"].str.contains(test_uniprot.strip())][["Uniprot_Entry", "Resid"]]
+            search_uniprot = self.df[self.df["Uniprot_Entry"] == test_uniprot.strip()][["Uniprot_Entry", "Resid"]]
             all_search_rows = search_uniprot.index.tolist()
+
             # go over each row of search_uniprot, see if the residue matches one of the desired ones
             wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
             not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
             print("Rows removed: " + str(len(not_wanted_rows)))
+
             # remove the rows which aren't wanted from the main data set
             self.df = self.df.drop(index = not_wanted_rows)
             # remove rows which contain the uniprot code that has been searched from test_table
-            test_table = test_table.drop(index = test_table[test_table["Uniprot_Entry"] == test_uniprot].index.tolist())
+            df_req_res = df_req_res.drop(index = df_req_res[df_req_res["Uniprot_Entry"] == test_uniprot].index.tolist())
 
         final_full_data_rows = len(self.df)
         diff_rows = initial_full_data_rows - final_full_data_rows
@@ -456,23 +457,20 @@ class Analysis(object):
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
 
         # if features not known which trend is best, ask user which is required
-        min_feats = ['propka', 'pkaani', 'legolas', 'depth']
-        max_feats = ['sasa', 'das', 'seqcharge', 'frustration']
+        unsure_feats = ['phi', 'psi', 'curvture', 'writhing', 'arc_length']
+        min_feats = ['propka', 'pkaANI', 'legolas', 'depth']
+        max_feats = ['sasa', 'das', 'seqcharge', 'frustration'] + unsure_feats  # unsure feats added to max feats for now
         for feat in features:
             if feat in ['aev', 'aev_legolas']:
                 print(f'>> Feature {feat} is not supported with this analysis. Dropping feature from ')
             if feat not in min_feats + max_feats:
                 pref = 'tmp'
                 while pref not in ['min', 'max']:
-                    pref = input('Bias towards min or max for curvature (enter "min" or "max"): ')
+                    pref = input(f'Enter bias towards min or max for {feat} (enter "min" or "max"): ')
                 if pref == 'min': min_feats.append(feat)
                 elif pref == 'max': max_feats.append(feat)
 
-        df_temp = df.drop_duplicates(subset=['Uniprot_Entry', 'Resid'])
-        for i, r in df_temp.iterrows():
-            uniprot_tmp, resid_tmp = r['Uniprot_Entry'], r['Resid']
-            df_query = df[(df['Uniprot_Entry'] == uniprot_tmp) & (df['Resid'] == resid_tmp)]
-
+        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df.groupby(self.lys_key):
             if len(df_query) > 1:
                 df_query = df_query.reset_index(drop=True)
 
@@ -497,22 +495,27 @@ class Analysis(object):
                                     print(f'>> Feature ({feature}) unknown, taking minimum')
                                     feat_list = list(df_query[feature])
                             feat_avg, feat_std = np.mean(feat_list), np.std(feat_list)
-                            feat_list_standardised = (feat_list - feat_avg) / feat_std
+                            if feat_std == 0:
+                                print(f'Standard deviation of feature: {feature} is 0 as is always constant, '
+                                      f'{feature} therefore contributes 0 to relative best.')
+                                feat_list_standardised = np.zeros(len(feat_list))
+                            else:
+                                feat_list_standardised = (feat_list - feat_avg) / feat_std
                             feat_list_weighted = feat_list_standardised * weight
                             metric_calculated_values_list_temp.append(feat_list_weighted)
                         except Exception as e:
                             print(f'>> Failed to load the data for the metric: {feature} with error: {e}')
                 except Exception as e:
                     print(f'Error loading data for the metrics provided: {e}')
-                
+
                 try:
-                    index = -1
-                    base = 0
+                    index = 0
+                    base = -np.inf
                     for i, val in enumerate(metric_calculated_values_list_temp[0]):
                         weighted_sum = 0
                         for weighted_value_index, metric_value in enumerate(metric_calculated_values_list_temp):
                             weighted_sum += metric_value[i]
-                        if weighted_sum >= base:
+                        if np.isfinite(weighted_sum) and weighted_sum >= base:
                             index = i
                             base = weighted_sum
                     row_to_append = df_query.iloc[[index],:]
@@ -536,7 +539,7 @@ class Analysis(object):
             if uni in self.GO_dict[GO_code]:
                 bp_list += 1
 
-        bp_not_list = len([p for p in reference if GO_code in self.GO_dict[p]]) - bp_list
+        bp_not_list = len([p for p in reference if p in self.GO_dict[GO_code]]) - bp_list
         not_bp_list = len(my_list) - bp_list
 
         not_bp_not_list = 0

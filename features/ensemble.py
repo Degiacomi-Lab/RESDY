@@ -17,8 +17,11 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 import torch
+import torch.nn as nn
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+import MDAnalysis as mda
+from MDAnalysis.analysis import rms, align
 from features.error_reporting import report_error_to_file
 
 try: 
@@ -63,17 +66,37 @@ class Ensemble():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-
-        # Prepare model parameters
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
         
+        self.model_loaded = False
+
+
+    def _initialise_esm_model(self):
+        '''
+        Initialise global parameters and models in calculating ESM values
+        '''
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.esm2_model_650M, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
         self.esm2_model_650M = self.esm2_model_650M.to(device=self.device)
         self.batch_converter = self.alphabet.get_batch_converter()
         self.esm2_model_650M.eval()
-        self.esm_proj_linear = torch.nn.Linear(1280, 512).to(device=self.device)
+        
+        torch.manual_seed(25)
+        if self.device == 'cuda':
+            torch.cuda.manual_seed(25)
+            torch.cuda.manual_seed_all(25)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+        self.esm_proj_linear = torch.nn.Linear(1280, 512)
+        nn.init.xavier_uniform_(self.esm_proj_linear.weight)
+        self.esm_proj_linear.to(device=self.device)
         self.lstm_module = torch.nn.LSTM(512, 256, 2, batch_first=True, bidirectional=True).to(device=self.device)
         
+        self.model_loaded = True
+
 
     def calculate_rmsf(self, path, df_subset):
         '''
@@ -106,13 +129,57 @@ class Ensemble():
           Chain   Resid     rmsf
         0     A      95       -3
         '''
-        # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time
-        file_header = f'{os.sep}'.join(path.split('/')[:-1])
-        df_prot_info = df_subset[df_subset['PDB_Code'] == file_header]
-        # search over the protein dataframe to extract subset dataframe
-        df_tmp_uniprot = df_subset[df_subset['Uniprot_Entry']]
+        try:
+            # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time
+            file_loc = os.path.dirname(path)
+            files = glob.glob(os.path.join(file_loc, "*pdb"))
+            uniprot_interest = list(df_subset[df_subset['PDB_Code'] == os.path.splitext(os.path.basename(path))[0].split('-')[0]]['Uniprot_Entry'])[0]
+            prot_info = list(df_subset[df_subset['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
+            prot_match_exists = [a for a in files if os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info]
 
-        #https://userguide.mdanalysis.org/stable/examples/analysis/alignment_and_rms/rmsf.html
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
+            
+            M_ca = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+            if self.include_modified: idx_n_res_interest = M_ca.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'CA', use_resname=True, get_index=True)[1]
+            else: idx_n_res_interest = M_ca.atomselect('*', self.aa_properties['non_modified_codes'], 'CA', use_resname=True, get_index=True)[1]
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M_ca.data['resname']))
+            df_rmsf = M_ca.data[['resid', 'chain']]
+            if self.include_modified: df_rmsf = df_rmsf.assign(**{'Modified': list_modified})
+
+            M_df_compare = M.data[M.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
+        except Exception as e:
+            if self.record_errors: report_error_to_file('RMSF 1', path, str(e), self.error_filename)
+            print(f'RMSF Calculation 1: Failed to find other protein structures and get reference for uniprot: {path}, error: {e}')
+            return pd.DataFrame(columns=['chain', 'resid', 'rmsf'])
+
+        try:
+            prot_matches = []
+            for file in prot_match_exists:
+                T = bb.Molecule()
+                T.import_pdb(file, include_hetatm=True)
+                T_df_compare = T.data[T.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
+                if M_df_compare.equals(T_df_compare):
+                    prot_matches.append(file)
+            
+            if len(prot_matches) > 1:
+                prot_conf_unv = mda.Universe(prot_matches[0], prot_matches, format='PDB', dt=1.0)
+                aligner = align.AlignTraj(prot_conf_unv, prot_conf_unv, select='protein and name CA', in_memory=True, ref_frame=0).run()
+                prot_c_alphas = prot_conf_unv.select_atoms('protein and name CA')
+                rmsf_calculator = rms.RMSF(prot_c_alphas).run()
+                rmsf_vals = rmsf_calculator.results.rmsf
+                df_rmsf = df_rmsf.assign(**{'rmsf': rmsf_vals})
+
+            else:
+                df_rmsf = df_rmsf.assign(**{'rmsf': np.NaN})
+
+            df_rmsf = df_rmsf.iloc[idx_n_res_interest]
+        except Exception as e:
+            if self.record_errors: report_error_to_file('RMSF 2', path, str(e), self.error_filename)
+            print(f'RMSF Calculation 2: Failed to calculate RMSF for uniprot: {path}, error: {e}')
+            return pd.DataFrame(columns=['chain', 'resid', 'rmsf'])
+
+        return df_rmsf.reset_index(drop=True)
 
 
     def calculate_esm(self, path, num_add_aa=20):
@@ -139,11 +206,17 @@ class Ensemble():
         5     A    48  [-0.040656737983226776, -0.01545296423137188, ...
         6     A    63  [-0.05812466889619827, 0.03620311990380287, 0....
         '''
+
+        if not self.model_loaded: self._initialise_esm_model()
+
         # 1: Extract the sequence sections from the given protein structure
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
+
             if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
             else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
+
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
@@ -178,7 +251,7 @@ class Ensemble():
                 pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
         except Exception as e:
-            report_error_to_file('Ensemble - ESM 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Ensemble - ESM 1', path, str(e), self.error_filename)
             print(f'Ensemble ESM Calculation: 1 - could not extract the sequence from the protein file given: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'esm'])
 
@@ -211,9 +284,10 @@ class Ensemble():
                 batch_labels, batch_strings, batch_tokens = self.batch_converter(data)
                 batch_tokens = batch_tokens.to(device=self.device)
                 with torch.no_grad():
-                    results = self.esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=True)
-                seq_encode_tokens = results["representations"][33]
-                #seq_encode_tokens = seq_encode_tokens.to('cpu')
+                    results = self.esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=False)
+                    seq_encode_tokens = results["representations"][33]
+                    #seq_out = seq_encode_tokens[0, num_add_aa + 1, :]  # this bit of code can be used to extract a direct lysine representation without dimension reduction
+                    #seq_encode_tokens = seq_encode_tokens.to('cpu')
 
                 esm_linear = self.esm_proj_linear(seq_encode_tokens)# [1, 43, 512]
                 hidden_n = torch.zeros(4, esm_linear.size(0), 256).to(device=self.device)
@@ -228,7 +302,7 @@ class Ensemble():
                     df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': str(seq_out.tolist()[0][0])}])], ignore_index=True)
 
             except Exception as e:
-                report_error_to_file('Ensemble ESM 2', path, str(e), self.error_filename)
+                if self.record_errors: report_error_to_file('Ensemble ESM 2', path, str(e), self.error_filename)
                 print(f'Ensemble ESM Calculation 2: Failed to encode sequence for uniprot: {path}, chain: {lys_chain}, resid: {lys_num}, error: {e}')
                 if self.include_modified:
                     df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': None, 'Modified': list_modified[idx]}])], ignore_index=True)
@@ -242,9 +316,9 @@ if __name__ == '__main__':
     
     df_prot = pd.DataFrame()
     E = Ensemble(df_proteins=df_prot, include_modified=False)
-    df_esm = E.calculate_esm(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb')
-    print(df_esm)
+    print(E.calculate_esm(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
 
+    print(E.calculate_rmsf(df_subset=pd.read_csv(f'result{os.sep}proteins.csv'), path=f'result{os.sep}curated{os.sep}3BBC-alt1A.pdb'))
     #df_esm.to_pickle('testing_esm_csv.pkl')  #  pickle used if keeping tensors in output dataframe, csv fine if taking list through as can literal_eval
     #df_esm_csv = pd.read_pickle('testing_esm_csv.pkl')
     #print(df_esm_csv)

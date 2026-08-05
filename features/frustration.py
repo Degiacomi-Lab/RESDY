@@ -91,10 +91,13 @@ class Frustration():
         # Frustratometer 1 - create structure and AWSEM model
         df_frustration = pd.DataFrame()
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
             M_ca = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+
             if self.include_modified: idx_res_interest = M_ca.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'CA', use_resname=True, get_index=True)[1]
             else: idx_res_interest = M_ca.atomselect('*', self.aa_properties['non_modified_codes'], 'CA', use_resname=True, get_index=True)[1]
+
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M_ca.data['resname']))
             df_frustration = M_ca.data[['resid', 'chain', 'resname']]
             df_frustration = df_frustration.assign(**{'Modified': list_modified})
@@ -121,8 +124,7 @@ class Frustration():
             if not self.include_modified: df_frustration_res_interest = df_frustration_res_interest.drop(columns=['Modified'])
 
             try:
-                pdb_code = path.split('/')[-1]
-                cleaned_code_to_remove = pdb_code.split('.')[0] + '_cleaned.pdb'
+                cleaned_code_to_remove = os.path.splitext(os.path.basename(path))[0] + '_cleaned.pdb'
                 os.remove(cleaned_code_to_remove)
             except Exception as ef:
                 print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
@@ -130,7 +132,7 @@ class Frustration():
             report_error_to_file('Frustratometer 2', path, str(e), self.error_filename)
             print(f'Frustratometer calculation 2 - failed to extract frustratometer outputs or to append data to return dataframe: {e}')
 
-        return df_frustration_res_interest
+        return df_frustration_res_interest.reset_index(drop=True)
 
 
 if __name__ == '__main__':

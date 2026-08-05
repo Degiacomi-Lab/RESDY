@@ -32,12 +32,16 @@ def download_AF_struc(pdb, outfolder="result"):
     if not os.path.exists(download_path):
         os.makedirs(download_path)
 
+    if os.path.exists(os.path.join(download_path, f'{pdb}.pdb')):
+        print(f'>> AF structure for {pdb} is already downloaded, using previous version')
+        return
+
     print(f"> downloading AlphaFold structure {pdb}")
 
     tool = get_download_tool()
     try:
         if tool == "curl":
-            line = f"curl -s -o {pdb}.pdb https://alphafold.ebi.ac.uk/files/{pdb}.pdb"
+            line = f"curl -s -f -o {pdb}.pdb https://alphafold.ebi.ac.uk/files/{pdb}.pdb"
         elif tool == "wget":
             line = f"wget https://alphafold.ebi.ac.uk/files/{pdb}.pdb"
         else:
@@ -105,33 +109,32 @@ def find_af_plddt(af_code_full, outfolder="result"):
     dict_plddt = dict()
 
     try:
-        f = open(os.path.join(outfolder, "curated", af_code_full + ".pdb"), "r")
+        with open(os.path.join(outfolder, "curated", af_code_full + ".pdb"), "r") as f:
+            # parse the file to find plddt values
+            for line in f:
+                try:
+                    if re.search(r'CA\s\sLYS', line):
+                        line = str(line)
+                        chain = line[21]
+                        resid = line[22:26].strip()
+                        plddt = line[60:66].strip()
+                        chain_resid = chain + resid
 
-        # parse the file to find plddt values
-        for line in f:
-            try:
-                if re.search(r'CA\s\sLYS', line):
-                    line = str(line)
-                    chain = line[21]
-                    resid = line[22:26]
-                    plddt = line[60:66]
-                    chain_resid = chain + resid
+                        dict_plddt.update({chain_resid: plddt})
 
-                    dict_plddt.update({chain_resid: plddt})
+                        print(af_code_full + "; Chain: " + str(chain_resid[0]) + "; Resid: " + str(chain_resid[1:]) + "; PLDDT: " + plddt)
+                        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': plddt})
+                        chain, resid, plddt = '', '', ''
 
-                    print(af_code_full + "; Chain: " + str(chain_resid[0]) + "; Resid: " + str(chain_resid[1:]) + "; PLDDT: " + plddt)
-                    plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': plddt})
-
-            except Exception as e:
-                print(f"Error {e}")
-                plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
-                continue
+                except Exception as e:
+                    print(f"Error {e}")
+                    plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
+                    continue
 
     except Exception as e:
         print(f'Failed to obtain PLDDT data for {af_code_full}; error: {e}')
         plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
 
-    f.close()
     plddt_out_file.close()
     return dict_plddt
 

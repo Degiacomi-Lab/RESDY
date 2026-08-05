@@ -107,8 +107,10 @@ class Uniprot(object):
 
         codes = []
         for batch, total in _get_batch(url):
-            for line in batch.text.splitlines()[1:]:
-                codes.append(line)
+            for line in batch.text.splitlines():
+                line = line.strip()
+                if line and line != 'Entry':
+                    codes.append(line)
             print(f'{len(codes)} / {total}')
 
         return codes
@@ -155,7 +157,8 @@ class Uniprot(object):
                     if not af_details_response.ok:
                         af_details_response.raise_for_status()
                     af_data = af_details_response.json()
-                    af_code = f'AF-{uniprot_code}-F1-model_v{str(af_data["latestVersion"])}'
+                    latest_version = str(af_data[0]['latestVersion'])
+                    af_code = f'AF-{uniprot_code}-F1-model_v{latest_version}'
                 except Exception as e:
                     print(f'>> Failed to obtain information about AF structure for uniprot code {uniprot_code} with error {e}, using v6 for AF code.')
                     af_code = f'AF-{uniprot_code}-F1-model_v6'
@@ -188,14 +191,19 @@ class Uniprot(object):
                         resolution = np.nan
                     chains = words[-1][:-1]
 
+                    data = None
                     if chain_target != "":
-                        for j, c in enumerate(chains.split('/')):
+                        for c in chains.split('/'):
                             if chain_target == c:
-                                data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains' : c}
+                                data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                        'Method': method_obtained, 'Resolution': resolution, 'Chains' : c}
+                                break
                     else:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains' : chains}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': method_obtained, 'Resolution': resolution, 'Chains' : chains}
 
-                    self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                    if data is not None:
+                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
             except Exception as e:
                 print(f'Error {e}')
@@ -241,7 +249,7 @@ class Uniprot(object):
                 if pdb_code == 0:
                     self.get_protein_data(uniprot_code)
 
-                if pdb_code == 'AF':
+                elif pdb_code == 'AF':
                     pdb_code = f'AF-{uniprot_code}-F1-model_v6'
 
                     d = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}

@@ -58,6 +58,8 @@ class PKA():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
         if self.calc_method == 'propka':
             self.pka_outdir = os.path.join(outdir, "propkaoutput")
             if not os.path.exists(self.pka_outdir):
@@ -120,7 +122,24 @@ class PKA():
         5     A     48       x
         6     A     63       x
         '''
-
+        # Get modified residues that aren't titratable by PROPKA
+        if self.include_modified:
+            try:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
+    
+                idx_mod_res = M.atomselect('*', self.aa_properties['modified_codes'], 'CA', use_resname=True, get_index=True)[1]
+                lys_res_nums = list(M.data['resid'][idx_mod_res])
+                list_chains = list(M.data['chain'][idx_mod_res])
+                list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_mod_res]))
+                df_mod = pd.DataFrame({'Resid': lys_res_nums,
+                                       'Chain': list_chains,
+                                       'Modified': list_modified,
+                                       'propka': ['NonTitratable'] * len(lys_res_nums)})
+                print(df_mod)
+            except Exception as e:
+                print(f'>> Failed to identify modified residues for path:{path}. '
+                      f'If there are any modified residues present, they may be listed as NaN for this structure.')
         code_for_df = os.path.basename(path).split(".")[0]
         propka_error_file_name = os.path.join(self.pka_outdir, f"{code_for_df}_propka_errors.txt")
 
@@ -141,35 +160,36 @@ class PKA():
                 except:
                     pass
 
-                report_error_to_file('PROPKA 1', path, str(e), self.error_filename)
+                if self.record_errors: report_error_to_file('PROPKA 1', path, str(e), self.error_filename)
                 raise Exception(f'Failed to obtain pKa data (PROPKA): {e}') from e
 
         try:
             propka_res_interest_fails = self._parse_propka_errors(propka_error_file_name)
         except Exception as e:
-            report_error_to_file('PROPKA 2', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('PROPKA 2', path, str(e), self.error_filename)
             raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
 
         try:
-            pka_file = code_for_df + '.pka'
-            propka_outfile = open(pka_file)
+            propka_file = code_for_df + '.pka'
+            propka_outfile = open(propka_file)
         except Exception as e:
-            report_error_to_file('PROPKA 3', path, str(e), self.error_filename)
-            raise Exception(f'Failed to find {pka_file} output file to read') from e
+            if self.record_errors: report_error_to_file('PROPKA 3', path, str(e), self.error_filename)
+            raise Exception(f'Failed to find {propka_file} output file to read') from e
 
         res_interest_numbers = []
         pka_vals = []
         chain = []
         try:
             for line in propka_outfile:
-                if re.search(f'^\s\s\s{self.aa_properties["non_modified_codes"][0]}' , line):
+                # Only searching for non-modified canonical amino acid code as these codes only form part of the titratable subset which can be calculated by PROPKA
+                if re.search(rf'^\s{{3}}(?:{self.aa_properties["non_modified_codes"][0]})\s' , line):
                     try:
                         line = line.split()
                         # reject adding entries associated with errors in structure (as per logfile)
                         if len(propka_res_interest_fails)>0:
                             idx = np.where((propka_res_interest_fails["Chain"] == line[2]) & (propka_res_interest_fails["Resid"].astype(int) == int(line[1])))
                             if len(idx[0])>0:
-                                print(f'Error associated with lysine {int(line[0])} on chain {line[1]} found in the log file at index {idx[0]} for pKa calculation. Value not taken through to measurements.')
+                                print(f'Error associated with lysine {int(line[1])} on chain {line[2]} found in the log file at index {idx[0]} for pKa calculation. Value not taken through to measurements.')
                                 continue
 
                         res_interest_numbers.append(int(line[1]))
@@ -182,12 +202,12 @@ class PKA():
                         continue
 
             propka_outfile.close()
-            shutil.move(pka_file, os.path.join(self.pka_outdir, pka_file))
+            shutil.move(propka_file, os.path.join(self.pka_outdir, propka_file))
 
         except Exception as e:
             propka_outfile.close()
-            shutil.move(pka_file, os.path.join(self.pka_outdir, pka_file))
-            report_error_to_file('PROPKA 5', path, str(e), self.error_filename)
+            shutil.move(propka_file, os.path.join(self.pka_outdir, propka_file))
+            if self.record_errors: report_error_to_file('PROPKA 5', path, str(e), self.error_filename)
             raise Exception(f'Failure parsing {code_for_df}.pka, error: {e}') from e
 
         try:
@@ -197,12 +217,17 @@ class PKA():
 
             df_propka = df_propka.dropna()
             df_propka = df_propka.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+            
+            if self.include_modified:
+                df_propka = df_propka.assign(**{'Modified': [False] * len(df_propka)})
+                if len(df_mod) > 0:
+                    df_propka = df_propka.set_index(['Resid', 'Chain']).combine_first(df_mod.set_index(['Resid', 'Chain'])).reset_index()
 
         except Exception as e:
-            report_error_to_file('PROPKA 6', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('PROPKA 6', path, str(e), self.error_filename)
             raise Exception(f'Failed to construct pKa (PROPKA) dataframe. {e}') from e
 
-        return df_propka.sort_values(by='Resid')
+        return df_propka.sort_values(by='Resid').reset_index(drop=True)
 
 
     def _parse_propka_errors(self, path):
@@ -238,24 +263,22 @@ class PKA():
         df_propka_errors = pd.DataFrame(columns=['Chain', 'Resid'])
         for line in f:
             cnt += 1
-            res_interest_raw = re.findall(rf'{self.aa_properties["non_modified_codes"][0]} [\d]*[\s][\w]*', line)
-
-            for line in res_interest_raw:
-                words = line.split(' ')
-                resid = words[1]
-                chain = words[2]
-                if resid != '' and chain != '':
-                    df_propka_errors = pd.concat([df_propka_errors, pd.DataFrame({'Chain': chain, 'Resid': resid})], axis=0, ignore_index=True)
-
-            res_interest_raw_2 = re.findall(rf'[\d]*-{self.aa_properties["non_modified_codes"][0]} \(\w\)', line)
-
-            for line in res_interest_raw_2:
-                words = line.split()
-                chain = (words[1])[1:-1]
-                words_2 = line.split('-')
-                resid = words_2[0]
-                if resid != '' and chain != '':
-                    df_propka_errors = pd.concat([df_propka_errors, pd.DataFrame({'Chain': chain, 'Resid': resid})], axis=0, ignore_index=True)
+            res_interest_raw = re.findall(rf'{self.aa_properties["non_modified_codes"][0]}[\s]+[\d]+[\s]+[\w]+', line)
+            if res_interest_raw:
+                for line in res_interest_raw:
+                    words = line.split()
+                    resid = words[1]
+                    chain = words[2]
+                    if resid != '' and chain != '':
+                        df_propka_errors = pd.concat([df_propka_errors, pd.DataFrame([{'Chain': chain, 'Resid': resid}])], axis=0, ignore_index=True)
+            else:
+                res_interest_raw_2 = re.findall(rf'[\d]*-{self.aa_properties["non_modified_codes"][0]} \(\w\)', line)
+                for line in res_interest_raw_2:
+                    words = line.split()
+                    resid = line.split('-')[0]
+                    chain = words[1].strip(' ()')
+                    if resid != '' and chain != '':
+                        df_propka_errors = pd.concat([df_propka_errors, pd.DataFrame([{'Chain': chain, 'Resid': resid}])], axis=0, ignore_index=True)
 
         f.close()
 
@@ -313,17 +336,17 @@ class PKA():
             except Exception as e:
                 print(e)
                 if "[Errno 2] No such file or directory: 'pkaani'" == str(e):
-                    report_error_to_file('pkaANI 1a', path, str(e), self.error_filename)
+                    if self.record_errors: report_error_to_file('pkaANI 1a', path, str(e), self.error_filename)
                     raise Exception(f'Error: Failed to obtain pkaANI data: {e}. Is pkaANI installed correctly? If so, reload environment and try again.')
                 else:
-                    report_error_to_file('pkaANI 1b', path, str(e), self.error_filename)
+                    if self.record_errors: report_error_to_file('pkaANI 1b', path, str(e), self.error_filename)
                     raise Exception(f"Failed to obtain pkaANI data through running pkaANI, error: {e}")
 
         try:
             log_file = pdb_path + '_pka.log'
             propres = open(log_file)
         except Exception as e:
-            report_error_to_file('pkaANI 2', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('pkaANI 2', path, str(e), self.error_filename)
             raise Exception(f'Failed to find pkaANI log file: {e}') from e
 
         res_interest_resids = []
@@ -342,7 +365,7 @@ class PKA():
             propres.close()
         except Exception as e:
             propres.close()
-            report_error_to_file('pkaANI 3', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('pkaANI 3', path, str(e), self.error_filename)
             raise Exception(f'Failure parsing pkaANI log file for: {code_for_df}_pka.log. {e}') from e
 
         try:
@@ -354,7 +377,7 @@ class PKA():
             df_pkaani = df_pkaani.dropna()
             df_pkaani = df_pkaani.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
         except Exception as e:
-            report_error_to_file('pkaANI 4', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('pkaANI 4', path, str(e), self.error_filename)
             raise Exception(f'Failed to construct pkaANI dataframe, error: {e}') from e
 
         return df_pkaani
@@ -365,5 +388,6 @@ if __name__ == '__main__':
     pka = PKA(outdir='result',
               calc_method='propka',
               include_modified=True)
+    #print(pka._parse_propka_errors(path=f'data{os.sep}propkaoutput{os.sep}1A0F-alt-1_propka_errors.txt'))
     print(pka.calculate_pka(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    print(pka.calculate_pka(path=f'2I1V-alt-1.pdb'))
+    #print(pka.calculate_pka(path=f'2I1V-alt-1.pdb'))

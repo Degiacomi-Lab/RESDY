@@ -184,7 +184,7 @@ class Viewer(object):
                     self.bar.data[i].visible = False # clear the bar chart
                 return
             
-            selected_df = self.analysis.df_sub[(self.analysis.df_sub['pKa'] >= pka_l) & (self.analysis.df_sub['pKa'] <= pka_u)]
+            selected_df = self.analysis.df_sub[(self.analysis.df_sub['propka'] >= pka_l) & (self.analysis.df_sub['propka'] <= pka_u)]
             selected_df = selected_df[(selected_df['sasa'] >= sasa_l) & (selected_df['sasa'] <= sasa_u)]
             self.temp_df = selected_df
             
@@ -204,7 +204,7 @@ class Viewer(object):
             for i in range(len(self.bar.data)):
                 self.bar.data[i].visible = False
             
-            df_e = self.analysis.enrichment_analysis(p, s)
+            df_e = self.analysis.enrichment_analysis(['propka', pka_l, pka_u], ['sasa', sasa_l, sasa_u])
             
             # remove lines containing 0 examples in the region
             test = [int(v.split("/")[0])>cutoff for v in df_e["num in the region"].values]
@@ -237,7 +237,7 @@ class Viewer(object):
             
             ###################################################################################################
             
-            label = 'pKa: %.1f-%.1f | SASA: %.1f-%.1f'%(pka_l, pka_u, sasa_l, sasa_u)
+            label = 'propka: %.1f-%.1f | SASA: %.1f-%.1f'%(pka_l, pka_u, sasa_l, sasa_u)
             labels = ["UNIPROT: %s<br>resid: %i"%(selected_df["Uniprot_Entry"].values[i], selected_df["Resid"].values[i]) for i in range(len(selected_df))]
             self.f.add_scatter(x=selected_df["sasa"], y=selected_df["pKa"],
                     mode='markers', showlegend=False, name=label,
@@ -289,14 +289,14 @@ class Viewer(object):
             selected_df = self.analysis.GO_search_term(df = self.analysis.df_sub, code = GO_code)
             
             # only want the points inside the region
-            selected_df = selected_df[(selected_df['pKa'] >= pka_l) & (selected_df['pKa'] <= pka_u)]
+            selected_df = selected_df[(selected_df['propka'] >= pka_l) & (selected_df['propka'] <= pka_u)]
             selected_df = selected_df[(selected_df['sasa'] >= sasa_l) & (selected_df['sasa'] <= sasa_u)]
             selected_df = selected_df.reset_index(drop=True) # this step is needed when attatching a call_back
             
             # store the dataframe for the call back function
             self.temp_df_2 = selected_df
             
-            label = '%s: %s | pKa: %.1f-%.1f | SASA: %.1f-%.1f'%(GO_code, GO_name, pka_l, pka_u, sasa_l, sasa_u)
+            label = '%s: %s | propka: %.1f-%.1f | SASA: %.1f-%.1f'%(GO_code, GO_name, pka_l, pka_u, sasa_l, sasa_u)
             labels = ["Uniprot_Entry: %s"%(selected_df["Uniprot_Entry"].values[i]) for i in range(len(selected_df))]
     
             self.f.add_scatter(x=selected_df["sasa"], y=selected_df["pKa"],

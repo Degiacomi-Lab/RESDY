@@ -126,6 +126,12 @@ class Measure(object):
         # modified lysine management
         self.include_mod = include_modified
 
+        # document failed pdb files
+        self.wrong_pdb_file = []
+        self.report_errors = report_errors
+        if self.report_errors: self.error_filename = self._setup_report_errors_file()
+        else: self.error_filename = 'no_record'
+
         self.aa_properties = self._match_resid_codes(residue_of_interest)
         self.features = features
         self.legolas_aevs = True
@@ -137,11 +143,6 @@ class Measure(object):
         self.current_index = 0
         self.progress_index = 0
         self.pdb_only_files_to_ignore = []
-
-        # document failed pdb files
-        self.wrong_pdb_file = []
-        self.report_errors = report_errors
-        if self.report_errors: self.error_filename = self._setup_report_errors_file()
 
         # for parallel measurements
         self.parallel = parallel
@@ -259,11 +260,13 @@ class Measure(object):
                     melodia_added = True
             elif m == 'esm':
                 ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
+                ensemble._initialise_esm_model()
                 self.measures.append(['esm', ensemble.calculate_esm])
             elif m == 'rmsf':
                 ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
+                if self.include_mod: self._report_error_to_file('Setup measures: measure unknown', 'setup', str(e))
                 raise Exception(f"measure {m} unknown")
 
 
@@ -332,6 +335,8 @@ class Measure(object):
                                 'atom_select_names_nonmod': ['CA'],
                                 'atom_select_names_modified': []}
             case _:
+                print(f'>> Residue of interest given not known; using LYS as default')
+                if self.include_mod: self._report_error_to_file('Match resid codes for residue of interest', 'setup', str(e))
                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
@@ -349,7 +354,7 @@ class Measure(object):
         new_file_name = f'meaures_errors_{date.today()}.txt'
         while os.path.exists(new_file_name):
             if '_no' in new_file_name:
-                error_file_num = int(new_file_name.split('_no')[-1].split('.')[0])
+                error_file_num = int(os.path.splitext(new_file_name)[0].split('_no')[-1])
                 new_file_name = f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt'
             else:
                 new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
@@ -429,7 +434,7 @@ class Measure(object):
         -------
         self._report_error_to_file('propka 1', path, e)
         '''
-        with open(self.error_filename, 'a') as e_f:
+        with open(self.error_filename, 'a', encoding='utf-8') as e_f:
             e_f.writelines('--------------------------------------------------------------------------\n')
             e_f.writelines(f'{measurement_stage} calc error\n')
             e_f.writelines(path + '\n')
@@ -527,14 +532,9 @@ class Measure(object):
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
             print('\n>> Removed duplicates from measurement dataframe.')
-        except Exception as e_one:
-            try:
-                print(f'\n>> Failed to remove duplicates from measurement dataframe, trying new method: {e_one}')
-                self.df = self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
-                print('>> Removed duplicates from measurement dataframe using new method.')
-            except Exception as e_two:
-                print(f'>> Failed to remove duplicates from measurement dataframe: {e_two}')
-                pass
+        except Exception as e:
+            print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
+            if self.include_mod: self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
 
 
     def measure_dataframe(self):
@@ -570,26 +570,27 @@ class Measure(object):
         print(f'Total number of structures to analyse: {total_structures}')
 
         for i, r in self.df_input.iterrows():
-            pdb_code = r["PDB_Code"]
-            chains = r["Chains"].split("/")
+            pdb_code = r['PDB_Code']
+            chains = r['Chains']
+            if isinstance(chains, str):
+                chains = [c for c in chains.split('/') if c]
             method = r['Method']
             res = r['Resolution']
-            uniprot_code = r["Uniprot_Entry"]
+            uniprot_code = r['Uniprot_Entry']
             self.current_index = i
-            files_list = self.files_to_analyse
 
             if i != 0:
                 avg_time_per_pdb = (time.time() - overall_st) / i
-                pred_time_remaining = avg_time_per_pdb * (len(self.df_input) - i)
+                pred_time_remaining = str(round(avg_time_per_pdb * (len(self.df_input) - i), 2)) + 's'
             else:
                 pred_time_remaining = 'undefined'
-            print(f'Analysing PDB code ({pdb_code}) {i}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
+            print(f'Analysing PDB code ({pdb_code}) {i+1}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
 
-            for f in files_list:
-                if pdb_code.lower() != f.split('-')[0].lower():
+            for f in self.files_to_analyse:
+                if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
                     continue
 
-                tstart = time.time()
+                t_start = time.time()
                 print(f"\n> Calculating for measurements for file: {f}")
 
                 columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
@@ -600,6 +601,7 @@ class Measure(object):
                     M = bb.Molecule(f)
                 except Exception as e:
                     self.wrong_pdb_file.append(f)
+                    if self.include_mod: self._report_error_to_file('Failed to produce bb for pbd file', 'measure dataframe', str(e))
                     print(f'Failed to produce bb for pdb file with error: {e}')
                     continue
 
@@ -607,15 +609,15 @@ class Measure(object):
                 for i in idxs:
 
                     #save only lysine entries from chain of interest
-                    if M.data["chain"].values[i] not in chains:
+                    if M.data['chain'].values[i] not in chains:
                         continue
 
                     data = ({'Uniprot_Entry': uniprot_code,
-                        'PDB_Code': f.split(".")[0],
+                        'PDB_Code': os.path.splitext(os.path.basename(f))[0],
                         'Method': method,
                         'Resolution': res,
-                        'Chain': M.data["chain"].values[i],
-                        'Resid': M.data["resid"].values[i]})
+                        'Chain': M.data['chain'].values[i],
+                        'Resid': M.data['resid'].values[i]})
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -625,15 +627,15 @@ class Measure(object):
                 for meas in self.measures:
                     print(f">> evaluating {meas[0]}...")
                     try:
-                        #df_currentfile[meas[0]] = np.nan # create new column for measure
                         result = meas[1](f)
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                     except Exception as e:
+                        if self.include_mod: self._report_error_to_file('Error iterating measures, potential dataframe combination problem', 'measure dataframe', str(e))
                         print(f"Error iterating measures, potential dataframe combination problem: {e}")
                         continue
 
-                processing_time = round((time.time()-tstart), 2)
+                processing_time = round((time.time()-t_start), 2)
                 print(f">> file processed in {processing_time} seconds.")
                 #average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
                 #print(f'>> Time average per file: {average_time_per_file} seconds.')
@@ -652,6 +654,7 @@ class Measure(object):
                             self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
+                            if self.include_mod: self._report_error_to_file('Error in logging', 'measure dataframe', str(e))
                             print(f'Error in logging: {e}')
 
                         # reset the pandas display options back to default for regular displaying
@@ -667,14 +670,9 @@ class Measure(object):
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
             print('\n>> Removed duplicates from measurement dataframe.')
-        except Exception as e_one:
-            try:
-                print(f'\n>> Failed to remove duplicates from measurement dataframe, trying new method: {e_one}')
-                self.df = self.df.astype(str).drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
-                print('>> Removed duplicates from measurement dataframe using new method.')
-            except Exception as e_two:
-                print(f'>> Failed to remove duplicates from measurement dataframe: {e_two}')
-                pass
+        except Exception as e:
+            print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
+            if self.include_mod: self._report_error_to_file('Failed to remove duplicates from measurement dataframe (1)', 'measure dataframe', str(e))
 
 
     def _measure_file(self, file_details, lock, ns):
@@ -708,11 +706,10 @@ class Measure(object):
         self._measure_file(file_details, files_list)
         '''
         uniprot_code, pdb_code, method, res, chains = file_details
-        files_list = self.files_to_analyse
 
         # calculate features values from all PDB files associated with specific DataFrame entry
-        for f in files_list:
-            if pdb_code.lower() != f.split('-')[0].lower():
+        for f in self.files_to_analyse:
+            if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
                 continue
 
             terminal_out_statements = []
@@ -728,10 +725,11 @@ class Measure(object):
                 M = bb.Molecule(f) # sometimes bb does not work with a pdb file
             except Exception as e:
                 self.wrong_pdb_file.append(f)
+                if self.include_mod: self._report_error_to_file('Failed to produce bb for pdb file', 'measure file parallel', str(e))
                 terminal_out_statements.append(f'Failed to produce bb for pdb file with error: {e}')
                 continue
 
-            _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+            _, idxs = M.atomselect('*', ['LYS'], ['CA'], get_index=True, use_resname=True)
             for i in idxs:
 
                 #save only lysine entries from chain of interest
@@ -740,11 +738,11 @@ class Measure(object):
 
 
                 data = ({'Uniprot_Entry': uniprot_code,
-                    'PDB_Code': f.split(".")[0],
+                    'PDB_Code':os.path.splitext(os.path.basename(f))[0],
                     'Method': method,
                     'Resolution': res,
-                    'Chain': M.data["chain"].values[i],
-                    'Resid': M.data["resid"].values[i]})
+                    'Chain': M.data['chain'].values[i],
+                    'Resid': M.data['resid'].values[i]})
 
                 df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -763,7 +761,7 @@ class Measure(object):
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                 except Exception as e:
-                    #print(f"ERROR: {e}")
+                    if self.include_mod: self._report_error_to_file('Meas feat error', 'measure file parallel', str(e))
                     terminal_out_statements.append(f"ERROR: {e}")
                     continue
 
@@ -792,6 +790,7 @@ class Measure(object):
                             self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
+                            if self.include_mod: self._report_error_to_file('logging', 'measure file parallel', str(e))
                             print(f'Error in logging: {e}')
 
                         # reset the pandas display options back to default for regular displaying
@@ -940,27 +939,14 @@ class Measure(object):
 
         print('Restarting measurements')
         # 1. Analyse the measures log file to create a list of files that were analysed
-        log_path = os.path.join(self.outdir, log_path)
-        print(f'Finding measured proteins from log file: {log_path}')
-        proteins_completed = []
-        with open(log_path, "rb") as f:
-            num_lines = sum(1 for _ in f)
-        curr_line = 0
-        with open(file=log_path, mode='r') as lpf:
-            for line in lpf:
-                curr_line += 1
-                if line[0].isalpha() or line[0] == ' ' or line[0] == '-':
-                    continue
-                parts = line.split()
-                protein_code = parts[1]
-                proteins_completed.append(protein_code)
-                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
-        print('Measured proteins recovered from log file')
+        df_prev = self.recover_from_log(log_path=log_path)
+        print('Recovered measurement data from log file to workout which protein are left...')
 
         # remove the last protein from list incase it wasn't completed fully
-        final_protein = proteins_completed[-1]
+        measured_proteins = list(self.df['Uniprot_Entry'])
+        final_protein = measured_proteins[-1]
+        proteins_completed = list(set(measured_proteins))
         proteins_completed = [c for c in proteins_completed if c != final_protein]
-        proteins_completed = list(set(proteins_completed))
 
         # 2. Update df_input to only have the files which haven't been analysed yet
         idx_to_remove = []
@@ -996,6 +982,7 @@ class Measure(object):
         -------
         self._combine_dataframes(df, result, meas[0])
         '''
+        to_merge = to_merge.reset_index(drop=True)
         for i, r in target.iterrows():
 
             chain_value = r["Chain"]
@@ -1004,8 +991,13 @@ class Measure(object):
 
             if self.include_mod: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value) & (to_merge["Modified"].astype(bool) == modified_value))
             else: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
+
             if len(idx[0]) == 0:
                 continue
+            
+            if len(idx[0]) > 1:
+                print(f'>> Multiple rows match when trying to combine dataframes, {col_name}: {len(idx[0])} rows match; '
+                      f'for Chain: {chain_value}, Resid: {resid_value}, only taking first instance.')
 
             # account for measurements that have special cases
             if col_name == 'melodia':
@@ -1061,8 +1053,9 @@ class Measure(object):
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
 
-                if pdb_code.lower() != f.split('-')[0].lower():
+                if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
                     continue
+
                 if f in self.pdb_only_files_to_ignore:
                     continue
 
@@ -1077,22 +1070,19 @@ class Measure(object):
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
                 except Exception as e:
                     print(f'Failed to create biobox molecule for file {f} with error: {e}')
+                    if self.include_mod: self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
                     self.wrong_pdb_file.append(f)
                     continue
 
-                if self.include_mod: df_idx, idxs = M.atomselect("*", ['LYS', 'LYE', 'KCX'], ["CA"], get_index=True, use_resname=True)
+                if self.include_mod: df_idx, idxs = M.atomselect("*", ['LYS', 'LYSN', 'LYE', 'KCX'], ["CA"], get_index=True, use_resname=True)
                 else: df_idx, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
                 for i in idxs:
 
-                    #save only lysine entries from chain of interest
-                    #if M.data["chain"].values[i] not in chains:
-                    #    continue
-
                     if M.data['resname'].values[i] in ['LYE', 'KCX']: mod_stat = True
                     else: mod_stat = False
-                    data = ({'PDB_Code': f.split(".")[0],
-                        'Chain': M.data["chain"].values[i],
-                        'Resid': M.data["resid"].values[i],
+                    data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
+                        'Chain': M.data['chain'].values[i],
+                        'Resid': M.data['resid'].values[i],
                         'Modified': mod_stat})
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
@@ -1102,11 +1092,11 @@ class Measure(object):
                 for meas in self.measures:
                     print(f">> evaluating {meas[0]}...")
                     try:
-                        #df_currentfile[meas[0]] = np.nan # create new column for measure  # change GW 11.03.25 - dont need this, new column created anyway, leaving in incase removing creates problems later
                         result = meas[1](f)
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
+                        if self.include_mod: self._report_error_to_file(f'Error adding the measurements for file {f} to the dataframe', 'measure pdb only', str(e))
                         print(f"ERROR adding the measurements for file {f} to the dataframe: {e}")
                         continue
 
@@ -1132,12 +1122,13 @@ class Measure(object):
                             pd.reset_option('max_seq_items')
                             pd.reset_option('display.max_rows')
                         except Exception as e:
+                            if self.include_mod: self._report_error_to_file('logging error', 'measure pdb only', str(e))
                             print(f'Error in logging measurements: {e}')
 
                 if not df_currentfile.empty:
                     self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
-                if f.replace('.pdb', '') == pdb_code:
+                if pdb_code.lower() == os.path.basename(f).split("-")[0].lower():
                     self.df_input.at[pdb_idx, 'completed'] = True
                     break
 
@@ -1147,6 +1138,7 @@ class Measure(object):
                 perc_prog_measure = round(((pdb_idx + self.progress_index + 1)/num_pdb_files)*100, 2)
                 print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
             except Exception as e:
+                if self.include_mod: self._report_error_to_file('broken progress updater', 'measure pdb only', str(e))
                 print(f'>> Broken progress updater: {e} \r', end='', flush=True)
 
 
@@ -1195,7 +1187,7 @@ class Measure(object):
         with open(file=log_path, mode='r') as lpf:
             for line in lpf:
                 curr_line += 1
-                if line[0].isalpha() or line[0] == ' ' or line[0] == '-':
+                if line[0].isalpha() or line[0] in [' ', '-']:
                     continue
                 parts = line.split()
                 protein_code = parts[1].split('/')[-1]
@@ -1218,9 +1210,9 @@ class Measure(object):
             self.df_input['completed'] = False
         old_len_df_input = len(self.df_input)
         idx_to_remove = []
-        files = [a.split('/')[-1] for a in glob.glob(os.path.join(self.folder, "*pdb"))]
+        files_pdbs = [os.path.basename(a) for a in glob.glob(os.path.join(self.folder, "*pdb"))]
         for i, r in self.df_input.iterrows():
-            matched_pdb_files = [a.replace('.pdb', '') for a in files if r['PDB_Code'] in a]
+            matched_pdb_files = [a.replace('.pdb', '') for a in files_pdbs if r['PDB_Code'] in a]
             for recover_file in proteins_completed:
                 # case 1: exact match code and file - for measuring data from simulations mainly
                 if r['PDB_Code'] == recover_file:
@@ -1391,7 +1383,7 @@ class Measure(object):
         '''
         print('\n>> Cleaning up leftover files from measures calculations...')
         dir_files = [f for f in os.listdir() if os.path.isfile(os.path.join(os.getcwd(),f))]
-        nmr_cs_file = [], nmr_parquet_file = [], propka_pka_file = [], propka_error_file = []
+        nmr_cs_file, nmr_parquet_file, propka_pka_file, propka_error_file = [], [], [], []
         for f in dir_files:
             if f.endswith('_cs.csv'):
                 nmr_cs_file.append(f)
@@ -1410,10 +1402,10 @@ class Measure(object):
         if propka_error_file:
             for f_mv in propka_error_file: os.rename(f_mv, os.path.join(self.outdir, 'propkaoutput', f_mv))
         if self.report_errors:
+            num_lines = 10
             with open(self.error_filename, 'r') as f:
-                for count, line in enumerate(f):
-                    pass
-            if count <= 2:
+                num_lines = sum(1 for _ in f)
+            if num_lines <= 2:
                 os.remove(self.error_filename)
         print('>> Unused file cleanup complete.')
 
