@@ -6,6 +6,7 @@ import datetime
 import glob
 import time
 from datetime import date
+import multiprocessing as mp
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -146,6 +147,8 @@ class Measure(object):
 
         # for parallel measurements
         self.parallel = parallel
+        #if self.parallel:
+        #    mp.set_start_method('spawn', force=True)
         self.files_to_analyse = []
         self.parallel_items = {}
 
@@ -210,7 +213,7 @@ class Measure(object):
                 sasa = SASA(include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, sasa.calculate_sasa])
             elif m == "depth":
-                depth = Depth(include_modified=self.include_mod, error_filename=self.error_filename)
+                depth = Depth(calculation_type='ResidDepth', include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, depth.calculate_depth])
             elif m == 'aev':
                 aev = AEV(error_filename=self.error_filename)
@@ -487,7 +490,6 @@ class Measure(object):
             return 'Call PDB_only method instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
-        # remove the files which have pkaani in the name as these are output files from pkaani
         files = [file for file in files if 'pkaani' not in file]
         self.files_to_analyse = files
 
@@ -502,6 +504,7 @@ class Measure(object):
             case True:
                 # determine how to parallelise
                 n_cores_to_use = cpu_count() - 2
+                #n_cores_to_use = 16
                 print('>> Measurements running in parallel')
             case False:
                 # use a singular core for step by step processing
@@ -511,8 +514,6 @@ class Measure(object):
         with Manager() as manager:
             # create lock to avoid multiple parts writing to output files at the same time
             lock = manager.Lock()
-            ns_measures = manager.Namespace()
-            ns_measures.df = self.df
             # prepare the inputs for the parallelisation
             items = []
             for i, r in self.df_input.iterrows():
@@ -522,12 +523,11 @@ class Measure(object):
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
-                items.append([file_details, lock, ns_measures])
-            with Pool(n_cores_to_use, maxtasksperchild=10) as pool:
-                result = pool.starmap_async(self._measure_file, items)
-                result.wait()
-                print(result)
-                self.df = ns_measures.df
+                items.append([file_details, lock])
+            #with mp.get_context('spawn').Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+            with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                df_parallel = pd.concat(pool.starmap(self._measure_file, items), ignore_index=True)
+            self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
 
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
@@ -675,7 +675,7 @@ class Measure(object):
             if self.include_mod: self._report_error_to_file('Failed to remove duplicates from measurement dataframe (1)', 'measure dataframe', str(e))
 
 
-    def _measure_file(self, file_details, lock, ns):
+    def _measure_file(self, file_details, lock):
         '''
         Take a file and calculate the required measurements for this.
         Return the dataframe of the calculations to the overall self.df
@@ -697,10 +697,6 @@ class Measure(object):
         lock : multiprocessing manager lock
             lock used to stop processes writing to output files and dataframes at the same time
 
-        ns : multiprocessing manager namespace
-            allows appending the dataframe results to a shared out dataframe,
-            this is then transferred to self.df
-
         Example
         -------
         self._measure_file(file_details, files_list)
@@ -713,9 +709,7 @@ class Measure(object):
                 continue
 
             terminal_out_statements = []
-            #print(f'Analysing structure {current_structure}/{total_structures}')
             tstart = time.time()
-            #print(f"\n> File: {f}")
             terminal_out_statements.append(f"\n> File: {f}")
 
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
@@ -736,7 +730,6 @@ class Measure(object):
                 if M.data["chain"].values[i] not in chains:
                     continue
 
-
                 data = ({'Uniprot_Entry': uniprot_code,
                     'PDB_Code':os.path.splitext(os.path.basename(f))[0],
                     'Method': method,
@@ -746,11 +739,9 @@ class Measure(object):
 
                 df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
-            #print(f">> {len(df_currentfile)} lysines of interest found")
             terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
 
             for meas in self.measures:
-                #print(f">> evaluating {meas[0]}...")
                 terminal_out_statements.append(f">> evaluating {meas[0]}...")
                 try:
                     df_currentfile[meas[0]] = np.nan # create new column for measure
@@ -799,9 +790,9 @@ class Measure(object):
                         pd.reset_option('max_seq_items')
                         pd.reset_option('display.max_rows')
 
-                #append temporary DataFrame with all measures on a single file to main DataFrame
-                if not df_currentfile.empty:
-                    ns.df = pd.concat([ns.df, df_currentfile], ignore_index=True)
+
+            if not df_currentfile.empty:
+                return df_currentfile
 
 
     def recover_from_log(self, log_path):

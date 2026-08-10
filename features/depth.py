@@ -32,7 +32,7 @@ class Depth():
     Class to house the different methods for calculating depth values for structures
     '''
 
-    def __init__(self, calculation_type = 'AtomDepth',
+    def __init__(self, calculation_type = 'ResidDepth',
                  include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],

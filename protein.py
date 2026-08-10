@@ -643,40 +643,27 @@ class PDB(object):
                 aligner.extend_gap_score = -1
                 aligner.target_end_gap_score = 0.0
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
-                dash_locs = [i for i, aa in enumerate(alignment[1]) if aa =='-']
-                for idx, loc in enumerate(dash_locs):
-                    align_shift_dict[loc - (idx)] = idx + 1
-                old_res_count = 1
-                old_res_curr_num = -1
-                curr_chain = 'XXXX'
-                for i, r in M.data.iterrows():
-                    if r['chain'] == chain:
-                        if old_res_curr_num == -1: old_res_curr_num = r['resid']
-                        if curr_chain == 'XXXX': curr_chain = r['chain']
-                        shift = 0
-                        res_num = r['resid']
-                        if len(list(align_shift_dict.keys())) != 0:
-                            for bound in list(align_shift_dict.keys()):
-                                if res_num > bound:
-                                    shift = align_shift_dict[bound]
-                        if old_res_curr_num != r['resid']:
-                            old_res_count += 1
-                            old_res_curr_num = r['resid']
-                        if curr_chain != r['chain']:
-                            curr_chain = r['chain']
-                            old_res_count = 1
-                        M.data.at[i, 'resid'] = old_res_count + shift
+
+                res_mapper = {}
+                chain_res_list = sorted(list(set(M.data.loc[M.data['chain'] == chain, 'resid'])))
+                for start_map, end_map in alignment.aligned[0]:
+                    for idx_map, idx_bb in zip(range(start_map + 1, end_map+1), range(chain_res_list[0], chain_res_list[-1]+1)):
+                        res_mapper[idx_bb] = idx_map
+
+                M.data.loc[M.data['chain'] == chain, 'resid'] = M.data['resid'].map(res_mapper).astype('Int64')
+                if any(M.data.loc[M.data['chain'] == chain, 'resid'].isna()): failed.append(chain)
+
             except Exception as e:
                 print(f'Failed alignment of pdb {pdb_code}, chain {chain}, with error: {str(e)}')
                 failed.append(chain)
 
-        if failed:
+        if not failed:
+            M.write_pdb(pdb_code)
+            print(f'>> Chains aligned to canonical uniprot sequence for pdb code: {pdb_code}')
+
+        else:
             #raise RuntimeError(f'>> Alignment failed for pdb: {pdb_code}, not writing new file as not all chains matched properly')
             print(f'>> Alignment failed for pdb: {pdb_code}, not writing new file as not all chains matched properly')
-        
-        else:
-            M.write_pdb(pdb_code)
-            print(f'Chains aligned to canonical uniprot sequence for pdb code: {pdb_code}')
 
 
     def get_chain_replacement(self, pdb_code):
@@ -823,20 +810,13 @@ class PDB(object):
 
         '''
 
-        # First, the auth chain names are put in a list.
-        auth_list = list(replacement_dict)
-
         #The relevant file in conformations is then opened and rewritten.
         try:
             M = bb.Molecule(path)
             # find the indices of the atoms in the pdb file
             indices = M.atomselect('*', '*', '*', True, False)[1]
 
-            # transform to data lists and change the chain names
-            for index, row in M.data.iterrows():
-                if row['chain'] in auth_list:
-                    replacement_chain_name = replacement_dict.get(row['chain'])
-                    M.data.at[index, 'chain'] = replacement_chain_name
+            M.data['chain'] = M.data['chain'].replace(replacement_dict)
 
             pdb = path.split(os.sep)[-1].split('.')[0]
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
@@ -941,9 +921,9 @@ if __name__ == "__main__":
     #PDB.clean_and_split_pdb('1PAE') # test SEC to CYS mutation
     #PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
     #PDB.clean_and_split_pdb('2MBH') # test splitting of models
-    PDB.clean_and_split_pdb('1A6M') # test splitting rotamers
+    #PDB.clean_and_split_pdb('1A6M') # test splitting rotamers
     #PDB.clean_and_split_pdb('4WNC', 'P04406') # test splitting rotamers
-    #PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
+    PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
 
 
     #PDB._align_resnum_uniprot('P50030', f'result{os.sep}curated{os.sep}3DBJ-alt-1.pdb', chains=['A', 'C', 'E', 'G'])

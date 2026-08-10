@@ -360,13 +360,12 @@ def fragment(pdb, fasta, outfolder="."):
     doubleletter_pdb_files = []
     for file in all_files:
         temp_parts = file.split('.')
-        if file[0:5] == 'chain':
-            # next take only files which are pdb and have 2 character chain names
-            if temp_parts[1] == 'pdb' and len(temp_parts[0][5:]) == 2:
-                doubleletter_pdb_files.append(file)
+        if file[0:5] == 'chain' and temp_parts[1] == 'pdb' and len(temp_parts[0][5:]) == 2:
+            doubleletter_pdb_files.append(file)
 
     # iterate through the files and for each one replace the chain name with a single letter lowercase version of the chain name: eg. CA would go to c
     used_sl_chain_names = []
+    sl_to_dl_chain_map = {}
     for file in doubleletter_pdb_files:
         db_chain_name = file.split('.')[0][5:]
 
@@ -374,9 +373,11 @@ def fragment(pdb, fasta, outfolder="."):
         sl_chain_name = next((c for c in candidate_names if c not in used_sl_chain_names), None)
 
         if sl_chain_name is None:
-            raise Exception(f'>> No free single letter chain names available for renaming double letter chain names; chain: {db_chain_name}; error {e}')
+            raise Exception(f'>> No free single letter chain names available for renaming double letter chain names; '
+                            f'chain: {db_chain_name}; error {e}')
 
         used_sl_chain_names.append(sl_chain_name)
+        sl_to_dl_chain_map[sl_chain_name] = db_chain_name
 
         try:
             temp_file_path = os.path.join(outfolder, file)
@@ -387,8 +388,8 @@ def fragment(pdb, fasta, outfolder="."):
                         #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
                             if len(line) > 22:
-                                new_chain_name = ' ' + sl_chain_name
-                                line = line[:20] + new_chain_name + line[22:]
+                                new_chain_name = sl_chain_name
+                                line = line[:21] + new_chain_name + ' ' + line[23:]
                                 print(line, end ='')
                             else:
                                 print(line, end='')
@@ -417,19 +418,21 @@ def reassemble(pdbs, labels, outname, outdir):
             dbletter = True
 
         try:
-            if dbletter:
-                with fileinput.FileInput(pdb_file, inplace = True) as f:
-                    for line in f:
-                        try:
-                            #On lines with 'ATOM', 'TER' or 'HETATM'
-                            #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
-                            if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
-                                line = line[:20] + chainname + '' + line[22:]
-                                print(line, end ='')
+            with fileinput.FileInput(pdb_file, inplace = True) as f:
+                for line in f:
+                    try:
+                        #On lines with 'ATOM', 'TER' or 'HETATM'
+                        #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
+                        if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
+                            if dbletter:
+                                line = line[:21] + chainname + '' + line[23:]
                             else:
-                                print(line, end='')
-                        except:
-                            print(line, end='')
+                                line = line[:21] + chainname + ' ' + line[23:]
+
+                        print(line, end ='')
+
+                    except:
+                        print(line, end='')
 
         #If the protein fails, print error message with the error
         except Exception as e:
@@ -441,40 +444,13 @@ def reassemble(pdbs, labels, outname, outdir):
     for f in pdbs:
         monomers.append(bb.Molecule(f))
 
-    M = bb.Multimer()
-    M.load_list(monomers, labels)
-    M.write_pdb(outname)
-
-
-    '''
-    # After the pdb file has been reassembled, with the current method of replacing double letter chain names with lower case single ones temporarily
-    # need to convert back to the format it was given to the patcher.py script in
-    # Iterate through the file line by line and check for lower case letter chain names, replace with upper case version + 'A'
-
-    try:
-        outfile_path = os.path.join(outfolder, pdb)
-        with fileinput.FileInput(outfile_path, inplace = True) as f:
-            for line in f:
-                try:
-                    #On lines with 'ATOM', 'TER' or 'HETATM'
-                    #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
-                    if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
-                            current_chainname = line[21]
-                            if len(current_chainname)
-                            new_db_chainname = current_chainname.upper() + 'A'
-                            line = line[:20] + new_db_chainname + ' ' + line[22:]
-                            
-                            print(line, end ='')
-                            
-                    else:
-                        print(line, end='')
-                except:
-                    print(line, end='')
-
-    #If the protein fails, print error message with the error 
-    except Exception as e:
-        raise Exception(f'Failed replacing chains for file {file}. %s'%e)
-    '''
+    M_multi = bb.Multimer()
+    #print(labels)
+    M_multi.load_list(monomers, labels)
+    #print(list(set(list(M_multi.data['chain']))))
+    #print(list(set(list(M_multi.data['unit']))))
+    #print(M_multi.data)
+    M_multi.write_pdb(outname)
 
 
 
@@ -492,7 +468,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     if largest>gap:
         raise Exception(f"large gap detected ({largest} residues)")
 
-    #launch modeller on each individual chain
+    #launch modeller on each individual chain  # TODO do we actually need to launch modeller if gaps are 0?
     files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
     chains = []
     fouts = []
@@ -520,7 +496,6 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
             M_curated.data["resid"] = startval_clean
             M_curated.write_pdb(foutname)
 
-        # GW 18.03.24 - change chains appending to account for double letter chain names
         chains.append(fbasename.split('chain')[-1])
         fouts.append(foutname)
 
@@ -535,7 +510,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
     chains, fouts = zip(*sorting_pairs)
 
     reassemble(fouts, chains, outname, outdir)
-    #TODO: check whether patching process caused clashing with lysine
+
     shutil.rmtree(tmpfolder)
 
     return outname
