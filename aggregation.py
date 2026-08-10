@@ -87,18 +87,17 @@ class Aggregation:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
             self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'class']]
 
+        self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
         data_cols_entered = self.df_measurements.columns.values
-        cols_required = [a for a in self.df_measurements.columns if a in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
-        for feat in self.features_to_include:
-            if feat in data_cols_entered:
-                cols_required.append(feat)
-            else:
-                print(f'Feature given as input not available in all input files, will not be included: {feat}')
-        self.df_measurements = self.df_measurements[cols_required]
+        cols_required = [a for a in self.df_measurements.columns if a in self.lys_key + ['PDB_Code', 'class']]
+        self.features_to_include = [feat for feat in self.features_to_include if feat in data_cols_entered]
+        cols_removed = [f for f in self.features_to_include if f not in data_cols_entered]
+        if cols_removed: print(f'The following features given as input not available in all input files, will not be included: {cols_removed}')
+        self.df_measurements = self.df_measurements[cols_required + self.features_to_include]
 
         if 'Method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
         if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
-        self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)  # TODO GW 29.01.26 - add somethign to let you know how mnay lines have been removed and if many of them are from one specific feature
+        self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)  # TODO GW 29.01.26 - add something to let you know how many lines have been removed and if many of them are from one specific feature
 
     def aggregate_data(self):
         '''
@@ -113,7 +112,7 @@ class Aggregation:
         -------
         >> self.aggregate_data()
         '''
-        self._data_tidying()
+        self._remove_bad_data(feature='Depth', lower=0, upper=20)
         df_stats = self._calculate_statistics()
         match self.aggregation_method:
             case 'avg':
@@ -145,16 +144,9 @@ class Aggregation:
                 self.df_agg = self._aggregate_choose(df_stats)
             case _:
                 print('Aggregation method not recognised; using minmax values')
-                self.df_agg = df_stats.drop(a for a in df_stats.columns if a not in ['Uniprot_Entry', 'Resid', 'class'] or any(b in a for b in ['min', 'max']))
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'ESM'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
         return self.df_agg
 
-
-    def _data_tidying(self):
-        '''
-        Go over the provided data and remove any poor data from this. 
-        '''
-        if 'depth' in self.df_measurements.columns:
-            self._remove_bad_data('depth', 0, 20)
 
     def _remove_bad_data(self, feature, lower, upper):
         '''
@@ -170,15 +162,13 @@ class Aggregation:
             The upper bound of bad values to accept
         '''
         df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) | (self.df_measurements[feature] > upper)]
-        len_one = len(self.df_measurements)
-        remove_list = df_suspicious.index.tolist()
-        self.df_measurements = self.df_measurements.drop(index = remove_list)
-        print(f'>> Removed {len(df_suspicious)} rows from the measurements data, new length {len(self.df_measurements)} (old length: {len_one} rows)')
+        self.df_measurements[feature] = self.df_measurements[feature].where(self.df_measurements[feature].between(lower, upper))
+        print(f'>> Changed {len(df_suspicious)} values for {feature} from the measurements data which did not fall inside the bounds, replaced with NaN')
 
 
     def _reduce_aev_dimensions(self):
         '''
-        Due to curse of dimenstionality the model performs worse when the AEVs are clouding the
+        Due to curse of dimensionality the model performs worse when the AEVs are clouding the
         data as it cannot work out which features are actually important. Therefore, this function
         will call the required method to reduce the AEVs down to a specified number of features
         depending on the method chosen. Method options:
@@ -259,8 +249,9 @@ class Aggregation:
         print('>> Removing null AEV columns...')
         initial_num_cols = len(self.df_measurements.columns)
         num_cols_to_keep = sum((self.df_measurements != 0).any(axis=0))
-        self.df_measurements = self.df_measurements.loc[:, (self.df_measurements != 0).any(axis=0)]
-        print(f'>> Removed {initial_num_cols - len(self.df_measurements.columns)} null AEV columns, {num_cols_to_keep} AEV colums left.')
+        cols_to_remove = [a for a in list(self.df_measurements.loc[:, (self.df_measurements == 0).any(axis=0)].columns) if 'AEV_' in a]
+        self.df_measurements = self.df_measurements.drop(columns=cols_to_remove, axis=0)
+        print(f'>> Removed {len(cols_to_remove)} null AEV columns, {num_cols_to_keep} AEV columns left.')
 
 
     def _prepare_vif_aev(self):
@@ -274,16 +265,14 @@ class Aggregation:
         ------
         Take the dataframe of columns of the AEV and plug this into the preprocessing
         module to calculate the VIF values for each of these. This will return a list
-        of decorrelated columns which can be used to cut down the dataframe.
+        of de-correlated columns which can be used to cut down the dataframe.
 
         Example
         -------
         >> self._prepare_vif_aev()
         '''
-        # The columns_to_keep that is commented out is the oriignal set calculated by Phong
-        # over the negative dataset
         '''
-        # this columns_to_keep is the original set calculated with the original AEVs
+        # this columns_to_keep is the original set calculated with the original AEVs over the negative dataset
         columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
                             30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
                             399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
@@ -291,16 +280,15 @@ class Aggregation:
                             583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
                             709,711,716,719,73,74,745,75,751,76,77,78,79,9]
         '''
+
         print('>> Reducing AEV dimensions using VIF analysis...')
-        # use the preprocesing module to come up with exact columns to keep via VIF analysis
-        non_aev_cols = [a for a in self.df_measurements.columns if 'AEV_' not in a]
-        P = Preprocessing(self.df_measurements, non_aev_cols)
+        aev_cols = [a for a in self.df_measurements.columns if 'AEV_' in a]
+        P = Preprocessing(self.df_measurements, aev_cols)
         columns_to_keep = P.calculate_diff_features(self.df_measurements)
 
-        top_aev_feature_names = ['AEV_' + str(a) for a in columns_to_keep]
-        cols_to_remove = [a for a in self.df_measurements.columns if a not in top_aev_feature_names]
+        cols_to_remove = [a for a in self.df_measurements.columns if ('AEV_' in a) and (a not in columns_to_keep)]
         self.df_measurements.drop(cols_to_remove, axis=1, inplace=True)
-        print(f'>> VIF analysis reduced AEV dimensions from {len(non_aev_cols)} to {len(columns_to_keep)}.')
+        print(f'>> VIF analysis reduced AEV dimensions from {len(aev_cols)} to {len(columns_to_keep)}')
 
 
     def _prepare_pca(self):
@@ -323,7 +311,8 @@ class Aggregation:
         df_out = pd.DataFrame(pca_data)
         df_out = df_out.add_prefix('AEV_')
         self.df_measurements = pd.concat([self.df_measurements, df_out], axis=1)
-        print(f'>> PCA used {pca.n_components_} components to explain {n_components} variance. AEVs are now in reduced dimension format.')
+        print(f'>> PCA used {pca.n_components_} components to explain {n_components} '
+              f'variance. AEVs are now in reduced dimension format.')
 
 
     def _calculate_statistics(self):
@@ -336,21 +325,24 @@ class Aggregation:
         if 'class' not in self.df_measurements.columns:
             self.df_measurements['class'] = -1  # set to -1 as unsure if pos or neg
 
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Chain', 'Resid', 'class'])
 
         if 'aev' in self.features_to_include or 'esm' in self.features_to_include or 'aev_legolas' in self.features_to_include:
             self._reduce_aev_dimensions()
 
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)].copy().reset_index()
+        for (entry, chain, resid), df_query in self.df_measurements.groupby(self.lys_key):
+            df_query = df_query.reset_index(drop=True)
+            if len(set(df_query['class'])) != 1:
+                print(f'>> Not all instances of resid assigned to same class (instances: {list(set(df_query["class"]))}), '
+                      f'using class -1 instead: Uniprot: {entry}, Chain: {chain}, Resid: {resid}')
+                class_val = -1
+            else:
+                class_val = df_query['class'].iloc[0]  # take first value of class as overall class for resid
             data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid']]
+                    'Chain': chain,
+                    'Resid': resid,
+                    'class': class_val}
+            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'class']]
             for feature in features:
                 if feature == 'aev' or feature == 'aev_legolas':
                     df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
@@ -367,7 +359,7 @@ class Aggregation:
                         data[feat + '_absmax'] = round(df_query[feat].max(), 2)  # max value of any AEV at this position in the AEV
                         data[feat + '_med'] = round(df_query[feat].median(), 2)
                         data[feat + '_avg'] = round(df_query[feat].mean(), 2)
-                        data[feat + '_sd'] = round(df_query[feat].std(), 2)
+                        data[feat + '_sd'] = round(df_query[feat].std(ddof=0), 2)
                         data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
                 elif feature == 'esm':
                     for feat in [a for a in df_query.columns if 'ESM_' in a]:
@@ -378,7 +370,7 @@ class Aggregation:
                     data[feature + '_max'] = round(float(df_query[feature].max()), 2)
                     data[feature + '_med'] = round(df_query[feature].median(), 2)
                     data[feature + '_avg'] = round(df_query[feature].mean(),2)
-                    data[feature + '_sd'] = round(df_query[feature].std(),2)
+                    data[feature + '_sd'] = round(df_query[feature].std(ddof=0),2)
                     data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
                     data[feature + '_rand'] = df_query[feature].iloc[random.randrange(0, len(df_query))]
 
@@ -442,6 +434,11 @@ class Aggregation:
         return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + med_feat_cols + avg_feat_cols + sd_feat_cols + range_feat_cols + rand_feat_cols])
 
     def _aggregate_avg_less_avgaev(self):
+        '''
+            Create an aggregate of the AEVs whilst subtracting an average AEV of a general lysine to the
+            changes employed from this. 
+        '''
+
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
         df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
         for idx, row in seperate_lys.iterrows():
@@ -469,12 +466,10 @@ class Aggregation:
         if 'aev' in self.features_to_include:
             df_out = pd.DataFrame(df_data_agg['aev'].to_list())
             df_out = df_out.add_prefix('AEV_')
-            self.X_agg = pd.concat([df_data_agg, df_out], axis=1)
-            self.X_agg = self.X_agg.drop('aev', axis=1)
-            #aev_kept_cols = [f'AEV_{pos}' for pos in aev_kept_cols]
-            #df_out = df_out.set_axis(aev_kept_cols, axis=1)
-        else:
-            return df_data_agg
+            df_data_agg = pd.concat([df_data_agg, df_out], axis=1)
+            df_data_agg = df_data_agg.drop('aev', axis=1)
+
+        return df_data_agg
 
 
     def save_state(self, outname="measures_aggregated.csv"):

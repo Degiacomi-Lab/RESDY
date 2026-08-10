@@ -79,7 +79,7 @@ class Preprocessing:
             Number of rows in the cleaned dataframe.
 
         """
-        # remove any features from measurements that
+        # remove any features from measurements that are NaN
         print(f"Original number of observations: {len(df)}")
         df_cleaned = df.dropna(subset=features)
         print(f"Number of observations after removing rows containing NaN: {len(df_cleaned)}")
@@ -89,7 +89,6 @@ class Preprocessing:
         print(f"Number of observations after removing duplicates: {n_obs_cleaned}")
 
         return df_cleaned, n_obs_cleaned
-
 
 
     def calculate_vif(self, data, features, multi_vif=False):
@@ -192,6 +191,7 @@ class Preprocessing:
                 latest_vals = [a for a in latest_vals if str(a) != 'nan']
                 if all(x < 5 for x in latest_vals):
                     all_decorrelated = True
+                    break
 
                 # remove the column with the highest vif
                 max_val_idx = self.vif[list(self.vif.columns)[-1]].idxmax()
@@ -203,46 +203,35 @@ class Preprocessing:
 
         cut_df = self.vif[self.vif[list(self.vif.columns)[-1]] < 5]
         cols_to_keep = list(cut_df['Parameter'])
+        cols_to_keep.remove('const')
         return cols_to_keep
 
 
-    def _normalise(self, data_input="data", features=None):
+    def _normalise(self, data_input, features=None):
         """
         Normalise all specified feature columns to mean zero, standard deviation 1.
 
         Parameters
         ----------
-        data_input : Pandas DataFrame, optional
-            If no dataframe specified, normalise the cleaned dataframe and 
-            return the result to class attribute self.data_normalised
+        data_input : DataFrame
+            Dataframe over which to normalise the feature data.
         features : list, optional
             List of features to be normalised. If none specified, normalise all 
             columns in the given dataframe.
 
-        Returns (if a dataframe is given)
+        Returns
         -------
-        data : Pandas DataFrame
+        data : DataFrame
             Normalised dataframe.
-
         """
 
-        _case = 1
-        if isinstance(data_input, pd.core.frame.DataFrame):
-            data = deepcopy(self.data)
-            _case = 0
-        else:
-            data = deepcopy(data_input)
-
         if features is None:
-            features = data.columns
+            features = list(data_input.columns)
+
         for feature in features:
-            data[feature] = (data[feature] - np.mean(data[feature])) / np.std(data[feature])
+            data_input[feature] = (data_input[feature] - np.mean(data_input[feature])) / np.std(data_input[feature], ddof=0)
 
-        if _case == 0:
-            self.data_normalised = data
-        else:
-            return data
-
+        return data_input
 
 
     def undersampling(self, features, n_cluster, n_init=100, max_iter=500,

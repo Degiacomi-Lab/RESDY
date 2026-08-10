@@ -61,6 +61,8 @@ class Structure():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
         if self.melodia_features == ['all']:
             self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
 
@@ -101,7 +103,7 @@ class Structure():
                 melodia_results = melodia_results.to_frame().T
 
         except Exception as e:
-            report_error_to_file('Melodia 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Melodia 1', path, str(e), self.error_filename)
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
 
         # Melodia 2 - Formatting and filtering
@@ -118,7 +120,7 @@ class Structure():
             if self.include_modified: df_melodia['Modified'] = list_modified
 
         except Exception as e:
-            report_error_to_file('Melodia 2', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Melodia 2', path, str(e), self.error_filename)
             print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
 
         return df_melodia

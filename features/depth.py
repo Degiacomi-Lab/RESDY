@@ -32,10 +32,12 @@ class Depth():
     Class to house the different methods for calculating depth values for structures
     '''
 
-    def __init__(self, include_modified=False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                                                'modified_codes': ['LYE', 'KCX'],
-                                                                'atom_select_names_nonmod': ['NZ'],
-                                                                'atom_select_names_modified': ['NZ', 'N07']},
+    def __init__(self, calculation_type = 'ResidDepth',
+                 include_modified=False,
+                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                'modified_codes': ['LYE', 'KCX'],
+                                'atom_select_names_nonmod': ['NZ'],
+                                'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the Depth class, include any global variables that are required from
@@ -43,6 +45,10 @@ class Depth():
 
         Parameters
         ----------
+        calculation_type : str
+            Determines the calculation type for depth used. Options are:
+            - AtomDepth - Depth of the NZ atom of the lysine in the structure (Default)
+            - ResidDepth - Depth of the overall lysine in the structure
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
         aa_properties -> dict
@@ -54,9 +60,12 @@ class Depth():
             Name of the text file passed through from overall measures to write any errors from
             calculating features out to.
         '''
+        self.calculation_type = calculation_type
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
 
     def calculate_depth(self, path):
         '''
@@ -96,14 +105,17 @@ class Depth():
         6     A     63   x
         '''
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
+
             if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)[1]
+            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
+
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
-            report_error_to_file('Depth 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Depth 1', path, str(e), self.error_filename)
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
         try:
@@ -111,7 +123,7 @@ class Depth():
             structure = parser.get_structure('structure', path)
             surface = get_surface(structure[0])
         except Exception as e:
-            report_error_to_file('Depth 2', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Depth 2', path, str(e), self.error_filename)
             raise Exception(f">> DEPTH error: could not get biopython structure - {e}")
 
         depth_results = []
@@ -119,10 +131,13 @@ class Depth():
             mychain = structure[0][list_chains[i]]
             myres = mychain[int(lys_res_nums[i])]
             try:
-                #rd = min_dist(pos[i], surface)  # NZ atom depth
-                rd = residue_depth(myres, surface)  # average atom depth for all heavy atoms in residue of interest
+                match self.calculation_type:
+                    case 'ResidDepth':
+                        rd = residue_depth(myres, surface)  # average atom depth for all heavy atoms in residue of interest
+                    case 'AtomDepth' | _:
+                        rd = min_dist(M.coordinates[0][idx], surface)  # NZ atom depth
             except Exception as e:
-                report_error_to_file('Depth 3', path, str(e), self.error_filename)
+                if self.record_errors: report_error_to_file('Depth 3', path, str(e), self.error_filename)
                 raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
             depth_results.append(rd)
 
@@ -133,12 +148,12 @@ class Depth():
             df_depth['depth'] = depth_results
             if self.include_modified: df_depth['Modified'] = list_modified
         except Exception as e:
-            report_error_to_file('Depth 4', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('Depth 4', path, str(e), self.error_filename)
             print(f'Depth Calculation: 4 - Failed to create datafame to append to the overall dataframe: {e}')
         return df_depth
 
 if __name__ == '__main__':
-    depth = Depth(include_modified=True)
-    print(depth.calculate_depth(path=f'1ubq.pdb'))
+    depth = Depth(calculation_type='AtomDepth', include_modified=True)
+    print(depth.calculate_depth(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
     #print(depth.calculate_depth(path=f'tmp_checking_pdb.pdb'))
     #print(depth.calculate_depth(path=f'1nsk_AmberMod0000.pdb'))

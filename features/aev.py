@@ -16,7 +16,7 @@ from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-#from features.error_reporting import report_error_to_file
+from features.error_reporting import report_error_to_file
 
 
 # AEV packages
@@ -63,6 +63,8 @@ class AEV():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if self.error_filename != 'no_record': self.record_errors = True
+        else: self.record_errors = False
         
         # Preparation of AEV computer
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -112,35 +114,36 @@ class AEV():
 
         # 1: prepare the biobox structure, take the species and coordinates and convert to Atoms structure, find the locations of the NZ atoms within the lysines in the strucure
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=True)
+
             if self.include_modified:
                 coords_nz, idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)
             else:
-                coords_nz, idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nomod'], use_resname=True, get_index=True)
+                coords_nz, idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
-            report_error_to_file('AEV 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('AEV 1', path, str(e), self.error_filename)
             print(f'AEV Calculations: 1 - could not create atomic structure representation: {e}')
             return
 
         # 2: Iterate over the protein structure to cut out substructures and calculate an AEV at each of these.
         try:
-            for j, lys_coord in enumerate(coords_nz):
+            for lys_idx, lys_coord in enumerate(coords_nz):
                 # 2.1: for the NZ atom of the lysine, find all the atoms within the cutoff distance and create a substructure
                 distance_cut_off = 6  # current cutoff for substructure from analysis done on different cutoffs and matching pkaANI
                 coords_euc_dists = np.linalg.norm(all_coords - lys_coord, axis=1)
-                list_close_points = [a for a, x in enumerate(coords_euc_dists < distance_cut_off) if x]
+                list_close_points = np.where(coords_euc_dists < distance_cut_off)[0]
 
                 S = M.get_subset(idxs=list_close_points)
-                chain = list_chains[j]
-                resid = list_resids[j]
+                chain = list_chains[lys_idx]
+                resid = list_resids[lys_idx]
                 temp_atom_species = S.data['atomtype']
                 temp_coords = S.coordinates[0]
                 temp_structure = Atoms(temp_atom_species, temp_coords)
-                temp_idx_nz = S.atomselect("*", "LYS", "NZ", use_resname=True, get_index=True)[1]
                 aevs = None
 
                 # 2.2: calculate the AEV for the subset of the protein and add this to the output dataframe
@@ -148,31 +151,31 @@ class AEV():
                     species = self.ANI.species_to_tensor(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
                     ani_coords = torch.tensor(temp_structure.get_positions(), dtype=torch.float32).unsqueeze(0).to(device=self.device)
                     aevs = self.ANI.aev_computer((species, ani_coords)).aevs
-                    lys_nz_location = list_close_points.index(idx_nz[j])
+                    lys_nz_location = list_close_points.index(idx_nz[lys_idx])
                     aevs = aevs[0,lys_nz_location,:]
-                    aevs = str(list(aevs))
+                    aevs = str(list(aevs.detach().cpu()))
                 except Exception as e:
-                    report_error_to_file('AEV 1.1', path, str(e), self.error_filename)
-                    print(f'AEV Calculations: could not create AEV for resid {idx_nz[j]} of protein {path}, error: {e}')
+                    if self.record_errors: report_error_to_file('AEV 1.1', path, str(e), self.error_filename)
+                    print(f'AEV Calculations: could not create AEV for resid {idx_nz[lys_idx]} of protein {path}, error: {e}')
 
                 # 2.3: Append the new AEV to the output dataframe
-                if self.include_modified: aev_to_append = {'Chain': chain, 'Resid': resid, 'aev': aevs, 'Modified': list_modified[idx]}
+                if self.include_modified: aev_to_append = {'Chain': chain, 'Resid': resid, 'aev': aevs, 'Modified': list_modified[lys_idx]}
                 else: aev_to_append = {'Chain': chain, 'Resid': resid, 'aev': aevs}
                 df_aevs = pd.concat([df_aevs, pd.DataFrame([aev_to_append])], ignore_index=True)
 
         except torch.cuda.OutOfMemoryError:
             # potential that calculating the AEVs could overload the gpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CUDA memory error with file: {path}, skipping')
-            report_error_to_file('AEV 2', path, 'CUDA memory error with file', self.error_filename)
+            if self.record_errors: report_error_to_file('AEV 2', path, 'CUDA memory error with file', self.error_filename)
             return df_aevs
         except MemoryError:
             # potential that calculating the AEVs could overload the cpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CPU memory error with file: {path}, skipping')
-            report_error_to_file('AEV 2', path, 'CPU memory error with file', self.error_filename)
+            if self.record_errors: report_error_to_file('AEV 2', path, 'CPU memory error with file', self.error_filename)
             return df_aevs
         except Exception as e:
             print(f'AEV Calculations: 2 - could not create the AEVs for the protein for protein {path}, error: {e}')
-            report_error_to_file('AEV 2', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('AEV 2', path, str(e), self.error_filename)
             return df_aevs
 
         # 4: if everything has worked, return the dataframe with the AEVs for the protein
