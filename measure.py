@@ -245,10 +245,16 @@ class Measure(object):
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
+                # GW 06.08.25 - temporarily disabled frustration and density calculations as using Frustratometer currently overloads the memory.
+                print('>> Frustration and density metrics are not currently possible due to memory issues in the frustratometer package.')
+                print('>> Metric not added to the measures list.')
+                '''
                 if not frustration_added:
                     frustration = Frustration(include_modified=self.include_mod, error_filename=self.error_filename)
                     self.measures.append(['frustration', frustration.calculate_frustration])
                     frustration_added = True
+                '''
+                self.features.remove(m)
             elif m == 'melodia':
                 structure = Structure(melodia_features=['all'], include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append([m, structure.calculate_melodia])
