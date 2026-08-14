@@ -1,0 +1,14 @@
+Missing atoms or failed protonation for ARG 238 A (ARG) -- please check the structure
+Group (ARG) for    92-  CZ   238-ARG (A) [  17.179   -5.427   43.280] C
+Expected 8 interaction atoms for acids, found:
+                91-  NE   238-ARG (A) [  18.118   -4.623   42.702] N
+                94- NH2   238-ARG (A) [  17.437   -6.753   43.471] N
+                93- NH1   238-ARG (A) [  15.982   -4.900   43.670] N
+                 0-HH21   238-ARG (A) [  17.996   -7.260   42.800] H
+                 0-HH22   238-ARG (A) [  17.069   -7.227   44.283] H
+                 0-HH11   238-ARG (A) [  15.793   -3.918   43.529] H
+                 0-HH12   238-ARG (A) [  15.285   -5.492   44.100] H
+Expected 3 interaction atoms for bases, found:
+                91-  NE   238-ARG (A) [  18.118   -4.623   42.702] N
+                94- NH2   238-ARG (A) [  17.437   -6.753   43.471] N
+                93- NH1   238-ARG (A) [  15.982   -4.900   43.670] N

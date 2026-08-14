@@ -1,0 +1,3 @@
+PDB: Demo/conformations/7YQ7-alt1A.pdb; Chains: A, AA, B, BA, C, CA, D, DA, E, EA, F, FA, G, GA, H, HA, I, IA, J, JA, K, KA, L, LA, M, MA, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
+PDB: Demo/conformations/7YQ7-alt1B.pdb; Chains: A, AA, B, BA, C, CA, D, DA, E, EA, F, FA, G, GA, H, HA, I, IA, J, JA, K, KA, L, LA, M, MA, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
+PDB: Demo/conformations/7XSD-alt-1.pdb; Chains: A, AA, B, BA, C, CA, D, DA, E, EA, F, FA, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
