@@ -1,12 +1,7 @@
-import re
+import sys
 import os
-import io
-import logging
-import datetime
 import shutil
 import subprocess
-import glob
-import time
 from datetime import date
 from multiprocessing import cpu_count
 from multiprocessing import Manager
@@ -122,8 +117,15 @@ class NMR():
                     modified_struc = True
 
             M_n = M.get_subset(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])
-            if self.include_modified: idx_n_res_interest = M_n.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'N', use_resname=True, get_index=True)[1]
-            else: idx_n_res_interest = M_n.atomselect('*', self.aa_properties['non_modified_codes'], 'N', use_resname=True, get_index=True)[1]
+            if self.include_modified:
+                idx_n_res_interest = M_n.atomselect('*',
+                                                    (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                                    'N', use_resname=True, get_index=True)[1]
+            else:
+                idx_n_res_interest = M_n.atomselect('*',
+                                                    self.aa_properties['non_modified_codes'],
+                                                    'N', use_resname=True, get_index=True)[1]
+
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M_n.data['resname']))
             df_legolas = M_n.data[['resid', 'chain', 'resname']]
             if self.include_modified: df_legolas = df_legolas.assign(**{'Modified': list_modified})
@@ -144,7 +146,7 @@ class NMR():
             if not already_exists:
                 # Note: if you are not GW and running this, you will need to change this path to your own installation path!!
                 legolas_prog = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
-                subprocess.run(['python', legolas_prog, pdb_absolute_path, '-atype', 'N'], check=True)
+                subprocess.run([sys.executable, legolas_prog, pdb_absolute_path, '-atype', 'N'], check=True)
             else:
                 result_filename = os.path.join(self.legolas_output_path, result_filename)
             df_nmr = pd.read_csv(result_filename)
@@ -181,7 +183,7 @@ class NMR():
                         print('Legolas AEVs: tmp_aevs_protein.txt file not found')
                         aevs = []
 
-                    if aevs != []:
+                    if aevs != [] and len(aevs) == len(df_legolas):
                         df_legolas = df_legolas.assign(**{'aev_legolas': [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]})
 
                     if os.path.exists('tmp_aevs_protein.txt'):
@@ -195,7 +197,7 @@ class NMR():
                 rows_to_drop = []
                 for i, r in df_legolas.iterrows():
                     # LEGOLAS only calculates backbone 15N NMR => exactly 1 measurement per residue, any mismatches are gaps in sequence
-                    if r['resname'] != legolas_res_key[df_nmr['RESIDUE_ID'].iloc[i]]:
+                    if r['resname'] != legolas_res_key[int(df_nmr['RESIDUE_ID'].iloc[i])]:
                         rows_to_drop.append(i)
                 df_legolas = df_legolas.drop(index=rows_to_drop).reset_index(drop=True)
             df_legolas = pd.concat([df_legolas, df_nmr.loc[:, ~df_nmr.columns.str.contains('^Unnamed')]], axis=1)

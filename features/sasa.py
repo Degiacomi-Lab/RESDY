@@ -96,19 +96,38 @@ class SASA():
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
 
-            if self.include_modified: lys_coords, lys_idx = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)
-            else: lys_coords, lys_idx = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)
+            if self.include_modified:
+                lys_coords, lys_idx = M.atomselect('*',
+                                                   (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                                   self.aa_properties['atom_select_names_modified'],
+                                                   use_resname=True, get_index=True)
+                # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
+                key_res_chain = zip(list(M.data['resid'].values[lys_idx]), list(M.data['chain'].values[lys_idx]))
+                pairs_seen, keep_pos = set(), []
+                for pair, pos in zip(key_res_chain, range(len(lys_idx))):
+                    if pair not in pairs_seen:
+                        pairs_seen.add(pair)
+                        keep_pos.append(pos)
+                lys_idx = lys_idx[keep_pos]
+                lys_coords = lys_coords[keep_pos]
 
-            list_of_resid = list(M.data['resid'][lys_idx])
-            list_of_chains = list(M.data['chain'][lys_idx])
+            else:
+                lys_coords, lys_idx = M.atomselect('*',
+                                                   self.aa_properties['non_modified_codes'],
+                                                   self.aa_properties['atom_select_names_nonmod'],
+                                                   use_resname=True, get_index=True)
+
+            list_of_resid = list(M.data['resid'].values[lys_idx])
+            list_of_chains = list(M.data['chain'].values[lys_idx])
             list_of_sasa = []
-            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][lys_idx]))
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'].values[lys_idx]))
 
             all_coords, all_idx = M.atomselect('*','*','*', get_index=True)
 
         except Exception as e:
-            if self.include_modified: report_error_to_file('SASA 1', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('SASA 1', path, str(e), self.error_filename)
             print(f'SASA Calculation: 1 - Failed to extract lysine information from pdb file, error: {e}')
+            return pd.DataFrame(columns=["Chain", "Resid", "sasa"])
 
         for j, lys_coord in enumerate(lys_coords):
 
@@ -135,7 +154,7 @@ class SASA():
             except Exception as e:
                 print(f'SASA Calculation: 2 - Error obtaining SASA at index value {str(j)} with error: {e}')
                 list_of_sasa.append(None)
-                if self.include_modified: report_error_to_file('SASA 2', path, f'Error obtaining SASA at index value {str(j)} with error: {e}', self.error_filename)
+                if self.record_errors: report_error_to_file('SASA 2', path, f'Error obtaining SASA at index value {str(j)} with error: {e}', self.error_filename)
                 continue
 
         try:
@@ -145,8 +164,9 @@ class SASA():
             if self.include_modified: df_sasa['Modified'] = list_modified
 
         except Exception as e:
-            if self.include_modified: report_error_to_file('SASA 3', path, str(e), self.error_filename)
+            if self.record_errors: report_error_to_file('SASA 3', path, str(e), self.error_filename)
             print(f'SASA Calculation: 3 - Failed to write extracted sasa information to dataframe, error: {e}')
+            return pd.DataFrame(columns=["Chain", "Resid", "sasa"])
 
         return df_sasa
 

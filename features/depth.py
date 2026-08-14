@@ -47,8 +47,8 @@ class Depth():
         ----------
         calculation_type : str
             Determines the calculation type for depth used. Options are:
-            - AtomDepth - Depth of the NZ atom of the lysine in the structure (Default)
-            - ResidDepth - Depth of the overall lysine in the structure
+            - AtomDepth - Depth of the NZ atom of the lysine in the structure
+            - ResidDepth - Depth of the overall lysine in the structure (Default)
         include_modified : bool
             Toggle to include residues which have been modified within the featurisation
         aa_properties -> dict
@@ -108,8 +108,25 @@ class Depth():
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
 
-            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
+            if self.include_modified:
+                idx_nz = M.atomselect('*',
+                                      (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                      self.aa_properties['atom_select_names_modified'],
+                                      use_resname=True, get_index=True)[1]
+                # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
+                key_res_chain = zip(list(M.data['resid'].values[idx_nz]), list(M.data['chain'].values[idx_nz]))
+                pairs_seen, keep_pos = set(), []
+                for pair, pos in zip(key_res_chain, range(len(idx_nz))):
+                    if pair not in pairs_seen:
+                        pairs_seen.add(pair)
+                        keep_pos.append(pos)
+                idx_nz = idx_nz[keep_pos]
+
+            else:
+                idx_nz = M.atomselect('*',
+                                      self.aa_properties['non_modified_codes'],
+                                      self.aa_properties['atom_select_names_nonmod'],
+                                      use_resname=True, get_index=True)[1]
 
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
@@ -128,9 +145,9 @@ class Depth():
 
         depth_results = []
         for i, idx in enumerate(idx_nz):
-            mychain = structure[0][list_chains[i]]
-            myres = mychain[int(lys_res_nums[i])]
             try:
+                mychain = structure[0][list_chains[i]]
+                myres = mychain[int(lys_res_nums[i])]
                 match self.calculation_type:
                     case 'ResidDepth':
                         rd = residue_depth(myres, surface)  # average atom depth for all heavy atoms in residue of interest

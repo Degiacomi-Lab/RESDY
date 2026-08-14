@@ -1,12 +1,8 @@
 import re
 import os
-import io
-import logging
-import datetime
+import sys
 import shutil
 import subprocess
-import glob
-import time
 from datetime import date
 from multiprocessing import cpu_count
 from multiprocessing import Manager
@@ -124,6 +120,7 @@ class PKA():
         '''
         # Get modified residues that aren't titratable by PROPKA
         if self.include_modified:
+            df_mod = pd.DataFrame()
             try:
                 M = bb.Molecule()
                 M.import_pdb(path, include_hetatm=True)
@@ -136,7 +133,6 @@ class PKA():
                                        'Chain': list_chains,
                                        'Modified': list_modified,
                                        'propka': ['NonTitratable'] * len(lys_res_nums)})
-                print(df_mod)
             except Exception as e:
                 print(f'>> Failed to identify modified residues for path:{path}. '
                       f'If there are any modified residues present, they may be listed as NaN for this structure.')
@@ -147,7 +143,7 @@ class PKA():
         if not os.path.isfile(test_path):
             try:   
                 f = open(propka_error_file_name, 'w')
-                process = subprocess.Popen(['python', '-m', 'propka', path],
+                process = subprocess.Popen([sys.executable, '-m', 'propka', path],
                                     stdout=f, stderr=f)
                 stdout, stderr = process.communicate()
                 f.close()
@@ -387,7 +383,7 @@ if __name__ == '__main__':
     
     pka = PKA(outdir='result',
               calc_method='propka',
-              include_modified=True)
+              include_modified=False)
     #print(pka._parse_propka_errors(path=f'data{os.sep}propkaoutput{os.sep}1A0F-alt-1_propka_errors.txt'))
     print(pka.calculate_pka(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
     #print(pka.calculate_pka(path=f'2I1V-alt-1.pdb'))

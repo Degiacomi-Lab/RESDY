@@ -118,9 +118,25 @@ class AEV():
             M.import_pdb(path, include_hetatm=True)
 
             if self.include_modified:
-                coords_nz, idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)
+                coords_nz, idx_nz = M.atomselect('*',
+                                                 (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                                 self.aa_properties['atom_select_names_modified'],
+                                                 use_resname=True, get_index=True)
+                # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
+                key_res_chain = zip(list(M.data['resid'].values[idx_nz]), list(M.data['chain'].values[idx_nz]))
+                pairs_seen, keep_pos = set(), []
+                for pair, pos in zip(key_res_chain, range(len(idx_nz))):
+                    if pair not in pairs_seen:
+                        pairs_seen.add(pair)
+                        keep_pos.append(pos)
+                idx_nz = idx_nz[keep_pos]
+
             else:
-                coords_nz, idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)
+                coords_nz, idx_nz = M.atomselect('*',
+                                                 self.aa_properties['non_modified_codes'],
+                                                 self.aa_properties['atom_select_names_nonmod'],
+                                                 use_resname=True, get_index=True)
+
             all_coords, idx = M.atomselect('*','*','*', get_index=True)
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
@@ -151,9 +167,11 @@ class AEV():
                     species = self.ANI.species_to_tensor(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
                     ani_coords = torch.tensor(temp_structure.get_positions(), dtype=torch.float32).unsqueeze(0).to(device=self.device)
                     aevs = self.ANI.aev_computer((species, ani_coords)).aevs
-                    lys_nz_location = list_close_points.index(idx_nz[lys_idx])
-                    aevs = aevs[0,lys_nz_location,:]
-                    aevs = str(list(aevs.detach().cpu()))
+                    # match up the position of the lysine of interest to inside the structure cutout
+                    lys_nz_subloc = np.where(list_close_points == idx_nz[lys_idx])[0]
+                    if len(lys_nz_subloc) != 1:
+                        raise ValueError(f'>> Could not find the specified lysine within its own structure section for {idx_nz[lys_idx]}')
+                    aevs = str(aevs[0,int(lys_nz_subloc[0]),:].detach().cpu().tolist())
                 except Exception as e:
                     if self.record_errors: report_error_to_file('AEV 1.1', path, str(e), self.error_filename)
                     print(f'AEV Calculations: could not create AEV for resid {idx_nz[lys_idx]} of protein {path}, error: {e}')

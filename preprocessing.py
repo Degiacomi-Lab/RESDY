@@ -225,6 +225,8 @@ class Preprocessing:
             Normalised dataframe.
         """
 
+        data_input = data_input.copy()
+        features = features.copy()
         if features is None:
             features = list(data_input.columns)
 

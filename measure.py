@@ -53,6 +53,14 @@ try:
 except Exception as e:
     print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
+# ESM packages
+try:
+    import torch
+    import torch.nn as nn
+    import esm
+except Exception as e:
+    print(f'>> Failed to import packages required for esm calculations, will not be able to calculate sequence features based on esm. Error: {e}')
+
 
 class Measure(object):
     '''
@@ -134,9 +142,9 @@ class Measure(object):
         else: self.error_filename = 'no_record'
 
         self.aa_properties = self._match_resid_codes(residue_of_interest)
-        self.features = features
+        self.features = list(features)
         self.legolas_aevs = True
-        self._setup_measures(features)
+        self._setup_measures(list(features))
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
 
@@ -193,12 +201,11 @@ class Measure(object):
             features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
                         'esm', 'rmsf']
-            self.features = features
+            self.features = list(features)
         if 'melodia' in self.features: self.features.append(self.features.pop(self.features.index('melodia')))
         self.measures = []
         melodia_features = []
         melodia_added = False; frustration_added = False; legolas_added = False
-        #TODO can this handle calculations where you actually want multiple methods for same feature calculating
         for m in features:
             if m in ['propka', 'pkaANI']:
                 pka = PKA(outdir=self.outdir, calc_method=m, include_modified=self.include_mod, error_filename=self.error_filename)
@@ -269,7 +276,8 @@ class Measure(object):
                 ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
                 self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
-                if self.include_mod: self._report_error_to_file('Setup measures: measure unknown', 'setup', str(e))
+                if self.report_errors:
+                    self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
                 raise Exception(f"measure {m} unknown")
 
 
@@ -339,7 +347,8 @@ class Measure(object):
                                 'atom_select_names_modified': []}
             case _:
                 print(f'>> Residue of interest given not known; using LYS as default')
-                if self.include_mod: self._report_error_to_file('Match resid codes for residue of interest', 'setup', str(e))
+                if self.report_errors:
+                    self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_code}) not known; using LYS as default')
                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
@@ -499,10 +508,8 @@ class Measure(object):
         overall_st = time.time()
         print(f'Total number of structures to analyse: {total_structures}')
 
-        # 2 options: either linear or parallel measurements
         match self.parallel:
             case True:
-                # determine how to parallelise
                 n_cores_to_use = cpu_count() - 2
                 #n_cores_to_use = 16
                 print('>> Measurements running in parallel')
@@ -534,7 +541,8 @@ class Measure(object):
             print('\n>> Removed duplicates from measurement dataframe.')
         except Exception as e:
             print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
-            if self.include_mod: self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
+            if self.report_errors:
+                self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
 
 
     def measure_dataframe(self):
@@ -593,7 +601,7 @@ class Measure(object):
                 t_start = time.time()
                 print(f"\n> Calculating for measurements for file: {f}")
 
-                columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+                columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Modified']
                 df_currentfile = pd.DataFrame(columns=columns)
 
                 # append to temporary DataFrame all lysines in the file of interest
@@ -601,11 +609,14 @@ class Measure(object):
                     M = bb.Molecule(f)
                 except Exception as e:
                     self.wrong_pdb_file.append(f)
-                    if self.include_mod: self._report_error_to_file('Failed to produce bb for pbd file', 'measure dataframe', str(e))
+                    if self.report_errors:
+                        self._report_error_to_file('Failed to produce bb for pbd file', 'measure dataframe', str(e))
                     print(f'Failed to produce bb for pdb file with error: {e}')
                     continue
 
-                _, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                resnames_to_explore = list(self.aa_properties['non_modified_codes'])
+                if self.include_mod: resnames_to_explore += list(self.aa_properties['modified_codes'])
+                _, idxs = M.atomselect('*', resnames_to_explore, ['CA'], get_index=True, use_resname=True)
                 for i in idxs:
 
                     #save only lysine entries from chain of interest
@@ -618,6 +629,8 @@ class Measure(object):
                         'Resolution': res,
                         'Chain': M.data['chain'].values[i],
                         'Resid': M.data['resid'].values[i]})
+                    
+                    if self.include_mod: data['Modified'] = (M.data['resname'].values[i] in self.aa_properties('modified_codes'))
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -631,7 +644,8 @@ class Measure(object):
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                     except Exception as e:
-                        if self.include_mod: self._report_error_to_file('Error iterating measures, potential dataframe combination problem', 'measure dataframe', str(e))
+                        if self.report_errors:
+                            self._report_error_to_file('Error iterating measures, potential dataframe combination problem', 'measure dataframe', str(e))
                         print(f"Error iterating measures, potential dataframe combination problem: {e}")
                         continue
 
@@ -654,7 +668,8 @@ class Measure(object):
                             self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
-                            if self.include_mod: self._report_error_to_file('Error in logging', 'measure dataframe', str(e))
+                            if self.report_errors:
+                                self._report_error_to_file('Error in logging', 'measure dataframe', str(e))
                             print(f'Error in logging: {e}')
 
                         # reset the pandas display options back to default for regular displaying
@@ -672,7 +687,8 @@ class Measure(object):
             print('\n>> Removed duplicates from measurement dataframe.')
         except Exception as e:
             print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
-            if self.include_mod: self._report_error_to_file('Failed to remove duplicates from measurement dataframe (1)', 'measure dataframe', str(e))
+            if self.report_errors:
+                self._report_error_to_file('Failed to remove duplicates from measurement dataframe (1)', 'measure dataframe', str(e))
 
 
     def _measure_file(self, file_details, lock):
@@ -704,6 +720,7 @@ class Measure(object):
         uniprot_code, pdb_code, method, res, chains = file_details
 
         # calculate features values from all PDB files associated with specific DataFrame entry
+        frames_df_list = []
         for f in self.files_to_analyse:
             if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
                 continue
@@ -712,18 +729,21 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Modified']
             df_currentfile = pd.DataFrame(columns=columns)
 
             try:
                 M = bb.Molecule(f) # sometimes bb does not work with a pdb file
             except Exception as e:
                 self.wrong_pdb_file.append(f)
-                if self.include_mod: self._report_error_to_file('Failed to produce bb for pdb file', 'measure file parallel', str(e))
+                if self.report_errors:
+                    self._report_error_to_file('Failed to produce bb for pdb file', 'measure file parallel', str(e))
                 terminal_out_statements.append(f'Failed to produce bb for pdb file with error: {e}')
                 continue
 
-            _, idxs = M.atomselect('*', ['LYS'], ['CA'], get_index=True, use_resname=True)
+            resnames_to_explore = list(self.aa_properties['non_modified_codes'])
+            if self.include_mod: resnames_to_explore += list(self.aa_properties['modified_codes'])
+            _, idxs = M.atomselect('*', resnames_to_explore, ['CA'], get_index=True, use_resname=True)
             for i in idxs:
 
                 #save only lysine entries from chain of interest
@@ -736,6 +756,9 @@ class Measure(object):
                     'Resolution': res,
                     'Chain': M.data['chain'].values[i],
                     'Resid': M.data['resid'].values[i]})
+
+                if self.include_mod:
+                    data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
 
                 df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -752,7 +775,8 @@ class Measure(object):
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                 except Exception as e:
-                    if self.include_mod: self._report_error_to_file('Meas feat error', 'measure file parallel', str(e))
+                    if self.report_errors:
+                        self._report_error_to_file('Meas feat error', 'measure file parallel', str(e))
                     terminal_out_statements.append(f"ERROR: {e}")
                     continue
 
@@ -781,7 +805,8 @@ class Measure(object):
                             self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
-                            if self.include_mod: self._report_error_to_file('logging', 'measure file parallel', str(e))
+                            if self.report_errors:
+                                self._report_error_to_file('logging', 'measure file parallel', str(e))
                             print(f'Error in logging: {e}')
 
                         # reset the pandas display options back to default for regular displaying
@@ -792,7 +817,12 @@ class Measure(object):
 
 
             if not df_currentfile.empty:
-                return df_currentfile
+                frames_df_list.append(df_currentfile)
+
+        if not frames_df_list:
+            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid'])
+
+        return pd.concat(frames_df_list, ignore_index=True)
 
 
     def recover_from_log(self, log_path):
@@ -1061,7 +1091,8 @@ class Measure(object):
                     M = bb.Molecule(f) # sometimes bb does not work with a pdb file
                 except Exception as e:
                     print(f'Failed to create biobox molecule for file {f} with error: {e}')
-                    if self.include_mod: self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
+                    if self.report_errors:
+                        self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
                     self.wrong_pdb_file.append(f)
                     continue
 
@@ -1087,7 +1118,8 @@ class Measure(object):
                         df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                     except Exception as e:
-                        if self.include_mod: self._report_error_to_file(f'Error adding the measurements for file {f} to the dataframe', 'measure pdb only', str(e))
+                        if self.report_errors:
+                            self._report_error_to_file(f'Error adding the measurements for file {f} to the dataframe', 'measure pdb only', str(e))
                         print(f"ERROR adding the measurements for file {f} to the dataframe: {e}")
                         continue
 
@@ -1113,7 +1145,8 @@ class Measure(object):
                             pd.reset_option('max_seq_items')
                             pd.reset_option('display.max_rows')
                         except Exception as e:
-                            if self.include_mod: self._report_error_to_file('logging error', 'measure pdb only', str(e))
+                            if self.report_errors:
+                                self._report_error_to_file('logging error', 'measure pdb only', str(e))
                             print(f'Error in logging measurements: {e}')
 
                 if not df_currentfile.empty:
@@ -1129,7 +1162,8 @@ class Measure(object):
                 perc_prog_measure = round(((pdb_idx + self.progress_index + 1)/num_pdb_files)*100, 2)
                 print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
             except Exception as e:
-                if self.include_mod: self._report_error_to_file('broken progress updater', 'measure pdb only', str(e))
+                if self.report_errors:
+                    self._report_error_to_file('broken progress updater', 'measure pdb only', str(e))
                 print(f'>> Broken progress updater: {e} \r', end='', flush=True)
 
 

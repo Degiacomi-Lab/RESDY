@@ -95,8 +95,14 @@ class Frustration():
             M.import_pdb(path, include_hetatm=True)
             M_ca = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
 
-            if self.include_modified: idx_res_interest = M_ca.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'CA', use_resname=True, get_index=True)[1]
-            else: idx_res_interest = M_ca.atomselect('*', self.aa_properties['non_modified_codes'], 'CA', use_resname=True, get_index=True)[1]
+            if self.include_modified:
+                idx_res_interest = M_ca.atomselect('*',
+                                                   (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                                   'CA', use_resname=True, get_index=True)[1]
+            else:
+                idx_res_interest = M_ca.atomselect('*',
+                                                   self.aa_properties['non_modified_codes'],
+                                                   'CA', use_resname=True, get_index=True)[1]
 
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M_ca.data['resname']))
             df_frustration = M_ca.data[['resid', 'chain', 'resname']]
