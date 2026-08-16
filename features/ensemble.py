@@ -111,7 +111,10 @@ class Ensemble():
             # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time
             file_loc = os.path.dirname(path)
             files = glob.glob(os.path.join(file_loc, "*pdb"))
-            uniprot_interest = list(self.df_proteins[self.df_proteins['PDB_Code'] == os.path.splitext(os.path.basename(path))[0].split('-')[0]]['Uniprot_Entry'])[0]
+            code = os.path.splitext(os.path.basename(path))[0]
+            if 'AF-' not in code:
+                code = code.split('-')[0]
+            uniprot_interest = list(self.df_proteins[self.df_proteins['PDB_Code'] == code]['Uniprot_Entry'])[0]
             prot_info = list(self.df_proteins[self.df_proteins['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
             prot_match_exists = [a for a in files if os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info]
 
@@ -129,7 +132,7 @@ class Ensemble():
         except Exception as e:
             if self.record_errors: report_error_to_file('RMSF 1', path, str(e), self.error_filename)
             print(f'RMSF Calculation 1: Failed to find other protein structures and get reference for uniprot: {path}, error: {e}')
-            return pd.DataFrame(columns=['chain', 'resid', 'rmsf'])
+            return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
         try:
             prot_matches = []
@@ -155,7 +158,7 @@ class Ensemble():
         except Exception as e:
             if self.record_errors: report_error_to_file('RMSF 2', path, str(e), self.error_filename)
             print(f'RMSF Calculation 2: Failed to calculate RMSF for uniprot: {path}, error: {e}')
-            return pd.DataFrame(columns=['chain', 'resid', 'rmsf'])
+            return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
         return df_rmsf.reset_index(drop=True).rename(columns={'resid': 'Resid', 'chain': 'Chain'})
 

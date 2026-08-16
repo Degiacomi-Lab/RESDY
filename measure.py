@@ -182,6 +182,8 @@ class Measure(object):
             self.PDB_only = True
             columns = ['PDB_Code', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns = columns)
+            
+        print(self.df_input)
 
 
     def _setup_measures(self, features):
@@ -595,7 +597,7 @@ class Measure(object):
             print(f'Analysing PDB code ({pdb_code}) {i+1}/{len(self.df_input)}. Predicted time remaining: {pred_time_remaining}')
 
             for f in self.files_to_analyse:
-                if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
+                if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
                     continue
 
                 t_start = time.time()
@@ -629,8 +631,8 @@ class Measure(object):
                         'Resolution': res,
                         'Chain': M.data['chain'].values[i],
                         'Resid': M.data['resid'].values[i]})
-                    
-                    if self.include_mod: data['Modified'] = (M.data['resname'].values[i] in self.aa_properties('modified_codes'))
+
+                    if self.include_mod: data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
@@ -722,7 +724,7 @@ class Measure(object):
         # calculate features values from all PDB files associated with specific DataFrame entry
         frames_df_list = []
         for f in self.files_to_analyse:
-            if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
+            if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
                 continue
 
             terminal_out_statements = []
