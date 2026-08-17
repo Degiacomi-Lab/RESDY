@@ -14,6 +14,7 @@ import shutil
 from copy import deepcopy
 import numpy as np
 import biobox as bb
+import pandas as pd
 
 from modeller import *
 from modeller.automodel import *
@@ -21,21 +22,21 @@ from modeller.automodel import *
 from helper import get_download_tool, ShutUp
 
 
-def autopatch(fbasename, gap_cutoff=8):
+def autopatch(tmp_folder, fbasename, gap_cutoff=8):
 
     print('>> modelling missing residues')
-    #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise)
-    pdb_out = ""
+    pdb_out = ''
+    seq_name = ''
     try:
 
         _pdb2seq(fbasename)
         _fasta2pir(fbasename)
-        seq_name = _full_align(fbasename)
-        _trim_align("alignment.seg.ali")
-        patch_status = _gap_check("trimmed_align.ali", gap_cutoff)
+        seq_name = _full_align(tmp_folder, fbasename)
+        _trim_align(tmp_folder, "alignment.seg.ali")
+        patch_status = _gap_check(tmp_folder, "trimmed_align.ali", gap_cutoff)
 
         if patch_status == "yes":
-            pdb_out = _patch_model(fbasename, seq_name)
+            pdb_out = _patch_model(tmp_folder, fbasename, seq_name)
         else:
             pdb_out = ""
 
@@ -44,13 +45,13 @@ def autopatch(fbasename, gap_cutoff=8):
 
     finally:
 
-        autopatch_files = [f'{fbasename}.seq', f'{fbasename}.pir', 'alignment.seg',
-                'alignment.seg.ali', 'trimmed_align.ali', 'family.mat']
-        autopatch_files.extend(glob.glob(f'{seq_name}.ini'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.rsr'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.sch'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.V*'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.D*'))
+        autopatch_files = [f'{fbasename}.seq', f'{fbasename}.pir', f'{tmp_folder}{os.sep}alignment.seg',
+                f'{tmp_folder}{os.sep}alignment.seg.ali', f'{tmp_folder}{os.sep}trimmed_align.ali', 'family.mat']
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.ini'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.rsr'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.sch'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.V*'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.D*'))
 
         for patch_file in autopatch_files:
             m = os.path.join(os.getcwd(), patch_file)
@@ -60,7 +61,7 @@ def autopatch(fbasename, gap_cutoff=8):
                 print(f"cannot remove {m}, error: {e}; continuing...")
                 continue
 
-        return pdb_out
+    return pdb_out
 
 #autopatch step 1a. pir format of AA from pdb
 def _pdb2seq(fbasename):
@@ -69,28 +70,30 @@ def _pdb2seq(fbasename):
     mdl = Model(env, file=fbasename)
     aln = Alignment(env)
     aln.append_model(mdl, align_codes=fbasename)
-    aln.write(file=fbasename+'.seq')
+    aln.write(file=f'{fbasename}.seq')
 
 #autopatch step 1b. pir from complete AA fasta
 def _fasta2pir(fbasename):
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
     a = Alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
-    a.write(file=fbasename+'.pir', alignment_format='PIR')
+    a.write(file=f'{fbasename}.pir', alignment_format='PIR')
 
 #autopatch step 2. add sequence name to 2nd line; copy the pir contents and structure info into alignment.seg; align sequences and generate model
-def _full_align(fbasename):
-    pir_fname = fbasename+'.pir'
-    seq_fname = fbasename+'.seq'
+def _full_align(tmp_folder, fbasename):
+    pir_fname = f'{fbasename}.pir'
+    seq_fname = f'{fbasename}.seq'
+
     f = open(pir_fname, "r")
     f1 = f.readlines()
     f.close()
-    #f1 = [x.rstrip() for x in f1]
+
     for i, line in enumerate(f1):
         if "P1;" in line:
             seq_name = line[4:8]
         if "sequence:" in line:
-            seq_pos = i 
+            seq_pos = i
+
     P1 = ">P1;"+seq_name+"\n"
     seq_line = "sequence:"+seq_name+":::::::-1.00:-1.00\n"
     AA_block = ''.join([str(elem) for elem in f1[seq_pos+1:]])
@@ -99,19 +102,21 @@ def _full_align(fbasename):
     f.writelines(seq_block)
     f.close()
 
+    alignment_filename = f'{tmp_folder}{os.sep}alignment.seg'
+
     if sys.platform == "win32":
-        my_cmd_a = f'type {pir_fname} {seq_fname} > alignment.seg'
+        my_cmd_a = f'type {pir_fname} {seq_fname} > {alignment_filename}'
     else:
-        my_cmd_a = f'cat {pir_fname} {seq_fname} > alignment.seg'
+        my_cmd_a = f'cat {pir_fname} {seq_fname} > {alignment_filename}'
 
     os.system(my_cmd_a)
 
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
-    env.io.atom_files_directory = ['.', f'..{os.sep}atom_files']
+    env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
     a = AutoModel(env,
                   # file with template codes and target sequence
-                  alnfile  = 'alignment.seg',
+                  alnfile  = alignment_filename,
                   # PDB codes of the templates
                   knowns   = fbasename,
                   # code of the target
@@ -120,8 +125,8 @@ def _full_align(fbasename):
     return seq_name
 
 # autopatch step 3. trim the alignment by removing gaps for missing residues at the termini of the structure
-def _trim_align(align_file):
-    align_file = "alignment.seg.ali"
+def _trim_align(tmp_folder, align_file):
+    align_file = f'{tmp_folder}{os.sep}alignment.seg.ali'
     f=open(align_file, "r")
     f1 = f.readlines()
     P1_pos = []
@@ -164,15 +169,16 @@ def _trim_align(align_file):
 
     struc_sec = f1[sec_1] + f1[sec_1+1] + AA_struc_new + "\n"
     seq_sec = f1[sec_2] + f1[sec_2+1] + AA_seq_new + "\n"
-    f = open("trimmed_align.ali", 'w')
+    trim_filename = f'{tmp_folder}{os.sep}trimmed_align.ali'
+    f = open(trim_filename, 'w')
     f.writelines(struc_sec)
     f.writelines(seq_sec)
     f.close()
 
 #autopatch step 4. Check if any gap is more than cutoff length in the trimmed_align.ali and if so set patch_status = "no"
-def _gap_check(align_file, gap_cutoff):
+def _gap_check(tmp_folder, align_file, gap_cutoff):
     patch_status = "yes"
-    align_file = "trimmed_align.ali"
+    align_file = f'{tmp_folder}{os.sep}trimmed_align.ali'
     f=open(align_file, "r")
     f1 = f.readlines()
     P1_pos = []
@@ -195,29 +201,30 @@ def _gap_check(align_file, gap_cutoff):
     return patch_status
 
 #autopatch step 5. build missing residues
-def _patch_model(fbasename, seq_name):
+def _patch_model(tmp_folder, fbasename, seq_name):
     print(">> patching model...")
     log.verbose()
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
-    env.io.atom_files_directory = ['.', f'..{os.sep}atom_files']
+    env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
     a = AutoModel(env,
                   # file with template codes and target sequence
-                  alnfile  = 'trimmed_align.ali',
+                  alnfile  = f'{tmp_folder}{os.sep}trimmed_align.ali',
                   # PDB codes of the templates
                   knowns   = fbasename,
                   # code of the target
                   sequence = seq_name,
-                  assess_methods = (assess.DOPE, assess.GA341))
+                  assess_methods = (assess.DOPE, assess.GA341),
+                  root_name=os.path.basename(tmp_folder))
     a.md_level = refine.fast #very_fast, fast, slow, very_slow, slow_large, refine
     #repeat whole cycle twice and do not stop unless obj. func > 1e6
     #a.repeat_optimization = 2
     a.max_molpdf = 1e6
     a.make()
 
-    pdb_out = f"{fbasename}_PATCHED.pdb"
+    pdb_out = f'{fbasename}_PATCHED.pdb'
 
-    os.rename(f'{seq_name}.B99990001.pdb', pdb_out)
+    os.rename(f'{os.path.basename(tmp_folder)}.B99990001.pdb', pdb_out)
 
     return pdb_out
 
@@ -262,6 +269,19 @@ def fragment(pdb, fasta, outfolder="."):
     #split PDB file in chains using biobox
     M = bb.Molecule(pdb)
     chains = np.unique(M.data["chain"].values)
+
+    # Catch cases which have more than 62 chains which are not able to be worked with using PDB files
+    if len(chains) > 62:
+        with open(os.path.join(os.path.split(outfolder)[0], 'excessive_chains_files.txt'), 'a') as f1:
+            f1.write(f'PDB: {pdb}; Chains: {str(chains)}')
+        raise Exception(f'>> More than 62 individual chains present in the structure, not possible to curate a file for this number of chain names. File: {pdb}')
+
+    # Catch cases which have double letter chain names, used to work out if worth including more functionality for these, have left future double letter functionality in incase this is useful in future.
+    if any(len(chain) > 1 for chain in chains):
+        with open(os.path.join(os.path.split(outfolder)[0], 'double_letter_file_count.txt'), 'a') as f1:
+            f1.write(f'PDB: {pdb}; Chains: {", ".join(chains)}\n')
+        raise Exception(f'>> Double letter chain names are present within the structure, currently ignoring these, tally updated in \'double_letter_file_count.txt\'. File: {pdb}')
+
     gap_count = []
     for c in chains:
         idxs = M.atomselect([c], '*', '*', get_index=True)[1]
@@ -316,44 +336,8 @@ def fragment(pdb, fasta, outfolder="."):
             fout.writelines(sequences[i])
             fout.close()
 
-
-    # The following section commented out turns the fragmented files into the format specified by Modeller to work with double letter chain names
-    # This should work with the parameter iodata.two_char_chain, however this doesn't appear to be working in this implementation
-    # Therefore this code is left incase the parameter will start to work, new method is added below - GW_04.03.24
-    '''
-    # change the position of the chain names from single character format at 22 to double character 21-22 
-    all_files = os.listdir(outfolder) 
-    pdb_files = []
-    for file in all_files:
-        temp_parts = file.split('.')
-        if file[0:5] == 'chain':
-            if temp_parts[1] == 'pdb' and len(temp_parts[0][5:]) == 2:
-                pdb_files.append(file)
-        
-    for file in pdb_files:
-        # This will move the chain name 1 position to the left such that it will start at position 21 rather than 22 as it currently is
-        # This allows it to work with the two_chain_char modification to allow double chain names to be read by Modeller
-        # This style may be different for other programmes than Modeller
-        # TODO: check if Modeller output of double chain names works for other structures.
-        
-
-        with fileinput.FileInput(os.path.join(outfolder, file), inplace = True) as f:
-            for line in f:
-                try:
-                    #On lines with 'ATOM', 'TER' or 'HETATM' if the chain is in the auth_list
-                    #the auth chain name is replaced with the RCSB chain name.
-                    if (line[:4] == 'ATOM') or (line[:6] == 'HETATM'):
-                            line = line[:20] + line[21:23] + ' ' + line[23:]
-                            print(line, end ='')
-
-                    else:
-                        print(line, end='')
-                except:
-                    print(line, end='')
-    '''
-
     # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format
-    # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesnt convert all double letter chain names to A
+    # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesn't convert all double letter chain names to A
     # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
     # find the double chain name files and store in list to iterate through when converting the single character names
     all_files = os.listdir(outfolder)
@@ -373,8 +357,8 @@ def fragment(pdb, fasta, outfolder="."):
         sl_chain_name = next((c for c in candidate_names if c not in used_sl_chain_names), None)
 
         if sl_chain_name is None:
-            raise Exception(f'>> No free single letter chain names available for renaming double letter chain names; '
-                            f'chain: {db_chain_name}; error {e}')
+            raise Exception(f'>> No free single letter chain names available for renaming double '
+                            f'letter chain names; chain: {db_chain_name}')
 
         used_sl_chain_names.append(sl_chain_name)
         sl_to_dl_chain_map[sl_chain_name] = db_chain_name
@@ -384,12 +368,11 @@ def fragment(pdb, fasta, outfolder="."):
             with fileinput.FileInput(temp_file_path, inplace = True) as f:
                 for line in f:
                     try:
-                        #On lines with 'ATOM', 'TER' or 'HETATM'
-                        #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
+                        #On lines with 'ATOM', 'TER' or 'HETATM' the current chain name is replaced with the
+                        #new single letter chain name and adjusted to match the correct pdb file format
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
                             if len(line) > 22:
-                                new_chain_name = sl_chain_name
-                                line = line[:21] + new_chain_name + ' ' + line[23:]
+                                line = line[:21] + sl_chain_name + ' ' + line[23:]  # space needed here as double letter previously used and so without it you will get an artefact leaving a double letter chain name anyway eg AA would go to aA otherwise
                                 print(line, end ='')
                             else:
                                 print(line, end='')
@@ -406,16 +389,25 @@ def fragment(pdb, fasta, outfolder="."):
 
 
 def reassemble(pdbs, labels, outname, outdir):
-
-    # For each pdb file in pdbs go back through and take the chain name from the file name to replace the chain name back to a double letter
-    # This reverses the temporary measure of changing to lower case single letter names to allow Modeller to patch before changing back
-    tmpfolder = os.path.join(outdir, "tmp")
+    '''
+    For each pdb file in pdbs go back through and take the chain name from the file
+    name to replace the chain name back to a double letter. This reverses the
+    temporary measure of changing to lower case single letter names to allow
+    Modeller to patch before changing back.
+    '''
     for pdb_file in pdbs:
         # take pdb_file and extract the chain name - need to find the exact format it needs to go back into that the code is expecting to reconvert it from
         dbletter = False
+        thousand_chain = False
         chainname = os.path.splitext(os.path.basename(pdb_file))[0].split('_')[0][5:]
         if len(chainname) > 1:
             dbletter = True
+
+        M_tmp = bb.Molecule()
+        M_tmp.import_pdb(pdb_file, include_hetatm=True)
+        num_res = len(set(list((M_tmp.data['resid']))))
+        if num_res > 999:
+            thousand_chain = True
 
         try:
             with fileinput.FileInput(pdb_file, inplace = True) as f:
@@ -423,9 +415,17 @@ def reassemble(pdbs, labels, outname, outdir):
                     try:
                         #On lines with 'ATOM', 'TER' or 'HETATM'
                         #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
-                        if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
-                            if dbletter:
-                                line = line[:21] + chainname + '' + line[23:]
+                        if ((line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM')) and len(line) > 26:
+                            if dbletter and thousand_chain:
+                                raise Exception(f'>> Carbamylation code can\'t handle writing chains with more than '
+                                                f'1000 residues and a double letter chain name at the same time. '
+                                                f'Chain name: {dbletter}; Num resids: {num_res}')
+                            elif dbletter and not thousand_chain:
+                                resid = line[22:26].strip()
+                                line = line[:21] + chainname + '%3s' % resid + line[26:]
+                            elif not dbletter and thousand_chain:
+                                resid = line[22:26].strip()
+                                line = line[:21] + chainname + '%4s' % resid + line[26:]
                             else:
                                 line = line[:21] + chainname + ' ' + line[23:]
 
@@ -440,6 +440,23 @@ def reassemble(pdbs, labels, outname, outdir):
 
     # Take all the files in pdbs and turn each into a biobox Molecule object and append this to a list of monomers
     # create a biobox multimer from the list of monomors and write a new pdb file combining all these
+    # Slower solution but works
+    with open(outname, 'ab') as f_outname:
+        for i, (f, f_chain) in enumerate(zip(pdbs, labels)):
+            T = bb.Molecule()
+            T.import_pdb(f, include_hetatm=True)
+            T.data['chain'] = f_chain
+            T.write_pdb(f)
+            with open(f, 'rb') as f_new:
+                for line in f_new:
+                    if (line[:3] == 'TER'.encode() or line[:4] == 'ATOM'.encode() or line[:6] == 'HETATM'.encode()):
+                        f_outname.write(line)
+                    elif i == 0 and line.startswith('MODEL'.encode()):
+                        f_outname.write(line)
+
+    # The following commented section is preferred for writing files, however without resetting the chain
+    # names will reset them all, and if you reset the chains the double letters dont print correctly
+    '''
     monomers = []
     for f in pdbs:
         monomers.append(bb.Molecule(f))
@@ -447,21 +464,25 @@ def reassemble(pdbs, labels, outname, outdir):
     M_multi = bb.Multimer()
     #print(labels)
     M_multi.load_list(monomers, labels)
-    #print(list(set(list(M_multi.data['chain']))))
-    #print(list(set(list(M_multi.data['unit']))))
-    #print(M_multi.data)
+    print('m multi res', M_multi.chain_names)
+    M_multi.chain_names = labels
+    print('m multi res', M_multi.chain_names)
+    print(list(set(list(M_multi.data['chain']))))
+    print(M_multi.data)
+    
     M_multi.write_pdb(outname)
+    '''
 
 
-
-def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
-    tmpfolder = os.path.join(outdir, "tmp")
-    if os.path.exists(tmpfolder):
-        shutil.rmtree(tmpfolder)
-    os.makedirs(tmpfolder, exist_ok=True)
+def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
+    pdb_tmp_name = f'tmp_{os.path.splitext(os.path.basename(pdb))[0]}'
+    tmp_folder = os.path.join(outdir, pdb_tmp_name)
+    if os.path.exists(tmp_folder):
+        shutil.rmtree(tmp_folder)
+    os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    gap_count = fragment(pdb, fasta, tmpfolder)
+    gap_count = fragment(pdb, fasta, tmp_folder)
 
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
@@ -469,7 +490,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         raise Exception(f"large gap detected ({largest} residues)")
 
     #launch modeller on each individual chain  # TODO do we actually need to launch modeller if gaps are 0?
-    files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
+    files = glob.glob(os.path.join(tmp_folder, "chain*fasta"))
     chains = []
     fouts = []
     for f in files:
@@ -478,10 +499,10 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         fbasename = os.path.splitext(f)[0]
 
         if verbose:
-            foutname = autopatch(fbasename, gap)
+            foutname = autopatch(tmp_folder, fbasename, gap)
         else:
             with ShutUp():
-                foutname = autopatch(fbasename, gap)
+                foutname = autopatch(tmp_folder, fbasename, gap)
 
         if foutname == "":
             raise Exception("Autopatching failed.")
@@ -511,7 +532,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
 
     reassemble(fouts, chains, outname, outdir)
 
-    shutil.rmtree(tmpfolder)
+    shutil.rmtree(tmp_folder)
 
     return outname
 

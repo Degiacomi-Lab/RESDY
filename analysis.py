@@ -434,6 +434,12 @@ class Analysis(object):
                     print('>> Weight remains as default and equal for all metrics')
                     if len(features) == 1: weights = [1]
                     else: weights = [1/len(features)] * len(features)
+                elif len(features) == 2:
+                    print(f'>> 1 weight given, 2 features, assigning given weight ({weights}) to first feature ({features[0]}), second feature ({features[1]}) will take {1-weights} for weighting.')
+                    weights = [weights, 1-weights]
+                else:
+                    print('>> Not enough weights entered to work out weightings for features. Assuming equal weight for all metrics')
+                    weights = [1/len(features)] * len(features)
             elif isinstance(weights, list):
                 if len(set(weights)) == 1:
                     print('>> Weight remains as default and equal for all metrics')

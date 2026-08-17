@@ -85,19 +85,24 @@ class Aggregation:
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
-            self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'class']]
+            self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Resid', 'class']]
 
-        self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
+        self.lys_key = ['Uniprot_Entry', 'Resid']
         data_cols_entered = self.df_measurements.columns.values
         cols_required = [a for a in self.df_measurements.columns if a in self.lys_key + ['PDB_Code', 'class']]
-        self.features_to_include = [feat for feat in self.features_to_include if feat in data_cols_entered]
         cols_removed = [f for f in self.features_to_include if f not in data_cols_entered]
-        if cols_removed: print(f'The following features given as input not available in all input files, will not be included: {cols_removed}')
+        self.features_to_include = [f for f in self.features_to_include if f in data_cols_entered]
+        if cols_removed:
+            print(f'The following features given as input not available in all '
+                  f'input files, will not be included: {cols_removed}')
         self.df_measurements = self.df_measurements[cols_required + self.features_to_include]
 
         if 'Method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
         if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
-        self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)  # TODO GW 29.01.26 - add something to let you know how many lines have been removed and if many of them are from one specific feature
+        len_df_measures = len(self.df_measurements)
+        self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)
+        print(f'>> Removed {len_df_measures - len(self.df_measurements)} rows from the measurements dataframe which '
+              f'contained nan values. New dataframe length is {len(self.df_measurements)}')
 
     def aggregate_data(self):
         '''
@@ -112,7 +117,10 @@ class Aggregation:
         -------
         >> self.aggregate_data()
         '''
-        self._remove_bad_data(feature='Depth', lower=0, upper=20)
+        bad_feature_sets = [('depth', 0, 20)]  # add to as more confinements on features needed
+        for bad_feat, feat_low, feat_up in bad_feature_sets:
+            if bad_feat in self.df_measurements.columns:
+                self._remove_bad_data(feature=bad_feat, lower=feat_low, upper=feat_up)
         df_stats = self._calculate_statistics()
         match self.aggregation_method:
             case 'avg':
@@ -162,8 +170,10 @@ class Aggregation:
             The upper bound of bad values to accept
         '''
         df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) | (self.df_measurements[feature] > upper)]
-        self.df_measurements[feature] = self.df_measurements[feature].where(self.df_measurements[feature].between(lower, upper))
-        print(f'>> Changed {len(df_suspicious)} values for {feature} from the measurements data which did not fall inside the bounds, replaced with NaN')
+        #self.df_measurements[feature] = self.df_measurements[feature].where(self.df_measurements[feature].between(lower, upper))  # sets out of bounds entries to NaN
+        self.df_measurements = self.df_measurements[self.df_measurements[feature].between(lower, upper)]
+        #print(f'>> Changed {len(df_suspicious)} values for {feature} from the measurements data which did not fall inside the bounds, replaced with NaN')
+        print(f'>> Removed {len(df_suspicious)} rows which contain out of bounds entries for {feature} from the measurements data.')
 
 
     def _reduce_aev_dimensions(self):
@@ -249,7 +259,8 @@ class Aggregation:
         print('>> Removing null AEV columns...')
         initial_num_cols = len(self.df_measurements.columns)
         num_cols_to_keep = sum((self.df_measurements != 0).any(axis=0))
-        cols_to_remove = [a for a in list(self.df_measurements.loc[:, (self.df_measurements == 0).any(axis=0)].columns) if 'AEV_' in a]
+        aev_col_names = [a for a in list(self.df_measurements.columns) if 'AEV_' in a]
+        cols_to_remove = [a for a in aev_col_names if (self.df_measurements[a] == 0).all()]
         self.df_measurements = self.df_measurements.drop(columns=cols_to_remove, axis=0)
         print(f'>> Removed {len(cols_to_remove)} null AEV columns, {num_cols_to_keep} AEV columns left.')
 
@@ -325,24 +336,23 @@ class Aggregation:
         if 'class' not in self.df_measurements.columns:
             self.df_measurements['class'] = -1  # set to -1 as unsure if pos or neg
 
-        df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Chain', 'Resid', 'class'])
+        df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
 
         if 'aev' in self.features_to_include or 'esm' in self.features_to_include or 'aev_legolas' in self.features_to_include:
             self._reduce_aev_dimensions()
 
-        for (entry, chain, resid), df_query in self.df_measurements.groupby(self.lys_key):
+        for (entry, resid), df_query in self.df_measurements.groupby(self.lys_key):
             df_query = df_query.reset_index(drop=True)
             if len(set(df_query['class'])) != 1:
                 print(f'>> Not all instances of resid assigned to same class (instances: {list(set(df_query["class"]))}), '
-                      f'using class -1 instead: Uniprot: {entry}, Chain: {chain}, Resid: {resid}')
+                      f'using class -1 instead: Uniprot: {entry}, Resid: {resid}')
                 class_val = -1
             else:
                 class_val = df_query['class'].iloc[0]  # take first value of class as overall class for resid
             data = {'Uniprot_Entry': entry,
-                    'Chain': chain,
                     'Resid': resid,
                     'class': class_val}
-            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'class']]
+            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
             for feature in features:
                 if feature == 'aev' or feature == 'aev_legolas':
                     df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)

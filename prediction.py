@@ -7,9 +7,7 @@ import matplotlib
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from matplotlib.lines import Line2D
-
 from aggregation import Aggregation
-from models.pulearning import PUlearning
 
 class Prediction:
     '''
@@ -112,6 +110,7 @@ class Prediction:
         '''
         match prediction_model:
             case 'pulearning':
+                from models.pulearning import PUlearning
                 PUlearn = PUlearning(self.df_agg, self.y)
                 PUlearn.basic_pulearn()
     
@@ -157,12 +156,19 @@ class Prediction:
                 all_overlaps = pd.concat([all_overlaps, df_query[['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]], ignore_index=True)
                 self.df_agg = self.df_agg.drop(index=df_query.index[1:])  # drop all duplicates after the first occurance
         print(f'Number of overlaps: {len(all_overlaps)}')
-        num_pos_data = len(self.df_agg[self.df_agg['class'] == 1])
-        indices_random_neg_data = random.sample(range(num_pos_data, len(self.df_agg)), num_pos_data)
-        self.df_prepped = pd.concat([self.df_agg[self.df_agg['class'] == 1], self.df_agg.iloc[indices_random_neg_data]])
+
+        pos_data = self.df_agg[self.df_agg['class'] == 1]
+        neg_data = self.df_agg[self.df_agg['class'] == 0]
+        if len(neg_data) < len(pos_data):
+            raise ValueError(f'Fewer negatives than positives available in the dataset. '
+                                f'More needed. {len(neg_data)} negatives to {len(pos_data)} positives')
+        neg_data = neg_data.sample(n=len(pos_data), random_state=25)  # seeded to make split reproducible for testing purposes
+
+        self.df_prepped = pd.concat([pos_data, neg_data])
         self.y = self.df_prepped['class']
         self.df_prepped = self.df_prepped.drop(['Uniprot_Entry', 'Resid', 'class'], axis=1)
-    
+
+
     def produce_pca_3d(self):
         '''
         Create a 3D PCA based on the aggregated data

@@ -1,33 +1,19 @@
-import re
 import os, sys
-import io
-import logging
-import datetime
-import shutil
-import subprocess
 import glob
-import time
-from datetime import date
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import torch
-import torch.nn as nn
-import matplotlib.pyplot as plt
 from collections import OrderedDict
 import MDAnalysis as mda
 from MDAnalysis.analysis import rms, align
 from features.error_reporting import report_error_to_file
 
-try: 
+try:
+    import torch
+    import torch.nn as nn
     import esm
 except Exception as e:
-    print(f'>> Failed to import esm package required for esm calculations, will not be able to calculate sequence features based on esm')
+    print(f'>> Failed to import packages required for esm calculations, will not be able to calculate sequence features based on esm. Error: {e}')
 
 
 class Ensemble():
@@ -82,7 +68,7 @@ class Ensemble():
         self.esm2_model_650M = self.esm2_model_650M.to(device=self.device)
         self.batch_converter = self.alphabet.get_batch_converter()
         self.esm2_model_650M.eval()
-        
+
         torch.manual_seed(25)
         if self.device == 'cuda':
             torch.cuda.manual_seed(25)
@@ -90,15 +76,10 @@ class Ensemble():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-        self.esm_proj_linear = torch.nn.Linear(1280, 512)
-        nn.init.xavier_uniform_(self.esm_proj_linear.weight)
-        self.esm_proj_linear.to(device=self.device)
-        self.lstm_module = torch.nn.LSTM(512, 256, 2, batch_first=True, bidirectional=True).to(device=self.device)
-        
         self.model_loaded = True
 
 
-    def calculate_rmsf(self, path, df_subset):
+    def calculate_rmsf(self, path):
         '''
         Calculate the root mean square fluctuation of the lysines within the protein
         over all the structures which have been curated for the uniprot code
@@ -112,9 +93,6 @@ class Ensemble():
         ----------
         path : string
             The path of the pdb file that DAS is being calculated for.
-        df_subset : Dataframe
-            Subset of the protein dataframe which is given as input to the measure class
-            which shows which pdb files are associated with the uniprot code of interest
 
         Returns
         -------
@@ -133,8 +111,11 @@ class Ensemble():
             # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time
             file_loc = os.path.dirname(path)
             files = glob.glob(os.path.join(file_loc, "*pdb"))
-            uniprot_interest = list(df_subset[df_subset['PDB_Code'] == os.path.splitext(os.path.basename(path))[0].split('-')[0]]['Uniprot_Entry'])[0]
-            prot_info = list(df_subset[df_subset['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
+            code = os.path.splitext(os.path.basename(path))[0]
+            if 'AF-' not in code:
+                code = code.split('-')[0]
+            uniprot_interest = list(self.df_proteins[self.df_proteins['PDB_Code'] == code]['Uniprot_Entry'])[0]
+            prot_info = list(self.df_proteins[self.df_proteins['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
             prot_match_exists = [a for a in files if os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info]
 
             M = bb.Molecule()
@@ -151,7 +132,7 @@ class Ensemble():
         except Exception as e:
             if self.record_errors: report_error_to_file('RMSF 1', path, str(e), self.error_filename)
             print(f'RMSF Calculation 1: Failed to find other protein structures and get reference for uniprot: {path}, error: {e}')
-            return pd.DataFrame(columns=['chain', 'resid', 'rmsf'])
+            return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
         try:
             prot_matches = []
@@ -177,9 +158,9 @@ class Ensemble():
         except Exception as e:
             if self.record_errors: report_error_to_file('RMSF 2', path, str(e), self.error_filename)
             print(f'RMSF Calculation 2: Failed to calculate RMSF for uniprot: {path}, error: {e}')
-            return pd.DataFrame(columns=['chain', 'resid', 'rmsf'])
+            return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
-        return df_rmsf.reset_index(drop=True)
+        return df_rmsf.reset_index(drop=True).rename(columns={'resid': 'Resid', 'chain': 'Chain'})
 
 
     def calculate_esm(self, path, num_add_aa=20):
@@ -214,8 +195,25 @@ class Ensemble():
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
 
-            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
+            if self.include_modified:
+                idx_nz = M.atomselect('*',
+                                      (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                      self.aa_properties['atom_select_names_modified'],
+                                      use_resname=True, get_index=True)[1]
+                # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
+                key_res_chain = zip(list(M.data['resid'].values[idx_nz]), list(M.data['chain'].values[idx_nz]))
+                pairs_seen, keep_pos = set(), []
+                for pair, pos in zip(key_res_chain, range(len(idx_nz))):
+                    if pair not in pairs_seen:
+                        pairs_seen.add(pair)
+                        keep_pos.append(pos)
+                idx_nz = idx_nz[keep_pos]
+
+            else:
+                idx_nz = M.atomselect('*',
+                                      self.aa_properties['non_modified_codes'],
+                                      self.aa_properties['atom_select_names_nonmod'],
+                                      use_resname=True, get_index=True)[1]
 
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
@@ -286,20 +284,13 @@ class Ensemble():
                 with torch.no_grad():
                     results = self.esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=False)
                     seq_encode_tokens = results["representations"][33]
-                    #seq_out = seq_encode_tokens[0, num_add_aa + 1, :]  # this bit of code can be used to extract a direct lysine representation without dimension reduction
-                    #seq_encode_tokens = seq_encode_tokens.to('cpu')
-
-                esm_linear = self.esm_proj_linear(seq_encode_tokens)# [1, 43, 512]
-                hidden_n = torch.zeros(4, esm_linear.size(0), 256).to(device=self.device)
-                cell_n = torch.zeros(4, esm_linear.size(0), 256).to(device=self.device)
-                seq_lstm, _ = self.lstm_module(esm_linear, (hidden_n, cell_n))
-                seq_out = seq_lstm.mean(dim=1, keepdim=True)
-                seq_out = seq_out.to('cpu')
+                    seq_out = seq_encode_tokens[0, num_add_aa + 1, :]  # this bit of code can be used to extract a direct lysine representation without dimension reduction
+                    seq_out = seq_out.to('cpu')
 
                 if self.include_modified:
-                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': str(seq_out.tolist()[0][0]), 'Modified': list_modified[idx]}])], ignore_index=True)
+                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': str(seq_out.tolist()), 'Modified': list_modified[idx]}])], ignore_index=True)
                 else:
-                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': str(seq_out.tolist()[0][0])}])], ignore_index=True)
+                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'esm': str(seq_out.tolist())}])], ignore_index=True)
 
             except Exception as e:
                 if self.record_errors: report_error_to_file('Ensemble ESM 2', path, str(e), self.error_filename)
@@ -313,12 +304,12 @@ class Ensemble():
 
 
 if __name__ == '__main__':
-    
-    df_prot = pd.DataFrame()
+    outdir = 'Demo'
+    df_prot = pd.read_csv(f'{outdir}{os.sep}proteins_demo.csv')
     E = Ensemble(df_proteins=df_prot, include_modified=False)
     print(E.calculate_esm(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
 
-    print(E.calculate_rmsf(df_subset=pd.read_csv(f'result{os.sep}proteins.csv'), path=f'result{os.sep}curated{os.sep}3BBC-alt1A.pdb'))
+    #print(E.calculate_rmsf(path=f'{outdir}{os.sep}curated{os.sep}1M2E-alt-1.pdb'))
     #df_esm.to_pickle('testing_esm_csv.pkl')  #  pickle used if keeping tensors in output dataframe, csv fine if taking list through as can literal_eval
     #df_esm_csv = pd.read_pickle('testing_esm_csv.pkl')
     #print(df_esm_csv)

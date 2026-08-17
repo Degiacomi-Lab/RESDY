@@ -38,19 +38,10 @@ def download_AF_struc(pdb, outfolder="result"):
 
     print(f"> downloading AlphaFold structure {pdb}")
 
-    tool = get_download_tool()
     try:
-        if tool == "curl":
-            line = f"curl -s -f -o {pdb}.pdb https://alphafold.ebi.ac.uk/files/{pdb}.pdb"
-        elif tool == "wget":
-            line = f"wget https://alphafold.ebi.ac.uk/files/{pdb}.pdb"
-        else:
-            raise RuntimeError("You don't have a commandline tool for downloading files")
-
         response = requests.get(url=f'https://alphafold.ebi.ac.uk/files/{pdb}.pdb', timeout=20)
         response.raise_for_status()
-        subprocess.check_call(line, shell=True)
-        os.rename(os.path.join(os.getcwd(), f'{pdb}.pdb'), os.path.join(download_path, f'{pdb}.pdb'))
+        open(os.path.join(download_path, f'{pdb}.pdb'), 'wb').write(response.content)
 
     except Exception as e:
         print(f'>> AF structure not found for {pdb}, error: {e}')
@@ -141,4 +132,4 @@ def find_af_plddt(af_code_full, outfolder="result"):
 
 if __name__ == '__main__':
     download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='result')
-    find_af_plddt('AF-P0CG48-F1-model_v6', outfolder='result')
+    #find_af_plddt('AF-P0CG48-F1-model_v6', outfolder='result')

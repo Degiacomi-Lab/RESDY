@@ -99,8 +99,25 @@ class DAS():
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
 
-            if self.include_modified: idx_nz = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), self.aa_properties['atom_select_names_modified'], use_resname=True, get_index=True)[1]
-            else: idx_nz = M.atomselect('*', self.aa_properties['non_modified_codes'], self.aa_properties['atom_select_names_nonmod'], use_resname=True, get_index=True)[1]
+            if self.include_modified:
+                idx_nz = M.atomselect('*',
+                                      (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                      self.aa_properties['atom_select_names_modified'],
+                                      use_resname=True, get_index=True)[1]
+                # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
+                key_res_chain = zip(list(M.data['resid'].values[idx_nz]), list(M.data['chain'].values[idx_nz]))
+                pairs_seen, keep_pos = set(), []
+                for pair, pos in zip(key_res_chain, range(len(idx_nz))):
+                    if pair not in pairs_seen:
+                        pairs_seen.add(pair)
+                        keep_pos.append(pos)
+                idx_nz = idx_nz[keep_pos]
+
+            else:
+                idx_nz = M.atomselect('*',
+                                      self.aa_properties['non_modified_codes'],
+                                      self.aa_properties['atom_select_names_nonmod'],
+                                      use_resname=True, get_index=True)[1]
 
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
