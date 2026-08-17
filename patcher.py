@@ -22,22 +22,21 @@ from modeller.automodel import *
 from helper import get_download_tool, ShutUp
 
 
-def autopatch(fbasename, gap_cutoff=8):
+def autopatch(tmp_folder, fbasename, gap_cutoff=8):
 
     print('>> modelling missing residues')
-    #pdb_out = "%s_PATCHED.pdb"%fbasename; the output pdb file name (if successful, empty otherwise)
     pdb_out = ''
     seq_name = ''
     try:
 
         _pdb2seq(fbasename)
         _fasta2pir(fbasename)
-        seq_name = _full_align(fbasename)
-        _trim_align("alignment.seg.ali")
-        patch_status = _gap_check("trimmed_align.ali", gap_cutoff)
+        seq_name = _full_align(tmp_folder, fbasename)
+        _trim_align(tmp_folder, "alignment.seg.ali")
+        patch_status = _gap_check(tmp_folder, "trimmed_align.ali", gap_cutoff)
 
         if patch_status == "yes":
-            pdb_out = _patch_model(fbasename, seq_name)
+            pdb_out = _patch_model(tmp_folder, fbasename, seq_name)
         else:
             pdb_out = ""
 
@@ -46,13 +45,13 @@ def autopatch(fbasename, gap_cutoff=8):
 
     finally:
 
-        autopatch_files = [f'{fbasename}.seq', f'{fbasename}.pir', 'alignment.seg',
-                'alignment.seg.ali', 'trimmed_align.ali', 'family.mat']
-        autopatch_files.extend(glob.glob(f'{seq_name}.ini'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.rsr'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.sch'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.V*'))
-        autopatch_files.extend(glob.glob(f'{seq_name}.D*'))
+        autopatch_files = [f'{fbasename}.seq', f'{fbasename}.pir', f'{tmp_folder}{os.sep}alignment.seg',
+                f'{tmp_folder}{os.sep}alignment.seg.ali', f'{tmp_folder}{os.sep}trimmed_align.ali', 'family.mat']
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.ini'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.rsr'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.sch'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.V*'))
+        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.D*'))
 
         for patch_file in autopatch_files:
             m = os.path.join(os.getcwd(), patch_file)
@@ -71,28 +70,30 @@ def _pdb2seq(fbasename):
     mdl = Model(env, file=fbasename)
     aln = Alignment(env)
     aln.append_model(mdl, align_codes=fbasename)
-    aln.write(file=fbasename+'.seq')
+    aln.write(file=f'{fbasename}.seq')
 
 #autopatch step 1b. pir from complete AA fasta
 def _fasta2pir(fbasename):
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
     a = Alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
-    a.write(file=fbasename+'.pir', alignment_format='PIR')
+    a.write(file=f'{fbasename}.pir', alignment_format='PIR')
 
 #autopatch step 2. add sequence name to 2nd line; copy the pir contents and structure info into alignment.seg; align sequences and generate model
-def _full_align(fbasename):
-    pir_fname = fbasename+'.pir'
-    seq_fname = fbasename+'.seq'
+def _full_align(tmp_folder, fbasename):
+    pir_fname = f'{fbasename}.pir'
+    seq_fname = f'{fbasename}.seq'
+
     f = open(pir_fname, "r")
     f1 = f.readlines()
     f.close()
-    #f1 = [x.rstrip() for x in f1]
+
     for i, line in enumerate(f1):
         if "P1;" in line:
             seq_name = line[4:8]
         if "sequence:" in line:
-            seq_pos = i 
+            seq_pos = i
+
     P1 = ">P1;"+seq_name+"\n"
     seq_line = "sequence:"+seq_name+":::::::-1.00:-1.00\n"
     AA_block = ''.join([str(elem) for elem in f1[seq_pos+1:]])
@@ -101,19 +102,21 @@ def _full_align(fbasename):
     f.writelines(seq_block)
     f.close()
 
+    alignment_filename = f'{tmp_folder}{os.sep}alignment.seg'
+
     if sys.platform == "win32":
-        my_cmd_a = f'type {pir_fname} {seq_fname} > alignment.seg'
+        my_cmd_a = f'type {pir_fname} {seq_fname} > {alignment_filename}'
     else:
-        my_cmd_a = f'cat {pir_fname} {seq_fname} > alignment.seg'
+        my_cmd_a = f'cat {pir_fname} {seq_fname} > {alignment_filename}'
 
     os.system(my_cmd_a)
 
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
-    env.io.atom_files_directory = ['.', f'..{os.sep}atom_files']
+    env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
     a = AutoModel(env,
                   # file with template codes and target sequence
-                  alnfile  = 'alignment.seg',
+                  alnfile  = alignment_filename,
                   # PDB codes of the templates
                   knowns   = fbasename,
                   # code of the target
@@ -122,8 +125,8 @@ def _full_align(fbasename):
     return seq_name
 
 # autopatch step 3. trim the alignment by removing gaps for missing residues at the termini of the structure
-def _trim_align(align_file):
-    align_file = "alignment.seg.ali"
+def _trim_align(tmp_folder, align_file):
+    align_file = f'{tmp_folder}{os.sep}alignment.seg.ali'
     f=open(align_file, "r")
     f1 = f.readlines()
     P1_pos = []
@@ -166,15 +169,16 @@ def _trim_align(align_file):
 
     struc_sec = f1[sec_1] + f1[sec_1+1] + AA_struc_new + "\n"
     seq_sec = f1[sec_2] + f1[sec_2+1] + AA_seq_new + "\n"
-    f = open("trimmed_align.ali", 'w')
+    trim_filename = f'{tmp_folder}{os.sep}trimmed_align.ali'
+    f = open(trim_filename, 'w')
     f.writelines(struc_sec)
     f.writelines(seq_sec)
     f.close()
 
 #autopatch step 4. Check if any gap is more than cutoff length in the trimmed_align.ali and if so set patch_status = "no"
-def _gap_check(align_file, gap_cutoff):
+def _gap_check(tmp_folder, align_file, gap_cutoff):
     patch_status = "yes"
-    align_file = "trimmed_align.ali"
+    align_file = f'{tmp_folder}{os.sep}trimmed_align.ali'
     f=open(align_file, "r")
     f1 = f.readlines()
     P1_pos = []
@@ -197,29 +201,30 @@ def _gap_check(align_file, gap_cutoff):
     return patch_status
 
 #autopatch step 5. build missing residues
-def _patch_model(fbasename, seq_name):
+def _patch_model(tmp_folder, fbasename, seq_name):
     print(">> patching model...")
     log.verbose()
     env = Environ()
     env.io.two_char_chain = True  # TODO check locations of these to see if they do anything
-    env.io.atom_files_directory = ['.', f'..{os.sep}atom_files']
+    env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
     a = AutoModel(env,
                   # file with template codes and target sequence
-                  alnfile  = 'trimmed_align.ali',
+                  alnfile  = f'{tmp_folder}{os.sep}trimmed_align.ali',
                   # PDB codes of the templates
                   knowns   = fbasename,
                   # code of the target
                   sequence = seq_name,
-                  assess_methods = (assess.DOPE, assess.GA341))
+                  assess_methods = (assess.DOPE, assess.GA341),
+                  root_name=os.path.basename(tmp_folder))
     a.md_level = refine.fast #very_fast, fast, slow, very_slow, slow_large, refine
     #repeat whole cycle twice and do not stop unless obj. func > 1e6
     #a.repeat_optimization = 2
     a.max_molpdf = 1e6
     a.make()
 
-    pdb_out = f"{fbasename}_PATCHED.pdb"
+    pdb_out = f'{fbasename}_PATCHED.pdb'
 
-    os.rename(f'{seq_name}.B99990001.pdb', pdb_out)
+    os.rename(f'{os.path.basename(tmp_folder)}.B99990001.pdb', pdb_out)
 
     return pdb_out
 
@@ -390,7 +395,6 @@ def reassemble(pdbs, labels, outname, outdir):
     temporary measure of changing to lower case single letter names to allow
     Modeller to patch before changing back.
     '''
-    tmpfolder = os.path.join(outdir, "tmp")
     for pdb_file in pdbs:
         # take pdb_file and extract the chain name - need to find the exact format it needs to go back into that the code is expecting to reconvert it from
         dbletter = False
@@ -470,15 +474,15 @@ def reassemble(pdbs, labels, outname, outdir):
     '''
 
 
-
-def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
-    tmpfolder = os.path.join(outdir, "tmp")
-    if os.path.exists(tmpfolder):
-        shutil.rmtree(tmpfolder)
-    os.makedirs(tmpfolder, exist_ok=True)
+def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
+    pdb_tmp_name = f'tmp_{os.path.splitext(os.path.basename(pdb))[0]}'
+    tmp_folder = os.path.join(outdir, pdb_tmp_name)
+    if os.path.exists(tmp_folder):
+        shutil.rmtree(tmp_folder)
+    os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    gap_count = fragment(pdb, fasta, tmpfolder)
+    gap_count = fragment(pdb, fasta, tmp_folder)
 
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
@@ -486,7 +490,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         raise Exception(f"large gap detected ({largest} residues)")
 
     #launch modeller on each individual chain  # TODO do we actually need to launch modeller if gaps are 0?
-    files = glob.glob(os.path.join(tmpfolder, "chain*fasta"))
+    files = glob.glob(os.path.join(tmp_folder, "chain*fasta"))
     chains = []
     fouts = []
     for f in files:
@@ -495,10 +499,10 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
         fbasename = os.path.splitext(f)[0]
 
         if verbose:
-            foutname = autopatch(fbasename, gap)
+            foutname = autopatch(tmp_folder, fbasename, gap)
         else:
             with ShutUp():
-                foutname = autopatch(fbasename, gap)
+                foutname = autopatch(tmp_folder, fbasename, gap)
 
         if foutname == "":
             raise Exception("Autopatching failed.")
@@ -528,7 +532,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=True):
 
     reassemble(fouts, chains, outname, outdir)
 
-    shutil.rmtree(tmpfolder)
+    shutil.rmtree(tmp_folder)
 
     return outname
 
