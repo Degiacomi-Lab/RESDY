@@ -4,8 +4,6 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 from collections import OrderedDict
-import MDAnalysis as mda
-from MDAnalysis.analysis import rms, align
 from features.error_reporting import report_error_to_file
 
 try:
@@ -13,7 +11,15 @@ try:
     import torch.nn as nn
     import esm
 except Exception as e:
-    print(f'>> Failed to import packages required for esm calculations, will not be able to calculate sequence features based on esm. Error: {e}')
+    print(f'>> Failed to import packages required for esm calculations, '
+          f'will not be able to calculate sequence features based on esm. Error: {e}')
+
+try:
+    import MDAnalysis as mda
+    from MDAnalysis.analysis import rms, align
+except Exception as e:
+    print(f'>> Failed to import packages (MDanalysis) required for rmsf calculations, '
+          f'will not be able to calculate rmsf data. Error: {e}')
 
 
 class Ensemble():
