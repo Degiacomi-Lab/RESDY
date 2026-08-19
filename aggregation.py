@@ -1,9 +1,7 @@
-import os
 import random
 import statistics
 import random
 from ast import literal_eval
-from copy import deepcopy as dc
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -77,6 +75,8 @@ class Aggregation:
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
         self.df_agg = pd.DataFrame()
+        
+        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method', 'Resolution', 'Resid', 'class']
 
         if 'aev_legolas' in self.df_measurements.columns:
             if 'aev' in self.df_measurements.columns:
@@ -85,7 +85,7 @@ class Aggregation:
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
-            self.features_to_include = [a for a in self.df_measurements.columns if a not in ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Resid', 'class']]
+            self.features_to_include = [a for a in self.df_measurements.columns if a not in self.non_feature_cols]
 
         self.lys_key = ['Uniprot_Entry', 'Resid']
         data_cols_entered = self.df_measurements.columns.values
@@ -352,7 +352,7 @@ class Aggregation:
             data = {'Uniprot_Entry': entry,
                     'Resid': resid,
                     'class': class_val}
-            features = [a for a in self.features_to_include if a not in ['Uniprot_Entry', 'PDB_Code', 'Resid', 'class']]
+            features = [a for a in self.features_to_include if a not in self.non_feature_cols]
             for feature in features:
                 if feature == 'aev' or feature == 'aev_legolas':
                     df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)

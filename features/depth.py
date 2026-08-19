@@ -1,13 +1,4 @@
-import re
 import os
-import io
-import logging
-import datetime
-import shutil
-import subprocess
-import glob
-import time
-from datetime import date
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -16,14 +7,15 @@ from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
 
 # Depth packages
 try:
     from Bio.PDB import PDBParser
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
+    depth_packages_available = True
 except Exception as e:
+    depth_packages_available = False
     print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
 
 
@@ -66,6 +58,10 @@ class Depth():
         self.error_filename = error_filename
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
+
+        if not depth_packages_available:
+            raise ImportError('>> Packages required for depth calculations (biopython/msms) are '
+                                'not available, depth will be removed from features to calculate.')
 
     def calculate_depth(self, path):
         '''

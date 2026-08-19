@@ -1,13 +1,3 @@
-import re
-import os
-import io
-import logging
-import datetime
-import shutil
-import subprocess
-import glob
-import time
-from datetime import date
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -24,8 +14,11 @@ try:
     from ase import Atoms
     import torch
     import torchani
+    aev_packages_available = True
 except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
+    aev_packages_available = False
+    print(f'Packages required for AEV calculation are not available, '
+          f'will not be able to calculate AEVs. Error: {e}')
 
 
 class AEV():
@@ -65,7 +58,11 @@ class AEV():
         self.error_filename = error_filename
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
-        
+
+        if not aev_packages_available:
+            raise ImportError('>> Packages required for AEV calculations (ase/torch/torchani) are '
+                              'not available, aev will be removed from features to calculate.')
+
         # Preparation of AEV computer
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=self.device)

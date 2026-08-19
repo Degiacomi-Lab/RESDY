@@ -48,29 +48,7 @@ class PDB(object):
             Toggle for if you want to download a system from a list of PDB files (True)
             or from a Uniprot dataframe (False) created from the Uniprot class. 
         '''
-        self._setup(outdir, gap, PDB_only)
 
-    
-
-    def _setup(self, outdir, gap, PDB_only):
-        '''
-        Setup function used within the main initalisation of the PDB class and
-        later load_state function to resetup the class with the new data.
-        
-        Parameters
-        ----------
-        outdir : string
-            The directory in which files should be downloaded and curated within
-        
-        gap : int
-            The maximum gap that is allowed in the sequence for a structure that has been
-            downloaded that patching will be done on. For structures with a gap in the
-            sequence greater than this, the structure will be removed.
-        
-        PDB_only : bool
-            Toggle for if you want to download a system from a list of PDB files (True)
-            or from a Uniprot dataframe (False) created from the Uniprot class. 
-        '''
         self.outdir = outdir
         self.PDB_only = PDB_only
         self.parallel = parallel
@@ -97,7 +75,7 @@ class PDB(object):
         self.gap = gap
 
 
-    def save_state(self, outname="proteins.csv"):
+    def save_state(self, outname='proteins.csv'):
         '''
         Take the current dataframe of proteins that have been gathered (pdb.df) and write this
         to a csv file in the output directory for later use.
@@ -105,7 +83,7 @@ class PDB(object):
         Parameters
         ----------
         outname -> string
-            the desired name for the pdb.df csv file to be written as
+            the desired name for the pdb.df csv file to be written as; default: 'proteins.csv'
 
         Example
         -------
@@ -116,8 +94,24 @@ class PDB(object):
 
     def load_state(self, fname, outdir="", gap=10, PDB_only=False):
         '''
-        initialize DataFrame from csv file.
-        If no output directory is given, the folder containing the csv file is used.
+        Allows part resuming of a partially run curation. Loads in the proteins.csv file
+        curated in a previous run into the self.df dataframe. While it doesn't stop the
+        programme trying to curate everything again but this isn't a problem as it won't
+        re-curate data anyway if skip_if_true is set to True. Sets other necessary parameters
+        for matching the previous run. If no output directory is given, the folder containing
+        the csv file is used.
+        
+        Parameters
+        ----------
+        fname -> str
+            filename for the previous run protein.csv file
+        outdir -> str
+            path to the output directory to work in, if not output directory set, it tries to
+            take the one where the proteins.csv file was saved
+        gap -> int
+            max gap allowed in sequences to be able to be patched. Default 10
+        PDB_only -> str
+            run the curation based on pdb files alone without curating for full uniprot codes
         '''
         # TODO GW 30.07.26 - could we infer the PDB_only state from the measures df format
         if outdir == "":
@@ -129,9 +123,9 @@ class PDB(object):
 
         try:
             self.df = pd.read_csv(fname)
-            # remove duplicates from the dataframe to avoid extra unneccessary calculations
+            # remove duplicates from the dataframe to avoid extra unnecessary calculations
             self.df = self.df.drop_duplicates()
-            
+
         except Exception as e:
             print(f"Could not load csv file, error: {str(e)}")
 
@@ -139,14 +133,21 @@ class PDB(object):
     def gather_proteins(self, uniprot_df, skip_if_found=True):
         '''
         Go over the dataframe containing PDB structure information, download and
-        curate structures for every relevant PDB file.
-        
+        curate structures for every relevant PDB file. This is a redirection function
+        to call the correct gathering function based on parameters given in initialising
+        the class. Currently, will either call gather_proteins_parallel() or
+        gather_proteins_series() based on the setting of parallel in setting up the
+        protein class.
+
         Parameters
         ----------
         uniprot_df -> dataframe
             Dataframe containing all the uniprot codes of interest, can also include
             the residues of interest along with this. Columns: 'Uniprot_Entry', 'PDB_Code',
-            'Resid'
+            'Resid' (resid column not necessary)
+        skip_if_found -> bool
+            Set to true to not curate another structure for the given pdb if a curated file
+            is found, if set to false it will ignore previously curated files and start again
         '''
         match self.parallel:
             case True:
@@ -157,10 +158,20 @@ class PDB(object):
 
     def gather_proteins_parallel(self, uniprot_df, skip_if_found=True):
         '''
-        Iterate over lines of a DataFrame containing PDB structure information.
-        Download every structure, and curate it as necessary. Direct copy of
-        the gather_proteins_series function just implementing the requirements for
-        parallel running. 
+        Parallel method for gathering protein structures from the given dataframe containing
+        list of uniprot codes. This turns the input data into a list for input into the parallel
+        pool, format of the list depends on if running as PDB_only or not. Output from the
+        parallel run is concat into the overall output dataframe self.df.
+        
+        Parameters
+        ----------
+        uniprot_df -> dataframe
+            Dataframe containing all the uniprot codes of interest, can also include
+            the residues of interest along with this. Columns: 'Uniprot_Entry', 'PDB_Code' etc
+            This comes from the output of uniprot.py
+        skip_if_found -> bool
+            Set to true to not curate another structure for the given pdb if a curated file
+            is found, if set to false it will ignore previously curated files and start again
         '''
         if self.PDB_only:
             try:
@@ -171,7 +182,7 @@ class PDB(object):
                 return e
 
         n_cores_to_use = cpu_count() - 10
-        n_cores_to_use = 10
+        n_cores_to_use = 20
 
         with Manager() as manager:
             lock = manager.Lock()
@@ -179,15 +190,18 @@ class PDB(object):
             for i, r in uniprot_df.iterrows():
                 try:
                     if not self.PDB_only:
-                        method_obtained = r["Method"]
-                        resolution = r["Resolution"]
-                        chains = r["Chains"]
+                        method_obtained = r.get('Method', '')
+                        resolution = r.get('Resolution', '')
+                        chains = r.get('Chains', '')
                         items.append([[r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains], skip_if_found, lock])
                     else:
-                        items.append([[r['Uniprot_Entry'], r['PDB_Code']], skip_if_found, lock])
+                        items.append([[r['PDB_Code']], skip_if_found, lock])
                 except Exception as e:
                     method_obtained, resolution, chains = '', '', ''
-                    items.append([[r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains], skip_if_found, lock])
+                    if not self.PDB_only:
+                        items.append([[r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains], skip_if_found, lock])
+                    else:
+                        items.append([[r['PDB_Code']], skip_if_found, lock])
                     pass
                 
 
@@ -199,14 +213,31 @@ class PDB(object):
 
     def _curate_row(self, row_details, skip_if_found, lock):
         '''
-        Helper function for calculating curated structures to work in the gather_proteins_parallel
+        Function for use within the parallel gather proteins function for gathering pdb information
+        for the given uniprot code within the row details. Checks if the pdb code contains 'AF-', if it
+        does, follow the alphafold curation path, download the file and record the plddt scores for
+        it. If 'AF-' is not in it, follow route for pdb file code. If skip_if_true set to True, it will
+        check if any curated structures exist for that pdb and if there are, check alignment of sequence
+        and return. If not it will call the functions to clean and split the pdb into curated structures.
+
+        Parameters
+        ----------
+        row_details -> list
+            
+        skip_if_found -> bool
+            Set to true to not curate another structure for the given pdb if a curated file
+            is found, if set to false it will ignore previously curated files and start again
+        lock -> lock
+            Lock provided from the multiprocessing manager to use to stop child processes writing to
+            files at the same time. 
         '''
         print_statements = []
         start_time = time.time()
-        if len(row_details) == 5:
+        if not self.PDB_only:
             uniprot_code, pdb_code, method_obtained, resolution, chains = row_details
         else:
-            uniprot_code, pdb_code = row_details
+            pdb_code = row_details
+            uniprot_code = 'Running PDB only'
             method_obtained, resolution, chains = '', '', ''
 
         print_statements.append(f'>> Start file curation for uniprot: {uniprot_code}, pdb code: {pdb_code}')
@@ -218,10 +249,17 @@ class PDB(object):
 
         def finish_curate_jobs(failed=False):
             '''
-            Generalised function for finishing off the _curate_row() function output to terminal, placed
-            into function as this will be used at several points in the _curate_row() function.
+            Generalised function for finishing off the _curate_row() function output to
+            terminal, placed into function as this will be used at several points in
+            the _curate_row() function.
+
+            Parameters
+            ----------
+            failed -> bool
+                Determines the final statement to print on if the process failed (True)
+                or not (False); default is False
             '''
-            
+
             time_taken = round((time.time() - start_time), 2)
             if not failed:
                 print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; file curated in {time_taken}s\n\n')
@@ -252,10 +290,16 @@ class PDB(object):
                 print_statements.append(out_print_trap_af_download.getvalue())
             except Exception as e:
                 print_statements.append(f">> FAILED on calling download_AF_struc: {str(e)}")
-                pass
+                finish_curate_jobs(failed=True)
+                return None
 
             # check if the AlphaFold file contains ATOM statements
             af_filename = os.path.join(self.curated_dir, f"{pdb_code}.pdb")
+            if not os.path.exists(af_filename):
+                print_statements.append(f'Failed: no AF structure was written for {af_filename}')
+                finish_curate_jobs(failed=True)
+                return None
+
             fin = open(af_filename, "r")
             pdb_data_present = False
             for line in fin:
@@ -298,7 +342,10 @@ class PDB(object):
                     if not self.PDB_only:
                         matched_curated_files = [os.path.basename(a) for a in glob.glob(os.path.join(self.curated_dir, "*pdb")) if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]]
                         for file in matched_curated_files:
-                            self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
+                            out_print_trap_check = io.StringIO()
+                            with redirect_stdout(out_print_trap_check):
+                                self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
+                            print_statements.append(out_print_trap_check.getvalue())
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
                     else:
                         data = {'PDB_Code': pdb_code}
@@ -322,17 +369,35 @@ class PDB(object):
                 return pd.DataFrame.from_records(data, index=[0])
 
             except Exception as e:
+                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': str(e)}])
+                with lock:
+                    broken_prot.to_csv(os.path.join(self.outdir, 'uncuratable_pdb_files.csv'), mode='a', header=False)
                 print_statements.append(out_print_trap.getvalue())
                 print_statements.append(f">> FAILED clean and splitting of PDB entry file: {str(e)}")
                 finish_curate_jobs(failed=True)
                 pass
 
 
-
     def gather_proteins_series(self, uniprot_df, skip_if_found=True):
         '''
-        Iterate over lines of a DataFrame containing PDB structure information.
-        Download every structure, and curate it as necessary.
+        Series function for gathering pdb information from the dataframe given as input from
+        uniprot.py. Loops over the rows of the uniprot dataframe adn for each row it checks if
+        the pdb code contains 'AF-', if it does, follow the alphafold curation path, download
+        the file and record the PLDDT scores for it. If 'AF-' is not in it, follow route for
+        pdb file code. If skip_if_true set to True, it will check if any curated structures exist
+        for that pdb and if there are, check alignment of sequence and return. If not it will call
+        the functions to clean and split the pdb into curated structures.
+
+        Parameters
+        ----------
+        row_details -> list
+            
+        skip_if_found -> bool
+            Set to true to not curate another structure for the given pdb if a curated file
+            is found, if set to false it will ignore previously curated files and start again
+        lock -> lock
+            Lock provided from the multiprocessing manager to use to stop child processes writing to
+            files at the same time. 
         '''
         if self.PDB_only:
             try:
@@ -410,6 +475,7 @@ class PDB(object):
                 except Exception as e:
                     method_obtained, resolution, chains = '', '', ''
                     pass
+
                 if skip_if_found:
                     files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                     if pdb_code in files:
@@ -436,13 +502,28 @@ class PDB(object):
 
                 except Exception as e:
                     print(f">> FAILED clean and splitting of PDB entry file: {str(e)}")
+                    broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': str(e)}])
+                    broken_prot.to_csv(os.path.join(self.outdir, 'uncuratable_pdb_files.csv'), mode='a', header=False)
                     continue
 
 
     def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[]):
         '''
-        Download a pdb, and return a collection of cleaned and splitted alternative conformations
-        The results are saved into files: [outfolder]/conformations/*PDB code*-clean.pdb.
+        Download the pdb file from rcsb, clean the structure, split it based on alternative
+        conformations, find if there are gaps in the sequences, if more than the max gap set
+        in class definition, remove files, if smaller, patch the curated files. The results
+        are saved into files: [outfolder]/conformations/*PDB code*-clean.pdb.
+        
+        Parameters
+        ----------
+        pdb -> str
+            code of the pdb file to curate
+        uniprot_code -> str
+            corresponding uniprot code for the pdb file, not required but used for realignment.
+            Default ''
+        chains -> list
+            list of chains for the pdb interested in, not required but used if pdb file goes
+            over more than 1 uniprot code. Default: []
         '''
         try:
             #download and clean the structure
@@ -561,10 +642,28 @@ class PDB(object):
     def clean(self, pdb):
         '''
         Rename the protein's chains during the cleaning process so that they match
-        the chain names given in the FASTA file.
-        This is required as pdb files name their chains using the 'auth' name and
-        fasta with the normal chain name.
+        the chain names given in the FASTA file. This is required as pdb files name
+        their chains using the 'auth' name and fasta with the normal chain name.
         Therefore to avoid confusion we rename them all to what is used in the fasta file.
+
+        Iterates over the lines of the file performing checks:
+        - insertion codes -> make note and not patch structure if present
+        - modified lysines (KCX) -> remove CO2 and rename to LYS
+        - modified cysteines (SEC) -> replace SE with S and rename to CYS
+        - modified methionine (MSE) -> replace SE with S and rename to MET
+        - element codes -> if not present in pdb file, add these in based on guess from atomtype col
+        - neglect HETATMs unless metal ions and hydrogens
+        
+        Parameters
+        ----------
+        pdb -> str
+            pdb code for the structure of interest
+
+        Returns
+        -------
+        replacement_dict -> dict
+            Dictionary containing the mapping between original chains and renamed chains
+            produced by get_chain_replacement(pdb)
         '''
         try:
             replacement_dict = self.get_chain_replacement(pdb)
@@ -589,8 +688,14 @@ class PDB(object):
         test_MSE = False
         test_SEC = False
         test_KCX = False
+        
+        res_insertion_codes = []
 
         for line in read_file:
+
+            # check for resid insertion code in position 26
+            if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
+                res_insertion_codes.append(line[26])
 
             # replace selenomethionine with methionine
             if "MSE" in line and ('ATOM' in line or 'HETATM' in line):
@@ -646,7 +751,6 @@ class PDB(object):
             self._adapt_fasta(pdb=pdb)
         if test_KCX: print(">> mutation added to remove a lysine carboxylation")
 
-        res_insertion_codes = [a for a in [line[26] for line in read_file if line[:4] == 'ATOM' and line[26] != ' '] if a.isalpha()]
         if res_insertion_codes:
             raise Exception(f'>> Residue insertion codes found for pdb {pdb}, '
                             f'insertion codes found: {res_insertion_codes}, residue numbering therefore not unique')
@@ -654,8 +758,6 @@ class PDB(object):
         write_file.close()
         read_file.close()
 
-        #self.rewrite_pdb(write_file_path)
-        #remove the original pdb file as it is not needed anymore.
         os.remove(read_file_path)
 
         return replacement_dict
@@ -663,7 +765,15 @@ class PDB(object):
 
     def split_struc_nmr(self, pdb):
         '''
-        Write a new file for each alternate NMR structure.
+        Write a new file for each alternate NMR structure. Takes the clean pdb
+        file produced previously and identifies statements in the pdb file indicating
+        different conformations, for each conformation writes a new file of the
+        format f'{pdb}-alt-{i}.pdb'.
+
+        Parameters
+        ----------
+        pdb -> str
+            pdb name for the protein to split
         '''
 
         #define the name format which will be followed for each file.
@@ -737,6 +847,16 @@ class PDB(object):
     def split_struc_alt_aa(self, pdb):
         '''
         Writes a new file for each alternative amino acid conformation present.
+        Finds all pdb files created previoulsy for the given pdb file, for each
+        of the files, open and search column 16 for any alternate structure codes
+        present in the file. If there are codes present, for each code identified
+        goes over the file and splits it up to produce files of the format:
+        f'{pdb}-alt{i}{y}.pdb' where i is the nmr structure and y is the alternate code
+        
+        Parameters
+        ----------
+        pdb -> str
+            pdb code of the protein to curate
         '''
         #Get a list of all the .pdb files present in [outdir]/conformations
         #and select those that belong to the pdb we are interested in.
@@ -805,7 +925,11 @@ class PDB(object):
     def _align_resnum_uniprot(self, uniprot_code, pdb_code, chains):
         '''
         Function to align the residue numbers within the pdb file with the canonical
-        sequence available from the Uniprot website
+        sequence available from the Uniprot website. This will perform an alignment
+        using the biopython pairwise aligner with BLOSUM62 matrix, biased towards
+        matching at the start of the uniprot sequence. Sequence is derived for the pdb
+        using biobox. After alignment performs a mapping on the biobox instance and
+        rewrites the pdb with updated chain numbering.
 
         Parameters
         ----------
@@ -895,7 +1019,12 @@ class PDB(object):
         Parameters
         ----------
         pdb_code -> str
+            PDB code of the file to get the chain information for
 
+        Return
+        ------
+        replacement_dict -> dict
+            Dictionary of the mapping from auth name to rcsb chain name for all chains in structure
         '''
         try:
             self.download_fasta(pdb_code)
@@ -961,24 +1090,35 @@ class PDB(object):
         Potential for this to be needed if a pdb is curated for a uniprot code but pdb file also
         contains chains from another uniprot code which may not have been corrected fully. This
         is non-exhaustive and as other checks are added, may need to be included here.
+
+        Parameters
+        ----------
+        pdb -> str
+            file name for the pdb file to check
+        uniprot -> str
+            uniprot code for the file to check. Used to perform the alignment of the
+            structure to the uniprot seqeuence
+        chains -> list
+            list of chains within the structure to check over
         '''
         self._align_resnum_uniprot(uniprot, pdb, chains)
 
 
     def replace_chains(self, path, replacement_dict):
         '''
-        New version of the replace chains which correctly produces pdb files afterwards
-        for the patching as the original left some proteins in space. 
+        Replace chain names in a structure. Using the replacement dict given as
+        an parameter, it loads in a biobox instance of the pdb file and replaces
+        the chain names in the 'chain' column. It then writes a temporary pdb file
+        before inserting the new data into the old file to keep the additional
+        lines present.
 
         Parameters
         ----------
         path -> string
             The path of the pdb file that the work is being done on
-
         replacement_dict -> dict
             The dictionary which contains the information about which chains
             need replacing 
-
         '''
 
         #The relevant file in conformations is then opened and rewritten.
@@ -995,9 +1135,7 @@ class PDB(object):
 
             # take the new written file and insert in place where it would sit in the overall pdb file
             lines = open(path, 'r').readlines()
-            start_atoms = False
             first_lines = []
-            second_lines = []
             for line in lines:
                 if line[:4]  == "ATOM" or line[:6] == 'HETATM' or line[:3] == 'TER' or line[:5] == 'MODEL':
                     break
@@ -1024,6 +1162,7 @@ class PDB(object):
         '''
         Short function called if selenocysteine found in the structure to adapt the
         fasta file in order for modeller to be able to be called to fix the structure.
+        This writes over the fasta file with the correct sequence.
 
         Parameters
         ----------
@@ -1059,7 +1198,8 @@ class PDB(object):
     def rewrite_pdb(self, path):
         '''
         Short function to take a pdb file, load it into biobox as a molecule and
-        rewrite a pdb file from the molecule class.
+        rewrite a pdb file from the molecule class. If it fails it remove the path
+        of the file to rewrite.
 
         Parameters
         ----------

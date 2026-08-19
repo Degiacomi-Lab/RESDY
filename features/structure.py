@@ -22,7 +22,9 @@ from features.error_reporting import report_error_to_file
 # Melodia packages
 try:
     import melodia_py as mel
+    melodia_packages_available = True
 except Exception as e:
+    melodia_packages_available = False
     print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
 class Structure():
@@ -65,6 +67,10 @@ class Structure():
         else: self.record_errors = False
         if self.melodia_features == ['all']:
             self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
+
+        if not melodia_packages_available:
+            raise ImportError('>> Packages required for melodia calculations (melodia_py) are '
+                              'not available, melodia will be removed from features to calculate.')
 
     def calculate_melodia(self, path):
         '''

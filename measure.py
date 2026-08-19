@@ -59,7 +59,8 @@ try:
     import torch.nn as nn
     import esm
 except Exception as e:
-    print(f'>> Failed to import packages required for esm calculations, will not be able to calculate sequence features based on esm. Error: {e}')
+    print(f'>> Failed to import packages required for esm calculations, '
+          f'will not be able to calculate sequence features based on esm. Error: {e}')
 
 
 class Measure(object):
@@ -210,47 +211,78 @@ class Measure(object):
         melodia_added = False; frustration_added = False; legolas_added = False
         for m in features:
             if m in ['propka', 'pkaANI']:
-                pka = PKA(outdir=self.outdir, calc_method=m, include_modified=self.include_mod, error_filename=self.error_filename)
+                pka = PKA(outdir=self.outdir, calc_method=m,
+                          include_modified=self.include_mod,
+                          error_filename=self.error_filename,
+                          aa_properties=self.aa_properties)
                 self.measures.append([m, pka.calculate_pka])
             elif m == 'pka':
                 print('Please enter which pKa calculation method you would like to use: propka or pkaANI')
                 while not input('propka or pkaANI:') in ['propka', 'pkaANI']:
                     print('Please enter either propka or pkaANI')
-                pka = PKA(outdir=self.outdir, calc_method='propka', include_modified=self.include_mod)
+                pka = PKA(outdir=self.outdir, calc_method='propka',
+                          include_modified=self.include_mod,
+                          aa_properties=self.aa_properties)
                 self.measures.append([m, pka.calculate_propka])
             elif m == 'sasa':
-                sasa = SASA(include_modified=self.include_mod, error_filename=self.error_filename)
+                sasa = SASA(include_modified=self.include_mod,
+                            error_filename=self.error_filename,
+                            aa_properties=self.aa_properties)
                 self.measures.append([m, sasa.calculate_sasa])
             elif m == "depth":
-                depth = Depth(calculation_type='ResidDepth', include_modified=self.include_mod, error_filename=self.error_filename)
-                self.measures.append([m, depth.calculate_depth])
+                try:
+                    depth = Depth(calculation_type='ResidDepth',
+                                  include_modified=self.include_mod,
+                                  error_filename=self.error_filename,
+                                  aa_properties=self.aa_properties)
+                    self.measures.append([m, depth.calculate_depth])
+                except Exception as e:
+                    self.features.remove(m)
+                    print(f'>> Failed to add depth for features calculation list; error: {e}')
             elif m == 'aev':
-                aev = AEV(error_filename=self.error_filename)
-                self.measures.append([m, aev.calculate_aevs])
+                try:
+                    aev = AEV(error_filename=self.error_filename,
+                              aa_properties=self.aa_properties)
+                    self.measures.append([m, aev.calculate_aevs])
+                except Exception as e:
+                    self.features.remove(m)
+                    print(f'>> Failed to add aev for features calculation list; error: {e}')
             elif m == 'das':
-                das = DAS(include_modified=self.include_mod, error_filename=self.error_filename)
+                das = DAS(include_modified=self.include_mod,
+                          error_filename=self.error_filename,
+                          aa_properties=self.aa_properties)
                 self.measures.append([m, das.calculate_das])
             elif m == 'seqcharge':
-                charge = Charge(include_modified=self.include_mod, error_filename=self.error_filename)
+                charge = Charge(include_modified=self.include_mod,
+                                error_filename=self.error_filename,
+                                aa_properties=self.aa_properties)
                 self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'flexibility':
-                flex = Flexibility(include_modified=self.include_mod, error_filename=self.error_filename)
+                flex = Flexibility(include_modified=self.include_mod,
+                                   error_filename=self.error_filename,
+                                   aa_properties=self.aa_properties)
                 self.measures.append([m, flex.calculate_flexibility])
             elif m == 'legolas':
                 if self.legolas_aevs:
                     if 'aev_legolas' not in self.features:
                         self.features.append('aev_legolas')
                     nmr = NMR(outdir=self.outdir, legolas_aevs=True,
-                              include_modified=self.include_mod, error_filename=self.error_filename)
+                              include_modified=self.include_mod,
+                              error_filename=self.error_filename,
+                              aa_properties=self.aa_properties)
                 else:
                     nmr = NMR(outdir=self.outdir, legolas_aevs=False,
-                              include_modified=self.include_mod, error_filename=self.error_filename)
+                              include_modified=self.include_mod,
+                              error_filename=self.error_filename,
+                              aa_properties=self.aa_properties)
                 self.measures.append([m, nmr.calculate_legolas])
                 legolas_added = True
             elif m == 'aev_legolas':
                 if not legolas_added:
                     nmr = NMR(outdir=self.outdir, legolas_aevs=True,
-                              include_modified=self.include_mod, error_filename=self.error_filename)
+                              include_modified=self.include_mod,
+                              error_filename=self.error_filename,
+                              aa_properties=self.aa_properties)
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
@@ -265,28 +297,49 @@ class Measure(object):
                 '''
                 self.features.remove(m)
             elif m == 'melodia':
-                structure = Structure(melodia_features=['all'], include_modified=self.include_mod, error_filename=self.error_filename)
-                self.measures.append([m, structure.calculate_melodia])
-                melodia_added = True
-                self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
-                self.features.remove('melodia')
-            elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
-                if not melodia_added:
-                    melodia_features += [m]
-                    structure = Structure(melodia_features=melodia_features, include_modified=self.include_mod, error_filename=self.error_filename)
-                    self.measures.append(['melodia', structure.calculate_melodia])
+                try:
+                    structure = Structure(melodia_features=['all'],
+                                          include_modified=self.include_mod,
+                                          error_filename=self.error_filename,
+                                          aa_properties=self.aa_properties)
+                    self.measures.append([m, structure.calculate_melodia])
                     melodia_added = True
+                    self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
+                    self.features.remove('melodia')
+                except Exception as e:
+                    self.features.remove(m)
+                    print(f'>> Failed to add melodia for features calculation list; error: {e}')
+            elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
+                melodia_features += [m]
             elif m == 'esm':
-                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
+                ensemble = Ensemble(df_proteins=self.df_input,
+                                    include_modified=self.include_mod,
+                                    error_filename=self.error_filename,
+                                    aa_properties=self.aa_properties)
                 ensemble._initialise_esm_model()
                 self.measures.append(['esm', ensemble.calculate_esm])
             elif m == 'rmsf':
-                ensemble = Ensemble(df_proteins=self.df_input, include_modified=self.include_mod, error_filename=self.error_filename)
+                ensemble = Ensemble(df_proteins=self.df_input,
+                                    include_modified=self.include_mod,
+                                    error_filename=self.error_filename,
+                                    aa_properties=self.aa_properties)
                 self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
                 if self.report_errors:
                     self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
                 raise Exception(f"measure {m} unknown")
+
+        if not melodia_added and melodia_features:
+            try:
+                structure = Structure(melodia_features=melodia_features,
+                                      include_modified=self.include_mod,
+                                      error_filename=self.error_filename,
+                                      aa_properties=self.aa_properties)
+                self.measures.append(['melodia', structure.calculate_melodia])
+                melodia_added = True
+            except Exception as e:
+                self.features.remove(m)
+                print(f'>> Failed to add melodia for features calculation list; error: {e}')
 
 
     def _match_resid_codes(self, res_code):
@@ -533,7 +586,11 @@ class Measure(object):
             items = []
             for i, r in self.df_input.iterrows():
                 pdb_code = r["PDB_Code"]
-                chains = r["Chains"].split("/")
+                chains = r["Chains"]
+                if isinstance(chains, str):
+                    chains = [c for c in chains.split('/') if c]
+                else:
+                    chains = []
                 method = r['Method']
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
@@ -590,6 +647,8 @@ class Measure(object):
             chains = r['Chains']
             if isinstance(chains, str):
                 chains = [c for c in chains.split('/') if c]
+            else:
+                chains = []
             method = r['Method']
             res = r['Resolution']
             uniprot_code = r['Uniprot_Entry']
@@ -1042,7 +1101,7 @@ class Measure(object):
             elif col_name == 'legolas':
                 legolas_features = ['legolas', 'aev_legolas']
                 for feature in self.features:
-                    if feature in legolas_features:
+                    if feature in legolas_features and feature in to_merge.columns:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
@@ -1414,6 +1473,20 @@ class Measure(object):
         -------
         >> M._cleanup_calculation_files()
         '''
+        def _mv_files(files, dest):
+            '''
+            Generic function for moving list of files over to the destination
+            '''
+            if not files:
+                return
+            dest_path = os.path.join(self.outdir, dest)
+            os.makedirs(dest_path, exist_ok=True)
+            for f in files:
+                try:
+                    os.rename(f, os.path.join(dest_path, f))
+                except Exception as e:
+                    print(f'> Failed to move {f} to destination {dest_path} with error: {e}')
+
         print('\n>> Cleaning up leftover files from measures calculations...')
         dir_files = [f for f in os.listdir() if os.path.isfile(os.path.join(os.getcwd(),f))]
         nmr_cs_file, nmr_parquet_file, propka_pka_file, propka_error_file = [], [], [], []
@@ -1427,19 +1500,23 @@ class Measure(object):
             elif f.endswith('_propka_errors.txt'):
                 propka_error_file.append(f)
         if nmr_cs_file:
-            for f_mv in nmr_cs_file: os.rename(f_mv, os.path.join(self.outdir, 'legolas', f_mv))
+            _mv_files(nmr_cs_file, 'legolas')
         if nmr_parquet_file:
-            for f_mv in nmr_parquet_file: os.rename(f_mv, os.path.join(self.outdir, 'legolas', f_mv))
+            _mv_files(nmr_parquet_file, 'legolas')
         if propka_pka_file:
-            for f_mv in propka_pka_file: os.rename(f_mv, os.path.join(self.outdir, 'propkaoutput', f_mv))
+            _mv_files(propka_pka_file, 'propkaoutput')
         if propka_error_file:
-            for f_mv in propka_error_file: os.rename(f_mv, os.path.join(self.outdir, 'propkaoutput', f_mv))
+            _mv_files(propka_error_file, 'propkaoutput')
         if self.report_errors:
-            num_lines = 10
-            with open(self.error_filename, 'r') as f:
-                num_lines = sum(1 for _ in f)
-            if num_lines <= 2:
-                os.remove(self.error_filename)
+            try:
+                num_lines = 10
+                with open(self.error_filename, 'r') as f:
+                    num_lines = sum(1 for _ in f)
+                if num_lines <= 2:
+                    os.remove(self.error_filename)
+            except Exception as e:
+                print(f'>> Failed to cleanup the error file ({self.error_filename}) '
+                      f'for the measurements run with error: {e}')
         print('>> Unused file cleanup complete.')
 
 

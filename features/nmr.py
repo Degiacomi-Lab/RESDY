@@ -66,8 +66,7 @@ class NMR():
         else: self.record_errors = False
 
         self.legolas_output_path = os.path.join(self.outdir, 'legolas')
-        if not os.path.exists(self.legolas_output_path):
-            os.mkdir(self.legolas_output_path)
+        os.makedirs(self.legolas_output_path, exist_ok=True)
 
     def calculate_legolas(self, path):
         '''
@@ -172,6 +171,7 @@ class NMR():
                         if os.path.exists(os.path.join(self.legolas_output_path, new_aev_filename)):
                             with open(os.path.join(self.legolas_output_path, new_aev_filename)) as f:
                                 aevs = f.readlines()
+                            aevs = [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]
                         else:
                             aevs = []
                     elif os.path.exists('tmp_aevs_protein.txt'):
@@ -179,12 +179,13 @@ class NMR():
                             aevs = f.readlines()
                         os.rename('tmp_aevs_protein.txt', new_aev_filename)
                         shutil.move(new_aev_filename, self.legolas_output_path)
+                        aevs = [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]
                     else:
                         print('Legolas AEVs: tmp_aevs_protein.txt file not found')
                         aevs = []
 
                     if aevs != [] and len(aevs) == len(df_legolas):
-                        df_legolas = df_legolas.assign(**{'aev_legolas': [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]})
+                        df_legolas = df_legolas.assign(**{'aev_legolas': aevs})
 
                     if os.path.exists('tmp_aevs_protein.txt'):
                         os.remove('tmp_aevs_protein.txt')
@@ -202,7 +203,6 @@ class NMR():
                 df_legolas = df_legolas.drop(index=rows_to_drop).reset_index(drop=True)
             df_legolas = pd.concat([df_legolas, df_nmr.loc[:, ~df_nmr.columns.str.contains('^Unnamed')]], axis=1)
 
-            print(df_legolas)
             df_legolas = df_legolas.iloc[idx_n_res_interest].drop(columns=['resname', 'ATOM_TYPE', 'RESIDUE_ID', 'CHEMICAL_SHIFT_STD'])
             df_legolas = df_legolas.rename(columns={'CHEMICAL_SHIFT': 'legolas', 'chain': 'Chain', 'resid': 'Resid'})
 

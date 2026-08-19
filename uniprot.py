@@ -1,10 +1,7 @@
 import re
 import urllib.request
-import urllib.parse
-import urllib.error
 import requests
 from requests.adapters import HTTPAdapter, Retry
-
 import pandas as pd
 import numpy as np
 
