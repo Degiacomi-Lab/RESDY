@@ -10,14 +10,18 @@ try:
     import torch
     import torch.nn as nn
     import esm
+    esm_packages_available = True
 except Exception as e:
+    esm_packages_available = False
     print(f'>> Failed to import packages required for esm calculations, '
           f'will not be able to calculate sequence features based on esm. Error: {e}')
 
 try:
     import MDAnalysis as mda
     from MDAnalysis.analysis import rms, align
+    rmsf_packages_available = True
 except Exception as e:
+    rmsf_packages_available = False
     print(f'>> Failed to import packages (MDanalysis) required for rmsf calculations, '
           f'will not be able to calculate rmsf data. Error: {e}')
 
@@ -60,7 +64,11 @@ class Ensemble():
         self.error_filename = error_filename
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
-        
+
+        if not rmsf_packages_available:
+            raise ImportError('>> Packages required for RMSF calculations (mdanalysis) are '
+                                'not available, rmsf will be removed from features to calculate.')
+
         self.model_loaded = False
 
 
@@ -68,6 +76,10 @@ class Ensemble():
         '''
         Initialise global parameters and models in calculating ESM values
         '''
+        
+        if not esm_packages_available:
+            raise ImportError(f'>> Failed to import the packages required (esm/torch) '
+                              f'for esm calculations, esm will be removed from features.')
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.esm2_model_650M, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
@@ -148,13 +160,18 @@ class Ensemble():
                 T_df_compare = T.data[T.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
                 if M_df_compare.equals(T_df_compare):
                     prot_matches.append(file)
-            
+
+            select_crit = 'name CA'
             if len(prot_matches) > 1:
                 prot_conf_unv = mda.Universe(prot_matches[0], prot_matches, format='PDB', dt=1.0)
-                aligner = align.AlignTraj(prot_conf_unv, prot_conf_unv, select='protein and name CA', in_memory=True, ref_frame=0).run()
-                prot_c_alphas = prot_conf_unv.select_atoms('protein and name CA')
-                rmsf_calculator = rms.RMSF(prot_c_alphas).run()
-                rmsf_vals = rmsf_calculator.results.rmsf
+                aligner = align.AlignTraj(prot_conf_unv, prot_conf_unv, select=select_crit,
+                                          in_memory=True, ref_frame=0).run()
+                prot_c_alphas = prot_conf_unv.select_atoms(select_crit)
+                if len(prot_c_alphas) != len(df_rmsf):
+                    raise ValueError(f'>> Mismatch in resid count (based on CA count) between '
+                                     f'biobox (len {len(df_rmsf)}) and mdanalysis (len '
+                                     f'{len(prot_c_alphas)}) for file {path}')
+                rmsf_vals = rms.RMSF(prot_c_alphas).run().results.rmsf
                 df_rmsf = df_rmsf.assign(**{'rmsf': rmsf_vals})
 
             else:

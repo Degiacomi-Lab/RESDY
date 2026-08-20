@@ -1,22 +1,7 @@
-import re
 import os, sys
-import io
-import logging
-import datetime
-import shutil
-import subprocess
-import glob
-import time
-from datetime import date
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
 from collections import OrderedDict
 
@@ -26,10 +11,11 @@ class Charge():
     Class to house the different methods for calculating charge values for structures
     '''
 
-    def __init__(self, include_modified = False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                                                'modified_codes': ['LYE', 'KCX'],
-                                                                'atom_select_names_nonmod': ['NZ'],
-                                                                'atom_select_names_modified': ['NZ', 'N07']},
+    def __init__(self, include_modified = False,
+                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                'modified_codes': ['LYE', 'KCX'],
+                                'atom_select_names_nonmod': ['NZ'],
+                                'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the Charge class, include any global variables that are required from
@@ -214,6 +200,5 @@ class Charge():
 
 if __name__ == '__main__':
     C = Charge(include_modified=True)
-    #print(C.calculate_seqcharge(path=f'1ubq.pdb'))
-    print(C.calculate_seqcharge(path=f'1NSK-alt-1.pdb'))
-    #print(C.calculate_seqcharge(path=f'1nsk_AmberMod0000.pdb'))
+    print(C.calculate_seqcharge(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    #print(C.calculate_seqcharge(path=f'1NSK-alt-1.pdb'))

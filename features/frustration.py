@@ -1,21 +1,17 @@
 import os
 import io
-from datetime import date
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
 
 # Frustration packages
 try:
     import frustratometer
+    frustration_packages_available = True
 except Exception as e:
+    frustration_packages_available = False
     print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
 
 pd.set_option('display.max_rows', 200)
@@ -51,6 +47,10 @@ class Frustration():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+
+        if not frustration_packages_available:
+            raise ImportError('>> Packages required for calculating frustation or density (Frustratometer) '
+                              'are not available. Frustration or Density will be removed from feature list.')
 
     def calculate_frustration(self, path):
         '''

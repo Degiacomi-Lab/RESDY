@@ -2,14 +2,20 @@ from copy import deepcopy
 from ast import literal_eval
 import numpy as np
 import pandas as pd
-from statsmodels.stats.outliers_influence import variance_inflation_factor as VIF
-from statsmodels.tools.tools import add_constant
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.spatial.distance import euclidean
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+try:
+    from statsmodels.stats.outliers_influence import variance_inflation_factor as VIF
+    from statsmodels.tools.tools import add_constant
+    statsmodel_available = True
+except Exception as e:
+    statsmodel_available = False
+    print(f'>> preprocessing.py statsmodel import is unavailable, the VIF AEV reduction '
+          f'method can\'t be used. Error: {e}')
 
 scaler = StandardScaler()
 
@@ -102,9 +108,13 @@ class Preprocessing:
         data : Pandas DataFrame
             The overall measures dataframe
         features : list
-            List of features to be considered for VIF calculations.
-
+            List of features to be considered for VIF calculations
         """
+        
+        if not statsmodel_available:
+            raise ImportWarning(f'>> VIF reduction method requires statsmodels; use '
+                                f'aev_red_method=\'pca\' or install statsmodel')
+        
         if not multi_vif:
             data = data[features]
             data = add_constant(data)
@@ -168,6 +178,7 @@ class Preprocessing:
         '''
 
         all_decorrelated = False
+        min_feats = 2
 
         data = data[self.features]
         data = add_constant(data)
@@ -187,10 +198,13 @@ class Preprocessing:
         while not all_decorrelated:
             # check for correlation and then change the data
             if not self.vif.empty:
-                latest_vals = list(self.vif[list(self.vif.columns)[-1]])
-                latest_vals = [a for a in latest_vals if str(a) != 'nan']
+                latest_vals = [a for a in list(self.vif[list(self.vif.columns)[-1]]) if str(a) != 'nan']
                 if all(x < 5 for x in latest_vals):
                     all_decorrelated = True
+                    break
+                if data.shape[1] <= min_feats:
+                    print(f'>> VIF did not converge: {data.shape[1]} columns left '
+                          f'and still correlated, keeping columns')
                     break
 
                 # remove the column with the highest vif
@@ -202,8 +216,7 @@ class Preprocessing:
             self.calculate_vif(data, self.features, multi_vif=True)
 
         cut_df = self.vif[self.vif[list(self.vif.columns)[-1]] < 5]
-        cols_to_keep = list(cut_df['Parameter'])
-        cols_to_keep.remove('const')
+        cols_to_keep = [a for a in list(cut_df['Parameter']) if a != 'const']
         return cols_to_keep
 
 

@@ -1,3 +1,4 @@
+import os
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -195,3 +196,8 @@ class AEV():
 
         # 4: if everything has worked, return the dataframe with the AEVs for the protein
         return df_aevs
+
+
+if __name__ == '__main__':
+    AEV = AEV(include_modified=False)
+    print(AEV.calculate_aevs(f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

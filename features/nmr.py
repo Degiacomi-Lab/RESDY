@@ -2,18 +2,10 @@ import sys
 import os
 import shutil
 import subprocess
-from datetime import date
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
-
 
 # AEV packages
 try:
@@ -194,6 +186,8 @@ class NMR():
                     print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
                     if self.record_errors: report_error_to_file('LEGOLAS AEV 1', path, str(e), self.error_filename)
 
+            df_legolas = df_legolas.assign(**{'_of_interest':[i in set(idx_n_res_interest) for i in range(len(df_legolas))]})
+
             if len(df_legolas) != len(df_nmr):
                 rows_to_drop = []
                 for i, r in df_legolas.iterrows():
@@ -203,7 +197,7 @@ class NMR():
                 df_legolas = df_legolas.drop(index=rows_to_drop).reset_index(drop=True)
             df_legolas = pd.concat([df_legolas, df_nmr.loc[:, ~df_nmr.columns.str.contains('^Unnamed')]], axis=1)
 
-            df_legolas = df_legolas.iloc[idx_n_res_interest].drop(columns=['resname', 'ATOM_TYPE', 'RESIDUE_ID', 'CHEMICAL_SHIFT_STD'])
+            df_legolas = df_legolas[df_legolas['_of_interest']].drop(columns=['_of_interest', 'resname', 'ATOM_TYPE', 'RESIDUE_ID', 'CHEMICAL_SHIFT_STD'])
             df_legolas = df_legolas.rename(columns={'CHEMICAL_SHIFT': 'legolas', 'chain': 'Chain', 'resid': 'Resid'})
 
         except Exception as e:

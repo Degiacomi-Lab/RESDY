@@ -119,12 +119,12 @@ def find_af_plddt(af_code_full, outfolder="result"):
 
                 except Exception as e:
                     print(f"Error {e}")
-                    plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
+                    plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {str(e)}'})
                     continue
 
     except Exception as e:
         print(f'Failed to obtain PLDDT data for {af_code_full}; error: {e}')
-        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {e}'})
+        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {str(e)}'})
 
     plddt_out_file.close()
     return dict_plddt
