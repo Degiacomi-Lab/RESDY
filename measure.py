@@ -286,16 +286,16 @@ class Measure(object):
                     self.measures.append(['legolas', nmr.calculate_legolas])
                     legolas_added = True
             elif m in ['frustration', 'density']:
-                # GW 06.08.25 - temporarily disabled frustration and density calculations as using Frustratometer currently overloads the memory.
-                print('>> Frustration and density metrics are not currently possible due to memory issues in the frustratometer package.')
-                print('>> Metric not added to the measures list.')
-                '''
-                if not frustration_added:
-                    frustration = Frustration(include_modified=self.include_mod, error_filename=self.error_filename)
-                    self.measures.append(['frustration', frustration.calculate_frustration])
-                    frustration_added = True
-                '''
-                self.features.remove(m)
+                try:
+                    if not frustration_added:
+                        frustration = Frustration(include_modified=self.include_mod,
+                                                  error_filename=self.error_filename,
+                                                  aa_properties=self.aa_properties)
+                        self.measures.append(['frustration', frustration.calculate_frustration])
+                        frustration_added = True
+                except Exception as e:
+                    self.features.remove(m)
+                    print(f'>> Failed to add rmsf for features calculation list; error: {e}')
             elif m == 'melodia':
                 try:
                     structure = Structure(melodia_features=['all'],
@@ -312,18 +312,26 @@ class Measure(object):
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 melodia_features += [m]
             elif m == 'esm':
-                ensemble = Ensemble(df_proteins=self.df_input,
-                                    include_modified=self.include_mod,
-                                    error_filename=self.error_filename,
-                                    aa_properties=self.aa_properties)
-                ensemble._initialise_esm_model()
-                self.measures.append(['esm', ensemble.calculate_esm])
+                try:
+                    ensemble = Ensemble(df_proteins=self.df_input,
+                                        include_modified=self.include_mod,
+                                        error_filename=self.error_filename,
+                                        aa_properties=self.aa_properties)
+                    ensemble._initialise_esm_model()
+                    self.measures.append(['esm', ensemble.calculate_esm])
+                except Exception as e:
+                    self.features.remove(m)
+                    print(f'>> Failed to add esm for features calculation list; error: {e}')
             elif m == 'rmsf':
-                ensemble = Ensemble(df_proteins=self.df_input,
-                                    include_modified=self.include_mod,
-                                    error_filename=self.error_filename,
-                                    aa_properties=self.aa_properties)
-                self.measures.append(['rmsf', ensemble.calculate_rmsf])
+                try:
+                    ensemble = Ensemble(df_proteins=self.df_input,
+                                        include_modified=self.include_mod,
+                                        error_filename=self.error_filename,
+                                        aa_properties=self.aa_properties)
+                    self.measures.append(['rmsf', ensemble.calculate_rmsf])
+                except Exception as e:
+                    self.features.remove(m)
+                    print(f'>> Failed to add rmsf for features calculation list; error: {e}')
             else:
                 if self.report_errors:
                     self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
@@ -338,7 +346,9 @@ class Measure(object):
                 self.measures.append(['melodia', structure.calculate_melodia])
                 melodia_added = True
             except Exception as e:
-                self.features.remove(m)
+                for feat in melodia_features:
+                    if feat in self.features:
+                        self.features.remove(feat)
                 print(f'>> Failed to add melodia for features calculation list; error: {e}')
 
 
@@ -598,7 +608,7 @@ class Measure(object):
                 items.append([file_details, lock])
             #with mp.get_context('spawn').Pool(n_cores_to_use, maxtasksperchild=20) as pool:
             with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                df_parallel = pd.concat(pool.starmap(self._measure_file, items), ignore_index=True)
+                df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
             self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
 
         try:
@@ -834,7 +844,6 @@ class Measure(object):
             for meas in self.measures:
                 terminal_out_statements.append(f">> evaluating {meas[0]}...")
                 try:
-                    df_currentfile[meas[0]] = np.nan # create new column for measure
                     out_print_trap = io.StringIO()
                     with redirect_stdout(out_print_trap):
                         result = meas[1](f) # run measurement
@@ -1163,12 +1172,16 @@ class Measure(object):
                     self.wrong_pdb_file.append(f)
                     continue
 
-                if self.include_mod: df_idx, idxs = M.atomselect("*", ['LYS', 'LYSN', 'LYE', 'KCX'], ["CA"], get_index=True, use_resname=True)
-                else: df_idx, idxs = M.atomselect("*", ["LYS"], ["CA"], get_index=True, use_resname=True)
+                if self.include_mod:
+                    _, idxs = M.atomselect("*", (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                           ['CA'], get_index=True, use_resname=True)
+                else:
+                    _, idxs = M.atomselect("*",  self.aa_properties['non_modified_codes'],
+                                           ['CA'], get_index=True, use_resname=True)
+
                 for i in idxs:
 
-                    if M.data['resname'].values[i] in ['LYE', 'KCX']: mod_stat = True
-                    else: mod_stat = False
+                    mod_stat = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
                     data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
                         'Chain': M.data['chain'].values[i],
                         'Resid': M.data['resid'].values[i],
@@ -1220,8 +1233,9 @@ class Measure(object):
                     self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
                 if pdb_code.lower() == os.path.basename(f).split("-")[0].lower():
-                    self.df_input.at[pdb_idx, 'completed'] = True
                     break
+
+            self.df_input.at[pdb_idx, 'completed'] = True
 
             try:
                 avg_time_per_file = (time.time() - tstart_overall) / (pdb_idx + 1)

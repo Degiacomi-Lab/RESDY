@@ -1,15 +1,10 @@
 import os
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
 from features.error_reporting import report_error_to_file
 
-# Depth packages
+# Depth specific packages
 try:
     from Bio.PDB import PDBParser
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth

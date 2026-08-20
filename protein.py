@@ -114,11 +114,11 @@ class PDB(object):
             run the curation based on pdb files alone without curating for full uniprot codes
         '''
         # TODO GW 30.07.26 - could we infer the PDB_only state from the measures df format
-        if outdir == "":
+        if outdir == '' and self.outdir == '':
             outdir = os.path.dirname(fname)
+            self.outdir = outdir
 
         self.PDB_only = PDB_only
-        self.outdir = outdir
         self.gap = gap
 
         try:
@@ -181,8 +181,8 @@ class PDB(object):
             except Exception as e:
                 return e
 
-        n_cores_to_use = cpu_count() - 10
-        n_cores_to_use = 20
+        #n_cores_to_use = int(round(cpu_count() * 0.75))
+        n_cores_to_use = 26
 
         with Manager() as manager:
             lock = manager.Lock()
@@ -203,10 +203,11 @@ class PDB(object):
                     else:
                         items.append([[r['PDB_Code']], skip_if_found, lock])
                     pass
-                
+
 
             with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                df_tmp = pd.concat(pool.starmap(self._curate_row, items), ignore_index=True)
+                results = [t for t in pool.starmap(self._curate_row, items) if t is not None]
+                df_tmp = pd.concat(results, ignore_index=True)
 
             self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
 
@@ -236,7 +237,7 @@ class PDB(object):
         if not self.PDB_only:
             uniprot_code, pdb_code, method_obtained, resolution, chains = row_details
         else:
-            pdb_code = row_details
+            pdb_code, = row_details
             uniprot_code = 'Running PDB only'
             method_obtained, resolution, chains = '', '', ''
 
@@ -286,7 +287,10 @@ class PDB(object):
             try:
                 out_print_trap_af_download = io.StringIO()
                 with redirect_stdout(out_print_trap_af_download):
-                    af.download_AF_struc(pdb_code,outfolder=self.outdir)
+                    try:
+                        af.download_AF_struc(pdb_code,outfolder=self.outdir)
+                    except Exception as e:
+                        print_statements.append(f'>> Failed to download AF structure calling af.download_AF_struc() with error: {str(e)}')
                 print_statements.append(out_print_trap_af_download.getvalue())
             except Exception as e:
                 print_statements.append(f">> FAILED on calling download_AF_struc: {str(e)}")
@@ -317,8 +321,11 @@ class PDB(object):
                 # find the PLDDT codes for AF structures
                 out_print_trap_af_plddt = io.StringIO()
                 with redirect_stdout(out_print_trap_af_plddt):
-                    with lock:
-                        af.find_af_plddt(pdb_code,outfolder=self.outdir)
+                    try:
+                        with lock:
+                            af.find_af_plddt(pdb_code,outfolder=self.outdir)
+                    except Exception as e:
+                        print_statements.append(f'>> Failed on find_af_plddt() with error: {str(e)}')
                 print_statements.append(out_print_trap_af_plddt.getvalue())
 
                 finish_curate_jobs(failed=False)
@@ -344,7 +351,10 @@ class PDB(object):
                         for file in matched_curated_files:
                             out_print_trap_check = io.StringIO()
                             with redirect_stdout(out_print_trap_check):
-                                self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
+                                try:
+                                    self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
+                                except Exception as e:
+                                    print_statements.append(f'>> Failed checking structure on previously curated structure with error {str(e)}')
                             print_statements.append(out_print_trap_check.getvalue())
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
                     else:
@@ -357,12 +367,15 @@ class PDB(object):
             try:
                 out_print_trap = io.StringIO()
                 with redirect_stdout(out_print_trap):
-                    if not self.PDB_only:
-                        self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
-                    else:
-                        self.clean_and_split_pdb(pdb_code)
-                        data = {'PDB_Code': pdb_code}
+                    try:
+                        if not self.PDB_only:
+                            self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
+                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
+                        else:
+                            self.clean_and_split_pdb(pdb_code)
+                            data = {'PDB_Code': pdb_code}
+                    except Exception as e:
+                        print_statements.append(f'>> Failed clean_and_split_pdb() with error: {str(e)}')
                 print_statements.append(out_print_trap.getvalue())
 
                 finish_curate_jobs(failed=False)
@@ -370,8 +383,9 @@ class PDB(object):
 
             except Exception as e:
                 broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': str(e)}])
+                broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
                 with lock:
-                    broken_prot.to_csv(os.path.join(self.outdir, 'uncuratable_pdb_files.csv'), mode='a', header=False)
+                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
                 print_statements.append(out_print_trap.getvalue())
                 print_statements.append(f">> FAILED clean and splitting of PDB entry file: {str(e)}")
                 finish_curate_jobs(failed=True)
@@ -503,7 +517,8 @@ class PDB(object):
                 except Exception as e:
                     print(f">> FAILED clean and splitting of PDB entry file: {str(e)}")
                     broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': str(e)}])
-                    broken_prot.to_csv(os.path.join(self.outdir, 'uncuratable_pdb_files.csv'), mode='a', header=False)
+                    broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
+                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
                     continue
 
 
@@ -560,7 +575,7 @@ class PDB(object):
 
             except Exception as e:
                 tmp_name = f'tmp_{os.path.splitext(os.path.basename(f))[0]}'
-                shutil.rmtree(os.path.join(self.curated_dir, tmp_name))
+                shutil.rmtree(os.path.join(self.curated_dir, tmp_name), ignore_errors=True)
                 print(f">> Patching failed for conformer {cnt}. {str(e)}")
                 continue
 
@@ -751,12 +766,13 @@ class PDB(object):
             self._adapt_fasta(pdb=pdb)
         if test_KCX: print(">> mutation added to remove a lysine carboxylation")
 
-        if res_insertion_codes:
-            raise Exception(f'>> Residue insertion codes found for pdb {pdb}, '
-                            f'insertion codes found: {res_insertion_codes}, residue numbering therefore not unique')
-
         write_file.close()
         read_file.close()
+
+        if res_insertion_codes:
+            os.remove(write_file_path)
+            raise Exception(f'>> Residue insertion codes found for pdb {pdb}, '
+                            f'insertion codes found: {res_insertion_codes}, residue numbering therefore not unique')
 
         os.remove(read_file_path)
 
@@ -942,7 +958,7 @@ class PDB(object):
             within the pdb file
         '''
         tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
-        fasta_text = requests.get(tmp_url).text
+        fasta_text = requests.get(tmp_url, timeout=20).text
         uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
         M = bb.Molecule(pdb_code)
         c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
@@ -985,8 +1001,12 @@ class PDB(object):
                     for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
                         res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
-                M.data.loc[M.data['chain'] == chain, 'resid'] = M.data['resid'].map(res_mapper).astype('Int64')
-                if any(M.data.loc[M.data['chain'] == chain, 'resid'].isna()): failed.append(chain)
+                mapped_res = M.data['resid'].map(res_mapper)
+                sel_chain = M.data['chain'] == chain
+                if mapped_res[sel_chain].isna().any():
+                    failed.append(chain)
+                    continue
+                M.data.loc[sel_chain, 'resid'] = mapped_res[sel_chain].astype(M.data['resid'].dtype)
 
             except Exception as e:
                 print(f'Failed alignment of pdb {pdb_code}, chain {chain}, with error: {str(e)}')

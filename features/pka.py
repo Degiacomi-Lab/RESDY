@@ -3,16 +3,9 @@ import os
 import sys
 import shutil
 import subprocess
-from datetime import date
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
-import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
 
 

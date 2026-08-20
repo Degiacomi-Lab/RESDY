@@ -100,6 +100,17 @@ class Aggregation:
         if 'Method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
         if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
         len_df_measures = len(self.df_measurements)
+        print('>> Finding numbers of na values present in each feature column in the dataframe')
+        always_na_cols = []
+        for col in self.features_to_include:
+            tmp_na_vals = self.df_measurements[col].isna().sum()
+            print(f'Number of na values for feature: {col}: num na: {tmp_na_vals}')
+            if tmp_na_vals == len(self.df_measurements):
+                always_na_cols.append(col)
+            tmp_na_vals = 0
+        if always_na_cols:
+            print(f'>> Columns {", ".join(always_na_cols)} are always na and provide no information, removing from dataframe')
+            self.df_measurements = self.df_measurements.drop(columns=always_na_cols, axis=1)
         self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)
         print(f'>> Removed {len_df_measures - len(self.df_measurements)} rows from the measurements dataframe which '
               f'contained nan values. New dataframe length is {len(self.df_measurements)}')
