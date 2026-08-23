@@ -27,7 +27,9 @@ class PDB(object):
     model input. Cleaning is currently done using Modeller.
     '''
 
-    def __init__(self, outdir="result", gap=10, parallel = False, PDB_only=False):
+    def __init__(self, outdir="result", gap=10, parallel = False,
+                 PDB_only=False, include_hetatm=False,
+                 resnames_of_interest = ['LYS']):
         '''
         Initialise the PDB class.
 
@@ -35,23 +37,27 @@ class PDB(object):
         ----------
         outdir : string
             The directory in which files should be downloaded and curated within
-
         gap : int
             The maximum gap that is allowed in the sequence for a structure that has been
             downloaded that patching will be done on. For structures with a gap in the
             sequence greater than this, the structure will be removed.
-
         parallel : bool
             Toggle to run the curation of pdb files in parallel rather than series (default False)
-
         PDB_only : bool
             Toggle for if you want to download a system from a list of PDB files (True)
-            or from a Uniprot dataframe (False) created from the Uniprot class. 
+            or from a Uniprot dataframe (False) created from the Uniprot class.
+        include_hetatm -> bool
+            Toggleable option to allow hetatms to pass through biobox
+        resnames_of_interest -> list
+            List of residues to investigate, only used for curating list of PLDDT values
+            for the residues of interest here.
         '''
 
         self.outdir = outdir
         self.PDB_only = PDB_only
         self.parallel = parallel
+        self.include_hetatm = include_hetatm
+        self.resnames_of_interest = resnames_of_interest
 
         # create folder of curated protein structures
         self.curated_dir = os.path.join(outdir, "curated")
@@ -114,9 +120,14 @@ class PDB(object):
             run the curation based on pdb files alone without curating for full uniprot codes
         '''
         # TODO GW 30.07.26 - could we infer the PDB_only state from the measures df format
-        if outdir == '' and self.outdir == '':
-            outdir = os.path.dirname(fname)
-            self.outdir = outdir
+        if outdir == '':
+            outdir = os.path.dirname(fname) if self.outdir == '' else self.outdir
+
+        self.outdir = outdir
+        self.curated_dir = os.path.join(outdir, 'curated')
+        self.raw_dir = os.path.join(outdir, 'conformations')
+        os.makedirs(self.curated_dir, exist_ok=True)
+        os.makedirs(self.raw_dir, exist_ok=True)
 
         self.PDB_only = PDB_only
         self.gap = gap
@@ -181,8 +192,7 @@ class PDB(object):
             except Exception as e:
                 return e
 
-        #n_cores_to_use = int(round(cpu_count() * 0.75))
-        n_cores_to_use = 26
+        n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
 
         with Manager() as manager:
             lock = manager.Lock()
@@ -197,17 +207,17 @@ class PDB(object):
                     else:
                         items.append([[r['PDB_Code']], skip_if_found, lock])
                 except Exception as e:
-                    method_obtained, resolution, chains = '', '', ''
-                    if not self.PDB_only:
-                        items.append([[r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains], skip_if_found, lock])
-                    else:
-                        items.append([[r['PDB_Code']], skip_if_found, lock])
                     pass
 
 
             with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
                 results = [t for t in pool.starmap(self._curate_row, items) if t is not None]
-                df_tmp = pd.concat(results, ignore_index=True)
+
+            if not results:
+                print(f'>> No structures of the {len(items)} uniprot codes could be curated, '
+                      f'for more details, see uncuratable_pdb_files.csv')
+                return
+            df_tmp = pd.concat(results, ignore_index=True)
 
             self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
 
@@ -323,7 +333,7 @@ class PDB(object):
                 with redirect_stdout(out_print_trap_af_plddt):
                     try:
                         with lock:
-                            af.find_af_plddt(pdb_code,outfolder=self.outdir)
+                            af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
                     except Exception as e:
                         print_statements.append(f'>> Failed on find_af_plddt() with error: {str(e)}')
                 print_statements.append(out_print_trap_af_plddt.getvalue())
@@ -468,8 +478,8 @@ class PDB(object):
                         data = {'PDB_Code': pdb_code}
                     self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
-                    # find the PLDDT codes for AF structures - not fully sure where to put this
-                    af.find_af_plddt(pdb_code,outfolder=self.outdir)
+                    # find the PLDDT codes for AF structures
+                    af.find_af_plddt(pdb_code, outfolder=self.outdir, resnames=self.resnames_of_interest)
 
                 else:
                     print(">> FAILED: structure not found in AlphaFold database")
@@ -569,14 +579,17 @@ class PDB(object):
 
                 # TODO 24.03.26 - this is only possible with structures that have a Uniprot code associated in order to get the sequence to align to - find way to make work with pdb_only
                 if not self.PDB_only:
-                    self._align_resnum_uniprot(uniprot_code, fname, chains)
+                    try:
+                        self._align_resnum_uniprot(uniprot_code, fname, chains)
+                    except Exception as e:
+                        print(f'>> Renumbering skipped for conformer {cnt} with error: {str(e)}')
 
                 test = True
 
             except Exception as e:
                 tmp_name = f'tmp_{os.path.splitext(os.path.basename(f))[0]}'
                 shutil.rmtree(os.path.join(self.curated_dir, tmp_name), ignore_errors=True)
-                print(f">> Patching failed for conformer {cnt}. {str(e)}")
+                print(f">> Patching failed for conformer {cnt}. Error: {str(e)}")
                 continue
 
         if not test:
@@ -703,14 +716,18 @@ class PDB(object):
         test_MSE = False
         test_SEC = False
         test_KCX = False
-        
+
         res_insertion_codes = []
 
         for line in read_file:
 
             # check for resid insertion code in position 26
-            if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
-                res_insertion_codes.append(line[26])
+            if not self.include_hetatm:
+                if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
+                    res_insertion_codes.append(line[26])
+            else:
+                if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and len(line) > 26 and line[26].isalpha():
+                    res_insertion_codes.append(line[26])
 
             # replace selenomethionine with methionine
             if "MSE" in line and ('ATOM' in line or 'HETATM' in line):
@@ -771,6 +788,7 @@ class PDB(object):
 
         if res_insertion_codes:
             os.remove(write_file_path)
+            os.remove(read_file_path)
             raise Exception(f'>> Residue insertion codes found for pdb {pdb}, '
                             f'insertion codes found: {res_insertion_codes}, residue numbering therefore not unique')
 
@@ -960,7 +978,8 @@ class PDB(object):
         tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
         fasta_text = requests.get(tmp_url, timeout=20).text
         uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
-        M = bb.Molecule(pdb_code)
+        M = bb.Molecule()
+        M.import_pdb(pdb_code, include_hetatm=self.include_hetatm)
         c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
         subset_data = M.data.iloc[c_alpha_idxs]
 
@@ -982,10 +1001,9 @@ class PDB(object):
 
         if isinstance(chains, str):
             chains = [c for c in chains.split('/') if c]
-        
+
         failed = []
         for chain in chains:
-            align_shift_dict = {}
             try:
                 aligner = PairwiseAligner()
                 aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
@@ -1143,7 +1161,8 @@ class PDB(object):
 
         #The relevant file in conformations is then opened and rewritten.
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=self.include_hetatm)
             # find the indices of the atoms in the pdb file
             indices = M.atomselect('*', '*', '*', True, False)[1]
 
@@ -1231,7 +1250,8 @@ class PDB(object):
         >> self.rewrite_pdb(path)
         '''
         try:
-            M = bb.Molecule(path)
+            M = bb.Molecule()
+            M.import_pdb(path, include_hetatm=self.include_hetatm)
             indices = M.atomselect('*', '*', '*', True, False)[1]
             M.write_pdb(path, index=indices, split_struc=False)
 

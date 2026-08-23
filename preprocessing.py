@@ -179,6 +179,10 @@ class Preprocessing:
 
         all_decorrelated = False
         min_feats = 2
+        
+        if not statsmodel_available:
+            raise ImportError('>> Packages required for VIF analysis (statsmodel) are not '
+                              'available, install statsmodel or use aev_red_method=\'pca\'')
 
         data = data[self.features]
         data = add_constant(data)
@@ -205,7 +209,7 @@ class Preprocessing:
                 if data.shape[1] <= min_feats:
                     print(f'>> VIF did not converge: {data.shape[1]} columns left '
                           f'and still correlated, keeping columns')
-                    break
+                    return [a for a in list(data.columns) if a != 'const']
 
                 # remove the column with the highest vif
                 max_val_idx = self.vif[list(self.vif.columns)[-1]].idxmax()
@@ -217,6 +221,9 @@ class Preprocessing:
 
         cut_df = self.vif[self.vif[list(self.vif.columns)[-1]] < 5]
         cols_to_keep = [a for a in list(cut_df['Parameter']) if a != 'const']
+        if not cols_to_keep:
+            print('>> VIF kept no columns; falling back onto the surviving set')
+            cols_to_keep = [a for a in list(data.columns) if a != 'const']
         return cols_to_keep
 
 

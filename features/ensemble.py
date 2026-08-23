@@ -1,9 +1,9 @@
-import os, sys
+import os
 import glob
+from collections import OrderedDict
 import pandas as pd
 import numpy as np
 import biobox as bb
-from collections import OrderedDict
 from features.error_reporting import report_error_to_file
 
 try:
@@ -15,15 +15,6 @@ except Exception as e:
     esm_packages_available = False
     print(f'>> Failed to import packages required for esm calculations, '
           f'will not be able to calculate sequence features based on esm. Error: {e}')
-
-try:
-    import MDAnalysis as mda
-    from MDAnalysis.analysis import rms, align
-    rmsf_packages_available = True
-except Exception as e:
-    rmsf_packages_available = False
-    print(f'>> Failed to import packages (MDanalysis) required for rmsf calculations, '
-          f'will not be able to calculate rmsf data. Error: {e}')
 
 
 class Ensemble():
@@ -65,21 +56,25 @@ class Ensemble():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
-        if not rmsf_packages_available:
-            raise ImportError('>> Packages required for RMSF calculations (mdanalysis) are '
-                                'not available, rmsf will be removed from features to calculate.')
-
         self.model_loaded = False
 
 
-    def _initialise_esm_model(self):
+    def _check_esm_model_available(self):
         '''
-        Initialise global parameters and models in calculating ESM values
+        Check that the esm package is available, set model loaded to be False.
         '''
-        
         if not esm_packages_available:
             raise ImportError(f'>> Failed to import the packages required (esm/torch) '
                               f'for esm calculations, esm will be removed from features.')
+        self.model_loaded = False
+
+
+    def _ensure_esm_model(self):
+        '''
+        Load in the model when running the process in the pool rather than before forking
+        '''
+        if self.model_loaded:
+            return
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.esm2_model_650M, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
@@ -97,10 +92,11 @@ class Ensemble():
         self.model_loaded = True
 
 
-    def calculate_rmsf(self, path):
+    def calculate_rmsf(self, path, align_type='backbone'):
         '''
         Calculate the root mean square fluctuation of the lysines within the protein
-        over all the structures which have been curated for the uniprot code
+        over all the structures which have been curated for the Uniprot code. This method
+        uses biobox but doesn't adjust the size of the window used to gain more matches.
 
         Method
         ------
@@ -111,6 +107,10 @@ class Ensemble():
         ----------
         path : string
             The path of the pdb file that DAS is being calculated for.
+        align_type : string
+            The type of alignment to perform when calculating the RMSF values. Options:
+            - 'local' - Aligns to backbone of lysine to calculate RMSF value for
+            - 'backbone' (DEFAULT) - Aligns to backbone of full structure
 
         Returns
         -------
@@ -122,7 +122,7 @@ class Ensemble():
         Example
         -------
         >> print(self.calculate_rmsf(1M2F-alt-1.pdb))
-          Chain   Resid     rmsf
+            Chain   Resid     rmsf
         0     A      95       -3
         '''
         try:
@@ -134,16 +134,18 @@ class Ensemble():
                 code = code.split('-')[0]
             uniprot_interest = list(self.df_proteins[self.df_proteins['PDB_Code'] == code]['Uniprot_Entry'])[0]
             prot_info = list(self.df_proteins[self.df_proteins['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
-            prot_match_exists = [a for a in files if os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info]
+            prot_match_exists = [a for a in files if (os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info)
+                                    or (os.path.basename(a).split('.')[0] in prot_info)]
 
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
-            
+
             M_ca = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+            _, idx_resinterest = M.atomselect('*', 'LYS', 'CA', use_resname=True, get_index=True)
             if self.include_modified: idx_n_res_interest = M_ca.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'CA', use_resname=True, get_index=True)[1]
             else: idx_n_res_interest = M_ca.atomselect('*', self.aa_properties['non_modified_codes'], 'CA', use_resname=True, get_index=True)[1]
-            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M_ca.data['resname']))
-            df_rmsf = M_ca.data[['resid', 'chain']]
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.get_subset(idx_resinterest).data['resname']))
+            df_rmsf = M.data.loc[idx_resinterest, ['chain', 'resid']].rename(columns={'chain': 'Chain', 'resid': 'Resid'}).reset_index(drop=True)
             if self.include_modified: df_rmsf = df_rmsf.assign(**{'Modified': list_modified})
 
             M_df_compare = M.data[M.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
@@ -153,6 +155,7 @@ class Ensemble():
             return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
         try:
+            P = bb.Molecule()
             prot_matches = []
             for file in prot_match_exists:
                 T = bb.Molecule()
@@ -161,23 +164,42 @@ class Ensemble():
                 if M_df_compare.equals(T_df_compare):
                     prot_matches.append(file)
 
-            select_crit = 'name CA'
             if len(prot_matches) > 1:
-                prot_conf_unv = mda.Universe(prot_matches[0], prot_matches, format='PDB', dt=1.0)
-                aligner = align.AlignTraj(prot_conf_unv, prot_conf_unv, select=select_crit,
-                                          in_memory=True, ref_frame=0).run()
-                prot_c_alphas = prot_conf_unv.select_atoms(select_crit)
-                if len(prot_c_alphas) != len(df_rmsf):
-                    raise ValueError(f'>> Mismatch in resid count (based on CA count) between '
-                                     f'biobox (len {len(df_rmsf)}) and mdanalysis (len '
-                                     f'{len(prot_c_alphas)}) for file {path}')
-                rmsf_vals = rms.RMSF(prot_c_alphas).run().results.rmsf
-                df_rmsf = df_rmsf.assign(**{'rmsf': rmsf_vals})
+                P = bb.Molecule()
+                P.import_pdb(prot_matches[0])
+                for f in prot_matches[1:]:
+                    P2 = bb.Molecule()
+                    P2.import_pdb(f)
+                    P2_xyz = P2.get_xyz()
+                    P.add_xyz(P2_xyz)
+
+                df_out = pd.DataFrame()
+                res_interest = self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']
+                for i, r in P.data.drop_duplicates(subset=['chain', 'resid']).loc[P.data['resname'].isin(res_interest), ['chain', 'resid']].iterrows():
+                    chain = r['chain']
+                    resid = r['resid']
+                    try:
+                        match align_type:
+                            case 'local':
+                                _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"], get_index=True)
+                            case 'backbone' | _:
+                                _, idx_ref = P.atomselect('*', '*', ["C", "CA", "N", "O"], get_index=True)
+                        _, idx_target = P.atomselect(chain, resid, self.aa_properties['atom_select_names_nonmod'], get_index=True)
+
+                        P.rmsd_one_vs_all(0, points_index=idx_ref, align=True)
+                        rmsf = P.rmsf(indices=idx_target)[0]
+
+                        df_out = pd.concat([df_out, pd.DataFrame([{'Chain': chain, 'Resid': resid, 'rmsf': rmsf}])])
+                    except Exception:
+                        df_out = pd.concat([df_out, pd.DataFrame([{'Chain': chain, 'Resid': resid, 'rmsf': np.nan}])])
+                        pass
+
+                df_rmsf = df_rmsf.merge(df_out, how='left', on=['Chain', 'Resid'])
 
             else:
+                print('>> The only matching structure is itself, therefore rmsf cannot be calculated')
                 df_rmsf = df_rmsf.assign(**{'rmsf': np.NaN})
 
-            df_rmsf = df_rmsf.iloc[idx_n_res_interest]
         except Exception as e:
             if self.record_errors: report_error_to_file('RMSF 2', path, str(e), self.error_filename)
             print(f'RMSF Calculation 2: Failed to calculate RMSF for uniprot: {path}, error: {e}')
@@ -211,7 +233,10 @@ class Ensemble():
         6     A    63  [-0.05812466889619827, 0.03620311990380287, 0....
         '''
 
-        if not self.model_loaded: self._initialise_esm_model()
+        if not self.model_loaded:
+            self._check_esm_model_available()
+
+        self._ensure_esm_model()
 
         # 1: Extract the sequence sections from the given protein structure
         try:
@@ -330,7 +355,8 @@ if __name__ == '__main__':
     outdir = 'Demo'
     df_prot = pd.read_csv(f'{outdir}{os.sep}proteins_demo.csv')
     E = Ensemble(df_proteins=df_prot, include_modified=False)
-    print(E.calculate_esm(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    #print(E.calculate_esm(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    print(E.calculate_rmsf(path=f'{outdir}{os.sep}curated{os.sep}1M2F-alt-1.pdb'))
 
     #print(E.calculate_rmsf(path=f'{outdir}{os.sep}curated{os.sep}1M2E-alt-1.pdb'))
     #df_esm.to_pickle('testing_esm_csv.pkl')  #  pickle used if keeping tensors in output dataframe, csv fine if taking list through as can literal_eval

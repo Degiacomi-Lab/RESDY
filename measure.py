@@ -33,7 +33,8 @@ try:
     import torch
     import torchani
 except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
+    print(f'Packages required for AEV calculation are not available, '
+          f'will not be able to calculate AEVs. Error: {e}')
 
 try:
     from Bio.PDB import PDBParser
@@ -82,8 +83,10 @@ class Measure(object):
         df_input -> dataframe
             The input dataframe containing information on the structures over which the measurements
             will be done. This is usually the output given from the curation steps (pdb.df).
-            This contains the filepath, Uniprot_Entry, PDB_Code, etc
-            TODO: finish this description with full set of required column names here.
+            The format of this file depends on if running PDB_only or not. If running PDB only you
+            you will just need to give one column which is a list of paths to the pdb files. If
+            running fully the dataframe will contain columns of 'Uniprot_Entry', 'PDB_Code',
+            'Method', 'Resolution', 'Chains'
         outdir -> string
             The name of the directory where the measurement output will be written to.
         activate_log -> bool
@@ -156,8 +159,6 @@ class Measure(object):
 
         # for parallel measurements
         self.parallel = parallel
-        #if self.parallel:
-        #    mp.set_start_method('spawn', force=True)
         self.files_to_analyse = []
         self.parallel_items = {}
 
@@ -205,7 +206,6 @@ class Measure(object):
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
                         'esm', 'rmsf']
             self.features = list(features)
-        if 'melodia' in self.features: self.features.append(self.features.pop(self.features.index('melodia')))
         self.measures = []
         melodia_features = []
         melodia_added = False; frustration_added = False; legolas_added = False
@@ -295,7 +295,7 @@ class Measure(object):
                         frustration_added = True
                 except Exception as e:
                     self.features.remove(m)
-                    print(f'>> Failed to add rmsf for features calculation list; error: {e}')
+                    print(f'>> Failed to add frustration/density for features calculation list; error: {e}')
             elif m == 'melodia':
                 try:
                     structure = Structure(melodia_features=['all'],
@@ -317,21 +317,17 @@ class Measure(object):
                                         include_modified=self.include_mod,
                                         error_filename=self.error_filename,
                                         aa_properties=self.aa_properties)
-                    ensemble._initialise_esm_model()
+                    ensemble._check_esm_model_available()
                     self.measures.append(['esm', ensemble.calculate_esm])
                 except Exception as e:
                     self.features.remove(m)
                     print(f'>> Failed to add esm for features calculation list; error: {e}')
             elif m == 'rmsf':
-                try:
-                    ensemble = Ensemble(df_proteins=self.df_input,
-                                        include_modified=self.include_mod,
-                                        error_filename=self.error_filename,
-                                        aa_properties=self.aa_properties)
-                    self.measures.append(['rmsf', ensemble.calculate_rmsf])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add rmsf for features calculation list; error: {e}')
+                ensemble = Ensemble(df_proteins=self.df_input,
+                                    include_modified=self.include_mod,
+                                    error_filename=self.error_filename,
+                                    aa_properties=self.aa_properties)
+                self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
                 if self.report_errors:
                     self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
@@ -573,16 +569,12 @@ class Measure(object):
         files = [file for file in files if 'pkaani' not in file]
         self.files_to_analyse = files
 
-        first_index = self.df_input.index[0]
         total_structures = len(files)
-        current_structure = 0
-        overall_st = time.time()
         print(f'Total number of structures to analyse: {total_structures}')
 
         match self.parallel:
             case True:
-                n_cores_to_use = cpu_count() - 2
-                #n_cores_to_use = 16
+                n_cores_to_use = max(1, int(round(cpu_count() * 0.9)))
                 print('>> Measurements running in parallel')
             case False:
                 # use a singular core for step by step processing
@@ -590,9 +582,7 @@ class Measure(object):
                 print('>> Measurements running step by step')
 
         with Manager() as manager:
-            # create lock to avoid multiple parts writing to output files at the same time
             lock = manager.Lock()
-            # prepare the inputs for the parallelisation
             items = []
             for i, r in self.df_input.iterrows():
                 pdb_code = r["PDB_Code"]
@@ -606,9 +596,22 @@ class Measure(object):
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append([file_details, lock])
-            #with mp.get_context('spawn').Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-            with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
+
+            gpu_feats = ['aev', 'esm']
+            gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
+            cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
+
+            self.measures = cpu_measurements
+            if cpu_measurements:
+                with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                    df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
+
+            self.measures = gpu_measurements
+            if gpu_measurements:
+                df_gpu = pd.concat([self._measure_file(d, lock) for d, lock in items], ignore_index=True)
+                df_parallel = df_parallel.merge(df_gpu, how='left', on=['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid'])
+
+            self.measures = cpu_measurements + gpu_measurements
             self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
 
         try:
@@ -1141,11 +1144,15 @@ class Measure(object):
         if 'completed' not in self.df_input.columns:
             self.df_input['completed'] = False
 
+        pdb_count = 0
+
         for pdb_idx, row in self.df_input.iterrows():
             pdb_code = row['PDB_Code']
 
             if row['completed']:
                 continue
+
+            pdb_count += 1
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
@@ -1159,8 +1166,7 @@ class Measure(object):
                 tstart = time.time()
                 print(f"\n> File: {f}")
 
-                columns = ['PDB_Code', 'Chain', 'Resid']
-                if self.include_mod: columns.append('Modified')
+                columns = ['PDB_Code', 'Chain', 'Resid', 'Modified']
                 df_currentfile = pd.DataFrame(columns=columns)
 
                 try:
@@ -1232,21 +1238,17 @@ class Measure(object):
                 if not df_currentfile.empty:
                     self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
 
-                if pdb_code.lower() == os.path.basename(f).split("-")[0].lower():
-                    break
-
             self.df_input.at[pdb_idx, 'completed'] = True
 
             try:
-                avg_time_per_file = (time.time() - tstart_overall) / (pdb_idx + 1)
-                time_remaining = datetime.timedelta(seconds=int(round((len(self.df_input) - (pdb_idx + 1)) * avg_time_per_file, 0)))
-                perc_prog_measure = round(((pdb_idx + self.progress_index + 1)/num_pdb_files)*100, 2)
+                avg_time_per_file = (time.time() - tstart_overall) / pdb_count
+                time_remaining = datetime.timedelta(seconds=int(round((len(self.df_input) - pdb_count) * avg_time_per_file, 0)))
+                perc_prog_measure = round(((pdb_count + self.progress_index + 1)/num_pdb_files)*100, 2)
                 print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
             except Exception as e:
                 if self.report_errors:
                     self._report_error_to_file('broken progress updater', 'measure pdb only', str(e))
                 print(f'>> Broken progress updater: {e} \r', end='', flush=True)
-
 
 
     def restart_measure_pdb_only(self, log_path='measure_log.txt'):

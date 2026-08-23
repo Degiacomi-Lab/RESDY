@@ -132,25 +132,28 @@ class PKA():
         code_for_df = os.path.basename(path).split(".")[0]
         propka_error_file_name = os.path.join(self.pka_outdir, f"{code_for_df}_propka_errors.txt")
 
-        test_path = code_for_df + '.pka'
-        if not os.path.isfile(test_path):
-            try:   
+        propka_exist_output = os.path.join(self.pka_outdir, (code_for_df + '.pka'))
+        if not os.path.isfile(propka_exist_output):
+            try:
                 f = open(propka_error_file_name, 'w')
                 process = subprocess.Popen([sys.executable, '-m', 'propka', path],
                                     stdout=f, stderr=f)
                 stdout, stderr = process.communicate()
                 f.close()
+                shutil.move(code_for_df, propka_exist_output)
 
             except Exception as e:
                 f.close()
 
                 try:
-                    shutil.move(code_for_df, os.path.join(self.pka_outdir, code_for_df))
+                    shutil.move(code_for_df, propka_exist_output)
                 except:
                     pass
 
                 if self.record_errors: report_error_to_file('PROPKA 1', path, str(e), self.error_filename)
                 raise Exception(f'Failed to obtain pKa data (PROPKA): {e}') from e
+        else:
+            print(f'>> Previous PROPKA file found for pdb file {path}, using this instead of re-running.')
 
         try:
             propka_res_interest_fails = self._parse_propka_errors(propka_error_file_name)
@@ -159,8 +162,7 @@ class PKA():
             raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
 
         try:
-            propka_file = code_for_df + '.pka'
-            propka_outfile = open(propka_file)
+            propka_outfile = open(propka_exist_output)
         except Exception as e:
             if self.record_errors: report_error_to_file('PROPKA 3', path, str(e), self.error_filename)
             raise Exception(f'Failed to find {propka_file} output file to read') from e
@@ -191,11 +193,9 @@ class PKA():
                         continue
 
             propka_outfile.close()
-            shutil.move(propka_file, os.path.join(self.pka_outdir, propka_file))
 
         except Exception as e:
             propka_outfile.close()
-            shutil.move(propka_file, os.path.join(self.pka_outdir, propka_file))
             if self.record_errors: report_error_to_file('PROPKA 5', path, str(e), self.error_filename)
             raise Exception(f'Failure parsing {code_for_df}.pka, error: {e}') from e
 
@@ -246,6 +246,8 @@ class PKA():
             Chain   Resid
             x       x
         '''
+        if not os.path.exists(path):
+            return []
 
         f = open(path, 'r')
         cnt = 0
@@ -373,10 +375,8 @@ class PKA():
 
 
 if __name__ == '__main__':
-    
     pka = PKA(outdir='result',
               calc_method='propka',
               include_modified=False)
     #print(pka._parse_propka_errors(path=f'data{os.sep}propkaoutput{os.sep}1A0F-alt-1_propka_errors.txt'))
     print(pka.calculate_pka(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(pka.calculate_pka(path=f'2I1V-alt-1.pdb'))

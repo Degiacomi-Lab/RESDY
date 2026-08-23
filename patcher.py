@@ -381,7 +381,7 @@ def analyze_protein(M):
     return cnt
 
 
-def fragment(pdb, fasta, outfolder="."):
+def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     '''
     Take pdb file, check if more than 62 chains (can't patch this due to legacy pdb
     format problems) if so write to the given file, check if double letter chain names
@@ -400,13 +400,16 @@ def fragment(pdb, fasta, outfolder="."):
         Name of the fasta file corresponding to the pdb file of interest
     outfolder -> str
         path of the temporary folder for the patching
+    include_hetatm -> bool
+        Toggleable option to allow hetatms to pass through biobox
     '''
 
     if not os.path.exists(outfolder):
         os.mkdir(outfolder)
 
     #split PDB file in chains using biobox
-    M = bb.Molecule(pdb)
+    M = bb.Molecule()
+    M.import_pdb(pdb, include_hetatm=include_hetatm)
     chains = np.unique(M.data["chain"].values)
 
     # Catch cases which have more than 62 chains which are not able to be worked with using PDB files
@@ -527,7 +530,7 @@ def fragment(pdb, fasta, outfolder="."):
     return np.array(gap_count)
 
 
-def reassemble(pdbs, labels, outname, outdir):
+def reassemble(pdbs, labels, outname, outdir, include_hetatom=False):
     '''
     For each chain pdb file in the folder, check if the chain name in the filename
     is different to the one in the pdb data for double letter ones and if needs reverting
@@ -544,6 +547,8 @@ def reassemble(pdbs, labels, outname, outdir):
         Path of the curated structure overall to write to
     outdir -> str
         Path of the output directory
+    include_hetatm -> bool
+        Toggleable option to allow hetatms to pass through biobox
     '''
     for pdb_file in pdbs:
         # take pdb_file and extract the chain name - need to find the exact format it needs to go back into that the code is expecting to reconvert it from
@@ -554,7 +559,7 @@ def reassemble(pdbs, labels, outname, outdir):
             dbletter = True
 
         M_tmp = bb.Molecule()
-        M_tmp.import_pdb(pdb_file, include_hetatm=True)
+        M_tmp.import_pdb(pdb_file, include_hetatm=include_hetatom)
         max_res = int(M_tmp.data['resid'].max())
         if max_res > 999:
             thousand_chain = True
@@ -589,7 +594,7 @@ def reassemble(pdbs, labels, outname, outdir):
     with open(outname, 'wb') as f_outname:
         for i, (f, f_chain) in enumerate(zip(pdbs, labels)):
             T = bb.Molecule()
-            T.import_pdb(f, include_hetatm=True)
+            T.import_pdb(f, include_hetatm=include_hetatom)
             T.data['chain'] = f_chain
             T.write_pdb(f)
             with open(f, 'rb') as f_new:
@@ -619,7 +624,8 @@ def reassemble(pdbs, labels, outname, outdir):
     '''
 
 
-def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
+def curate(pdb, fasta, outdir="result", gap=10,
+           verbose=False, include_hetatm=False):
     '''
     Take pdb file, create specific temp folder for working in, call fragment
     to split into chains and get the gap counts, if gap counts are greater
@@ -640,6 +646,8 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
     verbose -> bool
         Toggleable option to allow for printing of full output from Modeller
         to the terminal (default False)
+    include_hetatm -> bool
+        Toggleable option to allow hetatms to pass through biobox
 
     Return
     ------
@@ -653,7 +661,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
     os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    gap_count = fragment(pdb, fasta, tmp_folder)
+    gap_count = fragment(pdb, fasta, tmp_folder, include_hetatm=include_hetatm)
 
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
@@ -679,9 +687,11 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
             raise Exception("Autopatching failed.")
 
         # ensure that sequences of AA starts from the correct resid
-        M_raw = bb.Molecule(f"{fbasename}.pdb")
+        M_raw = bb.Molecule()
+        M_raw.import_pdb(f'{fbasename}.pdb', include_hetatm=include_hetatm)
         startval_raw = M_raw.data["resid"].values
-        M_curated = bb.Molecule(foutname)
+        M_curated = bb.Molecule()
+        M_curated.import_pdb(foutname, include_hetatm=include_hetatm)
         startval_clean = M_curated.data["resid"].values
         if startval_raw[0] != startval_clean[0]:
             startval_clean += startval_raw[0] - startval_clean[0]
@@ -701,7 +711,7 @@ def curate(pdb, fasta, outdir="result", gap=10, verbose=False):
     sorting_pairs = sorted(zip(chains, fouts), key=lambda cf: cf[0])
     chains, fouts = zip(*sorting_pairs)
 
-    reassemble(fouts, chains, outname, outdir)
+    reassemble(fouts, chains, outname, outdir, include_hetatom=include_hetatm)
 
     shutil.rmtree(tmp_folder)
 
