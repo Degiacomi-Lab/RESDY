@@ -1,16 +1,9 @@
 import os
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import biobox as bb
 from features.error_reporting import report_error_to_file
 
-
-# AEV packages
 try:
     from ase import Atoms
     import torch
@@ -64,7 +57,16 @@ class AEV():
             raise ImportError('>> Packages required for AEV calculations (ase/torch/torchani) are '
                               'not available, aev will be removed from features to calculate.')
 
-        # Preparation of AEV computer
+        self.device = None
+        self.ANI = None
+
+
+    def _ensure_aev_model(self):
+        '''
+        On the first use of the model, load the model in the desired process for the work
+        '''
+        if self.ANI is not None:
+            return
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=self.device)
 
@@ -107,6 +109,8 @@ class AEV():
         5     A    48  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
         6     A    63  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
         '''
+
+        self._ensure_aev_model()
 
         df_aevs = pd.DataFrame(columns=["Chain", "Resid", "aev"])
 
@@ -199,5 +203,5 @@ class AEV():
 
 
 if __name__ == '__main__':
-    AEV = AEV(include_modified=False)
-    print(AEV.calculate_aevs(f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    aev_a = AEV(include_modified=False)
+    print(aev_a.calculate_aevs(f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

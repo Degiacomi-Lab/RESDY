@@ -65,21 +65,35 @@ class Ensemble():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
+        self.model_loaded = False
+
+
+    def _check_rsmf_package_available(self):
+        '''
+        Quick function to check that rmsf packages are available which allows esm to be
+        calculated even if rmsf packages aren't available
+        '''
         if not rmsf_packages_available:
             raise ImportError('>> Packages required for RMSF calculations (mdanalysis) are '
                                 'not available, rmsf will be removed from features to calculate.')
 
-        self.model_loaded = False
 
-
-    def _initialise_esm_model(self):
+    def _check_esm_model_available(self):
         '''
-        Initialise global parameters and models in calculating ESM values
+        Check that the esm package is available, set model loaded to be False.
         '''
-        
         if not esm_packages_available:
             raise ImportError(f'>> Failed to import the packages required (esm/torch) '
                               f'for esm calculations, esm will be removed from features.')
+        self.model_loaded = False
+
+
+    def _ensure_esm_model(self):
+        '''
+        Load in the model when running the process in the pool rather than before forking
+        '''
+        if self.model_loaded:
+            return
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.esm2_model_650M, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
@@ -175,7 +189,7 @@ class Ensemble():
                 df_rmsf = df_rmsf.assign(**{'rmsf': rmsf_vals})
 
             else:
-                df_rmsf = df_rmsf.assign(**{'rmsf': np.NaN})
+                df_rmsf = df_rmsf.assign(**{'rmsf': np.nan})
 
             df_rmsf = df_rmsf.iloc[idx_n_res_interest]
         except Exception as e:
@@ -211,7 +225,10 @@ class Ensemble():
         6     A    63  [-0.05812466889619827, 0.03620311990380287, 0....
         '''
 
-        if not self.model_loaded: self._initialise_esm_model()
+        if not self.model_loaded:
+            self._check_esm_model_available()
+
+        self._ensure_esm_model()
 
         # 1: Extract the sequence sections from the given protein structure
         try:

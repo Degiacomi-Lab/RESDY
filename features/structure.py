@@ -1,22 +1,5 @@
-import re
 import os
-import io
-import logging
-import datetime
-import shutil
-import subprocess
-import glob
-import time
-from datetime import date
-from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from contextlib import redirect_stdout
-from ast import literal_eval
 import pandas as pd
-import numpy as np
-import biobox as bb
-import matplotlib.pyplot as plt
 from features.error_reporting import report_error_to_file
 
 # Melodia packages
@@ -134,7 +117,4 @@ class Structure():
 
 if __name__ == '__main__':
     struc = Structure(include_modified=True)
-    #print(struc.calculate_melodia(path=f'1ubq.pdb'))
-    #print(struc.calculate_melodia(path=f'1ubq_frame_0.pdb'))
-    #print(struc.calculate_melodia(path=f'1ubq_mod6_frame_0.pdb'))
-    print(struc.calculate_melodia(path=f'1nsk_AmberMod0000.pdb'))
+    print(struc.calculate_melodia(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

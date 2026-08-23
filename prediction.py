@@ -196,6 +196,15 @@ class Prediction:
         plt.savefig('pca_allfeatures.svg')
         plt.show()
 
+    def predict(self, method):
+        '''
+        Call the relevant class for predictions and sort
+        '''
+        match method:
+            case 'general_rf':
+                print('Predicting using generic random forest model')
+        
+
 
 if __name__ == '__main__':
     pos_measure_files = ['data/measures_cut_CannData_all_12.05.25.csv',

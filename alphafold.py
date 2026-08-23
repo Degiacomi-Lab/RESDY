@@ -49,7 +49,7 @@ def download_AF_struc(pdb, outfolder="result"):
 
     return
 
-def find_af_plddt(af_code_full, outfolder="result"):
+def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     '''
     Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value
     for each lysine in an alphafold structure.
@@ -66,10 +66,12 @@ def find_af_plddt(af_code_full, outfolder="result"):
     ----------
     af_code_full : string
         The AF code for the structure to extract the PLDDT values from
-    
     outfolder : string
         The outdirectory to used to check that the PLDDT out file is in the correct place
         and allow appending to this
+    resnames : list
+        list of resid names to search for in the pdb files. Default is ['LYS'], set in overall
+        run through curation on aa_properties
 
     Returns
     -------
@@ -101,11 +103,10 @@ def find_af_plddt(af_code_full, outfolder="result"):
 
     try:
         with open(os.path.join(outfolder, "curated", af_code_full + ".pdb"), "r") as f:
-            # parse the file to find plddt values
             for line in f:
                 try:
-                    if re.search(r'CA\s\sLYS', line):
-                        line = str(line)
+                    line = str(line)
+                    if line[12:16].strip() == 'CA' and line[17:20].strip() in resnames:
                         chain = line[21]
                         resid = line[22:26].strip()
                         plddt = line[60:66].strip()
@@ -124,9 +125,11 @@ def find_af_plddt(af_code_full, outfolder="result"):
 
     except Exception as e:
         print(f'Failed to obtain PLDDT data for {af_code_full}; error: {e}')
-        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {str(e)}'})
+        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': '', 'Resid': '',
+                               'PLDDT': f'Error {str(e)}'})
 
-    plddt_out_file.close()
+    finally:
+        plddt_out_file.close()
     return dict_plddt
 
 

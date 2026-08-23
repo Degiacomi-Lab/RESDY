@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import fisher_exact
-from statsmodels.stats.multitest import multipletests
 
 #### TODO Section #### - for general todos in this file, may be more further down
 # TODO GW 13.09.24 - most of the GO term analysis currently only works for propka
@@ -20,6 +19,14 @@ from statsmodels.stats.multitest import multipletests
 #                    work with all the extra stuff added in
 # TODO GW 16.04.25 - removed dropna function on init, need to add in function which cleans the dataframe at the start instead. Dont want to blanket remove all null rows incase only null for some measurements and these arent being used
 
+try:
+    from statsmodels.stats.multitest import multipletests
+    statsmodel_available = True
+except Exception as e:
+    statsmodel_available = False
+    print(f'>> Packages available for calculating enrichment analysis '
+          f'(statsmodel.multipletests) are not available. Won\'t be '
+          f'able to calculate this. Error: {e}')
 
 class Analysis(object):
 
@@ -562,6 +569,9 @@ class Analysis(object):
         '''
         Analyse prevalence of GO-terms in sub-regions of the SASA vs pKa graph
         '''
+
+        if not statsmodel_available:
+            raise ImportError(f'>> GO enrichment analysis requires statsmodel.multipletests which isn\' available')
 
         # get all the uniprot codes inside the range and the reference uniprot code list
         feat_one, feat_one_low, feat_one_upper = str(feature_one[0]), float(feature_one[1]), float(feature_one[2])
