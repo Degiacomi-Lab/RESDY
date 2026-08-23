@@ -323,16 +323,11 @@ class Measure(object):
                     self.features.remove(m)
                     print(f'>> Failed to add esm for features calculation list; error: {e}')
             elif m == 'rmsf':
-                try:
-                    ensemble = Ensemble(df_proteins=self.df_input,
-                                        include_modified=self.include_mod,
-                                        error_filename=self.error_filename,
-                                        aa_properties=self.aa_properties)
-                    ensemble._check_rsmf_package_available()
-                    self.measures.append(['rmsf', ensemble.calculate_rmsf])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add rmsf for features calculation list; error: {e}')
+                ensemble = Ensemble(df_proteins=self.df_input,
+                                    include_modified=self.include_mod,
+                                    error_filename=self.error_filename,
+                                    aa_properties=self.aa_properties)
+                self.measures.append(['rmsf', ensemble.calculate_rmsf])
             else:
                 if self.report_errors:
                     self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
@@ -579,8 +574,7 @@ class Measure(object):
 
         match self.parallel:
             case True:
-                n_cores_to_use = cpu_count() - 2
-                #n_cores_to_use = 16
+                n_cores_to_use = max(1, int(round(cpu_count() * 0.9)))
                 print('>> Measurements running in parallel')
             case False:
                 # use a singular core for step by step processing
@@ -602,7 +596,7 @@ class Measure(object):
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append([file_details, lock])
-                
+
             gpu_feats = ['aev', 'esm']
             gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
             cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
