@@ -57,6 +57,14 @@ class NMR():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
+        # Note: if you are not GW and running this, you will need to change this path to your own installation path!!
+        legolas_path = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
+
+        self.legolas_prog = os.environ.get('LEGOLAS_PATH', legolas_path)
+        if not os.path.isfile(self.legolas_prog):
+            raise ImportError(f'>> legolas.py not found at {self.legolas_prog}, set LEGOLAS_PATH'
+                              f'or pass legolas_path=, legolas will be removed from features.')
+
         self.legolas_output_path = os.path.join(self.outdir, 'legolas')
         os.makedirs(self.legolas_output_path, exist_ok=True)
 
@@ -87,7 +95,6 @@ class NMR():
         5     data/curated/1UBQ-alt-1       A     48   119.989
         6     data/curated/1UBQ-alt-1       A     63   121.946
         '''
-
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             M = bb.Molecule()
@@ -104,7 +111,8 @@ class NMR():
                 if 'HIE' in list(M.data['resname']):
                     print('modifying the structure to change HIE to HIS')
                     M.data.loc[M.data['resname'] == 'HIE', 'resname'] = 'HIS'
-                    M.write_pdb('temp_legolas.pdb')
+                    tmp__file_stem = f'tmp_legolas_{os.path.basename(path).split(".")[0]}'
+                    M.write_pdb(f'{tmp__file_stem}.pdb')
                     modified_struc = True
 
             M_n = M.get_subset(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])
@@ -129,15 +137,13 @@ class NMR():
         # 2: change location to legolas directory and run the legolas program on the specified pdb before changing back to working directory
         try:
             if modified_struc:
-                pdb_absolute_path = 'temp_legolas.pdb'
-                result_filename = 'temp_legolas_cs.csv'
+                pdb_absolute_path = f'{tmp__file_stem}.pdb'
+                result_filename = f'{tmp__file_stem}_cs.csv'
             else:
                 pdb_absolute_path = os.path.join(os.getcwd(), path)
                 result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'
             if not already_exists:
-                # Note: if you are not GW and running this, you will need to change this path to your own installation path!!
-                legolas_prog = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
-                subprocess.run([sys.executable, legolas_prog, pdb_absolute_path, '-atype', 'N'], check=True)
+                subprocess.run([sys.executable, self.legolas_prog, pdb_absolute_path, '-atype', 'N'], check=True)
             else:
                 result_filename = os.path.join(self.legolas_output_path, result_filename)
             df_nmr = pd.read_csv(result_filename)
@@ -154,7 +160,7 @@ class NMR():
                 result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'
                 shutil.move(result_filename, self.legolas_output_path)
                 if modified_struc:
-                    os.remove('temp_legolas.pdb')
+                    os.remove(f'{tmp__file_stem}.pdb')
 
             if self.legolas_aevs:
                 try:
@@ -185,6 +191,9 @@ class NMR():
                 except Exception as e:
                     print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
                     if self.record_errors: report_error_to_file('LEGOLAS AEV 1', path, str(e), self.error_filename)
+
+                if os.path.exists(os.path.join(self.legolas_output_path, new_aev_filename)):
+                    os.remove(os.path.join(self.legolas_output_path, new_aev_filename))
 
             df_legolas = df_legolas.assign(**{'_of_interest':[i in set(idx_n_res_interest) for i in range(len(df_legolas))]})
 

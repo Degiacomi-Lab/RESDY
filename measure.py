@@ -6,7 +6,6 @@ import datetime
 import glob
 import time
 from datetime import date
-import multiprocessing as mp
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -20,11 +19,13 @@ from features.das import DAS
 from features.depth import Depth
 from features.frustration import Frustration
 from features.nmr import NMR
-from features.pka import PKA
+from features.propka import PROPKA
+from features.pkaani import PKAANI
 from features.sasa import SASA
 from features.structure import Structure
 from features.flexibility import Flexibility
-from features.ensemble import Ensemble
+from features.rmsf import RMSF
+from features.evolution import EVOLUTION
 
 
 # AEV packages
@@ -210,20 +211,17 @@ class Measure(object):
         melodia_features = []
         melodia_added = False; frustration_added = False; legolas_added = False
         for m in features:
-            if m in ['propka', 'pkaANI']:
-                pka = PKA(outdir=self.outdir, calc_method=m,
+            if m == 'propka':
+                P = PROPKA(outdir=self.outdir,
                           include_modified=self.include_mod,
                           error_filename=self.error_filename,
                           aa_properties=self.aa_properties)
-                self.measures.append([m, pka.calculate_pka])
-            elif m == 'pka':
-                print('Please enter which pKa calculation method you would like to use: propka or pkaANI')
-                while not input('propka or pkaANI:') in ['propka', 'pkaANI']:
-                    print('Please enter either propka or pkaANI')
-                pka = PKA(outdir=self.outdir, calc_method='propka',
+                self.measures.append([m, P.calculate])
+            elif m == 'pkaANI':
+                P = PKAANI(outdir=self.outdir,
                           include_modified=self.include_mod,
                           aa_properties=self.aa_properties)
-                self.measures.append([m, pka.calculate_propka])
+                self.measures.append([m, P.calculate])
             elif m == 'sasa':
                 sasa = SASA(include_modified=self.include_mod,
                             error_filename=self.error_filename,
@@ -311,23 +309,22 @@ class Measure(object):
                     print(f'>> Failed to add melodia for features calculation list; error: {e}')
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 melodia_features += [m]
-            elif m == 'esm':
+            elif m == 'evolution':
                 try:
-                    ensemble = Ensemble(df_proteins=self.df_input,
-                                        include_modified=self.include_mod,
-                                        error_filename=self.error_filename,
-                                        aa_properties=self.aa_properties)
-                    ensemble._check_esm_model_available()
-                    self.measures.append(['esm', ensemble.calculate_esm])
+                    E = EVOLUTION(include_modified=self.include_mod,
+                                  error_filename=self.error_filename,
+                                  aa_properties=self.aa_properties)
+                    E._check_esm_model_available()
+                    self.measures.append(['evolution', E.calculate])
                 except Exception as e:
                     self.features.remove(m)
                     print(f'>> Failed to add esm for features calculation list; error: {e}')
             elif m == 'rmsf':
-                ensemble = Ensemble(df_proteins=self.df_input,
-                                    include_modified=self.include_mod,
-                                    error_filename=self.error_filename,
-                                    aa_properties=self.aa_properties)
-                self.measures.append(['rmsf', ensemble.calculate_rmsf])
+                R = RMSF(df_proteins=self.df_input,
+                        include_modified=self.include_mod,
+                        error_filename=self.error_filename,
+                        aa_properties=self.aa_properties)
+                self.measures.append(['rmsf', R.calculate])
             else:
                 if self.report_errors:
                     self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
@@ -597,7 +594,10 @@ class Measure(object):
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append([file_details, lock])
 
-            gpu_feats = ['aev', 'esm']
+            base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Method']
+            df_parallel = pd.DataFrame()
+
+            gpu_feats = ['aev', 'esm', 'legolas', 'aev_legolas']
             gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
             cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
 
@@ -609,7 +609,15 @@ class Measure(object):
             self.measures = gpu_measurements
             if gpu_measurements:
                 df_gpu = pd.concat([self._measure_file(d, lock) for d, lock in items], ignore_index=True)
-                df_parallel = df_parallel.merge(df_gpu, how='left', on=['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid'])
+                
+                if df_parallel.empty:
+                    df_parallel = df_gpu
+                else:
+                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in df_parallel.columns and a not in base_cols])
+                    df_parallel = df_parallel.merge(df_gpu, how='left', on=[a for a in base_cols if a in df_gpu.columns])
+
+            if not cpu_measurements and gpu_measurements:
+                print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
             self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
@@ -1156,8 +1164,7 @@ class Measure(object):
 
             # calculate features values from all PDB files associated with specific DataFrame entry
             for f in files:
-
-                if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
+                if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
                     continue
 
                 if f in self.pdb_only_files_to_ignore:
@@ -1243,7 +1250,7 @@ class Measure(object):
             try:
                 avg_time_per_file = (time.time() - tstart_overall) / pdb_count
                 time_remaining = datetime.timedelta(seconds=int(round((len(self.df_input) - pdb_count) * avg_time_per_file, 0)))
-                perc_prog_measure = round(((pdb_count + self.progress_index + 1)/num_pdb_files)*100, 2)
+                perc_prog_measure = round(((pdb_count + self.progress_index)/num_pdb_files)*100, 2)
                 print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
             except Exception as e:
                 if self.report_errors:
