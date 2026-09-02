@@ -5,11 +5,10 @@ tags:
   - proteins
   - amino acids
   - featurization
-  - [EXTRA?]
   
 authors:
   - name: George Weston
-    orcid: [TBD]
+    orcid: 0009-0000-1924-7183
     equal-contrib: false
     affiliation: 1
   - name: Matteo T. Degiacomi
@@ -18,7 +17,7 @@ authors:
     corresponding: true
     affiliation: 2, 3
 affiliations:
- - name: Department of Chemistry, Durham University, United Kingdom
+ - name: Department of Biosciences, Durham University, United Kingdom
    index: 1
  - name: School of Informatics, University of Edinburgh, United Kingdom
    index: 2
@@ -100,10 +99,35 @@ The features currently available within `coolpackagename`, with associated origi
 
 # Usage
 
-Maybe we could give as an example a run on a (very very) small organism? I know, will might take a looong time, but could help make the point that this is done in literally four lines of code, that we could even show.
+To exemplify the usage of `coolpackagename` we gather, curate, and featurise all the proteins of the organism **Organismus importantissimus**. While `coolpackagename` allows processing unreviewed UNIPROT codes, its default behaviour is to only process reviewed ones.
+
+```
+import coolpackagename as CPN
+
+UP = CPN.Uniprot()
+UP.get_organism_proteins(code='UP000001811')
+
+P = CPN.PDB(gap=10)
+P.gather_proteins(uniprot_df=UP.df)
+
+M = CPN.Measure(df_input=P.df, residue_of_interest='LYS',
+            features=['depth', 'sasa', 'propka', 'aev'])
+M.measure_data()
+M.save_state()
+
+#add a line from analyser, that we can display below?
+```
+
+The code gathers … reviewed UNIPROT codes, associated with … proteins and … individually featurized aminoacids.
+On a computer with … CPUs and a … GPU this terminates in ….
+
+![here we could maybe display some violin plots of the output features? \label{fig:greatfigure2}.](greatfigure2.png)
+
+
+
 
 # Acknowledgements
 
-We thank Hao Man, Breanna Voss, Martin Cann, maybe Grace Carter... others? (NEED TO STATE WHAT WE THANK THEM FOR)
+We thank Hao Man, Breanna Voss, and Grace Carter for testing the code, and Martin Cann for sharing his expertise in the area of protein modifications.
 
 # References
