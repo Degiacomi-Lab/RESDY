@@ -2,12 +2,7 @@
 
 ## Introduction
 
-This software scans collections of protein structures, looking for lysines that may undergo a carbamlyation post-translational modification (PTM).
-
-It is implemented in a set of Python classes, assembled as a pipeline in the Jupyter notebook `carbamylation.ipynb`.
-A full description of the operations carried out by the pipeline is provided in the notebook.
-In order to run the notebook without errors, please download the entire repository.
-In short, the code will:
+This toolkit is subdivided in a set of classes that together operate as a pipeline enabling the rapid featurisation of aminoacids from collections of protein structures. Features and associated protein metadata can be explored with dedicated analysis and visualisation tools. In short, the pipeline will:
 
 * Identify PDB or AlphaFold files from UNIPROT codes (see `Uniprot` class). UNIPROT codes are either:
   - associated with an organism
@@ -17,12 +12,12 @@ In short, the code will:
 * download and curate each identified PDB file (see `PDB` class). Results are saved in the CSV file `result\proteins.csv`. Curation operations are:
   - mutation of MSE to MET
   - removal of all HETATM, ions excluded
-  - removal of carbamylations from lysines (revert to lysine)
-  - saving alternate conformations (e.g. NMR ensemble) in individual files
+  - reversion to modified aminoacid to their wild type counterpart.
+  - saving alternate conformations (e.g., NMR ensemble) in individual files
   - saving alternate side chain rotamers in individual files
-  - addition of missing regions with Modeller. This operation is only allowed if size of gaps in sequence is smaller <8 amino acids, if larger the protein is disregarded.
+  - addition of missing regions, if their size falls within a user-defined length (if larger the protein is disregarded).
   
-* calculate pKa and solvent accessible area for every lysine in every curated structure (see `Measure` class). Results are saved in the CSV file `result\measures.csv`.
+* calculate a set of features for every amino acid of interest in every curated structure (see `Measure` class). Results are saved in the CSV file `result\measures.csv`.
  
 * Plot aggregated data
 
@@ -45,7 +40,7 @@ The following Python packages are required to run the overall pipeline:
 
 ### Optional
 
-There are different requirements for the methods for calculating different features for the lysines. The table below documents the dependencies for each.
+There are different requirements for the methods for calculating different features. The table below documents the dependencies for each.
 
 <div class="table_component" role="region" tabindex="0">
 <table>
@@ -146,28 +141,31 @@ There are different requirements for the methods for calculating different featu
 </table>
 </div>
 
-If running the Jupyter notebook `carbamylation.ipynb`:
+If running the Jupyter notebook `carbamylation.ipynb`, additional dependencies are:
 * plotly
 * nglview
 * jupyter
 
+## Usage
+
+A tutorial on the pipeline main functionalities is is provided in the notebook `carbamylation.ipynb`.
+The API is available on readthedocs (LINK SOON).
+
 ## Technical Notes
 
-* The `Uniprot` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/uniprot.py">uniprot.py</a>) is used to handle collecting the structural information for the proteins required by mining the UNIPROT database. There are multiple ways to use this:
-  - from_csv_file() function allow you to pass a list of UNIPROT codes as a csv to mine. Respective headers for the file should be from: 'Uniprot_Entry', PDB_Code', 'Resid'. 'Uniprot_Entry' is the only required column. Add in data in the 'PDB_Code' if you only require a specific PDB file from this protein. 'Resid' allows you to note a specific residue of interest within this protein, can be used for later analysis.
-  - get_protein_data() function allows you to pass a UNIPROT code directly as a function input
-  - count_organism_proteins() function allows you to pass a code for a whole proteome and extract information about all the proteins within this.
+* The `Uniprot` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/uniprot.py">uniprot.py</a>) is used to handle the collection of structural information for required proteins by mining the UNIPROT database. There are multiple ways to use this:
+  - `from_csv_file()` function allow you to pass a list of UNIPROT codes as a csv to mine. Respective headers for the file should be from: 'Uniprot_Entry', PDB_Code', 'Resid'. 'Uniprot_Entry' is the only required column. Add data in 'PDB_Code' if you only require a specific PDB file from this protein. 'Resid' allows you to note a specific residue of interest within this protein, can be used for later analysis.
+  - `get_protein_data()` function allows you to pass a UNIPROT code directly as a function input
+  - `count_organism_proteins()` function allows you to pass a code for a whole proteome and extract information about all the proteins within this.
 
 * The `Protein` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/protein.py">protein.py</a>) is used to handle extracting PDB files for proteins specified within the Uniprot class. Structures are downloaded and patched to ensure good quality structures as used for calculations.
 
-* THe `Alphafold` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/alphafold.py">alphafold.py</a>) is used to handle extracting AlphaFold data for proteins specified within the Uniprot class. Structures are downloaded and patched to ensure good quality structures as used for calculations.
+* THe `Alphafold` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/alphafold.py">alphafold.py</a>) is used to handle the extracton of AlphaFold data for proteins specified within the Uniprot class. Structures are downloaded and patched to ensure only good quality structures as used for calculations.
 
-* The `Measure` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/measure.py">measure.py</a>) has been implemented to facilitate the addition of new measurable features. This is done by:
-  - implementing a method taking a filename as input and returning a pandas DataFrame with three columns [resid, chain, feature].
-  - adding the function name and its label in `self.measures` within `__init__`.
+* The `Measure` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/measure.py">measure.py</a>) has been implemented to facilitate the addition of new measurable features. This is done by implementing a new measuring class in a new file, saved in the `features` folder.
 
 * The `Analysis` class (<a href="https://github.com/Degiacomi-Lab/carbamylation/blob/main/analysis.py">analysis.py</a>) is responsible for aggregating the data (calculating mean, std, range for the feature of each lysine), scrape GO Terms from the Uniprot Database for each protein.
-  - `Analysis` class takes `Measure.df` as the input.
+  - `Analysis` class takes the `Measure.df` pandas dataframe as the input.
   - method `aggregate` will aggregate data and calculate descriptive statistics for each lysine. The resulting dataframe will be stored in `self.df_aggregated`. 
   - method `subset` will aggregate data in two ways using either 'average' or 'south_east': (1) only include the average values of the two features for each lysine (2) only include the measure of the lysine with relatively lower pKa and higher sasa. The resulting dataframe will be stored in `self.df_sub`.
   - method `Go_Get_Data` will extract GO Terms associated with each distinct lysine from the Uniprot Database. This operation is sped up by applying multi-threading. The data will be stored in a dictionary (GO ID: a list of uniprot codes).
