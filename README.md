@@ -132,24 +132,24 @@ There are different requirements for the methods for calculating different featu
             <td><a href="https://anaconda.org/conda-forge/pdbfixer">anaconda</a></td>
         </tr>
         <tr>
-            <td>15N nmr shift<br></td>
+            <td>15N NMR shift<br></td>
             <td>Legolas</td>
             <td><a href="https://github.com/roitberg-group/legolas">Legolas</a></td>
-            <td>Follow instructions in the <a href="https://github.com/roitberg-group/legolas">GitHub repo</a> for Legolast to install. Then update the path within measures.py function for this to point to the correct location.</td>
+            <td>Follow the installation instructions at <a href="https://github.com/roitberg-group/legolas">GitHub repo</a>.</td>
         </tr>
     </tbody>
 </table>
 </div>
 
 If running the Jupyter notebook `carbamylation.ipynb`, additional dependencies are:
-* plotly
-* nglview
-* jupyter
+* <a href="https://anaconda.org/conda-forge/seaborn">plotly</a>
+* <a href="https://anaconda.org/conda-forge/seaborn">nglview</a>
+* <a href="https://anaconda.org/conda-forge/jupyter">jupyter</a>
 
 ## Usage
 
-A tutorial on the pipeline main functionalities is is provided in the notebook `carbamylation.ipynb`.
-The API is available on readthedocs (LINK SOON).
+* A tutorial demonstrating the pipeline main functionalities is provided in the notebook `carbamylation.ipynb`.
+* The API is available on readthedocs (LINK SOON).
 
 ## Technical Notes
 
