@@ -15,7 +15,7 @@ except Exception as e:
           f'will not be able to calculate sequence features based on esm. Error: {e}')
 
 
-class EVOLUTION():
+class Evolution():
     '''
     Class to house functions for calculating ESM vectors for proteins
     '''
@@ -233,5 +233,5 @@ class EVOLUTION():
 
 if __name__ == '__main__':
     outdir = 'Demo'
-    E = EVOLUTION(include_modified=False)
+    E = Evolution(include_modified=False)
     print(E.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

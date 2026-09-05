@@ -120,7 +120,10 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
 
                 except Exception as e:
                     print(f"Error {e}")
-                    plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': f'Error {str(e)}'})
+                    plddt_writer.writerow({'Uniprot_Entry': af_code_full,
+                                           'Chain': line[21:22],
+                                           'Resid': line[22:26].strip(),
+                                           'PLDDT': f'Error {str(e)}'})
                     continue
 
     except Exception as e:

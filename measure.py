@@ -13,19 +13,7 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from features.aev import AEV
-from features.charge import Charge
-from features.das import DAS
-from features.depth import Depth
-from features.frustration import Frustration
-from features.nmr import NMR
-from features.propka import PROPKA
-from features.pkaani import PKAANI
-from features.sasa import SASA
-from features.structure import Structure
-from features.flexibility import Flexibility
-from features.rmsf import RMSF
-from features.evolution import EVOLUTION
+from features import *
 
 
 # AEV packages
@@ -212,24 +200,24 @@ class Measure(object):
         melodia_added = False; frustration_added = False; legolas_added = False
         for m in features:
             if m == 'propka':
-                P = PROPKA(outdir=self.outdir,
+                P = features.PROPKA(outdir=self.outdir,
                           include_modified=self.include_mod,
                           error_filename=self.error_filename,
                           aa_properties=self.aa_properties)
                 self.measures.append([m, P.calculate])
             elif m == 'pkaANI':
-                P = PKAANI(outdir=self.outdir,
+                P = features.PKAANI(outdir=self.outdir,
                           include_modified=self.include_mod,
                           aa_properties=self.aa_properties)
                 self.measures.append([m, P.calculate])
             elif m == 'sasa':
-                sasa = SASA(include_modified=self.include_mod,
+                sasa = features.SASA(include_modified=self.include_mod,
                             error_filename=self.error_filename,
                             aa_properties=self.aa_properties)
                 self.measures.append([m, sasa.calculate_sasa])
             elif m == "depth":
                 try:
-                    depth = Depth(calculation_type='ResidDepth',
+                    depth = features.Depth(calculation_type='ResidDepth',
                                   include_modified=self.include_mod,
                                   error_filename=self.error_filename,
                                   aa_properties=self.aa_properties)
@@ -239,24 +227,24 @@ class Measure(object):
                     print(f'>> Failed to add depth for features calculation list; error: {e}')
             elif m == 'aev':
                 try:
-                    aev = AEV(error_filename=self.error_filename,
+                    aev = features.AEV(error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
                     self.measures.append([m, aev.calculate_aevs])
                 except Exception as e:
                     self.features.remove(m)
                     print(f'>> Failed to add aev for features calculation list; error: {e}')
             elif m == 'das':
-                das = DAS(include_modified=self.include_mod,
+                das = features.DAS(include_modified=self.include_mod,
                           error_filename=self.error_filename,
                           aa_properties=self.aa_properties)
                 self.measures.append([m, das.calculate_das])
             elif m == 'seqcharge':
-                charge = Charge(include_modified=self.include_mod,
+                charge = features.Charge(include_modified=self.include_mod,
                                 error_filename=self.error_filename,
                                 aa_properties=self.aa_properties)
                 self.measures.append([m, charge.calculate_seqcharge])
             elif m == 'flexibility':
-                flex = Flexibility(include_modified=self.include_mod,
+                flex = features.Flexibility(include_modified=self.include_mod,
                                    error_filename=self.error_filename,
                                    aa_properties=self.aa_properties)
                 self.measures.append([m, flex.calculate_flexibility])
@@ -264,12 +252,12 @@ class Measure(object):
                 if self.legolas_aevs:
                     if 'aev_legolas' not in self.features:
                         self.features.append('aev_legolas')
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
+                    nmr = features.NMR(outdir=self.outdir, legolas_aevs=True,
                               include_modified=self.include_mod,
                               error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
                 else:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=False,
+                    nmr = features.NMR(outdir=self.outdir, legolas_aevs=False,
                               include_modified=self.include_mod,
                               error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
@@ -277,7 +265,7 @@ class Measure(object):
                 legolas_added = True
             elif m == 'aev_legolas':
                 if not legolas_added:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
+                    nmr = features.NMR(outdir=self.outdir, legolas_aevs=True,
                               include_modified=self.include_mod,
                               error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
@@ -286,7 +274,7 @@ class Measure(object):
             elif m in ['frustration', 'density']:
                 try:
                     if not frustration_added:
-                        frustration = Frustration(include_modified=self.include_mod,
+                        frustration = features.Frustration(include_modified=self.include_mod,
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
                         self.measures.append(['frustration', frustration.calculate_frustration])
@@ -296,7 +284,7 @@ class Measure(object):
                     print(f'>> Failed to add frustration/density for features calculation list; error: {e}')
             elif m == 'melodia':
                 try:
-                    structure = Structure(melodia_features=['all'],
+                    structure = features.Structure(melodia_features=['all'],
                                           include_modified=self.include_mod,
                                           error_filename=self.error_filename,
                                           aa_properties=self.aa_properties)
@@ -311,7 +299,7 @@ class Measure(object):
                 melodia_features += [m]
             elif m == 'evolution':
                 try:
-                    E = EVOLUTION(include_modified=self.include_mod,
+                    E = features.Evolution(include_modified=self.include_mod,
                                   error_filename=self.error_filename,
                                   aa_properties=self.aa_properties)
                     E._check_esm_model_available()
@@ -320,7 +308,7 @@ class Measure(object):
                     self.features.remove(m)
                     print(f'>> Failed to add esm for features calculation list; error: {e}')
             elif m == 'rmsf':
-                R = RMSF(df_proteins=self.df_input,
+                R = features.RMSF(df_proteins=self.df_input,
                         include_modified=self.include_mod,
                         error_filename=self.error_filename,
                         aa_properties=self.aa_properties)
@@ -332,7 +320,7 @@ class Measure(object):
 
         if not melodia_added and melodia_features:
             try:
-                structure = Structure(melodia_features=melodia_features,
+                structure = features.Structure(melodia_features=melodia_features,
                                       include_modified=self.include_mod,
                                       error_filename=self.error_filename,
                                       aa_properties=self.aa_properties)
