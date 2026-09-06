@@ -441,7 +441,6 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
         if ">" in line:
             fasta_headers.append(line)
             chain_raw_info = line.split("|")[1][6:].split(",")
-            #chain_info = [chain_raw_info[i].strip()[0] for i in range(len(chain_raw_info))]
             if len(chain_raw_info[0]) == 1:
                 chain_info = chain_raw_info
             elif '[' in chain_raw_info[0]:
@@ -530,7 +529,7 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     return np.array(gap_count)
 
 
-def reassemble(pdbs, labels, outname, outdir, include_hetatom=False):
+def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
     '''
     For each chain pdb file in the folder, check if the chain name in the filename
     is different to the one in the pdb data for double letter ones and if needs reverting
@@ -559,7 +558,7 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatom=False):
             dbletter = True
 
         M_tmp = bb.Molecule()
-        M_tmp.import_pdb(pdb_file, include_hetatm=include_hetatom)
+        M_tmp.import_pdb(pdb_file, include_hetatm=include_hetatm)
         max_res = int(M_tmp.data['resid'].max())
         if max_res > 999:
             thousand_chain = True
@@ -594,7 +593,7 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatom=False):
     with open(outname, 'wb') as f_outname:
         for i, (f, f_chain) in enumerate(zip(pdbs, labels)):
             T = bb.Molecule()
-            T.import_pdb(f, include_hetatm=include_hetatom)
+            T.import_pdb(f, include_hetatm=include_hetatm)
             T.data['chain'] = f_chain
             T.write_pdb(f)
             with open(f, 'rb') as f_new:
@@ -711,7 +710,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
     sorting_pairs = sorted(zip(chains, fouts), key=lambda cf: cf[0])
     chains, fouts = zip(*sorting_pairs)
 
-    reassemble(fouts, chains, outname, outdir, include_hetatom=include_hetatm)
+    reassemble(fouts, chains, outname, outdir, include_hetatm=include_hetatm)
 
     shutil.rmtree(tmp_folder)
 

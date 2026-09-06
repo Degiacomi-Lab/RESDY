@@ -450,6 +450,10 @@ class Measure(object):
             case (True, True):
                 # PDB only and parallel
                 print('This setup does not currently have a method, please change the setup')
+                return
+
+        df_af_plddt = pd.read_csv(os.path.join(self.folder, 'AF_PLDDT_Output.csv'))
+        self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
 
         self._cleanup_calculation_files()
 

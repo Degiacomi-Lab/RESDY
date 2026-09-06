@@ -1,8 +1,8 @@
-# CARBAMYLATION FINDER
+# CoolPackageName
 
 ## Introduction
 
-This software scans collections of protein structures, looking for lysines that may undergo a carbamlyation post-translational modification (PTM).
+This software scans collections of protein structures, going from uniprot organism or protein codes, curating sets of structures from RCSB PDB or Alphafold, before calculating measurements based on sets of features to allow further investigations into specific residue sites on the proteins or classification algorithms.
 
 It is implemented in a set of Python classes, assembled as a pipeline in the Jupyter notebook `carbamylation.ipynb`.
 A full description of the operations carried out by the pipeline is provided in the notebook.
@@ -28,6 +28,9 @@ In short, the code will:
 
 
 ## Dependencies
+
+requirements.yaml is provided to create a conda environment which is capable of running most of the features of the pipeline.
+Features denoted in the table below with specific package requirements or programme installations may not be available unless manually added to the working environment. 
 
 ### Required
 
