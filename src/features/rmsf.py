@@ -1,10 +1,9 @@
 import os
 import glob
-from collections import OrderedDict
 import pandas as pd
 import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 
 class RMSF():

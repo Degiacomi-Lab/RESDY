@@ -1,9 +1,7 @@
 import csv
 import os
-import re
-import subprocess
 import requests
-from helper import get_download_tool
+from src.helper import get_download_tool
 
 def download_AF_struc(pdb, outfolder="result"):
     '''
@@ -88,11 +86,11 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     AF-P0CG48-F1-model_v4; Resid No. A27; PLDDT: 94.28
     ...
     '''
-    cols = ['Uniprot_Entry', 'Chain', 'Resid', 'PLDDT']
+    cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
         with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w', newline='') as plddt_out_file:
             plddt_writer = csv.writer(plddt_out_file)
-            plddt_writer.writerow(['Uniprot_Entry', 'Chain', 'Resid', 'PLDDT'])
+            plddt_writer.writerow(['PDB_Code', 'Chain', 'Resid', 'PLDDT'])
 
     plddt_out_file = open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'a', newline='')
     plddt_writer = csv.DictWriter(plddt_out_file, fieldnames=cols)
@@ -115,12 +113,12 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
                         dict_plddt.update({chain_resid: plddt})
 
                         print(af_code_full + "; Chain: " + str(chain_resid[0]) + "; Resid: " + str(chain_resid[1:]) + "; PLDDT: " + plddt)
-                        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': plddt})
+                        plddt_writer.writerow({'PDB_Code': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': plddt})
                         chain, resid, plddt = '', '', ''
 
                 except Exception as e:
                     print(f"Error {e}")
-                    plddt_writer.writerow({'Uniprot_Entry': af_code_full,
+                    plddt_writer.writerow({'PDB_Code': af_code_full,
                                            'Chain': line[21:22],
                                            'Resid': line[22:26].strip(),
                                            'PLDDT': f'Error {str(e)}'})
@@ -128,7 +126,7 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
 
     except Exception as e:
         print(f'Failed to obtain PLDDT data for {af_code_full}; error: {e}')
-        plddt_writer.writerow({'Uniprot_Entry': af_code_full, 'Chain': '', 'Resid': '',
+        plddt_writer.writerow({'PDB_Code': af_code_full, 'Chain': '', 'Resid': '',
                                'PLDDT': f'Error {str(e)}'})
 
     finally:

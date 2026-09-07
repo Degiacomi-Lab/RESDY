@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 
 class SASA():
@@ -41,7 +41,7 @@ class SASA():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
-    def calculate_sasa(self, path):
+    def calculate(self, path):
         '''
         Calculate the solvent accessible surface area of the NZ atom within the lysine structure
 
@@ -158,7 +158,5 @@ class SASA():
 
 if __name__ == '__main__':
     sasa = SASA(include_modified=True)
-    #print(sasa.calculate_sasa(path=f'1ubq.pdb'))
-    print(sasa.calculate_sasa(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(sasa.calculate_sasa(path=f'result{os.sep}curated{os.sep}6XZ7-alt1A.pdb'))
-    #print(sasa.calculate_sasa(path=f'1nsk_AmberMod0000.pdb'))
+    print(sasa.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    #print(sasa.calculate(path=f'result{os.sep}curated{os.sep}6XZ7-alt1A.pdb'))

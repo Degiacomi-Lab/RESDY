@@ -1,8 +1,7 @@
-import os, sys
+import os
 import pandas as pd
-import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 from collections import OrderedDict
 
 
@@ -40,7 +39,7 @@ class Charge():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
     
-    def calculate_seqcharge(self, path, num_add_aa=10):
+    def calculate(self, path, num_add_aa=10):
         '''
         Calculate the Sequence Charge of the local sequence around a LYS of interest.
         This is a single value number representing the summation of the charges of the amino acids
@@ -200,5 +199,4 @@ class Charge():
 
 if __name__ == '__main__':
     C = Charge(include_modified=True)
-    print(C.calculate_seqcharge(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(C.calculate_seqcharge(path=f'1NSK-alt-1.pdb'))
+    print(C.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

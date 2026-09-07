@@ -5,6 +5,7 @@ import logging
 import datetime
 import glob
 import time
+import inspect
 from datetime import date
 from multiprocessing import cpu_count
 from multiprocessing import Manager
@@ -13,7 +14,7 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from features import *
+from src.features import *
 
 
 # AEV packages
@@ -177,7 +178,7 @@ class Measure(object):
         print(self.df_input)
 
 
-    def _setup_measures(self, features):
+    def _setup_measures(self, features_list):
         '''
         Convert a list of features into a measuring protocol. If ['all'] given as input for
         the features, this will convert the features list to a list containing all current
@@ -190,74 +191,74 @@ class Measure(object):
         '''
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
-        if 'all' in features:
-            features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
+        if 'all' in features_list:
+            features_list = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
                         'esm', 'rmsf']
-            self.features = list(features)
+            self.features = list(features_list)
         self.measures = []
         melodia_features = []
         melodia_added = False; frustration_added = False; legolas_added = False
-        for m in features:
+        for m in features_list:
             if m == 'propka':
-                P = features.PROPKA(outdir=self.outdir,
+                P = PROPKA(outdir=self.outdir,
                           include_modified=self.include_mod,
                           error_filename=self.error_filename,
                           aa_properties=self.aa_properties)
                 self.measures.append([m, P.calculate])
             elif m == 'pkaANI':
-                P = features.PKAANI(outdir=self.outdir,
+                P = PKAANI(outdir=self.outdir,
                           include_modified=self.include_mod,
                           aa_properties=self.aa_properties)
                 self.measures.append([m, P.calculate])
             elif m == 'sasa':
-                sasa = features.SASA(include_modified=self.include_mod,
+                sasa = SASA(include_modified=self.include_mod,
                             error_filename=self.error_filename,
                             aa_properties=self.aa_properties)
-                self.measures.append([m, sasa.calculate_sasa])
+                self.measures.append([m, sasa.calculate])
             elif m == "depth":
                 try:
-                    depth = features.Depth(calculation_type='ResidDepth',
+                    depth = Depth(calculation_type='ResidDepth',
                                   include_modified=self.include_mod,
                                   error_filename=self.error_filename,
                                   aa_properties=self.aa_properties)
-                    self.measures.append([m, depth.calculate_depth])
+                    self.measures.append([m, depth.calculate])
                 except Exception as e:
                     self.features.remove(m)
                     print(f'>> Failed to add depth for features calculation list; error: {e}')
             elif m == 'aev':
                 try:
-                    aev = features.AEV(error_filename=self.error_filename,
+                    aev = AEV(error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
-                    self.measures.append([m, aev.calculate_aevs])
+                    self.measures.append([m, aev.calculate])
                 except Exception as e:
                     self.features.remove(m)
                     print(f'>> Failed to add aev for features calculation list; error: {e}')
             elif m == 'das':
-                das = features.DAS(include_modified=self.include_mod,
-                          error_filename=self.error_filename,
-                          aa_properties=self.aa_properties)
-                self.measures.append([m, das.calculate_das])
+                das = DAS(include_modified=self.include_mod,
+                            error_filename=self.error_filename,
+                            aa_properties=self.aa_properties)
+                self.measures.append([m, das.calculate])
             elif m == 'seqcharge':
-                charge = features.Charge(include_modified=self.include_mod,
+                charge = Charge(include_modified=self.include_mod,
                                 error_filename=self.error_filename,
                                 aa_properties=self.aa_properties)
-                self.measures.append([m, charge.calculate_seqcharge])
+                self.measures.append([m, charge.calculate])
             elif m == 'flexibility':
-                flex = features.Flexibility(include_modified=self.include_mod,
+                flex = Flexibility(include_modified=self.include_mod,
                                    error_filename=self.error_filename,
                                    aa_properties=self.aa_properties)
-                self.measures.append([m, flex.calculate_flexibility])
+                self.measures.append([m, flex.calculate])
             elif m == 'legolas':
                 if self.legolas_aevs:
                     if 'aev_legolas' not in self.features:
                         self.features.append('aev_legolas')
-                    nmr = features.NMR(outdir=self.outdir, legolas_aevs=True,
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
                               include_modified=self.include_mod,
                               error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
                 else:
-                    nmr = features.NMR(outdir=self.outdir, legolas_aevs=False,
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=False,
                               include_modified=self.include_mod,
                               error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
@@ -265,7 +266,7 @@ class Measure(object):
                 legolas_added = True
             elif m == 'aev_legolas':
                 if not legolas_added:
-                    nmr = features.NMR(outdir=self.outdir, legolas_aevs=True,
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
                               include_modified=self.include_mod,
                               error_filename=self.error_filename,
                               aa_properties=self.aa_properties)
@@ -274,7 +275,7 @@ class Measure(object):
             elif m in ['frustration', 'density']:
                 try:
                     if not frustration_added:
-                        frustration = features.Frustration(include_modified=self.include_mod,
+                        frustration = Frustration(include_modified=self.include_mod,
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
                         self.measures.append(['frustration', frustration.calculate_frustration])
@@ -284,11 +285,11 @@ class Measure(object):
                     print(f'>> Failed to add frustration/density for features calculation list; error: {e}')
             elif m == 'melodia':
                 try:
-                    structure = features.Structure(melodia_features=['all'],
+                    structure = Structure(melodia_features=['all'],
                                           include_modified=self.include_mod,
                                           error_filename=self.error_filename,
                                           aa_properties=self.aa_properties)
-                    self.measures.append([m, structure.calculate_melodia])
+                    self.measures.append([m, structure.calculate])
                     melodia_added = True
                     self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                     self.features.remove('melodia')
@@ -299,7 +300,7 @@ class Measure(object):
                 melodia_features += [m]
             elif m == 'evolution':
                 try:
-                    E = features.Evolution(include_modified=self.include_mod,
+                    E = Evolution(include_modified=self.include_mod,
                                   error_filename=self.error_filename,
                                   aa_properties=self.aa_properties)
                     E._check_esm_model_available()
@@ -308,23 +309,40 @@ class Measure(object):
                     self.features.remove(m)
                     print(f'>> Failed to add esm for features calculation list; error: {e}')
             elif m == 'rmsf':
-                R = features.RMSF(df_proteins=self.df_input,
+                R = RMSF(df_proteins=self.df_input,
                         include_modified=self.include_mod,
                         error_filename=self.error_filename,
                         aa_properties=self.aa_properties)
                 self.measures.append(['rmsf', R.calculate])
             else:
-                if self.report_errors:
-                    self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
-                raise Exception(f"measure {m} unknown")
+                print(m.upper())
+                if m.upper() in globals().keys():
+                    if inspect.isclass(globals()[m.upper()]) and hasattr(globals()[m.upper()], 'calculate') and callable(getattr(globals()[m.upper()], 'calculate')):
+                        print('in')
+                        try:
+                            XX = globals()[m.upper()](include_modified=self.include_mod,
+                                                    error_filename=self.error_filename,
+                                                    aa_properties=self.aa_properties)
+                            self.measures.append([m, XX.calculate])
+                        except Exception as e:
+                            if self.report_errors:
+                                self._report_error_to_file('Setup measures: custom measure failed to be added', 'setup', f'Custom measure {m} failed to be added')
+                            self.features.remove(m)
+                            print(f'Failed to add measure feature {m}, please check script follow the template correctly. Error: {e}')
+                            continue
+                else:
+                    if self.report_errors:
+                        self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
+                    self.features.remove(m)
+                    raise Exception(f"measure {m} unknown")
 
         if not melodia_added and melodia_features:
             try:
-                structure = features.Structure(melodia_features=melodia_features,
+                structure = Structure(melodia_features=melodia_features,
                                       include_modified=self.include_mod,
                                       error_filename=self.error_filename,
                                       aa_properties=self.aa_properties)
-                self.measures.append(['melodia', structure.calculate_melodia])
+                self.measures.append(['melodia', structure.calculate])
                 melodia_added = True
             except Exception as e:
                 for feat in melodia_features:
@@ -1540,8 +1558,8 @@ if __name__ == "__main__":
 
     file_one = "Demo{os.sep}curated{os.sep}1M2E-alt-1.pdb"
 
-    from uniprot import Uniprot
-    from protein import PDB
+    from src.uniprot import Uniprot
+    from src.protein import PDB
 
     print("Scanning UNIPROT...")
     UP = Uniprot()

@@ -2,7 +2,7 @@ import os
 from collections import OrderedDict
 import pandas as pd
 import biobox as bb
-from error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 try:
     import torch

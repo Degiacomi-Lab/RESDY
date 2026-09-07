@@ -1,8 +1,7 @@
 import os
 import pandas as pd
-import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 class DAS():
     '''
@@ -38,7 +37,7 @@ class DAS():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
-    def calculate_das(self, path):
+    def calculate(self, path):
         '''
         Calculate the Dynamically Accessible Surface (DAS) of the NZ atom in the lysine structure
         This is effectively the number of positions that the NZ atom can take within the structure
@@ -149,5 +148,4 @@ class DAS():
 
 if __name__ == '__main__':
     das = DAS(include_modified=True)
-    print(das.calculate_das(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(das.calculate_das(path=f'1ubq_mod6_frame_0.pdb'))
+    print(das.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

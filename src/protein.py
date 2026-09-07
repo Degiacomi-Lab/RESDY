@@ -14,9 +14,9 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-import alphafold as af
-import patcher
-from helper import get_download_tool, ShutUp
+import src.alphafold as af
+import src.patcher as patcher
+from src.helper import get_download_tool, ShutUp
 
 
 class PDB(object):
@@ -634,161 +634,108 @@ class PDB(object):
             elif (line[:4] == 'ATOM' or line[:6] == 'HETATM') and line[17:20].upper() not in standard_resids:
                 aa_num = int(line[22:26].strip())
                 old_mod_aa_code = line[17:20]
-                fasta_solved = False
                 if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
                     continue
-                '''
-                if not fasta_chains:
-                    fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
-                    try:
-                        f = open(fasta_name, 'r')
-                        fasta_chain_letters = []
-                        fasta_seqs = []
-                        for fasta_line in f:
-                            if ">" in fasta_line:
-                                chain_raw_info = fasta_line.split("|")[1][6:].split(",")
-                                if len(chain_raw_info[0]) == 1:
-                                    chain_info = chain_raw_info
-                                else:
-                                    chain_info = [a.strip()[0] for a in chain_raw_info]
-                                fasta_chain_letters.append(chain_info)
-                                if "fasta_seq" in locals():
-                                    fasta_seqs.append(fasta_seq)
 
-                                fasta_seq = []
+                if uniprot_code != '':
+                    if uniprot_fasta == '':
+                        tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
+                        fasta_text = requests.get(tmp_url, timeout=20).text
+                        uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
+                    
+                    M = bb.Molecule()
+                    M.import_pdb(pdb=read_file_path, include_hetatm=True)
+                    M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                    pdb_seqs = {}
+                    for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                        tmp_data = subset_data[subset_data['chain'] == chain]
+                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                    aligner = PairwiseAligner()
+                    aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+                    aligner.open_gap_score = -11
+                    aligner.extend_gap_score = -11
+                    aligner.target_end_gap_score = 0.0
+                    alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
 
-                            else:
-                                #replace non-canonical aminoacids in FASTA sequence
-                                if "KCX" in fasta_line:
-                                    line = line.replace('(KCX)', 'K')
-                                if "MSE" in fasta_line :
-                                    fasta_line = fasta_line.replace('(MSE)', 'M')
+                    res_mapper = {}
 
-                                fasta_seq.append(fasta_line)
+                    for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
+                        for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
+                            res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
-                        fasta_seqs.append(fasta_seq)
-                        f.close()
-                        
-                        for chain, seq in zip(fasta_chain_letters, fasta_seqs):
-                            for c in chain:
-                                fasta_chains[c] = seq
-
-                    except Exception as e:
-                        print(f'FASTA file parsing failed. Error: {str(e)}')
-                        if 'f' in locals():
-                            f.close()
-                        fasta_chains = {}
-
-                if fasta_chains:
-                    seq_interest = fasta_chains[line[21]]
-                    aa_interest = seq_interest[0][int(aa_num)-1]  # account for shift in seq values?
+                    aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
                     if aa_interest in list(standard_resids.values()):
-                        fasta_solved = True
-                        line[17:20] = standard_resids_inv[aa_interest]
-                        list_prev_mod_resids[line[22:26].strip()] = standard_resids_inv[aa_interest]
-                        if line[12:16].strip() not in ['C', 'N', 'O' 'CA']:
-                            continue
-                '''
-                if not fasta_solved:
-                    if uniprot_code != '':
-                        if uniprot_fasta == '':
-                            tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
-                            fasta_text = requests.get(tmp_url, timeout=20).text
-                            uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
-                        
-                        M = bb.Molecule()
-                        M.import_pdb(pdb=read_file_path, include_hetatm=True)
-                        M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-                        subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
-                        pdb_seqs = {}
-                        for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
-                            tmp_data = subset_data[subset_data['chain'] == chain]
-                            pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
-                        chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
-                        aligner = PairwiseAligner()
-                        aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
-                        aligner.open_gap_score = -11
-                        aligner.extend_gap_score = -11
-                        aligner.target_end_gap_score = 0.0
-                        alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
+                        line = line.replace('HETATM', 'ATOM  ')
+                        line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
+                        list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
 
-                        res_mapper = {}
-
-                        for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                            for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
-                                res_mapper[chain_res_list[pdb_pos]] = uni_pos
-
-                        aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
-                        if aa_interest in list(standard_resids.values()):
-                            line = line.replace('HETATM', 'ATOM  ')
-                            line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
-                            list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
-
-                            # edit the fasta file to change the position
-                            fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
-                            try:
-                                f = open(fasta_name, 'r')
-                                fasta_headers = []
-                                fasta_chain_letters = []
-                                fasta_seqs = []
-                                for fasta_line in f:
-                                    if ">" in fasta_line:
-                                        fasta_headers.append(fasta_line)
-                                        chain_raw_info = fasta_line.split("|")[1][6:].split(",")
-                                        if len(chain_raw_info[0]) == 1:
-                                            chain_info = chain_raw_info
-                                        else:
-                                            chain_info = [a.strip()[0] for a in chain_raw_info]
-                                        fasta_chain_letters.append(chain_info)
-                                        if "fasta_seq" in locals():
-                                            fasta_seqs.append(fasta_seq)
-
-                                        fasta_seq = []
-
+                        # edit the fasta file to change the position
+                        fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
+                        try:
+                            f = open(fasta_name, 'r')
+                            fasta_headers = []
+                            fasta_chain_letters = []
+                            fasta_seqs = []
+                            for fasta_line in f:
+                                if ">" in fasta_line:
+                                    fasta_headers.append(fasta_line)
+                                    chain_raw_info = fasta_line.split("|")[1][6:].split(",")
+                                    if len(chain_raw_info[0]) == 1:
+                                        chain_info = chain_raw_info
                                     else:
-                                        fasta_seq.append(fasta_line)
-        
-                                fasta_seqs.append(fasta_seq)
+                                        chain_info = [a.strip()[0] for a in chain_raw_info]
+                                    fasta_chain_letters.append(chain_info)
+                                    if "fasta_seq" in locals():
+                                        fasta_seqs.append(fasta_seq)
+
+                                    fasta_seq = []
+
+                                else:
+                                    fasta_seq.append(fasta_line)
+    
+                            fasta_seqs.append(fasta_seq)
+                            f.close()
+
+                            new_fasta = open(fasta_name, 'w')
+                            for header, chain, seq in zip(fasta_headers, fasta_chain_letters, fasta_seqs):
+                                new_fasta.write(header)
+                                seq = seq[0].strip()
+                                if chain[0] == line[21]:
+                                    
+                                    F = bb.Molecule()
+                                    F.import_pdb(pdb=read_file_path, include_hetatm=True)
+                                    F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+                                    subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                                    pdb_seqs = {}
+                                    for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                                        tmp_data = subset_data[subset_data['chain'] == chain]
+                                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                                    aligner = PairwiseAligner()
+                                    aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+                                    aligner.open_gap_score = -11
+                                    aligner.extend_gap_score = -11
+                                    aligner.target_end_gap_score = 0.0
+                                    alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
+
+                                    for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
+                                        fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
+                                    
+                                    seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:] + '\n'
+                                new_fasta.write(seq)
+                            new_fasta.close()
+
+                        except Exception as e:
+                            print(f'FASTA file parsing failed. Error: {str(e)}')
+                            if 'f' in locals():
                                 f.close()
+                            fasta_chains = {}
 
-                                new_fasta = open(fasta_name, 'w')
-                                for header, chain, seq in zip(fasta_headers, fasta_chain_letters, fasta_seqs):
-                                    new_fasta.write(header)
-                                    seq = seq[0].strip()
-                                    if chain[0] == line[21]:
-                                        
-                                        F = bb.Molecule()
-                                        F.import_pdb(pdb=read_file_path, include_hetatm=True)
-                                        F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-                                        subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
-                                        pdb_seqs = {}
-                                        for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
-                                            tmp_data = subset_data[subset_data['chain'] == chain]
-                                            pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
-                                        chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
-                                        aligner = PairwiseAligner()
-                                        aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
-                                        aligner.open_gap_score = -11
-                                        aligner.extend_gap_score = -11
-                                        aligner.target_end_gap_score = 0.0
-                                        alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
-
-                                        for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                                            fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
-                                        
-                                        seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:] + '\n'
-                                    new_fasta.write(seq)
-                                new_fasta.close()
-
-                            except Exception as e:
-                                print(f'FASTA file parsing failed. Error: {str(e)}')
-                                if 'f' in locals():
-                                    f.close()
-                                fasta_chains = {}
-
-                    else:
-                        raise Exception(f'Error in patching file: could not get residue type for modified '
-                                        f'residue to convert to standard; file: {pdb}')
+                else:
+                    raise Exception(f'Error in patching file: could not get residue type for modified '
+                                    f'residue to convert to standard; file: {pdb}')
 
             #neglect HETATM atoms, unless they are metal ions
             if line[:6] == 'HETATM':

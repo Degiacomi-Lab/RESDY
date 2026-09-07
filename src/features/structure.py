@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 # Melodia packages
 try:
@@ -55,7 +55,7 @@ class Structure():
             raise ImportError('>> Packages required for melodia calculations (melodia_py) are '
                               'not available, melodia will be removed from features to calculate.')
 
-    def calculate_melodia(self, path):
+    def calculate(self, path):
         '''
         Call the Melodia package to calculate data for the following structural features of
         the lysines of interest within the structure: curvature, arc-length, phi, psi
@@ -117,4 +117,4 @@ class Structure():
 
 if __name__ == '__main__':
     struc = Structure(include_modified=True)
-    print(struc.calculate_melodia(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    print(struc.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

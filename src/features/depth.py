@@ -1,8 +1,7 @@
 import os
 import pandas as pd
-import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 # Depth specific packages
 try:
@@ -58,7 +57,7 @@ class Depth():
             raise ImportError('>> Packages required for depth calculations (biopython/msms) are '
                                 'not available, depth will be removed from features to calculate.')
 
-    def calculate_depth(self, path):
+    def calculate(self, path):
         '''
         Calculate the depth of the lysine from the surface of the protein within
         the overall protein structure.
@@ -162,6 +161,4 @@ class Depth():
 
 if __name__ == '__main__':
     depth = Depth(calculation_type='AtomDepth', include_modified=True)
-    print(depth.calculate_depth(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(depth.calculate_depth(path=f'tmp_checking_pdb.pdb'))
-    #print(depth.calculate_depth(path=f'1nsk_AmberMod0000.pdb'))
+    print(depth.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
