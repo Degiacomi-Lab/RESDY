@@ -2,9 +2,8 @@ import os
 import io
 from contextlib import redirect_stdout
 import pandas as pd
-import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 # Frustration packages
 try:

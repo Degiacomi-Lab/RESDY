@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 try:
     from ase import Atoms
@@ -25,10 +25,11 @@ class AEV():
     3. Coarse-grain representation AEVs 
     '''
 
-    def __init__(self, include_modified=False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                                                'modified_codes': ['LYE', 'KCX'],
-                                                                'atom_select_names_nonmod': ['NZ'],
-                                                                'atom_select_names_modified': ['NZ', 'N07']},
+    def __init__(self, include_modified=False,
+                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                  'modified_codes': ['LYE', 'KCX'],
+                                  'atom_select_names_nonmod': ['NZ'],
+                                  'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the AEV class, provides general global variables and information taken forward from
@@ -71,7 +72,7 @@ class AEV():
         self.ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=self.device)
 
 
-    def calculate_aevs(self, path):
+    def calculate(self, path):
         '''
         Calculate the Atomic Environment Vectors (AEVs) of the NZ atom within the lysine structure
 
@@ -204,4 +205,4 @@ class AEV():
 
 if __name__ == '__main__':
     aev_a = AEV(include_modified=False)
-    print(aev_a.calculate_aevs(f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    print(aev_a.calculate(f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

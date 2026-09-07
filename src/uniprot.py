@@ -207,6 +207,27 @@ class Uniprot(object):
                 continue
 
 
+    def from_organism(self, code, reviewed_only=False):
+        '''
+        Function to go from an organism to dataframe of proteins ready to be curated
+        in the protein class. This will take an organism code, find all the proteins
+        associated with this proteome, then iterate over the returned list of structures
+        to append to the class output dataframe containing full details
+
+        Parameters
+        ----------
+        code -> str
+            Code for the organism
+        reviewed_only -> bool
+            Toggle to return only reviewed proteins or all
+        '''
+        prot_list = self.get_organism_proteins(code=code, reviewed_only=reviewed_only)
+        for i, prot in enumerate(prot_list):
+            print(f'Extracting protein information for protein {prot} in organism '
+                  f'{code}; {i}/{len(prot_list)}')
+            self.get_protein_data(uniprot_code=prot)
+
+
     def from_csv_file(self, csv_file):
         '''
         Parse a .csv file to find uniprot and pdb codes to pass into the pipeline.
@@ -225,15 +246,12 @@ class Uniprot(object):
         try:
             csv_df = pd.read_csv(csv_file)
             print('.csv input file of Uniprot codes successfully opened')
-
         except Exception as e:
             raise Exception(f'Failed to read {csv_file}: {e}') from e
 
         #Next abstract column names
         try:
-            column_names = list(csv_df.columns)
             csv_df['PDB_Code'] = csv_df['PDB_Code'].fillna(0)
-
         except Exception as e:
             raise Exception(f'Failed to get data from .csv file. {e}') from e
 
@@ -278,11 +296,25 @@ class Uniprot(object):
         return self.df[self.df['Method'].isin(list_of_techniques)]
 
 
+    def save_state(self, outname='potential_proteins.csv'):
+        '''
+        Quick function to aid saving a list of protein structures that have been found
+        ready to be used in the protein class.
+        
+        Parameters
+        ----------
+        outname -> str
+            Name of the file to write the UP.df dataframe to
+        '''
+        self.df.to_csv(outname, index_label=False, index=False)
+
+
 if __name__ == "__main__":
 
     UP = Uniprot()
 
-    #UP.get_organism_proteins('UP000001811')
-    UP.get_protein_data("P09167")
+    #print(UP.get_organism_proteins('UP000001806'))
+    UP.from_organism('UP000000625')
+    #UP.get_protein_data("P09167")
     #UP.from_csv_file("inputs\\input_codes_4.csv")
     print(UP.df)

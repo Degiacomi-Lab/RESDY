@@ -276,6 +276,7 @@ class Analysis(object):
         #         deal if is, otherwise add new column in
         try:
             new_df = pd.read_csv(extra_measures_filename)
+            if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
             base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
             new_measures_columns = [a for a in new_df.columns if a not in base_columns]
@@ -416,6 +417,7 @@ class Analysis(object):
         print(f'Current num of rows: {final_full_data_rows}')
         print(f'Num of rows removed: {diff_rows}')
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
+        return self.df
 
 
     def relative_best(self, df, weights, features=['depth']):

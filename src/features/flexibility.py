@@ -1,9 +1,7 @@
 import os
-import io
 import pandas as pd
-import numpy as np
 import biobox as bb
-from features.error_reporting import report_error_to_file
+from src.features.error_reporting import report_error_to_file
 
 
 class Flexibility():
@@ -40,7 +38,7 @@ class Flexibility():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
-    def calculate_flexibility(self, path):
+    def calculate(self, path):
         '''
         Calculate the flexibility of the lysine of interest within the protein structure.
         This uses B-factor values for atoms within the lysine and reports the average
@@ -135,6 +133,4 @@ class Flexibility():
 
 if __name__ == '__main__':
     flex = Flexibility(include_modified=True)
-    print(flex.calculate_flexibility(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(flex.calculate_flexibility(path=f'tmp_checking_pdb.pdb'))
-    #print(flex.calculate_flexibility(path=f'1nsk_AmberMod0000.pdb'))
+    print(flex.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

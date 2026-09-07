@@ -1,4 +1,4 @@
-# CARBAMYLATION FINDER
+# CoolPackageName
 
 ## Introduction
 
@@ -23,6 +23,9 @@ This toolkit is subdivided in a set of classes that together operate as a pipeli
 
 
 ## Dependencies
+
+requirements.yaml is provided to create a conda environment which is capable of running most of the features of the pipeline.
+Features denoted in the table below with specific package requirements or programme installations may not be available unless manually added to the working environment. 
 
 ### Required
 

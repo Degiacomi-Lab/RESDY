@@ -14,9 +14,9 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-import alphafold as af
-import patcher
-from helper import get_download_tool, ShutUp
+import src.alphafold as af
+import src.patcher as patcher
+from src.helper import get_download_tool, ShutUp
 
 
 class PDB(object):
@@ -143,32 +143,6 @@ class PDB(object):
 
     def gather_proteins(self, uniprot_df, skip_if_found=True):
         '''
-        Go over the dataframe containing PDB structure information, download and
-        curate structures for every relevant PDB file. This is a redirection function
-        to call the correct gathering function based on parameters given in initialising
-        the class. Currently, will either call gather_proteins_parallel() or
-        gather_proteins_series() based on the setting of parallel in setting up the
-        protein class.
-
-        Parameters
-        ----------
-        uniprot_df -> dataframe
-            Dataframe containing all the uniprot codes of interest, can also include
-            the residues of interest along with this. Columns: 'Uniprot_Entry', 'PDB_Code',
-            'Resid' (resid column not necessary)
-        skip_if_found -> bool
-            Set to true to not curate another structure for the given pdb if a curated file
-            is found, if set to false it will ignore previously curated files and start again
-        '''
-        match self.parallel:
-            case True:
-                self.gather_proteins_parallel(uniprot_df, skip_if_found)
-            case False:
-                self.gather_proteins_series(uniprot_df, skip_if_found)
-
-
-    def gather_proteins_parallel(self, uniprot_df, skip_if_found=True):
-        '''
         Parallel method for gathering protein structures from the given dataframe containing
         list of uniprot codes. This turns the input data into a list for input into the parallel
         pool, format of the list depends on if running as PDB_only or not. Output from the
@@ -192,7 +166,10 @@ class PDB(object):
             except Exception as e:
                 return e
 
-        n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+        if self.parallel:
+            n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+        else:
+            n_cores_to_use = 1
 
         with Manager() as manager:
             lock = manager.Lock()
@@ -207,14 +184,20 @@ class PDB(object):
                     else:
                         items.append([[r['PDB_Code']], skip_if_found, lock])
                 except Exception as e:
-                    pass
+                    print(f'>> In adding rows to the parallel pool, failed to add row {i} '
+                          f'and therefore will not be created; error: {e}')
+                    broken_prot = pd.DataFrame([{'Uniprot': r.get('Uniprot_Entry', ''),
+                                                 'PDB': r.get('PDB_Code', ''),
+                                                 'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
+                    broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
+                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
 
 
             with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
                 results = [t for t in pool.starmap(self._curate_row, items) if t is not None]
 
             if not results:
-                print(f'>> No structures of the {len(items)} uniprot codes could be curated, '
+                print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
                       f'for more details, see uncuratable_pdb_files.csv')
                 return
             df_tmp = pd.concat(results, ignore_index=True)
@@ -402,136 +385,6 @@ class PDB(object):
                 pass
 
 
-    def gather_proteins_series(self, uniprot_df, skip_if_found=True):
-        '''
-        Series function for gathering pdb information from the dataframe given as input from
-        uniprot.py. Loops over the rows of the uniprot dataframe adn for each row it checks if
-        the pdb code contains 'AF-', if it does, follow the alphafold curation path, download
-        the file and record the PLDDT scores for it. If 'AF-' is not in it, follow route for
-        pdb file code. If skip_if_true set to True, it will check if any curated structures exist
-        for that pdb and if there are, check alignment of sequence and return. If not it will call
-        the functions to clean and split the pdb into curated structures.
-
-        Parameters
-        ----------
-        row_details -> list
-            
-        skip_if_found -> bool
-            Set to true to not curate another structure for the given pdb if a curated file
-            is found, if set to false it will ignore previously curated files and start again
-        lock -> lock
-            Lock provided from the multiprocessing manager to use to stop child processes writing to
-            files at the same time. 
-        '''
-        if self.PDB_only:
-            try:
-                # when the inputs are PDB codes only, convert them to a dataframe
-                dic = {'PDB_Code':uniprot_df}
-                uniprot_df = pd.DataFrame(dic)
-            except Exception as e:
-                return e
-
-        for idx, row in uniprot_df.iterrows():
-
-            pdb_code = row["PDB_Code"]
-
-            if not self.PDB_only:
-                uniprot_code = row["Uniprot_Entry"]
-                print(f"\nUNIPROT: {uniprot_code}, PDB: {pdb_code}")
-            else:
-                print(f"\nPDB: {pdb_code}")
-
-            if pdb_code[:2] == "AF":
-
-                if skip_if_found:
-                    files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
-                    if pdb_code in files:
-                        print(f">> curated {pdb_code} PDB found, continuing...")
-                        if not self.PDB_only:
-                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
-                        else:
-                            data = {'PDB_Code': pdb_code}
-
-                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                        continue
-
-                try:
-                    af.download_AF_struc(pdb_code,outfolder=self.outdir)
-                except Exception as e:
-                    print(f">> FAILED on calling download_AF_struc: {str(e)}")
-                    continue
-
-                # check if the AlphaFold file contains ATOM statements
-                af_filename = os.path.join(self.curated_dir, f"{pdb_code}.pdb")
-                fin = open(af_filename, "r")
-                test = False
-                for line in fin:
-                    if line.startswith("ATOM"):
-                        test = True
-                        break
-                fin.close()
-
-                if test:
-                    if not self.PDB_only:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
-                    else:
-                        data = {'PDB_Code': pdb_code}
-                    self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                    # find the PLDDT codes for AF structures
-                    af.find_af_plddt(pdb_code, outfolder=self.outdir, resnames=self.resnames_of_interest)
-
-                else:
-                    print(">> FAILED: structure not found in AlphaFold database")
-                    try:
-                        os.remove(af_filename)
-                    except Exception as e:
-                        pass
-
-            else:
-                try:
-                    if not self.PDB_only:
-                        method_obtained = row["Method"]
-                        resolution = row["Resolution"]
-                        chains = row["Chains"]
-                        if isinstance(chains, str):
-                            chains = [c for c in chains.split('/') if c]
-                except Exception as e:
-                    method_obtained, resolution, chains = '', '', ''
-                    pass
-
-                if skip_if_found:
-                    files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
-                    if pdb_code in files:
-                        print(f">> curated {pdb_code} PDB found, continuing...")
-                        if not self.PDB_only:
-                            matched_curated_files = [os.path.basename(a) for a in glob.glob(os.path.join(self.curated_dir, "*pdb")) if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]]
-                            for file in matched_curated_files:
-                                self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
-                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
-                        else:
-                            data = {'PDB_Code': pdb_code}
-                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-                        continue
-
-                # load, clean, and split it in alternate conformations
-                try:
-                    if not self.PDB_only:
-                        self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
-                    else:
-                        self.clean_and_split_pdb(pdb_code)
-                        data = {'PDB_Code': pdb_code}
-                    self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                except Exception as e:
-                    print(f">> FAILED clean and splitting of PDB entry file: {str(e)}")
-                    broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': str(e)}])
-                    broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
-                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
-                    continue
-
-
     def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[]):
         '''
         Download the pdb file from rcsb, clean the structure, split it based on alternative
@@ -553,7 +406,7 @@ class PDB(object):
         try:
             #download and clean the structure
             self.download_pdb(pdb)
-            replacement_dict = self.clean(pdb)
+            replacement_dict = self.clean(pdb, uniprot_code=uniprot_code)
 
             #splits into all alternative conformations into independent structures
             self.split_struc_nmr(pdb)
@@ -568,11 +421,11 @@ class PDB(object):
         for cnt, f in enumerate(files):
             mypath = os.path.split(f)[0]
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
-            print(fasta_loc)
 
             try:
 
-                fname = patcher.curate(f, fasta_loc, outdir=self.curated_dir, gap=self.gap)
+                fname = patcher.curate(f, fasta_loc, outdir=self.curated_dir,
+                                       gap=self.gap, include_hetatm=self.include_hetatm)
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
@@ -667,7 +520,7 @@ class PDB(object):
             print(f'Fasta file for {pdb} previously downloaded, using previous copy.')
 
 
-    def clean(self, pdb):
+    def clean(self, pdb, uniprot_code = ''):
         '''
         Rename the protein's chains during the cleaning process so that they match
         the chain names given in the FASTA file. This is required as pdb files name
@@ -681,11 +534,15 @@ class PDB(object):
         - modified methionine (MSE) -> replace SE with S and rename to MET
         - element codes -> if not present in pdb file, add these in based on guess from atomtype col
         - neglect HETATMs unless metal ions and hydrogens
+        - check for modified residues in structure, convert back to 
         
         Parameters
         ----------
         pdb -> str
             pdb code for the structure of interest
+        uniprot_code -> str
+            Uniprot code corresponding to structure of interest - default is '' to allow
+            for pdb only cases
 
         Returns
         -------
@@ -704,6 +561,14 @@ class PDB(object):
 
         #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
         list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
+        standard_resids = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q',
+                           'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
+                           'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
+                           'TYR': 'Y', 'VAL': 'V'}
+        standard_resids_inv = {v: k for k, v in standard_resids.items()}
+        fasta_chains = {}
+        uniprot_fasta = ''
+        list_prev_mod_resids = {}
 
         read_file_path = os.path.join(self.raw_dir, f"{pdb}.pdb")
         read_file = open(read_file_path)
@@ -759,6 +624,118 @@ class PDB(object):
             if not element_col:
                 # guess element based on atom type name
                 element_col = line[12:16].strip().lstrip('0123456789')[:2].upper()
+
+            #check that amino acid is one of the 20 standard amino acids
+            if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and (line[21] + line[22:26].strip()) in list(list_prev_mod_resids):
+                if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
+                    continue
+                line = line.replace('HETATM', 'ATOM  ')
+                line = line.replace(line[17:20], list_prev_mod_resids[line[21] + line[22:26].strip()])
+            elif (line[:4] == 'ATOM' or line[:6] == 'HETATM') and line[17:20].upper() not in standard_resids:
+                aa_num = int(line[22:26].strip())
+                old_mod_aa_code = line[17:20]
+                if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
+                    continue
+
+                if uniprot_code != '':
+                    if uniprot_fasta == '':
+                        tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
+                        fasta_text = requests.get(tmp_url, timeout=20).text
+                        uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
+                    
+                    M = bb.Molecule()
+                    M.import_pdb(pdb=read_file_path, include_hetatm=True)
+                    M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                    pdb_seqs = {}
+                    for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                        tmp_data = subset_data[subset_data['chain'] == chain]
+                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                    aligner = PairwiseAligner()
+                    aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+                    aligner.open_gap_score = -11
+                    aligner.extend_gap_score = -11
+                    aligner.target_end_gap_score = 0.0
+                    alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
+
+                    res_mapper = {}
+
+                    for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
+                        for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
+                            res_mapper[chain_res_list[pdb_pos]] = uni_pos
+
+                    aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
+                    if aa_interest in list(standard_resids.values()):
+                        line = line.replace('HETATM', 'ATOM  ')
+                        line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
+                        list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
+
+                        # edit the fasta file to change the position
+                        fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
+                        try:
+                            f = open(fasta_name, 'r')
+                            fasta_headers = []
+                            fasta_chain_letters = []
+                            fasta_seqs = []
+                            for fasta_line in f:
+                                if ">" in fasta_line:
+                                    fasta_headers.append(fasta_line)
+                                    chain_raw_info = fasta_line.split("|")[1][6:].split(",")
+                                    if len(chain_raw_info[0]) == 1:
+                                        chain_info = chain_raw_info
+                                    else:
+                                        chain_info = [a.strip()[0] for a in chain_raw_info]
+                                    fasta_chain_letters.append(chain_info)
+                                    if "fasta_seq" in locals():
+                                        fasta_seqs.append(fasta_seq)
+
+                                    fasta_seq = []
+
+                                else:
+                                    fasta_seq.append(fasta_line)
+    
+                            fasta_seqs.append(fasta_seq)
+                            f.close()
+
+                            new_fasta = open(fasta_name, 'w')
+                            for header, chain, seq in zip(fasta_headers, fasta_chain_letters, fasta_seqs):
+                                new_fasta.write(header)
+                                seq = seq[0].strip()
+                                if chain[0] == line[21]:
+                                    
+                                    F = bb.Molecule()
+                                    F.import_pdb(pdb=read_file_path, include_hetatm=True)
+                                    F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+                                    subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                                    pdb_seqs = {}
+                                    for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                                        tmp_data = subset_data[subset_data['chain'] == chain]
+                                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                                    aligner = PairwiseAligner()
+                                    aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+                                    aligner.open_gap_score = -11
+                                    aligner.extend_gap_score = -11
+                                    aligner.target_end_gap_score = 0.0
+                                    alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
+
+                                    for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
+                                        fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
+                                    
+                                    seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:] + '\n'
+                                new_fasta.write(seq)
+                            new_fasta.close()
+
+                        except Exception as e:
+                            print(f'FASTA file parsing failed. Error: {str(e)}')
+                            if 'f' in locals():
+                                f.close()
+                            fasta_chains = {}
+
+                else:
+                    raise Exception(f'Error in patching file: could not get residue type for modified '
+                                    f'residue to convert to standard; file: {pdb}')
 
             #neglect HETATM atoms, unless they are metal ions
             if line[:6] == 'HETATM':
@@ -1008,7 +985,7 @@ class PDB(object):
                 aligner = PairwiseAligner()
                 aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                 aligner.open_gap_score = -11
-                aligner.extend_gap_score = -1
+                aligner.extend_gap_score = -11
                 aligner.target_end_gap_score = 0.0
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
 
@@ -1071,7 +1048,7 @@ class PDB(object):
 
         name = os.path.join(self.raw_dir, pdb_code + '.fasta')
 
-        try:    
+        try:
             #append chain information into the chains_raw list
             f = open(name, 'r')
             list_of_chains = []
@@ -1264,13 +1241,14 @@ class PDB(object):
 if __name__ == "__main__":
 
     PDB = PDB(outdir='result')
-    #PDB.clean_and_split_pdb('13LD') # test KCX to LYS mutation
-    PDB.clean_and_split_pdb('1PAE') # test SEC to CYS mutation
-    #PDB.clean_and_split_pdb('6XZ7') # test MSE to MET mutation
-    #PDB.clean_and_split_pdb('2MBH') # test splitting of models
-    #PDB.clean_and_split_pdb('1A6M') # test splitting rotamers
+    #PDB.clean_and_split_pdb('13LD', 'P10724) # test KCX to LYS mutation
+    #PDB.clean_and_split_pdb('1PAE', 'P22887') # test SEC to CYS mutation
+    #PDB.clean_and_split_pdb('6XZ7, 'P60422') # test MSE to MET mutation
+    #PDB.clean_and_split_pdb('2MBH, 'Q13351') # test splitting of models
+    #PDB.clean_and_split_pdb('1A6M', 'P02185) # test splitting rotamers
     #PDB.clean_and_split_pdb('4WNC', 'P04406') # test splitting rotamers
     #PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
+    PDB.clean_and_split_pdb('2MWS', 'P0CG48') #  test removal of modified residue
 
 
     #PDB._align_resnum_uniprot('P50030', f'result{os.sep}curated{os.sep}3DBJ-alt-1.pdb', chains=['A', 'C', 'E', 'G'])
