@@ -714,7 +714,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
 
     shutil.rmtree(tmp_folder)
 
-    return outname
+    return outname, largest
 
 ##############################################################################
 
