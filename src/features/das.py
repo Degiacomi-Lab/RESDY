@@ -5,8 +5,7 @@ from src.features.error_reporting import report_error_to_file
 
 class DAS():
     '''
-    Class to house the different methods for calculating dynamically accessible surface
-    area (das) values for structures
+    Dynamically accessible surface area (DAS) values for structures.
     '''
 
     def __init__(self, include_modified=False, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
@@ -15,21 +14,21 @@ class DAS():
                                                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the DAS class, include any global variables that are required from
-        measures in here.
+        Initialise the DAS class, include any global variables that are required from measures in
+        here.
 
-        Parameters
-        ----------
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -43,39 +42,37 @@ class DAS():
         This is effectively the number of positions that the NZ atom can take within the structure
         of the protein.
 
-        Method
-        ------
-        Uses biobox functionality to calculate the value
-        Create a molecule for the protein structure from the bb.Molecule class
-        Use the bb.Xlink class to setup the linking module
-        Use the hidden method .__get_half_sphere() to work out the das value
-        As the density of points in the sphere of the NZ atom of the lysine is constant,
-            the das value is the number of points that are accessible
+        .. rubric:: Method
 
+        - Uses biobox functionality to calculate the value
+        - Create a molecule for the protein structure from the bb.Molecule class
+        - Use the bb.Xlink class to setup the linking module
+        - Use the hidden method .__get_half_sphere() to work out the das value
+        - As the density of points in the sphere of the NZ atom of the lysine is constant, the das
+          value is the number of points that are accessible
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
+        :param path: The path of the pdb file that DAS is being calculated for.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and DAS output. Outline::
 
-        Returns
-        -------
-        df_das : dataframe
-            Dataframe with information on chain, residue number and DAS output. Outline:
-            Chain   Resid   das
-            x       x       x
+                Chain   Resid   das
+                x       x       x
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        >> print(calculate_das(1ubq.pdb))
-        Chain  Resid  das
-        0     A      6   36
-        1     A     11   47
-        2     A     27   22
-        3     A     29   37
-        4     A     33   46
-        5     A     48   34
-        6     A     63   30
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate_das(1ubq.pdb))
+            Chain  Resid  das
+            0     A      6   36
+            1     A     11   47
+            2     A     27   22
+            3     A     29   37
+            4     A     33   46
+            5     A     48   34
+            6     A     63   30
         '''
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this

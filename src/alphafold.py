@@ -7,23 +7,22 @@ def download_AF_struc(pdb, outfolder="result"):
     '''
     Download AlphaFold2 structures into the assembled folder.
 
-    Method
-    ------
-    Check that curated directory exists in outdir, otherwise create one
-    Use the appropriate download tool to download the AF structure for the code given
+    .. rubric:: Method
 
+    - Check that curated directory exists in outdir, otherwise create one
+    - Use the appropriate download tool to download the AF structure for the code given
 
-    Parameters
-    ----------
-    pdb : string
-        The AF code for the structure to extract the PLDDT values from
-    
-    outfolder : string
-        The outdirectory to used to know where the downloaded files should be written to
+    :param pdb: The AF code for the structure to extract the PLDDT values from
+    :type pdb: str
+    :param outfolder: The output directory used to know where the downloaded files should be
+        written to
+    :type outfolder: str
 
-    Example
-    -------
-    >> download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='test_plddt')
+    .. rubric:: Example
+
+    ::
+
+        >>> download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='test_plddt')
     '''
 
     download_path = os.path.join(outfolder, "curated")
@@ -49,42 +48,38 @@ def download_AF_struc(pdb, outfolder="result"):
 
 def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     '''
-    Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value
-    for each lysine in an alphafold structure.
+    Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value for each lysine in an
+    alphafold structure.
 
-    Method
-    ------
-    If the PLDDT output file hasn't been created yet, create and add column headings
-    Open the PLDDT output file for appending data.
-    Search the curated AF structure pdb file to extract the PLDDT values.
-    Append the PLDDT value to the output file and write to the console log.
+    .. rubric:: Method
 
+    - If the PLDDT output file hasn't been created yet, create and add column headings
+    - Open the PLDDT output file for appending data.
+    - Search the curated AF structure pdb file to extract the PLDDT values.
+    - Append the PLDDT value to the output file and write to the console log.
 
-    Parameters
-    ----------
-    af_code_full : string
-        The AF code for the structure to extract the PLDDT values from
-    outfolder : string
-        The outdirectory to used to check that the PLDDT out file is in the correct place
-        and allow appending to this
-    resnames : list
-        list of resid names to search for in the pdb files. Default is ['LYS'], set in overall
-        run through curation on aa_properties
+    :param af_code_full: The AF code for the structure to extract the PLDDT values from
+    :type af_code_full: str
+    :param outfolder: The output directory used to check that the PLDDT out file is in the correct
+        place and allow appending to this
+    :type outfolder: str
+    :param resnames: list of resid names to search for in the pdb files. Default is ['LYS'], set in
+        overall run through curation on aa_properties
+    :type resnames: list
+    :returns: A dictionary matching up all the lysines with their corresponding PLDDT values for the
+        given AF structure.
+    :rtype: dict
 
-    Returns
-    -------
-    dict_plddt : dictionary
-        A dictionary matching up all the lysines with their corresponding PLDDT values
-        for the given AF structure.
+    .. rubric:: Example
 
-    Example
-    -------
-    >>find_af_plddt('AF-P0CG48-F1-model_v4', outfolder='test_plddt')
-    > Finding plddt
-    AF-P0CG48-F1-model_v4; Resid No. A6; PLDDT: 93.79
-    AF-P0CG48-F1-model_v4; Resid No. A11; PLDDT: 89.45
-    AF-P0CG48-F1-model_v4; Resid No. A27; PLDDT: 94.28
-    ...
+    ::
+
+        >>>find_af_plddt('AF-P0CG48-F1-model_v4', outfolder='test_plddt')
+        > Finding plddt
+        AF-P0CG48-F1-model_v4; Resid No. A6; PLDDT: 93.79
+        AF-P0CG48-F1-model_v4; Resid No. A11; PLDDT: 89.45
+        AF-P0CG48-F1-model_v4; Resid No. A27; PLDDT: 94.28
+        ...
     '''
     cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):

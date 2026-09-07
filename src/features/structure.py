@@ -12,8 +12,7 @@ except Exception as e:
 
 class Structure():
     '''
-    Class to house the different methods for calculating structural measurement values
-    for structures.
+    Structural measurement values for structures.
     '''
 
     def __init__(self, melodia_features=['all'], include_modified=False,
@@ -24,22 +23,22 @@ class Structure():
                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the Structure class
-        
-        Parameters
-        ----------
-        melodia_features : list
-            List of features which are calculated through melodia which has been requested
-            when the Measure class is initialised. Default is set to ['all'].
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+
+        :param melodia_features: List of features which are calculated through melodia which has
+            been requested when the Measure class is initialised. Default is set to ['all'].
+        :type melodia_features: list
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
 
         self.melodia_features = melodia_features
@@ -57,33 +56,32 @@ class Structure():
 
     def calculate(self, path):
         '''
-        Call the Melodia package to calculate data for the following structural features of
-        the lysines of interest within the structure: curvature, arc-length, phi, psi
+        Call the Melodia package to calculate data for the following structural features of the
+        lysines of interest within the structure: curvature, arc-length, phi, psi
 
-        Method
-        ------
-        Call melodia on the path of the pdb file that has been passed to the function and
-        create dataframe from the results. Process the dataframe to remove any of the 
-        calculated features that were not asked for.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
+        Call melodia on the path of the pdb file that has been passed to the function and create
+        dataframe from the results. Process the dataframe to remove any of the calculated features
+        that were not asked for.
 
-        Returns
-        -------
-        df_melodia : dataframe
+        :param path: The path of the pdb file that the structural features are being calculated for.
+        :type path: str
+        :returns:
             Dataframe with information on chain, residue number and desired melodia output.
-            Outline for all features:
-            Chain   Resid   curvature   writhing    torsion   arc-length  phi psi
-            x           x           x          x          x            x    x   x
+            Outline for all features::
 
-        Example
-        -------
-        >> print(self.calculate_melodia(1ubq.pdb))
-        Chain   Resid    curvature  writhing    torsion  arc-length  phi psi
-        0
+                Chain   Resid   curvature   writhing    torsion   arc-length  phi psi
+                x           x           x          x          x            x    x   x
+        :rtype: pandas.DataFrame
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(self.calculate_melodia(1ubq.pdb))
+            Chain   Resid    curvature  writhing    torsion  arc-length  phi psi
+            0
         '''
         # Melodia 1 - Calculating geometry using melodia-py
         try:

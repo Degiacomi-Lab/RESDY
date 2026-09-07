@@ -7,10 +7,13 @@ import importlib
 import inspect
 
 __all__ = []
-feature_folder = f'src{os.sep}features'
+# resolved from __file__ rather than from the working directory, so that the package can be
+# imported from anywhere (Sphinx, for instance, builds from the docs folder)
+feature_folder = os.path.dirname(os.path.abspath(__file__))
 scripts_to_ignore = ['feature.py', '__init__.py', 'error_reporting.py']
 feat_folder_scripts = [a for a in os.listdir(feature_folder) if a not in scripts_to_ignore
-                       and (os.path.isfile(os.path.join(f'src{os.sep}features', a)))]
+                       and a.endswith('.py')
+                       and (os.path.isfile(os.path.join(feature_folder, a)))]
 
 for f in feat_folder_scripts:
     mod_name = f'{__name__}.{f.split(".")[0]}'

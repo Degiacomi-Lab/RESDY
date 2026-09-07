@@ -21,23 +21,19 @@ scaler = StandardScaler()
 
 class Preprocessing:
     '''
-    Class encompasing methods used for preprocesing the data before it is passed through
-    to a model to train on the data. Functions include correlation analysis of the features
-    using VIF and undersampling to be used to reduce the size of a dataset without losing
-    key information.
+    Class encompassing methods used for preprocessing the data before it is passed through to a model
+    to train on the data. Functions include correlation analysis of the features using VIF and
+    undersampling to be used to reduce the size of a dataset without losing key information.
     '''
 
     def __init__(self, df, features=[]):
         '''
         Initialise the preprocessing class
-        
-        Parameters
-        ----------
-        df : DataFrame
-            The overall measures dataframe for the analysis to be completed on.
-        
-        features : list
-            The list of features to be considered within the analysis.
+
+        :param df: The overall measures dataframe for the analysis to be completed on.
+        :type df: pandas.DataFrame
+        :param features: The list of features to be considered within the analysis.
+        :type features: list
         '''
         self.df = df
         self.n_obs = len(self.df)
@@ -70,20 +66,14 @@ class Preprocessing:
     def clean(self, df, features):
         """
         Clean the input dataframe by removing rows containing NaN and duplicated rows.
-        
-        Parameters
-        ----------
-        df : Pandas DataFrame
-        
-        features : list
-            List of features (columns) to be checked for NaN entries and duplication
 
-        Returns
-        -------
-        df_cleaned : Pandas DataFrame
-        n_obs_cleaned : int
-            Number of rows in the cleaned dataframe.
-
+        :param df:
+        :type df: pandas.DataFrame
+        :param features: List of features (columns) to be checked for NaN entries and duplication
+        :type features: list
+        :returns: The cleaned dataframe ``df_cleaned``, and ``n_obs_cleaned``, the number of rows in
+            the cleaned dataframe.
+        :rtype: tuple(pandas.DataFrame, int)
         """
         # remove any features from measurements that are NaN
         print(f"Original number of observations: {len(df)}")
@@ -99,16 +89,14 @@ class Preprocessing:
 
     def calculate_vif(self, data, features, multi_vif=False):
         """
-        Calculate Variance Inflation Factors (VIFs) of the features selected.
-        This allows for the n most decorrelated features to be selected later to take
-        forward into the model, reducing the degrees of complexity.
+        Calculate Variance Inflation Factors (VIFs) of the features selected. This allows for the n
+        most decorrelated features to be selected later to take forward into the model, reducing the
+        degrees of complexity.
 
-        Parameters
-        ----------
-        data : Pandas DataFrame
-            The overall measures dataframe
-        features : list
-            List of features to be considered for VIF calculations
+        :param data: The overall measures dataframe
+        :type data: pandas.DataFrame
+        :param features: List of features to be considered for VIF calculations
+        :type features: list
         """
         
         if not statsmodel_available:
@@ -162,19 +150,14 @@ class Preprocessing:
 
     def calculate_diff_features(self, data):
         '''
-        Function to calculate the most decorrelated features from the measurements through
-        VIF analysis. This will continuously call the VIF calculation until all the values
-        returned are less than 5 (the commonly used value for decorrelation)
+        Function to calculate the most decorrelated features from the measurements through VIF
+        analysis. This will continuously call the VIF calculation until all the values returned are
+        less than 5 (the commonly used value for decorrelation)
 
-        Parameters
-        ----------
-        data : DataFrame
-            The overall dataframe of measurements to be analysed.
-
-        Returns
-        -------
-        cols_to_keep : List
-            The list of the column names which are the most decorrelated
+        :param data: The overall dataframe of measurements to be analysed.
+        :type data: pandas.DataFrame
+        :returns: The list of the column names which are the most decorrelated
+        :rtype: list
         '''
 
         all_decorrelated = False
@@ -231,18 +214,13 @@ class Preprocessing:
         """
         Normalise all specified feature columns to mean zero, standard deviation 1.
 
-        Parameters
-        ----------
-        data_input : DataFrame
-            Dataframe over which to normalise the feature data.
-        features : list, optional
-            List of features to be normalised. If none specified, normalise all 
-            columns in the given dataframe.
-
-        Returns
-        -------
-        data : DataFrame
-            Normalised dataframe.
+        :param data_input: Dataframe over which to normalise the feature data.
+        :type data_input: pandas.DataFrame
+        :param features: List of features to be normalised. If none specified, normalise all columns
+            in the given dataframe.
+        :type features: list, optional
+        :returns: Normalised dataframe.
+        :rtype: pandas.DataFrame
         """
 
         data_input = data_input.copy()
@@ -259,48 +237,42 @@ class Preprocessing:
     def undersampling(self, features, n_cluster, n_init=100, max_iter=500,
                       iqr_reject_range=1.5, outlier_cluster_radius=0.6):
         '''
-        Function to select a sample of points from a dataset which is representative
-        of the entire dataset that has been fed, finding the most different points.
-        
-        Method
-        ------
-        First separate the dataset into two parts, the 'common' and the 
-        'outliers', based on interquartile range (IQR). The sensitivity can be 
-        changed by fixing the argument iqr_reject_range: all data points having 
-        at least one feature lie in the rejection region are considered as 
-        outliers; this region is defined by 
-        [25th percentile - iqr_reject_range*IQR, 75th percentile + iqr_reject_range*IQR].
-        
-        +) Common part: use K-means to group data points into clusters, then 
-        from each cluster choose the point closest to cluster centre.
-        
-        +) Outlier part: use DBSCAN algorithm to find small clusters in the set 
-        of outliers, then from each cluster choose the point closest to cluster 
-        centre. The sensitivity can be tuned by changing the argument 
-        outlier_cluster_radius.
-        
+        Function to select a sample of points from a dataset which is representative of the entire
+        dataset that has been fed, finding the most different points.
 
-        Parameters
-        ----------
-        features : list
-            List of features to be considered in the selection process.
-        n_cluster : int
-            Number of data points to be chosen from the common part.
-        n_init : int, optional
-            Number of runs for the K-means. The best run is chosen as the final 
-            result. The default is 100.
-        max_iter : int, optional
-            Number of iterations in each run. The default is 500.
-        iqr_reject_range : float, optional
-            Determines the boundary between 'common' and 'outliers'. The 
+        .. rubric:: Method
+
+        First separate the dataset into two parts, the 'common' and the 'outliers', based on
+        interquartile range (IQR). The sensitivity can be changed by fixing the argument
+        iqr_reject_range: all data points having at least one feature lie in the rejection region
+        are considered as outliers, this region is defined by ``[25th percentile -
+        iqr_reject_range*IQR, 75th percentile + iqr_reject_range*IQR]``.
+
+        - Common part: use K-means to group data points into clusters, then from each cluster
+          choose the point closest to cluster centre.
+        - Outlier part: use DBSCAN algorithm to find small clusters in the set of outliers, then
+          from each cluster choose the point closest to cluster centre. The sensitivity can be
+          tuned by changing the argument outlier_cluster_radius.
+
+        :param features: List of features to be considered in the selection process.
+        :type features: list
+        :param n_cluster: Number of data points to be chosen from the common part.
+        :type n_cluster: int
+        :param n_init: Number of runs for the K-means. The best run is chosen as the final result.
+            The default is 100.
+        :type n_init: int, optional
+        :param max_iter: Number of iterations in each run. The default is 500.
+        :type max_iter: int, optional
+        :param iqr_reject_range: Determines the boundary between 'common' and 'outliers'. The
             default is 1.5.
-        outlier_cluster_radius : float, optional
-            Determines the sensitivity of DBSCAN. The default is 0.6.
+        :type iqr_reject_range: float, optional
+        :param outlier_cluster_radius: Determines the sensitivity of DBSCAN. The default is 0.6.
+        :type outlier_cluster_radius: float, optional
 
+        .. note::
 
-        Returns
-        -------
-        Selections are stored in the attribute self.undersampled_data
+           Nothing is returned. The selections are stored in the attribute
+           ``self.undersampled_data``.
         '''
 
         data = self.data[features]

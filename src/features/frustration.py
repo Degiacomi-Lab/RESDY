@@ -16,8 +16,7 @@ except Exception as e:
 pd.set_option('display.max_rows', 200)
 class Frustration():
     '''
-    Class to house the different methods for calculating frustration metric values
-    for structures.
+    Frustration metric values for structures.
     '''
 
     def __init__(self, include_modified = False,
@@ -30,18 +29,18 @@ class Frustration():
         Initialise the Frustration class, include any global variables that are required from
         measures in here.
 
-        Parameters
-        ----------
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -53,41 +52,42 @@ class Frustration():
 
     def calculate_frustration(self, path):
         '''
-        Use the Frustratometer package to identify the frustration metric for the lysines
-        of interest.
+        Use the Frustratometer package to identify the frustration metric for the lysines of
+        interest.
 
-        Method
-        ------
-        Load in protein structure into frustratometer before using AWSEM to create a model for
-        this with desired parameters. Use this model to calculate the 
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
+        Load in protein structure into frustratometer before using AWSEM to create a model for this
+        with desired parameters. Use this model to calculate the
 
-        Returns
-        -------
-        df_frustration : dataframe
-            Dataframe with information on chain, residue number and desired output from Frustratometer.
-            Outline for all features:
-            Chain   Resid   frustration   density
-            x           x             x         x
+        :param path: The path of the pdb file that the frustration metric is being calculated for.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and desired output from
+            Frustratometer. Outline for all features::
 
-        Example
-        -------
-        >> print(self.calculate_frustration(1ubq.pdb))
-            resid chain  Modified  frustration   density
-        5       6     A     False    -1.180647  4.474738
-        10     11     A     False    -1.277059  1.951710
-        26     27     A     False    -0.584062  4.216964
-        28     29     A     False    -0.721478  3.747545
-        32     33     A     False    -0.706590  2.437673
-        47     48     A     False    -0.974550  3.083861
-        62     63     A     False    -0.532853  1.358850
+                Chain   Resid   frustration   density
+                x           x             x         x
+        :rtype: pandas.DataFrame
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(self.calculate_frustration(1ubq.pdb))
+                resid chain  Modified  frustration   density
+            5       6     A     False    -1.180647  4.474738
+            10     11     A     False    -1.277059  1.951710
+            26     27     A     False    -0.584062  4.216964
+            28     29     A     False    -0.721478  3.747545
+            32     33     A     False    -0.706590  2.437673
+            47     48     A     False    -0.974550  3.083861
+            62     63     A     False    -0.532853  1.358850
+
+        .. todo::
+
+           Add the modules required by this feature (openmm, pdbfixer) to the readme.
         '''
-        # temp - TODO modules required to add into readme - openmm, pdbfixer
-        # Frustratometer 1 - create structure and AWSEM model
         df_frustration = pd.DataFrame()
         try:
             M = bb.Molecule()

@@ -5,11 +5,10 @@ import sys, os
 def get_download_tool():
     '''
     Get the name of the tool used for commandline download
-    
-    Returns:
-    --------
-    tool_name : string
-        Name of the tool currently wget and curl supported if fails None returned
+
+    :returns: Name of the tool to use. Only wget and curl are supported; None is returned if
+        neither is found.
+    :rtype: str
     '''
 
     if shutil.which('wget') is not None:

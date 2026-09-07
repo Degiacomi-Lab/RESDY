@@ -6,8 +6,7 @@ from src.features.error_reporting import report_error_to_file
 
 class Flexibility():
     '''
-    Class to house the different methods for calculating the flexibility parameters
-    for lysines within the protein structures.
+    Flexibility parameters for lysines within the protein structures.
     '''
 
     def __init__(self, include_modified, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
@@ -19,18 +18,18 @@ class Flexibility():
         Initialise the Flexibility class, include any global variables that are required from
         measures in here.
 
-        Parameters
-        ----------
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -40,40 +39,38 @@ class Flexibility():
 
     def calculate(self, path):
         '''
-        Calculate the flexibility of the lysine of interest within the protein structure.
-        This uses B-factor values for atoms within the lysine and reports the average
-        of all atoms within the lysine to form the final scalar quantity.
+        Calculate the flexibility of the lysine of interest within the protein structure. This uses
+        B-factor values for atoms within the lysine and reports the average of all atoms within the
+        lysine to form the final scalar quantity.
 
-        Method
-        ------
-        Read in the column for the B-factor values, take values which correspond to the
-        lysine of interest and calculate the average to report.
+        .. rubric:: Method
 
+        Read in the column for the B-factor values, take values which correspond to the lysine of
+        interest and calculate the average to report.
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
-
-        Returns
-        -------
-        df_flex : dataframe
+        :param path: The path of the pdb file that the flexibility is being calculated for.
+        :type path: str
+        :returns:
             Dataframe with information on chain, residue number and flexibility output.
-            Outline:
-            Chain   Resid   Flexibility
-            x       x       x
+            Outline::
 
-        Example
-        -------
-        >> print(calculate_flexibility(1ubq.pdb))
-          Chain  Resid  flexibility
-        0     A      6    10.776667
-        1     A     11    15.058889
-        2     A     27     7.253333
-        3     A     29    13.685556
-        4     A     33    20.076667
-        5     A     48    13.066667
-        6     A     63    15.998889
+                Chain   Resid   Flexibility
+                x       x       x
+        :rtype: pandas.DataFrame
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate_flexibility(1ubq.pdb))
+              Chain  Resid  flexibility
+            0     A      6    10.776667
+            1     A     11    15.058889
+            2     A     27     7.253333
+            3     A     29    13.685556
+            4     A     33    20.076667
+            5     A     48    13.066667
+            6     A     63    15.998889
         '''
 
         try:

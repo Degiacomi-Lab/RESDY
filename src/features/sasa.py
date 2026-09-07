@@ -7,8 +7,7 @@ from src.features.error_reporting import report_error_to_file
 
 class SASA():
     '''
-    Class to house the different methods for calculating solvent accessible surface area
-    (SASA) values for structures
+    Solvent accessible surface area (SASA) values for structures.
     '''
 
     def __init__(self,
@@ -19,21 +18,21 @@ class SASA():
                                     'atom_select_names_modified': ['NZ', 'N07']},
                   error_filename = 'measure_errors.txt'):
         '''
-        Initialise the SASA class, include any global variables that are required from
-        measures in here.
+        Initialise the SASA class, include any global variables that are required from measures in
+        here.
 
-        Parameters
-        ----------
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -45,36 +44,40 @@ class SASA():
         '''
         Calculate the solvent accessible surface area of the NZ atom within the lysine structure
 
-        Method
-        ------
-        Form small structures which include just the atoms surrounding the lysine of interest.
-        Small structures are classified as any atoms within 15 angstroms of the NZ of the lysines.
-        A new biobox moleucle is created for the substructure and SASA is calculated from that.
-        The SASA calculation uses the bb.sasa() function.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that SASA is being calculated for.
+        - Form small structures which include just the atoms surrounding the lysine of interest.
+        - Small structures are classified as any atoms within 15 angstroms of the NZ of the lysines.
+        - A new biobox molecule is created for the substructure and SASA is calculated from that.
+        - The SASA calculation uses the bb.sasa() function.
 
-        Returns
-        -------
-        df_sasa : dataframe
-            Dataframe with information on chain, residue number and sasa output. Outline:
-            Chain   Resid   sasa
-            x       x       x
+        :param path: The path of the pdb file that SASA is being calculated for.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and sasa output. Outline::
 
-        Example
-        -------
-        >> print(calculate_sasa(1ubq.pdb))
-        Chain  Resid  sasa
-        0     A      6   x
-        1     A     11   x
-        2     A     27   x
-        3     A     29   x
-        4     A     33   x
-        5     A     48   x
-        6     A     63   x
+                Chain   Resid   sasa
+                x       x       x
+        :rtype: pandas.DataFrame
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate_sasa(1ubq.pdb))
+            Chain  Resid  sasa
+            0     A      6   x
+            1     A     11   x
+            2     A     27   x
+            3     A     29   x
+            4     A     33   x
+            5     A     48   x
+            6     A     63   x
+
+        .. todo::
+
+           Generalise the atom selection to amino acids other than lysine: the element codes used here
+           are specific to LYS (GW, 23.07.26).
         '''
 
         try:
@@ -125,7 +128,6 @@ class SASA():
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
 
-                # TODO GW 23.07.26 - update this to be general to other AA as element codes are LYS specific here
                 if self.include_modified:
                     pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ", 'C03', 'C04', 'C05', 'C06', 'N07'],
                                             use_resname=False, get_index=True)

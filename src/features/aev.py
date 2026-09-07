@@ -17,12 +17,12 @@ except Exception as e:
 
 class AEV():
     '''
-    Class to house the different methods for calculating representations for the local structure
-    of lysines within the protein structure termed atomic environment vectors (AEVs). Potential AEV
-    representations are currently:
+    Representations of the local structure of lysines within the protein structure, termed atomic
+    environment vectors (AEVs). Potential AEV representations are currently:
+
     1. ANI-2x AEVs
     2. LEGOLAS ANI-2x AEVs - currently calculated through the LEGOLAS nmr package as an add-on
-    3. Coarse-grain representation AEVs 
+    3. Coarse-grain representation AEVs
     '''
 
     def __init__(self, include_modified=False,
@@ -32,21 +32,21 @@ class AEV():
                                   'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the AEV class, provides general global variables and information taken forward from
-        the overall measures class in here.
+        Initialise the AEV class, provides general global variables and information taken forward
+        from the overall measures class in here.
 
-        Parameters
-        ----------
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -76,39 +76,38 @@ class AEV():
         '''
         Calculate the Atomic Environment Vectors (AEVs) of the NZ atom within the lysine structure
 
-        Method
-        ------
-        Uses the ANI-2x AEV calculator to calculate the AEVs
-        Option available to use cuaev accelerated AEV calculation, can also just be run with a cpu
-        For each NZ atom withing the lysines of the protein, a substructure is created 
-            including all atoms within a cutoff distance
-        The cutoff distance is set at 6A currently as this was the minimum distance needed
-            for all information and agrees with pkaANI cutoff set
-        The AEV is a vector with length 1008 representing the environment for the lysine
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that SASA is being calculated for.
+        - Uses the ANI-2x AEV calculator to calculate the AEVs
+        - Option available to use cuaev accelerated AEV calculation, can also just be run with a cpu
+        - For each NZ atom within the lysines of the protein, a substructure is created including
+          all atoms within a cutoff distance
+        - The cutoff distance is set at 6A currently as this was the minimum distance needed for all
+          information and agrees with pkaANI cutoff set
+        - The AEV is a vector with length 1008 representing the environment for the lysine
 
-        Returns
-        -------
-        df_aevs : dataframe
-            Dataframe with information on chain, residue number and AEV output. Outline:
-            Chain   Resid   aev
-            x       x       [x]
+        :param path: The path of the pdb file that the AEVs are being calculated for.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and AEV output. Outline::
 
-        Example
-        -------
-        >> print(calculate_aevs(1ubq.pdb))
-        Chain Resid                                                aev
-        0     A     6  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
-        1     A    11  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
-        2     A    27  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
-        3     A    29  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
-        4     A    33  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
-        5     A    48  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
-        6     A    63  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+                Chain   Resid   aev
+                x       x       [x]
+        :rtype: pandas.DataFrame
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate_aevs(1ubq.pdb))
+            Chain Resid                                                aev
+            0     A     6  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+            1     A    11  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+            2     A    27  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+            3     A    29  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+            4     A    33  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+            5     A    48  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
+            6     A    63  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ...
         '''
 
         self._ensure_aev_model()

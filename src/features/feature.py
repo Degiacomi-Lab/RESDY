@@ -6,8 +6,8 @@ from src.features.error_reporting import report_error_to_file
 
 class Feature():
     '''
-    Example class for adding your own features into the codebase. To allow the measuring parent script
-    to pick it up, please enure that the class name if the same as the filename.
+    Example class for adding your own features into the codebase. To allow the measuring parent
+    script to pick it up, please ensure that the class name is the same as the filename.
     '''
 
     def __init__(self, include_modified=False,
@@ -17,21 +17,21 @@ class Feature():
                                   'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the feauture class here, note custom variables will not be taken through
-        to the measurements unless defined as default
+        Initialise the feature class here, note custom variables will not be taken through to the
+        measurements unless defined as default
 
-        Parameters
-        ----------
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -43,17 +43,14 @@ class Feature():
         '''
         Calculate the feature
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
+        :param path: The path of the pdb file that the feature is being calculated for.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and feature output. Outline::
 
-        Returns
-        -------
-        df_feature : dataframe
-            Dataframe with information on chain, residue number and feature output. Outline:
-            Chain   Resid   das
-            x       x       x
+                Chain   Resid   feature
+                x       x       x
+        :rtype: pandas.DataFrame
         '''
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this

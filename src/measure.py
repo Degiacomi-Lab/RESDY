@@ -56,8 +56,8 @@ except Exception as e:
 
 class Measure(object):
     '''
-    Class to handle functions used in calling feature functions and managing how these are
-    called and return a dataframe which contains the results after.
+    Class to handle functions used in calling feature functions and managing how these are called
+    and return a dataframe which contains the results after.
     '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
@@ -68,43 +68,44 @@ class Measure(object):
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
 
-        Parameters
-        ----------
-        df_input -> dataframe
-            The input dataframe containing information on the structures over which the measurements
-            will be done. This is usually the output given from the curation steps (pdb.df).
-            The format of this file depends on if running PDB_only or not. If running PDB only you
-            you will just need to give one column which is a list of paths to the pdb files. If
-            running fully the dataframe will contain columns of 'Uniprot_Entry', 'PDB_Code',
-            'Method', 'Resolution', 'Chains'
-        outdir -> string
-            The name of the directory where the measurement output will be written to.
-        activate_log -> bool
-            By default a log is produced for the measurements, the option here enables a more
-            detailed log of the measurements work for debugging.
-        log_path -> string
-            The name of the output file which contains the log of the measurements.
+        :param df_input: The input dataframe containing information on the structures over which the
+            measurements will be done. This is usually the output given from the curation steps
+            (pdb.df). The format of this file depends on if running PDB_only or not. If running PDB
+            only you will just need to give one column which is a list of paths to the pdb
+            files. If running fully the dataframe will contain columns of 'Uniprot_Entry',
+            'PDB_Code', 'Method', 'Resolution', 'Chains'
+        :type df_input: pandas.DataFrame
+        :param outdir: The name of the directory where the measurement output will be written to.
+        :type outdir: str
+        :param activate_log: By default a log is produced for the measurements, the option here
+            enables a more detailed log of the measurements work for debugging.
+        :type activate_log: bool
+        :param log_path: The name of the output file which contains the log of the measurements.
             This file can be used to create the measurement csv file through using the
             recover_from_log() function.
-        features -> list
-            The list of measurements that you wish to use on the given structures. Select which
-            of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth', 'aev',
-            'das', 'seqcharge', 'melodia', 'frustration', 'density', 'legolas', 'writhing',
-            'curvature', 'torsion', 'arc_length', 'phi', 'psi'
-        residue_of_interest -> string
-            3 letter code of the residue to measure features over
-        parallel -> bool
-            Option to run the measurements in parallel.
-        include_modified -> bool
-            Option to include lysines that have been seen to be modified in the measurements
-            analysis. If False, only lysines of type 'LYS' will be included in the measurements.
-            If True, lysines of types 'LYE' will be included in the measurements as well as all
-            'LYS' residues. In either case, a column will be included stating if the measured
-            residue is a modified one.
-        report_errors -> bool
-            Option to record any of the protein files which are giving errors when measures
-            calculations are being performed. This will write the file and the error to a separate
-            text document labelled "measures_errors_{date}.txt".
+        :type log_path: str
+        :param features: The list of measurements that you wish to use on the given structures.
+            Select which of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth',
+            'aev', 'aev_legolas', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
+            'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'frustration',
+            'density', 'evolution', 'rmsf'. Any class defined in a script added to the features
+            folder can also be requested by its class name. 'all' is a shorthand for the preset
+            list defined in _setup_measures().
+        :type features: list
+        :param residue_of_interest: 3 letter code of the residue to measure features over
+        :type residue_of_interest: str
+        :param parallel: Option to run the measurements in parallel.
+        :type parallel: bool
+        :param include_modified: Option to include lysines that have been seen to be modified in the
+            measurements analysis. If False, only lysines of type 'LYS' will be included in the
+            measurements. If True, lysines of types 'LYE' will be included in the measurements as
+            well as all 'LYS' residues. In either case, a column will be included stating if the
+            measured residue is a modified one.
+        :type include_modified: bool
+        :param report_errors: Option to record any of the protein files which are giving errors when
+            measures calculations are being performed. This will write the file and the error to a
+            separate text document labelled "measures_errors_{date}.txt".
+        :type report_errors: bool
         '''
 
         self.activate_log = False
@@ -180,14 +181,13 @@ class Measure(object):
 
     def _setup_measures(self, features_list):
         '''
-        Convert a list of features into a measuring protocol. If ['all'] given as input for
-        the features, this will convert the features list to a list containing all current
-        possible features.
-        
-        Parameters
-        ----------
-        features : list
-            The list of features that are required to measure over the set of proteins
+        Convert a list of features into a measuring protocol. If ['all'] given as input for the
+        features, this will convert the features list to a list containing all current possible
+        features.
+
+        :param features_list: The list of features that are required to measure over the set of
+            proteins
+        :type features_list: list
         '''
         # measures to carry out [label for DataFrame column, and function evaluating a file]
         # functions must return a dataframe [chain, resid, measure]
@@ -351,21 +351,26 @@ class Measure(object):
 
     def _match_resid_codes(self, res_code):
         '''
-        Adding in the function required for the codebase to have the potential to be used
-        with residues other than lysines. Matches up a 3 letter code given as input to
-        measures to a list of all the 3 letter codes associated for the non-modified
-        amino acid (eg different charged states) and modified codes for
-        self.include_modified options. If a rogue 3 letter code is given, it defaults to
-        carbamylation data.
-        potential TODO change this to not default to carbamylation work and stop codebase instead
-        TODO GW 23/07/26 - add in checking for which residue is being taken through to measurements to check which programmes can actually be run
-        PROPKA - ASP, GLU, HIS, CYS, TYR, LYS, ARG
-        pkaANI - ASP, GLU, HIS, TYR, LYS
-        
-        Parameters
-        ----------
-        res_code -> string
-            3 letter code of the residue to match up other 3 letter codes for
+        Adding in the function required for the codebase to have the potential to be used with
+        residues other than lysines. Matches up a 3 letter code given as input to measures to a list
+        of all the 3 letter codes associated for the non-modified amino acid (eg different charged
+        states) and modified codes for self.include_modified options. If a rogue 3 letter code is
+        given, it defaults to carbamylation data.
+
+        :param res_code: 3 letter code of the residue to match up other 3 letter codes for
+        :type res_code: str
+
+        .. todo::
+
+           Change this so that it does not default to the carbamylation work, and stops the
+           codebase instead.
+
+        .. todo::
+
+           Add a check on which residue is taken through to the measurements, so that it can be
+           established which programmes can actually be run on it. The residues covered are
+           PROPKA (ASP, GLU, HIS, CYS, TYR, LYS, ARG) and pkaANI (ASP, GLU, HIS, TYR, LYS)
+           (GW, 23/07/26).
         '''
         match res_code:
             case 'LYS':
@@ -427,9 +432,9 @@ class Measure(object):
 
     def _setup_report_errors_file(self):
         '''
-        Function to set up the file where errors produced through running the Measure
-        class will be written to such that they are easier to look over after running,
-        rather than trawling through output.
+        Function to set up the file where errors produced through running the Measure class will be
+        written to such that they are easier to look over after running, rather than trawling
+        through output.
         '''
         new_file_name = f'meaures_errors_{date.today()}.txt'
         while os.path.exists(new_file_name):
@@ -445,13 +450,15 @@ class Measure(object):
 
     def measure_data(self):
         '''
-        Determine the appropriate measures function to call based on the combination of
-        running PDB_only and in parallel, reducing the number individual functions that
-        the user will have to call themselves.
+        Determine the appropriate measures function to call based on the combination of running
+        PDB_only and in parallel, reducing the number of individual functions that the user will have
+        to call themselves.
 
-        Example
-        -------
-        M.measure_data()
+        .. rubric:: Example
+
+        ::
+
+            M.measure_data()
         '''
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
@@ -473,14 +480,16 @@ class Measure(object):
 
     def restart_measure_data(self):
         '''
-        Determine the appropriate measures function to call based on the combination of
-        running PDB_only and in parallel, reducing the number individual functions that
-        the user will have to call themselves. Different to measure_data() as this will
-        restart the measurements from final previous point rather than starting again.
+        Determine the appropriate measures function to call based on the combination of running
+        PDB_only and in parallel, reducing the number of individual functions that the user will have
+        to call themselves. Different to measure_data() as this will restart the measurements from
+        final previous point rather than starting again.
 
-        Example
-        -------
-        M.restart_measure_data()
+        .. rubric:: Example
+
+        ::
+
+            M.restart_measure_data()
         '''
         match (self.PDB_only, self.parallel):
             case (False, False) | (False, True):
@@ -500,20 +509,21 @@ class Measure(object):
         '''
         Helper function to remove redundant code writing errors in the measurements to the
         measurement error log file.
-        
-        Parameters
-        ----------
-        measurement_stage -> string
-            The stage of measurements that has caused the error with the file, eg propka 1
-        path -> string
-            The path of the pdb file that the measurement has been attempted on
-        error -> string
-            The error that has been produced at that step of the measurement when it has been
-            attempted to extract features from the pdb file
-        
-        Example
-        -------
-        self._report_error_to_file('propka 1', path, e)
+
+        :param measurement_stage: The stage of measurements that has caused the error with the file,
+            eg propka 1
+        :type measurement_stage: str
+        :param path: The path of the pdb file that the measurement has been attempted on
+        :type path: str
+        :param error: The error that has been produced at that step of the measurement when it has
+            been attempted to extract features from the pdb file
+        :type error: str
+
+        .. rubric:: Example
+
+        ::
+
+            self._report_error_to_file('propka 1', path, e)
         '''
         with open(self.error_filename, 'a', encoding='utf-8') as e_f:
             e_f.writelines('--------------------------------------------------------------------------\n')
@@ -525,18 +535,18 @@ class Measure(object):
     def save_state(self, outname="measures.csv"):
         '''
         Function saves a csv file of all of the measurements calculated through measure_dataframe()
-        File automatically saved in the output directory that has been set
-        previously when setting up the measures class
-        Option to customise the name of the output file through outname parameter
+        File automatically saved in the output directory that has been set previously when setting
+        up the measures class Option to customise the name of the output file through outname
+        parameter
 
-        Parameters
-        ----------
-        outname : string
-            the name of the csv file that the output is written to
+        :param outname: the name of the csv file that the output is written to
+        :type outname: str
 
-        Example
-        -------
-        M.save_state(outname='measures.csv')
+        .. rubric:: Example
+
+        ::
+
+            M.save_state(outname='measures.csv')
         '''
         # sort by uniprot code to give order to output after parallel run
         if not self.PDB_only:
@@ -546,21 +556,23 @@ class Measure(object):
 
     def measure_dataframe(self):
         '''
-        Function to measure specified features for all the structure files curated earlier
-        in the programme. Will take a list of the required proteins, finds associated curated
-        structures and runs the required measurement functions. Results are saved to memory
-        and a log file produced at the same time. (M.save_state() can be used to save the data
-        to a csv). This either runs in series of parallel based on the setting of parallel in
-        the measure class initialisation.
+        Function to measure specified features for all the structure files curated earlier in the
+        programme. Will take a list of the required proteins, finds associated curated structures
+        and runs the required measurement functions. Results are saved to memory and a log file
+        produced at the same time. (M.save_state() can be used to save the data to a csv). This
+        either runs in series or in parallel based on the setting of parallel in the measure class
+        initialisation.
 
-        Method
-        ------
-        Create list of files that have been curated into the self.outdir directory.
-        Iterate over the list of the files, check if structure file is
+        .. rubric:: Method
 
-        Example
-        -------
-        >> M.measure_dataframe()
+        Create list of files that have been curated into the self.outdir directory. Iterate over the
+        list of the files, check if structure file is
+
+        .. rubric:: Example
+
+        ::
+
+            >>> M.measure_dataframe()
         '''
         if self.PDB_only:
             return 'Call PDB_only method instead'
@@ -635,29 +647,28 @@ class Measure(object):
 
     def _measure_file(self, file_details, lock):
         '''
-        Take a file and calculate the required measurements for this.
-        Return the dataframe of the calculations to the overall self.df
+        Take a file and calculate the required measurements for this. Return the dataframe of the
+        calculations to the overall self.df
 
-        Method
-        ------
-        Take the given information about the file and through the given file_list,
-        find the files to analyse. Through the structure, identify all lysines and
-        create a temporary dataframe for the results. Iterate over the required measurements
-        (self.measures) and insert results into the temporary dataframe. Append temporary
-        dataframe to main dataframe.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        file_details : list
-            list of details for the file that has been selected to be calculated
-            takes the form of [uniprot_code, pdb_code, method, res, chains]
-        
-        lock : multiprocessing manager lock
-            lock used to stop processes writing to output files and dataframes at the same time
+        Take the given information about the file and through the given file_list, find the files to
+        analyse. Through the structure, identify all lysines and create a temporary dataframe for
+        the results. Iterate over the required measurements (self.measures) and insert results into
+        the temporary dataframe. Append temporary dataframe to main dataframe.
 
-        Example
-        -------
-        self._measure_file(file_details, files_list)
+        :param file_details: list of details for the file that has been selected to be calculated,
+            taking the form of [uniprot_code, pdb_code, method, res, chains]
+        :type file_details: list
+        :param lock: lock used to stop processes writing to output files and dataframes at the same
+            time
+        :type lock: multiprocessing manager lock
+
+        .. rubric:: Example
+
+        ::
+
+            self._measure_file(file_details, files_list)
         '''
         uniprot_code, pdb_code, method, res, chains = file_details
 
@@ -770,27 +781,24 @@ class Measure(object):
         '''
         Take the log file produced through running measure_dataframe() and convert this to a csv
 
-        Method
-        ------
-        Read in the log file (measure_log.txt)
-        Work out the columns from the header
-        If the headers can't be worked out, ask for input to match up columns
-        Read in data
-        Sets self.df to be the data output recovered from the log file.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        log_path : string
-            the file name for the log file to convert
+        - Read in the log file (measure_log.txt)
+        - Work out the columns from the header
+        - If the headers can't be worked out, ask for input to match up columns
+        - Read in data
+        - Sets self.df to be the data output recovered from the log file.
 
-        Returns
-        -------
-        log_to_df : dataframe
-            Dataframe containing all the measurements that were in the given log file
+        :param log_path: the file name for the log file to convert
+        :type log_path: str
+        :returns: Dataframe containing all the measurements that were in the given log file
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        M.recover_from_log()
+        .. rubric:: Example
+
+        ::
+
+            M.recover_from_log()
         '''
         if self.PDB_only:
             return 'Function not callable.'
@@ -874,26 +882,26 @@ class Measure(object):
 
     def restart_measure(self, log_path='measure_log.txt'):
         '''
-        A function to restart the measurements calculations
-        Useful if the initial run of the measurements crashes or gets stuck
-        Works out how far along the simulation was by running an analysis of the measures log file
+        A function to restart the measurements calculations Useful if the initial run of the
+        measurements crashes or gets stuck Works out how far along the simulation was by running an
+        analysis of the measures log file
 
-        Method
-        ------
-        Read over the measures log file and collate a list of files that have been analysed
-        Remove the final value from the list as this may not have been done properly
-        Remove completed files from files to do
-        Restart measure_dataframe() with the new list
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        log_path : string
-            The name of the measures log file
-            By default takes the name 'measures_log.txt'
+        - Read over the measures log file and collate a list of files that have been analysed
+        - Remove the final value from the list as this may not have been done properly
+        - Remove completed files from files to do
+        - Restart measure_dataframe() with the new list
 
-        Example
-        -------
-        >> M.restart_measure()
+        :param log_path: The name of the measures log file By default takes the name
+            'measures_log.txt'
+        :type log_path: str
+
+        .. rubric:: Example
+
+        ::
+
+            >>> M.restart_measure()
         '''
 
         if self.PDB_only:
@@ -927,23 +935,23 @@ class Measure(object):
 
     def _combine_dataframes(self, target, to_merge, col_name):
         '''
-        Function to combine the dataframe produced by a measurement function into the
-        main dataframe containing all the measurements.
-        target is a DataFrame to be filled with data, to_merge contains the data.
-        Values to insert are indexed in both array by two columns: Chain and Resid.
+        Function to combine the dataframe produced by a measurement function into the main dataframe
+        containing all the measurements. target is a DataFrame to be filled with data, to_merge
+        contains the data. Values to insert are indexed in both array by two columns: Chain and
+        Resid.
 
-        Parameters
-        ----------
-        target : DataFrame
-            DataFrame to be filled with data.
-        to_merge : DataFrame
-            to_merge contains the new data to merge.
-        col_name : string
-            Name of the column which the new data is from.
-        
-        Example
-        -------
-        self._combine_dataframes(df, result, meas[0])
+        :param target: DataFrame to be filled with data.
+        :type target: pandas.DataFrame
+        :param to_merge: to_merge contains the new data to merge.
+        :type to_merge: pandas.DataFrame
+        :param col_name: Name of the column which the new data is from.
+        :type col_name: str
+
+        .. rubric:: Example
+
+        ::
+
+            self._combine_dataframes(df, result, meas[0])
         '''
         to_merge = to_merge.reset_index(drop=True)
         for i, r in target.iterrows():
@@ -986,14 +994,16 @@ class Measure(object):
     def measure_PDB_only(self):
         '''
         Function to measure specified features for a set of pdb files. Takes a list of pdb files,
-        finds associated curated structures and runs the required measurement functions.
-        Results are saved to memory and a log file produced at the same time if required. Timing
-        is kept to updated the predicted time remaining as it goes along.
-        M.save_state() can be used to save the data to a csv.
+        finds associated curated structures and runs the required measurement functions. Results are
+        saved to memory and a log file produced at the same time if required. Timing is kept to
+        update the predicted time remaining as it goes along. M.save_state() can be used to save
+        the data to a csv.
 
-        Example
-        -------
-        >> M.measure_PDB_only()
+        .. rubric:: Example
+
+        ::
+
+            >>> M.measure_PDB_only()
         '''
         if not self.PDB_only:
             print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
@@ -1115,26 +1125,36 @@ class Measure(object):
 
     def restart_measure_pdb_only(self, log_path='measure_log.txt'):
         '''
-        A function to restart the measurements calculations for the PDB only function.
-        Useful if the initial run of the measurements crashes or gets stuck.
-        Works out how far along the simulation was by running an analysis of the measures log file.
+        A function to restart the measurements calculations for the PDB only function. Useful if the
+        initial run of the measurements crashes or gets stuck. Works out how far along the
+        simulation was by running an analysis of the measures log file.
 
-        Method
-        ------
-        Read over the measures log file and collate a list of files that have been analysed.
-        Remove the final value from the list as this may not have been done properly.
-        Remove completed files from files to do.
-        Restart measure_dataframe() with the new list.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        log_path : string
-            The name of the measures log file
-            By default takes the name 'measures_log.txt'
+        - Read over the measures log file and collate a list of files that have been analysed.
+        - Remove the final value from the list as this may not have been done properly.
+        - Remove completed files from files to do.
+        - Restart measure_dataframe() with the new list.
 
-        Example
-        -------
-        >> M.restart_measure_pdb_only()
+        :param log_path: The name of the measures log file By default takes the name
+            'measures_log.txt'
+        :type log_path: str
+
+        .. rubric:: Example
+
+        ::
+
+            >>> M.restart_measure_pdb_only()
+
+        .. todo::
+
+           Use a 'completed' column for everything here, rather than removing the rows from df_input
+           (GW, 16.01.25).
+
+        .. todo::
+
+           Remove the discarded measurement from measures_log.txt. Currently this does not matter much,
+           as the entry is removed with the duplicates later on (GW, 14.01.25).
         '''
 
         if not self.PDB_only:
@@ -1171,9 +1191,6 @@ class Measure(object):
         proteins_completed = [c for c in proteins_completed if c != final_protein]
         proteins_completed = list(set(proteins_completed))
         self.progress_index = len(proteins_completed)
-        # TODO GW 14.01.25 - need to remove this measurement from the measures_log.txt file
-        #                    eventually currently doesn't matter too much as will just be
-        #                    removed with remove duplicates later
 
         # 3. Update df_input to only have the files which haven't been analysed yet
         if 'completed' not in self.df_input.columns:
@@ -1201,8 +1218,6 @@ class Measure(object):
         self.df_input = self.df_input.drop(idx_to_remove)
         new_len_df_input = len(self.df_input)
         lines_df_input_removed = old_len_df_input - new_len_df_input
-        # TODO GW 16.01.25 - updated verison for this will use column of completed for everything here, change over to this rather than removing it from the df_input
-        # 4. Restart the measure_dataframe() with the new file list
         files_left_to_calc = len(self.df_input) - len(self.pdb_only_files_to_ignore)
         print(f'>> {lines_df_input_removed} exact matches in PDB codes removed from the input list that have already been calculated.')
         print(f'>> {len(self.pdb_only_files_to_ignore)} files to ignore in measurements that have already been calculated.')
@@ -1214,27 +1229,24 @@ class Measure(object):
         '''
         Take the log file produced through running measure_PDB_only() and convert this to a csv
 
-        Method
-        ------
-        Read in the log file (measure_log.txt) or other given name.
-        Work out the columns from the header.
-        If the headers can't be worked out, ask for input to match up columns.
-        Read in data.
-        Sets self.df to be the data output recovered from the log file.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        log_path : string
-            the file name for the log file to convert
+        - Read in the log file (measure_log.txt) or other given name.
+        - Work out the columns from the header.
+        - If the headers can't be worked out, ask for input to match up columns.
+        - Read in data.
+        - Sets self.df to be the data output recovered from the log file.
 
-        Returns
-        -------
-        log_to_df : dataframe
-            Dataframe containing all the measurements that were in the given log file
+        :param log_path: the file name for the log file to convert
+        :type log_path: str
+        :returns: Dataframe containing all the measurements that were in the given log file
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        M.recover_from_log_PDB_only()
+        .. rubric:: Example
+
+        ::
+
+            M.recover_from_log_PDB_only()
         '''
         if not self.PDB_only:
             return 'Function not callable.'
@@ -1337,19 +1349,20 @@ class Measure(object):
 
     def _cleanup_calculation_files(self):
         '''
-        Function to remove any temporary or result files created through the calculation
-        of the measurements within this class. While all are meant to have been moved
-        at the time of calculation, occasionally this fails and leaves some behind.
-        Note: please add specific subprocesses if need to add extra cleanup items into
-        this function.
+        Function to remove any temporary or result files created through the calculation of the
+        measurements within this class. While all are meant to have been moved at the time of
+        calculation, occasionally this fails and leaves some behind. Note: please add specific
+        subprocesses if need to add extra cleanup items into this function.
 
-        Method
-        ------
+        .. rubric:: Method
+
         Call subprocess calls to move specific sets of files to a specific directory.
 
-        Example
-        -------
-        >> M._cleanup_calculation_files()
+        .. rubric:: Example
+
+        ::
+
+            >>> M._cleanup_calculation_files()
         '''
         def _mv_files(files, dest):
             '''

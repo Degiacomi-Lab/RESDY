@@ -8,7 +8,7 @@ from src.features.error_reporting import report_error_to_file
 
 class RMSF():
     '''
-    Class to house the code required for calculating RMSF values for curated proteins
+    RMSF values for curated proteins.
     '''
 
     def __init__(self, df_proteins, include_modified = False,
@@ -18,24 +18,24 @@ class RMSF():
                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the Charge class, include any global variables that are required from
-        measures in here.
+        Initialise the RMSF class, include any global variables that are required from measures in
+        here.
 
-        Parameters
-        ----------
-        df_prot : dataframe
-            Dataframe including the information passed into measures from protein about which
-            structures correspond to the uniprot codes. 
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param df_proteins: Dataframe including the information passed into measures from protein
+            about which structures correspond to the uniprot codes.
+        :type df_proteins: pandas.DataFrame
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.df_proteins = df_proteins
         self.include_modified = include_modified
@@ -49,36 +49,38 @@ class RMSF():
 
     def calculate(self, path, align_type='backbone'):
         '''
-        Calculate the root mean square fluctuation of the lysines within the protein
-        over all the structures which have been curated for the Uniprot code. This method
-        uses biobox but doesn't adjust the size of the window used to gain more matches.
+        Calculate the root mean square fluctuation of the lysines within the protein over all the
+        structures which have been curated for the Uniprot code. This method uses biobox but doesn't
+        adjust the size of the window used to gain more matches.
 
-        Method
-        ------
-        Find all structures, loop over structures aligning and calculating deviations,
-        calculate RMSF and return values as dataframe
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
-        align_type : string
-            The type of alignment to perform when calculating the RMSF values. Options:
+        Find all structures, loop over structures aligning and calculating deviations, calculate
+        RMSF and return values as dataframe
+
+        :param path: The path of the pdb file that the RMSF is being calculated for.
+        :type path: str
+        :param align_type: The type of alignment to perform when calculating the RMSF values.
+            Options:
+
             - 'local' - Aligns to backbone of lysine to calculate RMSF value for
             - 'backbone' (DEFAULT) - Aligns to backbone of full structure
+        :type align_type: str
+        :returns:
+            Dataframe with information on chain, residue number and rmsf output.
+            Outline::
 
-        Returns
-        -------
-        df_rmsf : dataframe
-            Dataframe with information on chain, residue number and seqcharge output. Outline:
-            Chain   Resid   rmsf
-            x           x      x
+                Chain   Resid   rmsf
+                x           x      x
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        >> print(self.calculate_rmsf(1M2F-alt-1.pdb))
-            Chain   Resid     rmsf
-        0     A      95       -3
+        .. rubric:: Example
+
+        ::
+
+            >>> print(self.calculate_rmsf(1M2F-alt-1.pdb))
+                Chain   Resid     rmsf
+            0     A      95       -3
         '''
         try:
             # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time

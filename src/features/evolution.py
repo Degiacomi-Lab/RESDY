@@ -17,7 +17,7 @@ except Exception as e:
 
 class Evolution():
     '''
-    Class to house functions for calculating ESM vectors for proteins
+    ESM vectors for proteins.
     '''
 
     def __init__(self, include_modified = False,
@@ -27,24 +27,24 @@ class Evolution():
                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the Charge class, include any global variables that are required from
-        measures in here.
+        Initialise the Evolution class, include any global variables that are required from measures
+        in here.
 
-        Parameters
-        ----------
-        df_prot : dataframe
-            Dataframe including the information passed into measures from protein about which
-            structures correspond to the uniprot codes. 
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param df_prot: Dataframe including the information passed into measures from protein about
+            which structures correspond to the uniprot codes.
+        :type df_prot: pandas.DataFrame
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -90,27 +90,27 @@ class Evolution():
 
     def calculate(self, path, num_add_aa=20):
         '''
-        Calculate the ESM LLM output for subset protein sequences obtained through searching
-        over the path of the protein structure given.
+        Calculate the ESM LLM output for subset protein sequences obtained through searching over
+        the path of the protein structure given.
 
-        Parameters
-        ----------
-        path -> string
-            Path of the pdb file of interest
-        num_add_aa -> int
-            Number of amino acids to go either side of the lysine of interest
-        
-        Example
-        -------
-        >> print(E.calculate_esm('1UBQ-alt-1.pdb', num_add_aa = 20))
-          Chain Resid                                          evolution
-        0     A     6  [-0.027814002707600594, -0.03618992120027542, ...
-        1     A    11  [-0.0581485778093338, 0.01636454090476036, -0....
-        2     A    27  [0.06258092075586319, -0.024953410029411316, -...
-        3     A    29  [0.010486193001270294, 0.03880579397082329, -0...
-        4     A    33  [-0.016549628227949142, 0.061681147664785385, ...
-        5     A    48  [-0.040656737983226776, -0.01545296423137188, ...
-        6     A    63  [-0.05812466889619827, 0.03620311990380287, 0....
+        :param path: Path of the pdb file of interest
+        :type path: str
+        :param num_add_aa: Number of amino acids to go either side of the lysine of interest
+        :type num_add_aa: int
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(E.calculate_esm('1UBQ-alt-1.pdb', num_add_aa = 20))
+              Chain Resid                                          evolution
+            0     A     6  [-0.027814002707600594, -0.03618992120027542, ...
+            1     A    11  [-0.0581485778093338, 0.01636454090476036, -0....
+            2     A    27  [0.06258092075586319, -0.024953410029411316, -...
+            3     A    29  [0.010486193001270294, 0.03880579397082329, -0...
+            4     A    33  [-0.016549628227949142, 0.061681147664785385, ...
+            5     A    48  [-0.040656737983226776, -0.01545296423137188, ...
+            6     A    63  [-0.05812466889619827, 0.03620311990380287, 0....
         '''
 
         if not self.model_loaded:

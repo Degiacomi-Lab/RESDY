@@ -8,10 +8,9 @@ from src.preprocessing import Preprocessing
 
 class Aggregation:
     '''
-    Class to handle the different aggregation methods for sorting over the
-    different measurements that have been calculated. This will take a
-    dataframe of measurements, and return a dataframe with only one set
-    of measurements per lysine residue according to the aggregation method.
+    Class to handle the different aggregation methods for sorting over the different measurements
+    that have been calculated. This will take a dataframe of measurements, and return a dataframe
+    with only one set of measurements per lysine residue according to the aggregation method.
     '''
 
     def __init__(self, df_measurements, aggregation_method='minmax',
@@ -20,46 +19,49 @@ class Aggregation:
         '''
         Initialisation of the Aggregation class.
 
-        Parameters
-        ----------
-        df_measurements : DataFrame
-            The dataframe of measurements which need to be aggregated for use
-        aggregation_method : str
-            The aggregation method chosen to reduce the measurements into a usable format
-            for training on. Options are:
+        :param df_measurements: The dataframe of measurements which need to be aggregated for use
+        :type df_measurements: pandas.DataFrame
+        :param aggregation_method: The aggregation method chosen to reduce the measurements into a
+            usable format for training on. Options are:
+
             - 'avg': Take the average of all measurements for each lysine
             - 'random': Take a random measurement out of all measurements for the lysine
             - 'max': Take the maximum value of each feature for the lysine
             - 'min': Take the minimum value of each feature for the lysine
             - 'median': Take the median value of each feature for the lysine
-            - 'average subtract aev': Take the average of all aev features except the aevs WHAT IS USED HERE
+            - 'average subtract aev': Take the average of all aev features except the aevs WHAT
+              IS USED HERE
             - 'mixmatch': Takes the predicted metric which will work best for each feature. The
-                          max is used for features where a high value is likely to be important
-                          and min for features where less of it is required.
+              max is used for features where a high value is likely to be important and min for
+              features where less of it is required.
             - 'minmax': Takes both the min and max values of each feature which duplicates the
-                        the feature space allowing the model to use both as needed (default)
-            - 'minmaxavg': Takes the min, max and average of each feature, tripling feature space
-            - 'all': Takes all potential statistical features that have been coded to be calculated
+              feature space allowing the model to use both as needed (default)
+            - 'minmaxavg': Takes the min, max and average of each feature, tripling feature
+              space
+            - 'all': Takes all potential statistical features that have been coded to be
+              calculated
             - 'choose': Allows the user to choose which statistic for the feature they want
-        features_to_include : list, optional
-            The list of features that are to be included in the aggregation. The default
-            for this is taken to be all of them.
-        aev_red_method : string, optional
-            The dimensionality reduction method for reducing the size of the AEVs, reducing
-            clouding. PCA is taken as default for this. Options:
-            - 'PCA': Create a PCA which represents 99% of the variance of the data and use
-                     these new vectors to represent the AEVs instead.
+        :type aggregation_method: str
+        :param features_to_include: The list of features that are to be included in the aggregation.
+            The default for this is taken to be all of them.
+        :type features_to_include: list, optional
+        :param aev_red_method: The dimensionality reduction method for reducing the size of the
+            AEVs, reducing clouding. PCA is taken as default for this. Options:
+
+            - 'PCA': Create a PCA which represents 99% of the variance of the data and use these
+              new vectors to represent the AEVs instead.
             - 'sd': Take the standard deviation of all the AEV columns and work out which the
-                    top n are taken through for use
-            - 'vif': Uses variance inflation factors to calculate the decorrelation between
-                     the different columns of the AEV. Only takes through the features which
-                     are shown to not be correlated.
+              top n are taken through for use
+            - 'vif': Uses variance inflation factors to calculate the decorrelation between the
+              different columns of the AEV. Only takes through the features which are shown to
+              not be correlated.
             - 'autoencoder': Uses an autoencoder to reduce the dimensions, better for non-linear
-                             data.
+              data.
             - 'null': Removes all the null columns from the AEV
-        num_sd_aev_features : int, optional
-            The number of features to keep from the aevs when the standard deviation method is
-            used. Defualt is set to 100.
+        :type aev_red_method: str, optional
+        :param num_sd_aev_features: The number of features to keep from the aevs when the standard
+            deviation method is used. Default is set to 100.
+        :type num_sd_aev_features: int, optional
         '''
         # Note: current preference for using aev_legolas as easier to obtain - change here if necessary
         self.df_measurements = df_measurements
@@ -112,15 +114,17 @@ class Aggregation:
     def aggregate_data(self):
         '''
         Match aggregation type up to the relevant aggregation function
-        
-        Method
-        ------
-        Uses the input parameter of aggregation_method and calls the relevant function.
-        If no cases match, assumes average and prints to terminal to state this.
-        
-        Example
-        -------
-        >> self.aggregate_data()
+
+        .. rubric:: Method
+
+        Uses the input parameter of aggregation_method and calls the relevant function. If no cases
+        match, assumes average and prints to terminal to state this.
+
+        .. rubric:: Example
+
+        ::
+
+            >>> self.aggregate_data()
         '''
         bad_feature_sets = [('depth', 0, 20)]  # add to as more confinements on features needed
         for bad_feat, feat_low, feat_up in bad_feature_sets:
@@ -165,14 +169,12 @@ class Aggregation:
         '''
         Easy function for removing bad rows of data from the aggregated data
 
-        Parameters
-        ----------
-        feature -> string
-            The feature to investigate bad values for
-        lower -> float
-            The lower bound of bad values to accept
-        upper -> float
-            The upper bound of bad values to accept
+        :param feature: The feature to investigate bad values for
+        :type feature: str
+        :param lower: The lower bound of bad values to accept
+        :type lower: float
+        :param upper: The upper bound of bad values to accept
+        :type upper: float
         '''
         df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) | (self.df_measurements[feature] > upper)]
         #self.df_measurements[feature] = self.df_measurements[feature].where(self.df_measurements[feature].between(lower, upper))  # sets out of bounds entries to NaN
@@ -183,15 +185,21 @@ class Aggregation:
 
     def _reduce_aev_dimensions(self):
         '''
-        Due to curse of dimensionality the model performs worse when the AEVs are clouding the
-        data as it cannot work out which features are actually important. Therefore, this function
-        will call the required method to reduce the AEVs down to a specified number of features
-        depending on the method chosen. Method options:
+        Due to curse of dimensionality the model performs worse when the AEVs are clouding the data
+        as it cannot work out which features are actually important. Therefore, this function will
+        call the required method to reduce the AEVs down to a specified number of features depending
+        on the method chosen. Method options:
+
         - 'pca': Principal Component Analysis taking 99% of the variance within the data
         - 'sd': Standard Deviation of the AEV
-        - 'vif': Variance Inflation Factor Correlation analysis to remove features which are correlated
+        - 'vif': Variance Inflation Factor Correlation analysis to remove features which are
+          correlated
         - 'autoencoder': Autoencoder dimension reduction method, try and capture any non-linearity
         - 'null': Remove all the columns within the AEVs which are always zero
+
+        .. todo::
+
+           Implement the 'autoencoder' reduction method: the branch is currently empty (GW, 21.08.25).
         '''
         if 'aev' in self.features_to_include:
             df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.df_measurements['aev']]))
@@ -207,7 +215,6 @@ class Aggregation:
                     self._prepare_vif_aev()
                 case 'autoencoder':
                     i = 1
-                    # TODO: implement the autoencoder method here 21.08.25
                 case 'null':
                     self._cut_null_aev_columns()
                 case _:
@@ -224,21 +231,22 @@ class Aggregation:
     def _prepare_aev_sd(self):
         '''
         Model performs worse when more of the features of the AEV are taken through to training.
-        Reduce the AEVs down to the required number of features based on one of the methods
-        chosen below. The first method is to use the standard deviation of the individual features
-        of the AEV to workout which features show variation and will be likely to be good choices
-        to take through to the model. This is currently setup to find the top 100 from the base
-        aevs fed in.
-        
-        Method
-        ------
-        Take the dataframe and perform a standard deviation over the AEVs, take the top
-        required number of structures in terms of standard deviation as the new input
-        dataframe going forward. 
-        
-        Example
-        -------
-        >> self.reduce_aevs()
+        Reduce the AEVs down to the required number of features based on one of the methods chosen
+        below. The first method is to use the standard deviation of the individual features of the
+        AEV to work out which features show variation and will be likely to be good choices to take
+        through to the model. This is currently setup to find the top 100 from the base aevs fed in.
+
+        .. rubric:: Method
+
+        Take the dataframe and perform a standard deviation over the AEVs, take the top required
+        number of structures in terms of standard deviation as the new input dataframe going
+        forward.
+
+        .. rubric:: Example
+
+        ::
+
+            >>> self.reduce_aevs()
         '''
         print('>> Reducing AEV dimensions with standard deviation...')
         aev_stds = {}
@@ -258,8 +266,8 @@ class Aggregation:
 
     def _cut_null_aev_columns(self):
         '''
-        Function takes all the AEV columns and removes any that are always null which would
-        add nothing to the model except noise.
+        Function takes all the AEV columns and removes any that are always null which would add
+        nothing to the model except noise.
         '''
         print('>> Removing null AEV columns...')
         initial_num_cols = len(self.df_measurements.columns)
@@ -272,20 +280,22 @@ class Aggregation:
 
     def _prepare_vif_aev(self):
         '''
-        Use the preprocessing module to calculate the variance inflation factor values
-        for each of the columns within the AEVs and remove the columns which are highly
-        correlated together such that it is the minimum number of columns without
-        correlation. Non-correlation was taken to be a VIF value of less than 5.
-        
-        Method
-        ------
-        Take the dataframe of columns of the AEV and plug this into the preprocessing
-        module to calculate the VIF values for each of these. This will return a list
-        of de-correlated columns which can be used to cut down the dataframe.
+        Use the preprocessing module to calculate the variance inflation factor values for each of
+        the columns within the AEVs and remove the columns which are highly correlated together such
+        that it is the minimum number of columns without correlation. Non-correlation was taken to
+        be a VIF value of less than 5.
 
-        Example
-        -------
-        >> self._prepare_vif_aev()
+        .. rubric:: Method
+
+        Take the dataframe of columns of the AEV and plug this into the preprocessing module to
+        calculate the VIF values for each of these. This will return a list of de-correlated columns
+        which can be used to cut down the dataframe.
+
+        .. rubric:: Example
+
+        ::
+
+            >>> self._prepare_vif_aev()
         '''
         '''
         # this columns_to_keep is the original set calculated with the original AEVs over the negative dataset
@@ -309,9 +319,8 @@ class Aggregation:
 
     def _prepare_pca(self):
         '''
-        Short function to transform the AEV data using PCA to reduce the dimensions.
-        Changes the data in self.X_all ready for the aggregation to actually reduce
-        the dataset for training on
+        Short function to transform the AEV data using PCA to reduce the dimensions. Changes the
+        data in self.X_all ready for the aggregation to actually reduce the dataset for training on
         '''
         print('>> Calculating PCA on AEV data...')
         n_components = 0.99
@@ -333,9 +342,9 @@ class Aggregation:
 
     def _calculate_statistics(self):
         '''
-        Function for creating a dataframe which includes all the potential statistics which
-        could then be used for aggregation later on. This can then be shortened as desired
-        based on which method of aggregation is required for this.
+        Function for creating a dataframe which includes all the potential statistics which could
+        then be used for aggregation later on. This can then be shortened as desired based on which
+        method of aggregation is required for this.
         '''
         print('>> Calculating statistics for measurements data provided...')
         if 'class' not in self.df_measurements.columns:
@@ -396,7 +405,7 @@ class Aggregation:
 
     def _aggregate_choose(self, df_stats):
         '''
-        Choose method of aggregation allowing the user to choose the statistics they require 
+        Choose method of aggregation allowing the user to choose the statistics they require
         '''
         max_features = []; min_features = []; med_features = []; avg_features = []; sd_features = []; range_features = []; rand_features = []
         print('>> For the following list of features, please choosen which statistics you would like to include in the aggregation')
@@ -450,8 +459,8 @@ class Aggregation:
 
     def _aggregate_avg_less_avgaev(self):
         '''
-            Create an aggregate of the AEVs whilst subtracting an average AEV of a general lysine to the
-            changes employed from this. 
+        Create an aggregate of the AEVs whilst subtracting an average AEV of a general lysine to the
+        changes employed from this.
         '''
 
         seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
@@ -491,14 +500,14 @@ class Aggregation:
         '''
         Function saves a copy of the aggregated dataframe to a csv
 
-        Parameters
-        ----------
-        outname : string
-            the name of the csv file that the output is written to
+        :param outname: the name of the csv file that the output is written to
+        :type outname: str
 
-        Example
-        -------
-        agg.save_state(outname='measures_aggregated.csv')
+        .. rubric:: Example
+
+        ::
+
+            agg.save_state(outname='measures_aggregated.csv')
         '''
         self.df_agg.to_csv(outname, index_label=False, index=False)
 

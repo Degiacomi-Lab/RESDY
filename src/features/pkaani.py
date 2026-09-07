@@ -7,7 +7,7 @@ from src.features.error_reporting import report_error_to_file
 
 class PKAANI():
     '''
-    Class to house the different methods for calculating pKa values for structures
+    pKa values for structures, calculated with pKaANI.
     '''
 
     def __init__(self, outdir, calc_method='propka', include_modified=False,
@@ -20,21 +20,21 @@ class PKAANI():
         Setup the PKA class as required. Take input on which method to use and if to include
         modified structures.
 
-        Parameters
-        ----------
-        outdir : string
-            The output directory of the measures calculations. Needed to create the
+        :param outdir: The output directory of the measures calculations. Needed to create the
             propkaoutput directory to store the output files from the PROPKA calculations.
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :type outdir: str
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -48,35 +48,34 @@ class PKAANI():
         A second method for calculating the pKa of the NZ atom of the lysines within the protein
         structure, this time using the external program, pKaANI.
 
-        Method
-        ------
+        .. rubric:: Method
+
         Call a subprocess to open the pkaani program with the desired pdb file given through path.
-        Find the log file produced from running this and search this to find the values produced
-        for LYS. Translate the data found within the log file to the dataframe to be returned.
+        Find the log file produced from running this and search this to find the values produced for
+        LYS. Translate the data found within the log file to the dataframe to be returned.
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that pKa is being calculated for with pKaANI.
+        :param path: The path of the pdb file that pKa is being calculated for with pKaANI.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and pkaani output. Outline::
 
-        Returns
-        -------
-        df_pkaani : dataframe
-            Dataframe with information on chain, residue number and pkaani output. Outline:
-            Chain   Resid   pkaani
-            x       x       x
+                Chain   Resid   pkaani
+                x       x       x
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        >> print(calculate_pkaani(1ubq.pdb))
-          Chain  Resid pkaani
-        0     A      6      x
-        1     A     11      x
-        2     A     27      x
-        3     A     29      x
-        4     A     33      x
-        5     A     48      x
-        6     A     63      x
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate_pkaani(1ubq.pdb))
+              Chain  Resid pkaani
+            0     A      6      x
+            1     A     11      x
+            2     A     27      x
+            3     A     29      x
+            4     A     33      x
+            5     A     48      x
+            6     A     63      x
         '''
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]

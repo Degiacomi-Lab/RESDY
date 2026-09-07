@@ -17,7 +17,7 @@ except Exception as e:
 
 class NMR():
     '''
-    Class to house the different methods for calculating 15N nmr values for structures
+    15N NMR values for structures.
     '''
 
     def __init__(self, outdir, legolas_aevs=False, include_modified=False,
@@ -29,23 +29,23 @@ class NMR():
         '''
         Initialise the NMR class
 
-        Parameters
-        ----------
-        outdir : string
-            The output directory that measurements will be saved to.
-        legolas_aevs : bool
-            Toggle setting to indicate if you want the legolas programme to dump the AEVs from
-            the calculation of the 15N nmr values. Default is False.
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param outdir: The output directory that measurements will be saved to.
+        :type outdir: str
+        :param legolas_aevs: Toggle setting to indicate if you want the legolas programme to dump
+            the AEVs from the calculation of the 15N nmr values. Default is False.
+        :type legolas_aevs: bool
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
 
         self.outdir = outdir
@@ -70,29 +70,29 @@ class NMR():
     def calculate_legolas(self, path):
         '''
         Calculate 15N nmr data using legolas
-        
-        Method
-        ------
-        Use biobox to extract the positions of the lysines within the the protein
-        structure given in the path. Then change directory to the path of legolas
-        and run legolas.py on the desired protein structure.
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that legolas is being calculated for.
-        
-        Example
-        -------
-        >> print(self.calculate_legolas(1ubq.pdb))
-                             PDB_Code   Chain  Resid   legolas
-        0     data/curated/1UBQ-alt-1       A      6   121.614
-        1     data/curated/1UBQ-alt-1       A     11   121.192
-        2     data/curated/1UBQ-alt-1       A     27   118.507
-        3     data/curated/1UBQ-alt-1       A     29   119.557
-        4     data/curated/1UBQ-alt-1       A     33   117.238
-        5     data/curated/1UBQ-alt-1       A     48   119.989
-        6     data/curated/1UBQ-alt-1       A     63   121.946
+        .. rubric:: Method
+
+        Use biobox to extract the positions of the lysines within the protein structure given in
+        the path. Then change directory to the path of legolas and run legolas.py on the desired
+        protein structure.
+
+        :param path: The path of the pdb file that legolas is being calculated for.
+        :type path: str
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(self.calculate_legolas(1ubq.pdb))
+                                 PDB_Code   Chain  Resid   legolas
+            0     data/curated/1UBQ-alt-1       A      6   121.614
+            1     data/curated/1UBQ-alt-1       A     11   121.192
+            2     data/curated/1UBQ-alt-1       A     27   118.507
+            3     data/curated/1UBQ-alt-1       A     29   119.557
+            4     data/curated/1UBQ-alt-1       A     33   117.238
+            5     data/curated/1UBQ-alt-1       A     48   119.989
+            6     data/curated/1UBQ-alt-1       A     63   121.946
         '''
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:

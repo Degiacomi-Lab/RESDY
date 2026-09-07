@@ -11,7 +11,7 @@ from src.features.error_reporting import report_error_to_file
 
 class PROPKA():
     '''
-    Class to house the different methods for calculating pKa values for structures
+    pKa values for structures, calculated with PROPKA3.
     '''
 
     def __init__(self, outdir, include_modified=False,
@@ -24,21 +24,21 @@ class PROPKA():
         Setup the PKA class as required. Take input on which method to use and if to include
         modified structures.
 
-        Parameters
-        ----------
-        outdir : string
-            The output directory of the measures calculations. Needed to create the
+        :param outdir: The output directory of the measures calculations. Needed to create the
             propkaoutput directory to store the output files from the PROPKA calculations.
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :type outdir: str
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -52,39 +52,38 @@ class PROPKA():
 
     def calculate(self, path):
         '''
-        Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data
-        parse errors, and return a dataframe containing all measurements not yielding an error.
-        
-        Method
-        ------
-        Check if propka has been run before on this protein, otherwise run PROPKA3 on the given
-        pdb file. Use the function _parse_propka_errors() to identify any lysines within the
-        structure that did not caclulate correctly before searching the output file, extracting
-        the pka values produced and writing them to df_propka to output.
+        Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data parse
+        errors, and return a dataframe containing all measurements not yielding an error.
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that pKa is being calculated for with PROPKA3.
+        .. rubric:: Method
 
-        Returns
-        -------
-        df_propka : dataframe
-            Dataframe with information on chain, residue number and propka output. Outline:
-            Chain   Resid   propka
-            x       x       x
+        Check if propka has been run before on this protein, otherwise run PROPKA3 on the given pdb
+        file. Use the function _parse_propka_errors() to identify any lysines within the structure
+        that did not calculate correctly before searching the output file, extracting the pka values
+        produced and writing them to df_propka to output.
 
-        Example
-        -------
-        >> print(calculate(1ubq.pdb))
-          Chain  Resid  propka
-        0     A      6       x
-        1     A     11       x
-        2     A     27       x
-        3     A     29       x
-        4     A     33       x
-        5     A     48       x
-        6     A     63       x
+        :param path: The path of the pdb file that pKa is being calculated for with PROPKA3.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and propka output. Outline::
+
+                Chain   Resid   propka
+                x       x       x
+        :rtype: pandas.DataFrame
+
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate(1ubq.pdb))
+              Chain  Resid  propka
+            0     A      6       x
+            1     A     11       x
+            2     A     27       x
+            3     A     29       x
+            4     A     33       x
+            5     A     48       x
+            6     A     63       x
         '''
         if self.include_modified:
             df_mod = pd.DataFrame()
@@ -198,30 +197,28 @@ class PROPKA():
 
     def _parse_propka_errors(self, path):
         '''
-        parse the PROPKA output file and appends unique chain and resid of any lysines
-        mentioned a DataFrame. This list is returned to main and later the residues in it
-        are removed from the df.
-        
-        Method
-        ------
+        Parse the PROPKA output file and append the unique chain and resid of any lysines mentioned in
+        it to a DataFrame. This list is returned to main and later the residues in it are removed
+        from the df.
+
+        .. rubric:: Method
+
         Go over the propka errors output file that is produced when running. Identify the lines
-        which contain information about the lysines within the protein structure analysed that
-        have errors associated with them. Extract the chain and resid number from this and append
-        to a dataframe to return which contains a set of data on the lysines to remove from the
-        read output pka values.
+        which contain information about the lysines within the protein structure analysed that have
+        errors associated with them. Extract the chain and resid number from this and append to a
+        dataframe to return which contains a set of data on the lysines to remove from the read
+        output pka values.
 
-        Parameters
-        ----------
-        path : string
-            The path of the errors output file from the PROPKA analysis of the pdb file of interest.
+        :param path: The path of the errors output file from the PROPKA analysis of the pdb file of
+            interest.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number for lysines with calculation
+            errors. Outline::
 
-        Returns
-        -------
-        dataframe
-            Dataframe with information on chain, residue number for lysines with calculation errors.
-            Outline:
-            Chain   Resid
-            x       x
+                Chain   Resid
+                x       x
+        :rtype: pandas.DataFrame
         '''
         if not os.path.exists(path):
             return []

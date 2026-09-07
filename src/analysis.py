@@ -1,3 +1,23 @@
+'''
+General notes on the work still outstanding in this file. There may be more further down.
+
+.. todo::
+
+   Most of the GO term analysis currently only works for propka and not for pkaani, look into
+   adding this in (GW, 13.09.24).
+
+.. todo::
+
+   Look into the GO term functions and see if these still actually work with all the extra
+   material that has been added in (GW, 13.09.24).
+
+.. todo::
+
+   The dropna function was removed on init, a function that cleans the dataframe at the start is
+   needed instead. All null rows should not be removed indiscriminately, in case they are only
+   null for some measurements and those measurements are not being used (GW, 16.04.25).
+'''
+
 import os
 import re
 import urllib.request
@@ -12,13 +32,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import fisher_exact
 
-#### TODO Section #### - for general todos in this file, may be more further down
-# TODO GW 13.09.24 - most of the GO term analysis currently only works for propka
-#                    not pkaani, look into adding this in
-# TODO GW 13.09.24 - look into the GO term functions and see if these still actually
-#                    work with all the extra stuff added in
-# TODO GW 16.04.25 - removed dropna function on init, need to add in function which cleans the dataframe at the start instead. Dont want to blanket remove all null rows incase only null for some measurements and these arent being used
-
 try:
     from statsmodels.stats.multitest import multipletests
     statsmodel_available = True
@@ -32,17 +45,15 @@ class Analysis(object):
 
     def __init__(self, df, outdir="result", features_to_analyse = []):
         '''
-        Initialise the Analysis class which allows you to create graph and go
-        over other metrics such as GO terms
+        Initialise the Analysis class which allows you to create graph and go over other metrics
+        such as GO terms
 
-        Parameters
-        ----------
-        df -> dataframe
-            Dataframe of measurements to go over the analysis for
-        outdir -> string
-            Name of the directory to write to
-        features_to_analyse -> list
-            List of features which should be analysed over
+        :param df: Dataframe of measurements to go over the analysis for
+        :type df: pandas.DataFrame
+        :param outdir: Name of the directory to write to
+        :type outdir: str
+        :param features_to_analyse: List of features which should be analysed over
+        :type features_to_analyse: list
         '''
         if features_to_analyse == []:
             self.df = df
@@ -209,18 +220,17 @@ class Analysis(object):
 
     def get_outliers(self, uniprot_entry, resid, feature, whis = 1.5):
         '''
-        Extract outliers from a dataset using quartiles based on a given feature
-        and specific uniprot code and resid number.
+        Extract outliers from a dataset using quartiles based on a given feature and specific
+        uniprot code and resid number.
 
-        Parameters
-        ----------
-        uniprot_entry -> string
-            Uniprot code of interest
-        resid -> string
-            Residue number of the uniprot code of interest
-        feature -> string
-            Feature of interest to extract outliers over
-        whis -> float
+        :param uniprot_entry: Uniprot code of interest
+        :type uniprot_entry: str
+        :param resid: Residue number of the uniprot code of interest
+        :type resid: str
+        :param feature: Feature of interest to extract outliers over
+        :type feature: str
+        :param whis:
+        :type whis: float
         '''
         df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
         x = df_query[feature]
@@ -241,7 +251,6 @@ class Analysis(object):
 
     def remove_df(self, df_to_remove):
         '''
-        
         '''
         len_one = len(self.df)
         remove_list = df_to_remove.index.tolist()
@@ -254,22 +263,20 @@ class Analysis(object):
 
     def add_extra_measures(self, extra_measures_filename, write_new_file = False, out_filename='measures_new.csv'):
         '''
-        Function to add in extra measurements to the measures frame that has been
-        autoloaded into the analysis class on defining this. This will match up the
-        measurements in each case and hold in for the analysis. A new measures file
-        will be written with the new filename that has been passed into the function.
+        Function to add in extra measurements to the measures frame that has been autoloaded into
+        the analysis class on defining this. This will match up the measurements in each case and
+        hold in for the analysis. A new measures file will be written with the new filename that has
+        been passed into the function.
 
-        Parameters
-        ----------
-        extra_measures_filename -> string
-            The name of the new measures file written of the combination of both
-            measures dataframe.
-        write_new_file -> bool
-            True/False option for writing a new measures.csv file when the new data
-            has been added in. Auto set to False. 
-        out_filename -> string
-            The name of the new measures.csv file that you want to be produced. Auto
-            set to be measures_new.csv
+        :param extra_measures_filename: The name of the new measures file written of the combination
+            of both measures dataframe.
+        :type extra_measures_filename: str
+        :param write_new_file: True/False option for writing a new measures.csv file when the new
+            data has been added in. Auto set to False.
+        :type write_new_file: bool
+        :param out_filename: The name of the new measures.csv file that you want to be produced.
+            Auto set to be measures_new.csv
+        :type out_filename: str
         '''
 
         # Step 1: read in new dataframe, extract column names, check for overlap and
@@ -348,26 +355,22 @@ class Analysis(object):
 
     def remove_not_important_residues(self, req_resid_table, outname='measures_cut.csv'):
         '''
-        Function to take the input file documenting which residues are required to
-        keep due to being of interest and remove anything from the dataframe that
-        isnt in this list. This is required due to the codebase calculating data
-        for every possible resid in the structure.
+        Function to take the input file documenting which residues are required to keep due to being
+        of interest and remove anything from the dataframe that is not in this list. This is required
+        due to the codebase calculating data for every possible resid in the structure.
 
-        Method
-        ------
-        Extract the list of residues and taking data for these. Goes over the dataframe
-        and extracts any residues which are not present within the required residues.
-        Removes these from the dataframe and then writes a new dataframe with the
-        updated data.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        req_resid_table -> dataframe
-            Dataframe containing all the measured data inputted into the analysis class
-        
-        outname -> string
-            The name of the file to give in output for the new updated measures file.
+        Extract the list of residues and taking data for these. Goes over the dataframe and extracts
+        any residues which are not present within the required residues. Removes these from the
+        dataframe and then writes a new dataframe with the updated data.
+
+        :param req_resid_table: Dataframe containing all the measured data inputted into the
+            analysis class
+        :type req_resid_table: pandas.DataFrame
+        :param outname: The name of the file to give in output for the new updated measures file.
             Auto set to measures_cut.csv
+        :type outname: str
         '''
         print('>> Removing unrequired residues')
         # Remove duplicated data from the measurements
@@ -422,19 +425,18 @@ class Analysis(object):
 
     def relative_best(self, df, weights, features=['depth']):
         '''
-        Function to extract the best relative list of features for all combinations of uniprot
-        entry and residues based on a given list of metrics to do the calculation over and
-        the desired weightings for each of those features.
+        Function to extract the best relative list of features for all combinations of uniprot entry
+        and residues based on a given list of metrics to do the calculation over and the desired
+        weightings for each of those features.
 
-        Parameters
-        ----------
-        df -> dataframe
-            Dataframe of measurements to do the analysis over
-        weights -> list
-            List of floats which sum to 1 of the weights for each of the given features. Length
-            should match the list of features given
-        features -> list
-            List of features that the analyis should extract the relative best values for. 
+        :param df: Dataframe of measurements to do the analysis over
+        :type df: pandas.DataFrame
+        :param weights: List of floats which sum to 1 of the weights for each of the given features.
+            Length should match the list of features given
+        :type weights: list
+        :param features: List of features that the analysis should extract the relative best values
+            for.
+        :type features: list
         '''
         # go over the weights to make sure the values are good and then matches the number of features
         try:

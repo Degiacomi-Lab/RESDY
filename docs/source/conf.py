@@ -12,7 +12,19 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../..'))
+
+# Root of the repository. Needed because the modules import each other through the
+# "src" namespace package (e.g. "from src.helper import ShutUp").
+REPO_ROOT = os.path.abspath('../..')
+
+# The package source itself. Needed because the autodoc directives in the .rst files
+# refer to the modules by their bare name (e.g. "protein.PDB" rather than
+# "src.protein.PDB").
+SRC_DIR = os.path.join(REPO_ROOT, 'src')
+
+for path in (REPO_ROOT, SRC_DIR):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # -- Project information -----------------------------------------------------
 
@@ -39,12 +51,21 @@ extensions = ['sphinx.ext.autodoc',
 ]
 
 autoapi_type = "python"
-autoapi_dirs = [os.path.abspath('../../features')]
+autoapi_dirs = [os.path.join(SRC_DIR, 'features')]
+
+# Internal machinery of the features package: "feature.py" is the template users copy when
+# adding a feature of their own, and "error_reporting.py" is the shared error log writer.
+# Neither is a feature the user can request, so neither belongs on the feature pages.
+autoapi_ignore = ['*/feature.py', '*/error_reporting.py']
 
 # Use our own AutoAPI templates, so that the title and the introductory text of
 # the generated landing page can be edited (see _templates/autoapi/index.rst).
 # Any template not overridden here falls back to the one shipped with autoapi.
 autoapi_template_dir = "_templates/autoapi"
+
+# The docstrings still carry unfinished ".. todo::" notes; render them rather than
+# silently dropping them, so that they stay visible to whoever picks the work up.
+todo_include_todos = True
 
 
 def autoapi_prepare_jinja_env(jinja_env):
@@ -74,7 +95,12 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+#
+# "features" is a package, so AutoAPI generates a page for the package itself
+# carrying nothing but a toctree of its submodules. Dropping it lets the
+# "Feature measurements" landing page (see _templates/autoapi/index.rst) link
+# straight to each feature, rather than through an intermediate list.
+exclude_patterns = ['autoapi/features/index.rst']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -101,7 +127,15 @@ htmlhelp_basename = 'coolpackagedoc'
 add_module_names = False
 autoclass_content = "both"
 
-# Modeller is a licensed package that is not necessarily installed on the
-# machine building the documentation. Mocking it lets autodoc import
-# protein.py, which reaches Modeller through patcher.py.
-autodoc_mock_imports = ["modeller"]
+# Third-party packages that are either licensed (Modeller), optional, or only
+# installed on the machines that run the corresponding feature. Mocking them lets
+# autodoc import every module in src/ without having them present.
+autodoc_mock_imports = [
+    "modeller",
+    "nglview",
+    "torchani",
+    "esm",
+    "melodia_py",
+    "frustratometer",
+    "pkaani",
+]

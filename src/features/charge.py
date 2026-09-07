@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 class Charge():
     '''
-    Class to house the different methods for calculating charge values for structures
+    Charge values for structures.
     '''
 
     def __init__(self, include_modified = False,
@@ -17,21 +17,21 @@ class Charge():
                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the Charge class, include any global variables that are required from
-        measures in here.
+        Initialise the Charge class, include any global variables that are required from measures in
+        here.
 
-        Parameters
-        ----------
-        include_modified -> bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -41,38 +41,44 @@ class Charge():
     
     def calculate(self, path, num_add_aa=10):
         '''
-        Calculate the Sequence Charge of the local sequence around a LYS of interest.
-        This is a single value number representing the summation of the charges of the amino acids
-        over the specified number of amino acids either side of the lysine.
+        Calculate the Sequence Charge of the local sequence around a LYS of interest. This is a
+        single value number representing the summation of the charges of the amino acids over the
+        specified number of amino acids either side of the lysine.
 
-        Method
-        ------
-        Take the PDB file and extract the overall sequence using BioBox. Identify all lysines
-        within the structure and any shift that has taken place in the PDB file compared to
-        the Uniprot sequence. Extract sequences for the lysine of interest and calculate a
-        value for the charge based on the summation of charged residues within the sequence.
+        .. rubric:: Method
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that DAS is being calculated for.
+        Take the PDB file and extract the overall sequence using BioBox. Identify all lysines within
+        the structure and any shift that has taken place in the PDB file compared to the Uniprot
+        sequence. Extract sequences for the lysine of interest and calculate a value for the charge
+        based on the summation of charged residues within the sequence.
 
-        num_add_aa : int
-            The number of amino acids to include either side of the lysine of interest.
-            An optional parameter which is set to 10 by default.
+        :param path: The path of the pdb file that the sequence charge is being calculated for.
+        :type path: str
+        :param num_add_aa: The number of amino acids to include either side of the lysine of
+            interest. An optional parameter which is set to 10 by default.
+        :type num_add_aa: int
+        :returns:
+            Dataframe with information on chain, residue number and seqcharge output.
+            Outline::
 
-        Returns
-        -------
-        df_seqcharge : dataframe
-            Dataframe with information on chain, residue number and seqcharge output. Outline:
-            Chain   Resid   seqcharge
-            x           x           x
+                Chain   Resid   seqcharge
+                x           x           x
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        >> print(self.calculate_seqcharge(1M2F-alt-1.pdb))
-        Chain   Resid  seqcharge
-        0     A      95         -3
+        .. rubric:: Example
+
+        ::
+
+            >>> print(self.calculate_seqcharge(1M2F-alt-1.pdb))
+            Chain   Resid  seqcharge
+            0     A      95         -3
+
+        .. todo::
+
+           Add the ability to use 3 letter codes and their charges rather than the 1 letter codes, which
+           may run into problems when modified residues are used. The change would be to stop converting
+           to the classic 1 letter code sequence, and instead take the list of residues and map the
+           charges onto it to sum (GW, 16.04.25).
         '''
         # 1: Extract the overall sequence for the protein given
         try:
@@ -106,10 +112,6 @@ class Charge():
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
             subset_data = M.data.iloc[c_alpha_idxs]
 
-            # TODO GW 16.04.25 - eventually will need to add in ability to use  letter codes and charges
-            #                    for the 3 letter cases rather than the 1 letter cases which when using
-            #                    modified residues may run into problems
-            # would just change to not convert to classic 1 letter code sequence and take list of residues and map charges onto this to sum
 
             protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
                                     'CYS': 'C', 'GLU': 'E', 'GLN': 'Q', 'GLY': 'G',

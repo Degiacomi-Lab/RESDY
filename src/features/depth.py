@@ -15,7 +15,7 @@ except Exception as e:
 
 class Depth():
     '''
-    Class to house the different methods for calculating depth values for structures
+    Depth values for structures.
     '''
 
     def __init__(self, calculation_type = 'ResidDepth',
@@ -26,25 +26,26 @@ class Depth():
                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the Depth class, include any global variables that are required from
-        measures in here.
+        Initialise the Depth class, include any global variables that are required from measures in
+        here.
 
-        Parameters
-        ----------
-        calculation_type : str
-            Determines the calculation type for depth used. Options are:
+        :param calculation_type: Determines the calculation type for depth used. Options are:
+
             - AtomDepth - Depth of the NZ atom of the lysine in the structure
             - ResidDepth - Depth of the overall lysine in the structure (Default)
-        include_modified : bool
-            Toggle to include residues which have been modified within the featurisation
-        aa_properties -> dict
-            Properties of the amino acid of interest to investigate modification sites for.
-            Defaults to lysine for carbamylation. Properties are the 3 letter codes for
-            non modified ('non_modified_codes') and modified ('modified_codes') and the atom
-            names for non modified ('atom_select_names_nonmod') and modified ('atom_select_names_modified')
-        error_filename : str
-            Name of the text file passed through from overall measures to write any errors from
-            calculating features out to.
+        :type calculation_type: str
+        :param include_modified: Toggle to include residues which have been modified within the
+            featurisation
+        :type include_modified: bool
+        :param aa_properties: Properties of the amino acid of interest to investigate modification
+            sites for. Defaults to lysine for carbamylation. Properties are the 3 letter codes for
+            non modified ('non_modified_codes') and modified ('modified_codes') and the atom names
+            for non modified ('atom_select_names_nonmod') and modified
+            ('atom_select_names_modified')
+        :type aa_properties: dict
+        :param error_filename: Name of the text file passed through from overall measures to write
+            any errors from calculating features out to.
+        :type error_filename: str
         '''
         self.calculation_type = calculation_type
         self.include_modified = include_modified
@@ -59,40 +60,39 @@ class Depth():
 
     def calculate(self, path):
         '''
-        Calculate the depth of the lysine from the surface of the protein within
-        the overall protein structure.
+        Calculate the depth of the lysine from the surface of the protein within the overall protein
+        structure.
 
-        Method
-        ------
-        Identify all NZ atoms within the protein structure through biobox. Use the PDBparser
-        from biopython to calculate the surface of the protein. Loop over the identified positions
-        of all of the NZ atoms and use the residue_depth function contained in biopython
-        to extract the minimum distances from the surface for each of the lysines.
+        .. rubric:: Method
 
+        Identify all NZ atoms within the protein structure through biobox. Use the PDBparser from
+        biopython to calculate the surface of the protein. Loop over the identified positions of all
+        of the NZ atoms and use the residue_depth function contained in biopython to extract the
+        minimum distances from the surface for each of the lysines.
 
-        Parameters
-        ----------
-        path : string
-            The path of the pdb file that the depth of the lysines are being calculated for.
+        :param path: The path of the pdb file that the depth of the lysines are being calculated
+            for.
+        :type path: str
+        :returns:
+            Dataframe with information on chain, residue number and depth output. Outline::
 
-        Returns
-        -------
-        df_depth : dataframe
-            Dataframe with information on chain, residue number and depth output. Outline:
-            Chain   Resid   depth
-            x       x       x
+                Chain   Resid   depth
+                x       x       x
+        :rtype: pandas.DataFrame
 
-        Example
-        -------
-        >> print(calculate_depth(1ubq.pdb))
-        Chain  Resid  depth
-        0     A      6   x
-        1     A     11   x
-        2     A     27   x
-        3     A     29   x
-        4     A     33   x
-        5     A     48   x
-        6     A     63   x
+        .. rubric:: Example
+
+        ::
+
+            >>> print(calculate_depth(1ubq.pdb))
+            Chain  Resid  depth
+            0     A      6   x
+            1     A     11   x
+            2     A     27   x
+            3     A     29   x
+            4     A     33   x
+            5     A     48   x
+            6     A     63   x
         '''
         try:
             M = bb.Molecule()
