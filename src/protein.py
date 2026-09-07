@@ -77,7 +77,6 @@ class PDB(object):
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
             self.df = pd.DataFrame(columns=columns)
 
-        #gap to consider as small enough to justify patching
         self.gap = gap
 
 
@@ -349,7 +348,8 @@ class PDB(object):
                                 except Exception as e:
                                     print_statements.append(f'>> Failed checking structure on previously curated structure with error {str(e)}')
                             print_statements.append(out_print_trap_check.getvalue())
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
+                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': np.NaN}
                     else:
                         data = {'PDB_Code': pdb_code}
 
@@ -362,11 +362,12 @@ class PDB(object):
                 with redirect_stdout(out_print_trap):
                     try:
                         if not self.PDB_only:
-                            self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
-                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained, 'Resolution': resolution, 'Chains': '/'.join(chains)}
+                            largest_gap = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
+                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
+                                    'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
                         else:
-                            self.clean_and_split_pdb(pdb_code)
-                            data = {'PDB_Code': pdb_code}
+                            largest_gap = self.clean_and_split_pdb(pdb_code)
+                            data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
                     except Exception as e:
                         print_statements.append(f'>> Failed clean_and_split_pdb() with error: {str(e)}')
                 print_statements.append(out_print_trap.getvalue())
@@ -418,13 +419,14 @@ class PDB(object):
 
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
         test = False
+        largest_gap = np.NaN
         for cnt, f in enumerate(files):
             mypath = os.path.split(f)[0]
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
 
             try:
 
-                fname = patcher.curate(f, fasta_loc, outdir=self.curated_dir,
+                fname, largest_gap = patcher.curate(f, fasta_loc, outdir=self.curated_dir,
                                        gap=self.gap, include_hetatm=self.include_hetatm)
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
@@ -448,7 +450,7 @@ class PDB(object):
         if not test:
             raise Exception("Patching failed for all conformers")
 
-        return
+        return largest_gap
 
 
     def download_pdb(self, pdb):
@@ -583,8 +585,17 @@ class PDB(object):
         test_KCX = False
 
         res_insertion_codes = []
+        modres_sites = {}
 
         for line in read_file:
+
+            # check for modified residues
+            if line[:6] == 'MODRES':
+                # only add sites which have changed residue code (keeping mod residues with same code the same)
+                if line[12:15] != line[24:27]:
+                    chain = line[16]
+                    res_num = line[18:22].strip()
+                    modres_sites[chain + res_num] = line[24:27]
 
             # check for resid insertion code in position 26
             if not self.include_hetatm:
@@ -632,10 +643,14 @@ class PDB(object):
                 line = line.replace('HETATM', 'ATOM  ')
                 line = line.replace(line[17:20], list_prev_mod_resids[line[21] + line[22:26].strip()])
             elif (line[:4] == 'ATOM' or line[:6] == 'HETATM') and line[17:20].upper() not in standard_resids:
-                aa_num = int(line[22:26].strip())
-                old_mod_aa_code = line[17:20]
+
+                if (line[21] + line[17:20]) not in modres_sites:
+                    continue
                 if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
                     continue
+
+                aa_num = int(line[22:26].strip())
+                old_mod_aa_code = line[17:20]
 
                 if uniprot_code != '':
                     if uniprot_fasta == '':
