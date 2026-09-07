@@ -1,6 +1,6 @@
 Aggregation
 -----------
 
-.. autoclass:: aggregation.Aggregation
+.. autoclass:: coolpackage.aggregation.Aggregation
    :members:
    :private-members:

@@ -1,5 +1,5 @@
 Structure patching
 ------------------
 
-.. automodule:: patcher
+.. automodule:: coolpackage.patcher
    :members:

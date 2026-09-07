@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import biobox as bb
-from src.features.error_reporting import report_error_to_file
+from .error_reporting import report_error_to_file
 
 try:
     from ase import Atoms

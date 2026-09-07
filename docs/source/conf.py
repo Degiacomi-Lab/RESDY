@@ -13,18 +13,15 @@
 import os
 import sys
 
-# Root of the repository. Needed because the modules import each other through the
-# "src" namespace package (e.g. "from src.helper import ShutUp").
+# The package lives in the "src" layout, i.e. "src" is a container rather than a package
+# and "coolpackage" sits inside it. Putting "src" on sys.path lets the documentation build
+# without the package having been installed first; if it has been installed
+# ("pip install -e ."), this line is harmless.
 REPO_ROOT = os.path.abspath('../..')
-
-# The package source itself. Needed because the autodoc directives in the .rst files
-# refer to the modules by their bare name (e.g. "protein.PDB" rather than
-# "src.protein.PDB").
 SRC_DIR = os.path.join(REPO_ROOT, 'src')
 
-for path in (REPO_ROOT, SRC_DIR):
-    if path not in sys.path:
-        sys.path.insert(0, path)
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
 # -- Project information -----------------------------------------------------
 
@@ -51,12 +48,13 @@ extensions = ['sphinx.ext.autodoc',
 ]
 
 autoapi_type = "python"
-autoapi_dirs = [os.path.join(SRC_DIR, 'features')]
+autoapi_dirs = [os.path.join(SRC_DIR, 'coolpackage', 'features')]
 
-# Internal machinery of the features package: "feature.py" is the template users copy when
-# adding a feature of their own, and "error_reporting.py" is the shared error log writer.
-# Neither is a feature the user can request, so neither belongs on the feature pages.
-autoapi_ignore = ['*/feature.py', '*/error_reporting.py']
+# "feature.py" is the template users copy when adding a feature of their own, not a feature
+# the user can request, so it is skipped outright. "error_reporting.py" is skipped further
+# down instead of here: every feature module imports from it, and dropping it at this stage
+# would leave those imports unresolvable.
+autoapi_ignore = ['*/feature.py']
 
 # Use our own AutoAPI templates, so that the title and the introductory text of
 # the generated landing page can be edited (see _templates/autoapi/index.rst).
@@ -96,11 +94,16 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 #
-# "features" is a package, so AutoAPI generates a page for the package itself
-# carrying nothing but a toctree of its submodules. Dropping it lets the
-# "Feature measurements" landing page (see _templates/autoapi/index.rst) link
-# straight to each feature, rather than through an intermediate list.
-exclude_patterns = ['autoapi/features/index.rst']
+# "coolpackage" and "coolpackage.features" are packages, so AutoAPI generates a page for
+# each carrying nothing but a toctree of its submodules. Dropping them lets the
+# "Feature measurements" landing page (see _templates/autoapi/index.rst) link straight to
+# each feature, rather than through two intermediate lists. "error_reporting" is the shared
+# error log writer, internal machinery rather than a feature, so its page goes too.
+exclude_patterns = [
+    'autoapi/coolpackage/index.rst',
+    'autoapi/coolpackage/features/index.rst',
+    'autoapi/coolpackage/features/error_reporting/index.rst',
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -129,7 +132,7 @@ autoclass_content = "both"
 
 # Third-party packages that are either licensed (Modeller), optional, or only
 # installed on the machines that run the corresponding feature. Mocking them lets
-# autodoc import every module in src/ without having them present.
+# autodoc import every module of the package without having them present.
 autodoc_mock_imports = [
     "modeller",
     "nglview",

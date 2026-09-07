@@ -1,7 +1,7 @@
 Analysis
 --------
 
-.. automodule:: analysis
+.. automodule:: coolpackage.analysis
 
-.. autoclass:: analysis.Analysis
+.. autoclass:: coolpackage.analysis.Analysis
    :members:

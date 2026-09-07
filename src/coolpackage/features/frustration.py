@@ -3,7 +3,7 @@ import io
 from contextlib import redirect_stdout
 import pandas as pd
 import biobox as bb
-from src.features.error_reporting import report_error_to_file
+from .error_reporting import report_error_to_file
 
 # Frustration packages
 try:

@@ -3,7 +3,7 @@ from ast import literal_eval
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
-from src.preprocessing import Preprocessing
+from .preprocessing import Preprocessing
 
 
 class Aggregation:

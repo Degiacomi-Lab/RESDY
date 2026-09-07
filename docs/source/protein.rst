@@ -2,9 +2,9 @@
 Protein structure processing
 ----------------------------
 
-.. autoclass:: protein.PDB
+.. autoclass:: coolpackage.protein.PDB
    :members:
 
-.. automodule:: alphafold
+.. automodule:: coolpackage.alphafold
    :members:
 

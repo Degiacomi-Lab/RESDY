@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from src.features.error_reporting import report_error_to_file
+from .error_reporting import report_error_to_file
 
 # Melodia packages
 try:

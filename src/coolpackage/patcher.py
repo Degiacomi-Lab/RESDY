@@ -20,7 +20,7 @@ import pandas as pd
 from modeller import *
 from modeller.automodel import *
 
-from src.helper import ShutUp
+from .helper import ShutUp
 
 
 def autopatch(tmp_folder, fbasename, gap_cutoff=8):

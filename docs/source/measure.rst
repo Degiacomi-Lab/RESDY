@@ -2,5 +2,5 @@
 Measure
 -------
 
-.. autoclass:: measure.Measure
+.. autoclass:: coolpackage.measure.Measure
    :members:

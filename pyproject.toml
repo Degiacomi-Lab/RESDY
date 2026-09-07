@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coolpackage"
+version = "1.0"
+description = "Rapid featurisation of amino acids from collections of protein structures"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "G. Weston" },
+    { name = "M. T. Degiacomi" },
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "requests",
+    "biopython",
+    "biobox",
+]
+
+# Modeller is required by the structure patching step (coolpackage.patcher) but is not
+# installable from PyPI and needs a licence key, so it is not listed above. See the
+# Dependencies section of README.md.
+[project.optional-dependencies]
+analysis = ["statsmodels"]          # VIF decorrelation and GO term enrichment
+notebook = ["jupyter", "ipywidgets", "nglview", "plotly"]
+propka = ["propka"]                 # the 'propka' feature
+docs = ["sphinx", "sphinx-autoapi"]
+
+[project.urls]
+Homepage = "https://github.com/Degiacomi-Lab/carbamylation"
+
+[tool.setuptools.packages.find]
+where = ["src"]
