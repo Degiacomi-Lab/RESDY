@@ -93,7 +93,8 @@ Features denoted in the table below with specific package requirements or progra
         </tr>
         <tr>
             <td>MSMS</td>
-            <td><a href="https://ccsb.scripps.edu/mgltools/">from this website</a></td>
+            <td><a href="https://ccsb.scripps.edu/mgltools/">from this website</a>
+                <a href="https://anaconda.org/channels/conda-forge/packages/msms/overview">anaconda</a></td>
         </tr>
         <tr>
             <td>Solvent Accessible Surface Area<br></td>
@@ -141,7 +142,7 @@ Features denoted in the table below with specific package requirements or progra
             <td rowspan='3'>Frustration, density<br></td>
             <td rowspan='3'>Frustratometer</td>
             <td><a href="https://github.com/HanaJaafari/Frustratometer?tab=readme-ov-file">Frustratometer</a></td>
-            <td><a href="https://github.com/rwmontalvao/Melodia_py">GitHub Repository</a></td>
+            <td><a href="https://github.com/HanaJaafari/Frustratometer">GitHub Repository</a></td>
         </tr>
         <tr>
             <td>openmm</td>

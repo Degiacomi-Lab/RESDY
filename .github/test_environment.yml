@@ -1,0 +1,25 @@
+name: cpn_test
+channels:
+  - conda-forge
+  - salilab
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - biobox
+  - biopython
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - Modeller
+  - propka
+  - ase
+  - pytorch
+  - torchani
+  - openmm
+  - pdbfixer
+  - msms
+  - plotly
+  - pip:
+    - melodia-py==0.1.8

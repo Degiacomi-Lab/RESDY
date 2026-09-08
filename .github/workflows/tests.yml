@@ -1,0 +1,38 @@
+name: Tests
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up conda + mamba
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: cpn_test
+          environment-file: .github/test_environment.yml
+          mamba-version: '*'
+          conda-solver: libmamba
+          channels: conda-forge,salilab,defaults
+          channel-priority: strict
+          auto-update-conda: false
+          remove-profiles: true
+          run-post: true
+      - name: Test
+        run: |
+          cd test
+          python test_uniprot.py
+          python test_protein.py
+          python test_patcher.py
+          python test_alphafold.py
+          python test_helper.py
+          python test_measure.py
+          python test_aggregate.py
+          python test_analysis.py
+          python test_viewer.py

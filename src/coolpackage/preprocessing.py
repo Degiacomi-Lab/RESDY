@@ -1,12 +1,9 @@
-from copy import deepcopy
 from ast import literal_eval
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.spatial.distance import euclidean
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 try:
     from statsmodels.stats.outliers_influence import variance_inflation_factor as VIF
@@ -43,9 +40,12 @@ class Preprocessing:
         self.data = self.df_cleaned[features]
 
         if 'aev' in self.data.columns:
-            self.aev = np.zeros((len(self.df_cleaned), 1008))
-            for i in range(self.n_obs_cleaned):
-                self.aev[i] = np.array(self.df_cleaned['aev'][i].strip("[]").split(","), dtype=float)
+            vects = [np.array(v.strip('[]').split(','), dtype=float) for v in self.df_cleaned['aev']]
+            widths = {len(v) for v in vects}
+            if len(widths) > 1:
+                raise ValueError(f'>> aev column holds vectors of differing widths, can\'t use; widths: {widths}')
+            self.aev = np.vstack(vects) if vects else np.zeros((0, 0))
+
             self.aev = pd.DataFrame(self.aev)
             self.aev = self.aev.loc[:, (self.aev != 0).any(axis=0)]
 

@@ -63,7 +63,7 @@ class Aggregation:
             deviation method is used. Default is set to 100.
         :type num_sd_aev_features: int, optional
         '''
-        # Note: current preference for using aev_legolas as easier to obtain - change here if necessary
+        # Note: current preference is to ignore aev_legolas given aev is more likely to be calculated
         self.df_measurements = df_measurements
         self.aggregation_method = aggregation_method
         self.features_to_include = features_to_include
@@ -71,18 +71,24 @@ class Aggregation:
         self.num_sd_aev_features = num_sd_aev_features
         self.df_agg = pd.DataFrame()
         
-        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method', 'Resolution', 'Resid', 'class']
+        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
+                                 'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
 
         if 'aev_legolas' in self.df_measurements.columns:
             if 'aev' in self.df_measurements.columns:
-                self.df_measurements.drop(columns=['aev'], inplace=True)
-            self.df_measurements.rename(columns={'aev_legolas': 'aev'}, inplace=True)
+                self.df_measurements.drop(columns=['aev_legolas'], inplace=True)
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
             self.features_to_include = [a for a in self.df_measurements.columns if a not in self.non_feature_cols]
 
-        self.lys_key = ['Uniprot_Entry', 'Resid']
+        if 'Uniprot_Entry' in self.df_measurements.columms:
+            self.lys_key = ['Uniprot_Entry', 'Resid']
+        elif 'PDB_Code' in self.df_measurements.columns:
+            self.lys_key = ['Uniprot_Entry', 'Resid']
+        else:
+            return KeyError('>> Measurements dataframe must contain either a Uniprot_Entry or PDB_Code column in measurements file')
+
         data_cols_entered = self.df_measurements.columns.values
         cols_required = [a for a in self.df_measurements.columns if a in self.lys_key + ['PDB_Code', 'class']]
         cols_removed = [f for f in self.features_to_include if f not in data_cols_entered]
@@ -107,9 +113,16 @@ class Aggregation:
                   f'no information, removing from dataframe')
             self.df_measurements = self.df_measurements.drop(columns=always_na_cols, axis=1)
             self.features_to_include = [a for a in self.features_to_include if a not in always_na_cols]
+
+        len_before_df = len(self.df_measurements)
         self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)
+        if len_before_df and self.df_measurements.empty:
+            raise ValueError('>> Every row was removed by the NaN filter. The features with the most missing '
+                             'values are: ' + ', '.join(f'{c} ({n})' for c, n in
+                            sorted(((c, self.df_measurements[c].isna().sum()) for c in self.features_to_include), key=lambda t: -t[1])[:5]))
         print(f'>> Removed {len_df_measures - len(self.df_measurements)} rows from the measurements dataframe which '
               f'contained nan values. New dataframe length is {len(self.df_measurements)}')
+
 
     def aggregate_data(self):
         '''

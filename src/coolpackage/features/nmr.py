@@ -61,11 +61,12 @@ class NMR():
 
         self.legolas_prog = os.environ.get('LEGOLAS_PATH', legolas_path)
         if not os.path.isfile(self.legolas_prog):
-            raise ImportError(f'>> legolas.py not found at {self.legolas_prog}, set LEGOLAS_PATH'
+            raise ImportError(f'>> legolas.py not found at {self.legolas_prog}, set LEGOLAS_PATH '
                               f'or pass legolas_path=, legolas will be removed from features.')
 
         self.legolas_output_path = os.path.join(self.outdir, 'legolas')
         os.makedirs(self.legolas_output_path, exist_ok=True)
+
 
     def calculate_legolas(self, path):
         '''

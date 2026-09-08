@@ -1232,14 +1232,11 @@ class PDB(object):
 if __name__ == "__main__":
 
     PDB = PDB(outdir='result')
-    #PDB.clean_and_split_pdb('13LD', 'P10724) # test KCX to LYS mutation
+    #PDB.clean_and_split_pdb('13LD', 'P10724') # test KCX to LYS mutation
     #PDB.clean_and_split_pdb('1PAE', 'P22887') # test SEC to CYS mutation
-    #PDB.clean_and_split_pdb('6XZ7, 'P60422') # test MSE to MET mutation
-    #PDB.clean_and_split_pdb('2MBH, 'Q13351') # test splitting of models
-    #PDB.clean_and_split_pdb('1A6M', 'P02185) # test splitting rotamers
+    #PDB.clean_and_split_pdb('6XZ7', 'P60422') # test MSE to MET mutation
+    #PDB.clean_and_split_pdb('2MBH', 'Q13351') # test splitting of models
+    #PDB.clean_and_split_pdb('1A6M', 'P02185') # test splitting rotamers
     #PDB.clean_and_split_pdb('4WNC', 'P04406') # test splitting rotamers
     #PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G']) # test renumbering residues with canonical uniprot sequence
     PDB.clean_and_split_pdb('2MWS', 'P0CG48') #  test removal of modified residue
-
-
-    #PDB._align_resnum_uniprot('P50030', f'result{os.sep}curated{os.sep}3DBJ-alt-1.pdb', chains=['A', 'C', 'E', 'G'])

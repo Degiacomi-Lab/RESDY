@@ -194,7 +194,7 @@ class Measure(object):
         if 'all' in features_list:
             features_list = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
-                        'esm', 'rmsf']
+                        'evolution', 'rmsf']
             self.features = list(features_list)
         self.measures = []
         melodia_features = []
@@ -250,20 +250,21 @@ class Measure(object):
                                    aa_properties=self.aa_properties)
                 self.measures.append([m, flex.calculate])
             elif m == 'legolas':
-                if self.legolas_aevs:
-                    if 'aev_legolas' not in self.features:
-                        self.features.append('aev_legolas')
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
-                              include_modified=self.include_mod,
-                              error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                else:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=False,
-                              include_modified=self.include_mod,
-                              error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                self.measures.append([m, nmr.calculate_legolas])
-                legolas_added = True
+                try:
+                    if self.legolas_aevs:
+                        if 'aev_legolas' not in self.features:
+                            self.features.append('aev_legolas')
+                    nmr = NMR(outdir=self.outdir, legolas_aevs=self.legolas_aevs,
+                            include_modified=self.include_mod,
+                            error_filename=self.error_filename,
+                            aa_properties=self.aa_properties)
+                    self.measures.append([m, nmr.calculate_legolas])
+                    legolas_added = True
+                except Exception as e:
+                    for f in (m, 'aev_legolas'):
+                        if f in self.features: self.features.remove(f)
+                    print(f'>> Failed to add legolas to features calculation list; '
+                          f'removed from list; error: {e}')
             elif m == 'aev_legolas':
                 if not legolas_added:
                     nmr = NMR(outdir=self.outdir, legolas_aevs=True,
@@ -332,7 +333,7 @@ class Measure(object):
                     if self.report_errors:
                         self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
                     self.features.remove(m)
-                    raise Exception(f"measure {m} unknown")
+                    raise Exception(f'measure {m} unknown, removed from features list to calculate')
 
         if not melodia_added and melodia_features:
             try:
@@ -472,8 +473,13 @@ class Measure(object):
                 print('This setup does not currently have a method, please change the setup')
                 return
 
-        df_af_plddt = pd.read_csv(os.path.join(self.folder, 'AF_PLDDT_Output.csv'))
-        self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
+        plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
+        if os.path.exists(plddt_record_path):
+            df_af_plddt = pd.read_csv(plddt_record_path)
+            self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
+        else:
+            print(f'>> No PLDDT record file available at {plddt_record_path}, '
+                  f'no PLDDT column added to measurement dataframe')
 
         self._cleanup_calculation_files()
 
