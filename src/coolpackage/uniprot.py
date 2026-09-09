@@ -209,6 +209,7 @@ class Uniprot(object):
             print(f'Extracting protein information for protein {prot} in organism '
                   f'{code}; {i}/{len(prot_list)}')
             self.get_protein_data(uniprot_code=prot)
+        self.df = self.df.drop_duplicates()
 
 
     def from_csv_file(self, csv_file):
@@ -256,6 +257,8 @@ class Uniprot(object):
             except Exception as e:
                 print(f'> Error {e}')
                 continue
+
+        self.df = self.df.drop_duplicates()
 
 
     def filter_by_technique(self, list_of_techniques):

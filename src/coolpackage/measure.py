@@ -194,7 +194,8 @@ class Measure(object):
         if 'all' in features_list:
             features_list = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                         'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
-                        'evolution', 'rmsf']
+                        'evolution',
+                        'rmsf']
             self.features = list(features_list)
         self.measures = []
         melodia_features = []

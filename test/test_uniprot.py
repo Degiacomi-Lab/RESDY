@@ -11,14 +11,20 @@ class Test_Uniprot(unittest.TestCase):
         self.demo_csv = f'demo{os.sep}demo_input.csv'
 
     def test_organism_funcs(self):
-        self.UP.count_organism_proteins(code='UP000007445', reviewed_only=True)
-        self.UP.count_organism_proteins(code='UP000007445', reviewed_only=False)
+        tot_review = self.UP.count_organism_proteins(code='UP000007445', reviewed_only=True)
+        tot_all = self.UP.count_organism_proteins(code='UP000007445', reviewed_only=False)
+        self.assertAlmostEqual(int(tot_review), 4)
+        self.assertAlmostEqual(int(tot_all), 5)
 
-        self.UP.get_organism_proteins(code='UP000007445', reviewed_only=True)
-        self.UP.get_organism_proteins(code='UP000007445', reviewed_only=False)
+        codes_review = self.UP.get_organism_proteins(code='UP000007445', reviewed_only=True)
+        codes_all = self.UP.get_organism_proteins(code='UP000007445', reviewed_only=False)
+        self.assertAlmostEqual(len(codes_review), 4)
+        self.assertAlmostEqual(len(codes_all), 5)
 
         self.UP.from_organism(code='UP000007445', reviewed_only=True)
+        self.assertAlmostEqual(len(self.UP.df), 4)
         self.UP.from_organism(code='UP000007445', reviewed_only=False)
+        self.assertAlmostEqual(len(self.UP.df), 5)
 
     def test_protein(self):
         self.UP.get_protein_data('P09167')

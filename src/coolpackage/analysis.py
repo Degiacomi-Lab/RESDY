@@ -21,11 +21,8 @@ General notes on the work still outstanding in this file. There may be more furt
 import os
 import re
 import urllib.request
-import urllib.parse
-import urllib.error
 import threading
 import concurrent.futures
-from ast import literal_eval
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -42,6 +39,9 @@ except Exception as e:
           f'able to calculate this. Error: {e}')
 
 class Analysis(object):
+    '''
+    Class to handle nalysis of a measurements dataframe. GO term analysis, 
+    '''
 
     def __init__(self, df, outdir="result", features_to_analyse = []):
         '''
@@ -55,10 +55,15 @@ class Analysis(object):
         :param features_to_analyse: List of features which should be analysed over
         :type features_to_analyse: list
         '''
-        if features_to_analyse == []:
-            self.df = df
+        if isinstance(df, str):
+            self.df = pd.read_csv(df)
         else:
-            self.df = df.dropna(subset=features_to_analyse)
+            self.df = df
+
+        if features_to_analyse == []:
+            self.df = self.df
+        else:
+            self.df = self.df.dropna(subset=features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
@@ -282,7 +287,8 @@ class Analysis(object):
         # Step 1: read in new dataframe, extract column names, check for overlap and
         #         deal if is, otherwise add new column in
         try:
-            new_df = pd.read_csv(extra_measures_filename)
+            if isinstance(new_df, str):
+                new_df = pd.read_csv(extra_measures_filename)
             if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
             base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
@@ -374,7 +380,10 @@ class Analysis(object):
         '''
         print('>> Removing unrequired residues')
         # Remove duplicated data from the measurements
-        df_req_res = req_resid_table
+        if isinstance(req_resid_table, str):
+            df_req_res = pd.read_csv(req_resid_table)
+        else:
+            df_req_res = req_resid_table
         initial_data_one = len(self.df)
         self.df = self.df.drop_duplicates()
         duplicate_rows_removed = initial_data_one - len(self.df)

@@ -40,7 +40,8 @@ class Aggregation:
               space
             - 'all': Takes all potential statistical features that have been coded to be
               calculated
-            - 'choose': Allows the user to choose which statistic for the feature they want
+            - custom: Allows the user to choose which statistic for the feature they want. You
+                will be prompted on the command line to specify options for each feature passed.
         :type aggregation_method: str
         :param features_to_include: The list of features that are to be included in the aggregation.
             The default for this is taken to be all of them.
@@ -64,7 +65,10 @@ class Aggregation:
         :type num_sd_aev_features: int, optional
         '''
         # Note: current preference is to ignore aev_legolas given aev is more likely to be calculated
-        self.df_measurements = df_measurements
+        if isinstance(df_measurements, str):
+            self.df_measurements = pd.read_csv(df_measurements)
+        else:
+            self.df_measurements = df_measurements
         self.aggregation_method = aggregation_method
         self.features_to_include = features_to_include
         self.aev_red_method = aev_red_method
@@ -82,7 +86,7 @@ class Aggregation:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
             self.features_to_include = [a for a in self.df_measurements.columns if a not in self.non_feature_cols]
 
-        if 'Uniprot_Entry' in self.df_measurements.columms:
+        if 'Uniprot_Entry' in self.df_measurements.columns:
             self.lys_key = ['Uniprot_Entry', 'Resid']
         elif 'PDB_Code' in self.df_measurements.columns:
             self.lys_key = ['Uniprot_Entry', 'Resid']
@@ -165,16 +169,17 @@ class Aggregation:
                 avg_features = [a for a in [b for b in self.features_to_include if not any (c in b for c in max_features) and not any (c in b for c in min_features)] if 'avg' in a]
                 self.df_agg = df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_features])
             case 'minmax':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'ESM'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'minmaxavg':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg', 'ESM'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
             case 'all':
                 self.df_agg = df_stats
             case 'choose':
                 self.df_agg = self._aggregate_choose(df_stats)
             case _:
                 print('Aggregation method not recognised; using minmax values')
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'ESM'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.aggregation_method = 'minmax'
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
         return self.df_agg
 
 
@@ -310,16 +315,6 @@ class Aggregation:
 
             >>> self._prepare_vif_aev()
         '''
-        '''
-        # this columns_to_keep is the original set calculated with the original AEVs over the negative dataset
-        columns_to_keep = [12,120,135,16,17,182,19,197,20,211,22,228,23,231,26,27,28,29,
-                            30,31,339,34,344,35,351,365,366,367,37,370,372,38,387,39,396,
-                            399,40,407,41,415,42,425,428,43,431,44,442,443,45,46,463,47,
-                            50,51,52,53,54,543,544,555,556,557,558,563,57,573,579,58,580,
-                            583,588,59,590,591,60,61,62,622,63,689,696,699,70,704,705,706,
-                            709,711,716,719,73,74,745,75,751,76,77,78,79,9]
-        '''
-
         print('>> Reducing AEV dimensions using VIF analysis...')
         aev_cols = [a for a in self.df_measurements.columns if 'AEV_' in a]
         P = Preprocessing(self.df_measurements, aev_cols)
@@ -422,7 +417,7 @@ class Aggregation:
         '''
         max_features = []; min_features = []; med_features = []; avg_features = []; sd_features = []; range_features = []; rand_features = []
         print('>> For the following list of features, please choosen which statistics you would like to include in the aggregation')
-        print('>> The following statistics can be chosen (enter word or number seperated by ;): all (1), max (2), min (3), avg (4), sd (5), range (6), random (7)')
+        print('>> The following statistics can be chosen (enter word or number seperated by ;): all (1), max (2), min (3), med (4), avg (5), sd (6), range (7), random (8)')
         for feat in list(set([a.split('_')[0] for a in self.features_to_include if 'max' in a])):
             tmp_stats = input(f'>> Choose statistics for feature: {feat}')
             try:
