@@ -29,7 +29,7 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
-                 resnames_of_interest = ['LYS']):
+                 resnames_of_interest = ['LYS'], minimise_af=True):
         '''
         Initialise the PDB class.
 
@@ -50,6 +50,9 @@ class PDB(object):
         :param resnames_of_interest: List of residues to investigate, only used for curating list of
             PLDDT values for the residues of interest here.
         :type resnames_of_interest: list
+        :param minimise_af: Toggleable option to re-minimise AF structures in implicit solvent rather
+            than vacuum as standard AF structures are. Default is set to True. 
+        :type minimise_af: bool
         '''
 
         self.outdir = outdir
@@ -57,6 +60,7 @@ class PDB(object):
         self.parallel = parallel
         self.include_hetatm = include_hetatm
         self.resnames_of_interest = resnames_of_interest
+        self.minimise_af = minimise_af
 
         # create folder of curated protein structures
         self.curated_dir = os.path.join(outdir, "curated")
@@ -73,7 +77,7 @@ class PDB(object):
             columns = ['PDB_Code']
             self.df = pd.DataFrame(columns=columns)
         else:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains', 'Largest_Gap']
             self.df = pd.DataFrame(columns=columns)
 
         self.gap = gap
@@ -313,21 +317,19 @@ class PDB(object):
                     # find the PLDDT codes for AF structures
                     out_print_trap_af_plddt = io.StringIO()
                     with redirect_stdout(out_print_trap_af_plddt):
-                        try:
-                            with lock:
-                                af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
-                        except Exception as e:
-                            print_statements.append(f'>> Failed on find_af_plddt() with error: {str(e)}')
+                        with lock:
+                            af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
                     print_statements.append(out_print_trap_af_plddt.getvalue())
                 except Exception as e:
                     print(f'> Failed to calculate PLDDT values for Af structure: {pdb_code}; Error: {str(e)}')
-                
+
                 try:
-                    # apply minimisation to AF structure
-                    out_print_trap_af_minimisation = io.StringIO()
-                    with redirect_stdout(out_print_trap_af_minimisation):
-                        af.apply_minimisation(pdb_code, outfolder=self.outdir)
-                    print_statements.append(out_print_trap_af_minimisation.getvalue())
+                    if self.minimise_af:
+                        # apply minimisation to AF structure
+                        out_print_trap_af_minimisation = io.StringIO()
+                        with redirect_stdout(out_print_trap_af_minimisation):
+                            af.apply_minimisation(pdb_code, outfolder=self.outdir)
+                        print_statements.append(out_print_trap_af_minimisation.getvalue())
                 except Exception as e:
                     print(f'>> Failed on af.apply_minimisation() for pdb {pdb_code} with error: {str(e)}')
                     finish_curate_jobs(failed=True)

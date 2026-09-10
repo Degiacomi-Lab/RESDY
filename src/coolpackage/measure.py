@@ -441,13 +441,13 @@ class Measure(object):
         written to such that they are easier to look over after running, rather than trawling
         through output.
         '''
-        new_file_name = f'meaures_errors_{date.today()}.txt'
+        new_file_name = os.path.join(self.outdir, f'meaures_errors_{date.today()}.txt')
         while os.path.exists(new_file_name):
             if '_no' in new_file_name:
                 error_file_num = int(os.path.splitext(new_file_name)[0].split('_no')[-1])
-                new_file_name = f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt'
+                new_file_name = os.path.join(self.outdir, f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt')
             else:
-                new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
+                new_file_name = os.path.join(self.outdir, f'measure_errors_{date.today()}_no{1}.txt')
         with open(new_file_name, 'w') as error_f1:
             error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
         return new_file_name

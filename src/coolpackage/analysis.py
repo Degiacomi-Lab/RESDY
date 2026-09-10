@@ -27,6 +27,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from .aggregation import Aggregation
 from scipy.stats import fisher_exact
 
 try:
@@ -173,60 +174,111 @@ class Analysis(object):
         self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
 
-    def plot_graph(self, plot_type, feature, uniprot_entry = False, resid = False):
+    def plot_feature_histogram(self, feature, agg_type='avg', uniprot='',
+                               chain='', resid='', save_name=''):
         '''
-        Basic plot, show either a histogram or a boxplot
+        Create a basic plot showing the distribution of values for the specified feature
+        across the set of measurements passed into the analysis class. An aggregation
+        method will be employed to reduce biases, default here is avg unless other
+        method passed.
+
+        :param feature: Name of the feature to produce histogram of data for
+        :type feature: str
+        :param agg_type: Name of aggregation method to use when plotting the histogram.
+            For more information, see documentation of aggregation class.
+        :type agg_type: str
+        :param uniprot: Uniprot code given if a specific analysis of feature data for a
+            uniprot code is required. Default is left as '' and will take full dataframe
+            unless code given.
+        :type uniprot: str
+        :param chain: Chain given if a specific analysis of feature data for a chain is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type chain: str
+        :param resid: Resid given if a specific analysis of feature data for a resid is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type resid: str
+        :param save_name: File name to save the histogram to.
+        :type save_name: str
         '''
         try:
             plt.clf()
         except Exception:
             pass
 
-        if not uniprot_entry and not resid:
-            try:
-                x = self.df[feature]
-            except Exception:
-                print(f'could not find feature {feature}')
-                return
+        agg = Aggregation(df_measurements=self.df,
+                          aggregation_method=agg_type,
+                          features_to_include=[feature])
+        df_plot = agg.aggregate_data()
 
-            if plot_type == 'histogram':
-                sns.displot(x, kde=True)
+        if uniprot != '' and chain != '' and resid != '':
+            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot) & (df_plot['Chain'] == chain) & (df_plot['Resid'] == resid)]
+        elif uniprot != '' and chain != '' and resid == '':
+            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot) & (df_plot['Chain'] == chain)]
+        elif uniprot != '' and chain == '' and resid != '':
+            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot) & (df_plot['Resid'] == resid)]
+        elif uniprot == '' and chain != '' and resid != '':
+            df_plot = df_plot[(df_plot['Chain'] == chain) & (df_plot['Resid'] == resid)]
+        elif uniprot != '' and chain == '' and resid == '':
+            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot)]
+        elif uniprot == '' and chain != '' and resid == '':
+            df_plot = df_plot[(df_plot['Chain'] == chain)]
+        elif uniprot == '' and chain == '' and resid != '':
+            df_plot = df_plot[(df_plot['Resid'] == resid)]
 
-            elif plot_type == 'boxplot':
-                sns.boxplot(x=x)
-            else:
-                print('No Such Plot Available.')
-                return
+        feature_labels = {'depth': 'Depth (Å)',
+                        'sasa': 'SASA (Å\u00b2)',
+                        'propka': 'pKa (propka)',
+                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                        'curvature': 'Curvature',
+                        'arc_length': 'Arc Length',
+                        'das': 'Dynamically Accessible Surface',
+                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                        'phi': 'Phi',
+                        'psi': 'Psi',
+                        'seqcharge': 'Sequence Charge',
+                        'torsion': 'Torsion Angle',
+                        'writhing': 'Writhing',
+                        'frustration': 'Frustration',
+                        'rmsf': 'RMSF'}
 
-        else:
-            if uniprot_entry and resid:
-                if uniprot_entry not in self.df['Uniprot_Entry'].unique():
-                    print('Wrong Uniprot_Entry.')
-                    return
+        feature_histwidths = {'depth': 0.1,
+                            'sasa': 2,
+                            'propka': 0.2,
+                            'flexibility': 0.1,
+                            'curvature': 0.1,
+                            'arc_length': 0.1,
+                            'das': 2,
+                            'legolas': 2,
+                            'phi': 2,
+                            'psi': 2,
+                            'seqcharge': 0.5,
+                            'torsion': 0.2,
+                            'writhing': 0.02,
+                            'frustration': 0.5,
+                            'rmsf': 0.2}
 
-                else:
-                    if resid not in self.df[self.df['Uniprot_Entry'] == uniprot_entry]['Resid'].unique():
-                        print('Wrong Resid.')
-                        return
+        agg_feature = f'{feature}_{agg_type}'
 
-                df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
+        fig, ax = plt.plot()
+        fig.set_figheight(12)
+        fig.set_figwidth(12)
 
-                try:
-                    x = df_query[feature]
-                except Exception:
-                    print(f'could not find feature {feature}')
-                    return
+        x_left = df_plot[agg_feature].min()
+        x_right = df_plot[agg_feature].max()
+        step=feature_histwidths[feature]
 
-                if plot_type == 'histogram':
-                    sns.displot(x, kde=True)
-                elif plot_type == 'boxplot':
-                    sns.boxplot(x=x)
-                else:
-                    print('No Such Plot Available.')
-                    return
-            else:
-                print('Lack of Input Information.')
-                return
+        palatinate_colour = '#682860'
+        ax.hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                alpha=0.5, label='')
+        sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=ax)
+        ax.set_xlabel(feature_labels[feature])
+        ax.set_xlim(x_left, x_right)
+
+        ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
+
+        if save_name != '':
+            plt.savefig(save_name)
 
         plt.show()
 

@@ -305,7 +305,6 @@ class Aggregation:
         nothing to the model except noise.
         '''
         print('>> Removing null AEV columns...')
-        initial_num_cols = len(self.df_measurements.columns)
         num_cols_to_keep = sum((self.df_measurements != 0).any(axis=0))
         aev_col_names = [a for a in list(self.df_measurements.columns) if 'AEV_' in a]
         cols_to_remove = [a for a in aev_col_names if (self.df_measurements[a] == 0).all()]
