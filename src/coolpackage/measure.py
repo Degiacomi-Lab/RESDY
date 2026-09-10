@@ -156,6 +156,7 @@ class Measure(object):
         # Check that all files in DataFrame appear at least once in folder
         # find all AlphaFold entries
         files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
+        print(files_af)
         # find all PDB entries
         files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
         for f in df_input["PDB_Code"].values:

@@ -309,15 +309,29 @@ class PDB(object):
                 else:
                     data = {'PDB_Code': pdb_code}
 
-                # find the PLDDT codes for AF structures
-                out_print_trap_af_plddt = io.StringIO()
-                with redirect_stdout(out_print_trap_af_plddt):
-                    try:
-                        with lock:
-                            af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
-                    except Exception as e:
-                        print_statements.append(f'>> Failed on find_af_plddt() with error: {str(e)}')
-                print_statements.append(out_print_trap_af_plddt.getvalue())
+                try:
+                    # find the PLDDT codes for AF structures
+                    out_print_trap_af_plddt = io.StringIO()
+                    with redirect_stdout(out_print_trap_af_plddt):
+                        try:
+                            with lock:
+                                af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
+                        except Exception as e:
+                            print_statements.append(f'>> Failed on find_af_plddt() with error: {str(e)}')
+                    print_statements.append(out_print_trap_af_plddt.getvalue())
+                except Exception as e:
+                    print(f'> Failed to calculate PLDDT values for Af structure: {pdb_code}; Error: {str(e)}')
+                
+                try:
+                    # apply minimisation to AF structure
+                    out_print_trap_af_minimisation = io.StringIO()
+                    with redirect_stdout(out_print_trap_af_minimisation):
+                        af.apply_minimisation(pdb_code, outfolder=self.outdir)
+                    print_statements.append(out_print_trap_af_minimisation.getvalue())
+                except Exception as e:
+                    print(f'>> Failed on af.apply_minimisation() for pdb {pdb_code} with error: {str(e)}')
+                    finish_curate_jobs(failed=True)
+                    return None
 
                 finish_curate_jobs(failed=False)
                 return pd.DataFrame.from_records(data, index=[0])
