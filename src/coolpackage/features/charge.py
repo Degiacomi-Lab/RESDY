@@ -124,7 +124,7 @@ class Charge():
                                     'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
                                     'LYSN': 'K'}
             # KCX, LYE and LYSN (neutral lysine from gromacs) down as X so that they are not treated as positive K when calculations aren't including modified lysines
-            # however when including modified, need to consider these K for checking purposes, gets tricky when considering near lysines that are all modified...        
+            # however when including modified, need to consider these K for checking purposes, gets tricky when considering near lysines that are all modified...
             if self.include_modified: protein_letters_dict['KCX'] = 'K'; protein_letters_dict['LYE'] = 'K'
             else: protein_letters_dict['KCX'] = 'X'; protein_letters_dict['LYE'] = 'X' 
 
@@ -140,6 +140,12 @@ class Charge():
                 tmp_data = subset_data[subset_data['chain'] == chain]
                 pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
+            resid_to_index = {}
+            for chain in pdb_seqs:
+                tmp_data = subset_data[subset_data['chain'] == chain]
+                for pos, res in enumerate(tmp_data['resid']):
+                    resid_to_index[(chain, int(res))] = pos
+
         except Exception as e:
             if self.record_errors: report_error_to_file('Seqcharge 1', path, str(e), self.error_filename)
             print(f'SeqCharge Calculation: 1 - could not extract the sequence from the protein file given: {e}')
@@ -151,8 +157,10 @@ class Charge():
         for idx, (lys_chain, lys_num) in enumerate(zip(list_chains, lys_res_nums)):
             try:
                 seq = pdb_seqs[lys_chain]
-                chain_shift_val = int(M.data[M.data['chain'] == lys_chain]['resid'].iloc[0]) - 1
-                seq_lys_index = lys_num - chain_shift_val - 1
+                seq_lys_index = resid_to_index.get((lys_chain, int(lys_num)))
+                if seq_lys_index is None:
+                    print(f'> Res {lys_num} on chain {lys_chain} has no CA in {path}, skipped')
+                    continue
 
                 start_idx = seq_lys_index - num_add_aa
                 end_idx = seq_lys_index + num_add_aa + 1
@@ -170,7 +178,8 @@ class Charge():
                 seq = ('-' * start_null) + seq[start_idx:end_idx] + ('-' * end_null)
                 seq_split = list(seq)
                 if seq_split[num_add_aa] != 'K':
-                    print(f'A lysine was not found at the desired position {lys_num+1} on chain {lys_chain} read in for PDB file {path}; sequence -> {seq}')
+                    print(f'A lysine was not found at the desired position {lys_num} on chain {lys_chain} '
+                          f'read in for PDB file {path}; sequence -> {seq}')
                     continue
 
                 pos_aa = ['K', 'H', 'R']

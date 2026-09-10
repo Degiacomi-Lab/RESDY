@@ -43,10 +43,10 @@ class Test_Uniprot(unittest.TestCase):
         #self.assertEqual(len(self.A.df), 10)
 
     def test_GO_analysis(self):
+        self.A.GO_get_data()
         df_term = self.A.GO_search_term(df=pd.read_csv(self.df_measures),
                                         code='0003674',
                                         name='')
-        self.A.GO_get_data()
         go_list = self.A.GO_search_protein(uniprot_entry='P02185')
         df_enrichment = self.A.enrichment_analysis(feature_one = ['propka', 7, 11],
                                                    feature_two = ['sasa', 0, 10],

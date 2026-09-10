@@ -52,7 +52,8 @@ class Analysis(object):
         :type df: pandas.DataFrame
         :param outdir: Name of the directory to write to
         :type outdir: str
-        :param features_to_analyse: List of features which should be analysed over
+        :param features_to_analyse: List of features which should be analysed over. If ['all'] is
+            passed, all features available in the table will be used.
         :type features_to_analyse: list
         '''
         if isinstance(df, str):
@@ -60,10 +61,14 @@ class Analysis(object):
         else:
             self.df = df
 
-        if features_to_analyse == []:
+        if features_to_analyse == ['all']:
             self.df = self.df
         else:
             self.df = self.df.dropna(subset=features_to_analyse)
+
+        standard_cols = ['Uniprot_Entry', 'Chain', 'Resid', 'Resolution', 'Method', 'Class',
+                        'Modified', 'PLDDT']
+        self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
@@ -78,12 +83,11 @@ class Analysis(object):
         self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
 
 
-    # GW 05.12.24 function potentially unused - remove?
     def get_data(self, uniprot_entry, resid):
         df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
         return df_query
 
-    # GW 05.12.24 function potentially unused - remove?
+
     def get_data_alphafold(self):
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
@@ -110,6 +114,7 @@ class Analysis(object):
 
         return df_out
 
+
     def GO_search_protein(self, uniprot_entry):
         '''
         List all the GO Terms associated with a UNIPROT code
@@ -120,6 +125,7 @@ class Analysis(object):
                 GO_list.append(code)
         GO_list = [self.code_to_name[code] for code in GO_list]
         return GO_list
+
 
     def _GO_get_data(self, uniprot_code, lock, index, total):
         '''
@@ -155,6 +161,7 @@ class Analysis(object):
 
         except Exception as e:
             print(f'Error analysis GO data for Uniprot: {uniprot_code} with error: {e}')
+
 
     def GO_get_data(self):
         uniprot_codes = self.df['Uniprot_Entry'].unique()
@@ -223,6 +230,7 @@ class Analysis(object):
 
         plt.show()
 
+
     def get_outliers(self, uniprot_entry, resid, feature, whis = 1.5):
         '''
         Extract outliers from a dataset using quartiles based on a given feature and specific
@@ -250,9 +258,11 @@ class Analysis(object):
         df_outlier = df_query[(df_query[feature] < lower) | (df_query[feature] > upper)]
         return df_outlier
 
+
     def get_extreme_values(self, feature, lower = 1, upper = 14):
         df_query = self.df[(self.df[feature] < lower) | (self.df[feature] > upper)]
         return df_query
+
 
     def remove_df(self, df_to_remove):
         '''

@@ -210,6 +210,7 @@ class Measure(object):
             elif m == 'pkaANI':
                 P = PKAANI(outdir=self.outdir,
                           include_modified=self.include_mod,
+                          error_filename=self.error_filename,
                           aa_properties=self.aa_properties)
                 self.measures.append([m, P.calculate])
             elif m == 'sasa':
@@ -230,6 +231,7 @@ class Measure(object):
             elif m == 'aev':
                 try:
                     aev = AEV(error_filename=self.error_filename,
+                              include_modified=self.include_mod,
                               aa_properties=self.aa_properties)
                     self.measures.append([m, aev.calculate])
                 except Exception as e:
@@ -637,7 +639,7 @@ class Measure(object):
                     df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in df_parallel.columns and a not in base_cols])
                     df_parallel = df_parallel.merge(df_gpu, how='left', on=[a for a in base_cols if a in df_gpu.columns])
 
-            if not cpu_measurements and gpu_measurements:
+            if not cpu_measurements and not gpu_measurements:
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
@@ -689,11 +691,14 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Modified']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            if self.include_mod:
+                columns.append('Modified')
             df_currentfile = pd.DataFrame(columns=columns)
 
             try:
-                M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                M = bb.Molecule()
+                M.import_pdb(f, include_hetatm=True)
             except Exception as e:
                 self.wrong_pdb_file.append(f)
                 if self.report_errors:
@@ -961,21 +966,37 @@ class Measure(object):
             self._combine_dataframes(df, result, meas[0])
         '''
         to_merge = to_merge.reset_index(drop=True)
+
+        if self.include_mod and 'Modified' not in to_merge.columns:
+            raise KeyError(f'>> Running include modified but Modified column not present for feature: {col_name}')
+
         for i, r in target.iterrows():
 
             chain_value = r["Chain"]
             resid_value = r["Resid"]
-            if self.include_mod: modified_value = r['Modified']
+            if self.include_mod:
+                modified_value = r['Modified']
 
-            if self.include_mod: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value) & (to_merge["Modified"].astype(bool) == modified_value))
-            else: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
+            if self.include_mod:
+                idx = np.where((to_merge["Chain"] == chain_value) &
+                               (to_merge["Resid"].astype(int) == resid_value) &
+                               (to_merge["Modified"].astype(bool) == modified_value))
+            else:
+                idx = np.where((to_merge["Chain"] == chain_value) &
+                               (to_merge["Resid"].astype(int) == resid_value))
 
             if len(idx[0]) == 0:
                 continue
             
             if len(idx[0]) > 1:
-                print(f'>> Multiple rows match when trying to combine dataframes, {col_name}: {len(idx[0])} rows match; '
-                      f'for Chain: {chain_value}, Resid: {resid_value}, only taking first instance.')
+                out_print = (f'{col_name}: {len(idx[0])} rows match Chain {chain_value}, Resid '
+                             f'{resid_value}; an insertion code has been not managed properly, '
+                             f'no guess employed; continuing')
+                if self.report_errors:
+                    self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes', col_name, out_print)
+                print('>> ' + out_print)
+                continue
+
 
             # account for measurements that have special cases
             if col_name == 'melodia':
@@ -1045,11 +1066,14 @@ class Measure(object):
                 tstart = time.time()
                 print(f"\n> File: {f}")
 
-                columns = ['PDB_Code', 'Chain', 'Resid', 'Modified']
+                columns = ['PDB_Code', 'Chain', 'Resid']
+                if self.include_mod:
+                    columns.append('Modified')
                 df_currentfile = pd.DataFrame(columns=columns)
 
                 try:
-                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                    M = bb.Molecule()
+                    M.import_pdb(f, include_hetatm=True)
                 except Exception as e:
                     print(f'Failed to create biobox molecule for file {f} with error: {e}')
                     if self.report_errors:

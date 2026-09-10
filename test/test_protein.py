@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 import pandas as pd
+import biobox as bb
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import coolpackage as CPN
@@ -63,6 +64,8 @@ class Test_Uniprot(unittest.TestCase):
         #  test removal of modified residue
         self.PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
+        M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
+        self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
     def test_auxiliary(self):
         self.PDB.rewrite_pdb(path=f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb')
@@ -91,8 +94,7 @@ class Test_Uniprot(unittest.TestCase):
                             include_hetatm=include_hetatm,
                             resnames_of_interest=resnames_of_interest)
         PDB.gather_proteins(UP.df, skip_if_found=False)
-
-        self.assertEqual(len(f'demo{os.sep}proteins.csv'), len(PDB.df))
+        self.assertEqual(len(pd.read_csv(f'demo{os.sep}proteins.csv')), len(PDB.df))
 
     def test_gathering_parallel(self):
         # runs on separate instance of PDB to work with demo
@@ -112,8 +114,7 @@ class Test_Uniprot(unittest.TestCase):
                             include_hetatm=include_hetatm,
                             resnames_of_interest=resnames_of_interest)
         PDB.gather_proteins(UP.df, skip_if_found=False)
-
-        self.assertEqual(len(f'demo{os.sep}proteins.csv'), len(PDB.df))
+        self.assertEqual(len(pd.read_csv(f'demo{os.sep}proteins.csv')), len(PDB.df))
 
     def test_gathering_pdb_only(self):
         # runs on separate instance of PDB to work with demo

@@ -89,8 +89,16 @@ class RMSF():
             code = os.path.splitext(os.path.basename(path))[0]
             if 'AF-' not in code:
                 code = code.split('-')[0]
-            uniprot_interest = list(self.df_proteins[self.df_proteins['PDB_Code'] == code]['Uniprot_Entry'])[0]
-            prot_info = list(self.df_proteins[self.df_proteins['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
+
+            if 'Uniprot_Entry' not in self.df_proteins.columns:
+                prot_info = [code]
+            else:
+                matches = self.df_proteins[self.df_proteins['PDB_Code'] == code]['Uniprot_Entry']
+                if matches.empty:
+                    raise KeyError(f'{code} is not in the dataframe given to RMSF calculations')
+                uniprot_interest = matches.iloc[0]
+                prot_info = list(self.df_proteins[self.df_proteins['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
+
             prot_match_exists = [a for a in files if (os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info)
                                     or (os.path.basename(a).split('.')[0] in prot_info)]
 
@@ -165,7 +173,7 @@ class RMSF():
 
 
 if __name__ == '__main__':
-    outdir = 'Demo'
+    outdir = 'demo'
     df_prot = pd.read_csv(f'{outdir}{os.sep}proteins_demo.csv')
     rmsf = RMSF(df_proteins=df_prot, include_modified=False)
-    print(rmsf.calculate(path=f'{outdir}{os.sep}curated{os.sep}1M2F-alt-1.pdb'))
+    print(rmsf.calculate(path=f'{outdir}{os.sep}curated{os.sep}4DCN-alt-1.pdb'))

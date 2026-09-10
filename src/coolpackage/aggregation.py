@@ -15,7 +15,7 @@ class Aggregation:
 
     def __init__(self, df_measurements, aggregation_method='minmax',
                  features_to_include=['all'], aev_red_method='pca',
-                 num_sd_aev_features=100):
+                 num_sd_aev_features=100, include_chain=False):
         '''
         Initialisation of the Aggregation class.
 
@@ -63,6 +63,10 @@ class Aggregation:
         :param num_sd_aev_features: The number of features to keep from the aevs when the standard
             deviation method is used. Default is set to 100.
         :type num_sd_aev_features: int, optional
+        :param include_chain: Option to include chain in the aggregation key, if True it will
+            aggregate on 'Uniprot_Entry', 'Chain', 'Resid' else will aggregate on 'Uniprot_Entry',
+            'Resid' (default)
+        :type include_chain: bool, optional
         '''
         # Note: current preference is to ignore aev_legolas given aev is more likely to be calculated
         if isinstance(df_measurements, str):
@@ -73,6 +77,7 @@ class Aggregation:
         self.features_to_include = features_to_include
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
+        self.include_chain = include_chain
         self.df_agg = pd.DataFrame()
         
         self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
@@ -88,10 +93,15 @@ class Aggregation:
 
         if 'Uniprot_Entry' in self.df_measurements.columns:
             self.lys_key = ['Uniprot_Entry', 'Resid']
+            if self.include_chain:
+                self.lys_key.append('Chain')
         elif 'PDB_Code' in self.df_measurements.columns:
-            self.lys_key = ['Uniprot_Entry', 'Resid']
+            self.lys_key = ['PDB_Code', 'Resid']
+            if self.include_chain:
+                self.lys_key.append('Chain')
         else:
-            return KeyError('>> Measurements dataframe must contain either a Uniprot_Entry or PDB_Code column in measurements file')
+            return KeyError('>> Measurements dataframe must contain either a Uniprot_Entry '
+                            'or PDB_Code column in measurements file')
 
         data_cols_entered = self.df_measurements.columns.values
         cols_required = [a for a in self.df_measurements.columns if a in self.lys_key + ['PDB_Code', 'class']]
@@ -119,13 +129,19 @@ class Aggregation:
             self.features_to_include = [a for a in self.features_to_include if a not in always_na_cols]
 
         len_before_df = len(self.df_measurements)
-        self.df_measurements = self.df_measurements.dropna(subset=self.features_to_include)
-        if len_before_df and self.df_measurements.empty:
+
+        na_per_feature = {c: int(self.df_measurements[c].isna().sum()) for c in self.features_to_include}
+        keep = self.df_measurements.dropna(subset=self.features_to_include)
+        del_lysines = (self.df_measurements[self.lys_key].drop_duplicates().shape[0] - keep[self.lys_key].drop_duplicates().shape[0])
+        if len_before_df and keep.empty:
             raise ValueError('>> Every row was removed by the NaN filter. The features with the most missing '
                              'values are: ' + ', '.join(f'{c} ({n})' for c, n in
                             sorted(((c, self.df_measurements[c].isna().sum()) for c in self.features_to_include), key=lambda t: -t[1])[:5]))
-        print(f'>> Removed {len_df_measures - len(self.df_measurements)} rows from the measurements dataframe which '
-              f'contained nan values. New dataframe length is {len(self.df_measurements)}')
+        else:
+            print(f'>> Removed {len_before_df - len(keep)} rows of {len_before_df} possible measurement '
+                  f'rows containing nan values; which cost {del_lysines} distinct residues. The worst '
+                  f'features for this are: ' + ', '.join(f'{c} ({n})' for c, n in sorted(na_per_feature.items(), key=lambda t: -t[1])[:3]))
+            self.df_measurements = keep
 
 
     def aggregate_data(self):
@@ -148,17 +164,18 @@ class Aggregation:
             if bad_feat in self.df_measurements.columns:
                 self._remove_bad_data(feature=bad_feat, lower=feat_low, upper=feat_up)
         df_stats = self._calculate_statistics()
+        not_cols = self.lys_key + ['class']
         match self.aggregation_method:
             case 'avg':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in not_cols])
             case 'random':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'rand' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'rand' not in b] if a not in not_cols])
             case 'max':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'max' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'max' not in b] if a not in not_cols])
             case 'min':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'min' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'min' not in b] if a not in not_cols])
             case 'median':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'med' not in b] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'med' not in b] if a not in not_cols])
             case 'average subtract aev':
                 self.df_agg = self._aggregate_avg_less_avgaev()
             case 'mixmatch':
@@ -169,9 +186,9 @@ class Aggregation:
                 avg_features = [a for a in [b for b in self.features_to_include if not any (c in b for c in max_features) and not any (c in b for c in min_features)] if 'avg' in a]
                 self.df_agg = df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_features])
             case 'minmax':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in not_cols])
             case 'minmaxavg':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in not_cols])
             case 'all':
                 self.df_agg = df_stats
             case 'choose':
@@ -179,7 +196,7 @@ class Aggregation:
             case _:
                 print('Aggregation method not recognised; using minmax values')
                 self.aggregation_method = 'minmax'
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in ['Uniprot_Entry', 'Resid', 'class']])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in not_cols])
         return self.df_agg
 
 
@@ -238,11 +255,11 @@ class Aggregation:
                 case _:
                     print(f'>> AEV dimensionality reduction method: {self.aev_red_method}, was not recognised, using PCA method.')
                     self._prepare_pca()
-        if 'esm' in self.features_to_include:
-            df_esm = pd.DataFrame(list([literal_eval(esm) for esm in self.df_measurements['esm']]))
-            df_esm = df_esm.add_prefix('ESM_')
-            self.df_measurements = pd.concat([self.df_measurements.reset_index(), df_esm.reset_index()], axis=1)
-            self.df_measurements = self.df_measurements.drop(['index', 'esm'], axis=1)
+        if 'evolution' in self.features_to_include:
+            df_evolution = pd.DataFrame(list([literal_eval(evol) for evol in self.df_measurements['evolution']]))
+            df_evolution = df_evolution.add_prefix('EVL_')
+            self.df_measurements = pd.concat([self.df_measurements.reset_index(), df_evolution.reset_index()], axis=1)
+            self.df_measurements = self.df_measurements.drop(['index', 'evolution'], axis=1)
 
 
 
@@ -358,9 +375,10 @@ class Aggregation:
         if 'class' not in self.df_measurements.columns:
             self.df_measurements['class'] = -1  # set to -1 as unsure if pos or neg
 
-        df_stats = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
+        cols_key = self.lys_key + ['class']
+        df_stats = pd.DataFrame(columns=cols_key)
 
-        if 'aev' in self.features_to_include or 'esm' in self.features_to_include or 'aev_legolas' in self.features_to_include:
+        if 'aev' in self.features_to_include or 'evolution' in self.features_to_include or 'aev_legolas' in self.features_to_include:
             self._reduce_aev_dimensions()
 
         for (entry, resid), df_query in self.df_measurements.groupby(self.lys_key):
@@ -393,8 +411,8 @@ class Aggregation:
                         data[feat + '_avg'] = round(df_query[feat].mean(), 2)
                         data[feat + '_sd'] = round(df_query[feat].std(ddof=0), 2)
                         data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
-                elif feature == 'esm':
-                    for feat in [a for a in df_query.columns if 'ESM_' in a]:
+                elif feature == 'evolution':
+                    for feat in [a for a in df_query.columns if 'EVL_' in a]:
                         data[feat] = df_query[feat].loc[0]
 
                 else:
@@ -408,7 +426,7 @@ class Aggregation:
 
             df_stats = pd.concat([df_stats, pd.DataFrame([data])], ignore_index=True)
 
-        self.features_to_include = [a for a in list(df_stats.columns) if a not in ['Uniprot_Entry', 'Resid', 'class']]
+        self.features_to_include = [a for a in list(df_stats.columns) if a not in cols_key]
         return df_stats
 
     def _aggregate_choose(self, df_stats):
@@ -524,6 +542,6 @@ if __name__ == "__main__":
     test_dataframe_name = 'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv'
     test_measures_dataframe = pd.read_csv(test_dataframe_name)
     agg = Aggregation(test_measures_dataframe, aggregation_method='median', features_to_include=['all'], aev_red_method='pca')
-    test_agg_df = agg.aggregate_data()
+    agg.aggregate_data()
     print(agg.df_agg)
-    agg.save_state()
+    #agg.save_state()

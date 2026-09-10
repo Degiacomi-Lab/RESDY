@@ -356,33 +356,30 @@ class PDB(object):
                     return pd.DataFrame.from_records(data, index=[0])
 
             # load, clean, and split it in alternate conformations
+            out_print_trap = io.StringIO()
+            data = None
             try:
-                out_print_trap = io.StringIO()
                 with redirect_stdout(out_print_trap):
-                    try:
-                        if not self.PDB_only:
-                            largest_gap = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
-                            data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
-                                    'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
-                        else:
-                            largest_gap = self.clean_and_split_pdb(pdb_code)
-                            data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
-                    except Exception as e:
-                        print_statements.append(f'>> Failed clean_and_split_pdb() with error: {str(e)}')
-                print_statements.append(out_print_trap.getvalue())
-
-                finish_curate_jobs(failed=False)
-                return pd.DataFrame.from_records(data, index=[0])
-
+                    if not self.PDB_only:
+                        largest_gap = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
+                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
+                    else:
+                        largest_gap = self.clean_and_split_pdb(pdb_code)
+                        data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
             except Exception as e:
-                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': str(e)}])
+                print_statements.append(out_print_trap.getvalue())
+                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': f'{type(e).__name__}: {str(e)}'}])
                 broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
                 with lock:
                     broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
-                print_statements.append(out_print_trap.getvalue())
-                print_statements.append(f">> FAILED clean and splitting of PDB entry file: {str(e)}")
+                print_statements.append(f'>> Failed clean_and_split_pdb() with error: {str(e)}')
                 finish_curate_jobs(failed=True)
-                pass
+                return None
+
+            print_statements.append(out_print_trap.getvalue())
+            finish_curate_jobs(failed=False)
+            return pd.DataFrame.from_records(data, index=[0])
 
 
     def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[]):
@@ -508,8 +505,7 @@ class PDB(object):
 
             >>> self.download_fasta('1ubq')
         '''
-        files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
-        if pdb not in files:
+        def get_data():
             try:
                 print(f">> downloading FASTA for {pdb}")
 
@@ -520,8 +516,13 @@ class PDB(object):
             except Exception as e:
                 print(f'>> Failed downloading FASTA sequence for chain name comparison for {pdb}, error: {str(e)}')
                 raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{str(e)}') from e
+        files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
+        if pdb not in files:
+            get_data()
+        elif os.path.getsize(os.path.join(self.raw_dir, f'{pdb}.fasta')) == 0:
+            get_data()
         else:
-            print(f'Fasta file for {pdb} previously downloaded, using previous copy.')
+            print(f'Fasta file for {pdb} previously downloaded and has data, using previous copy.')
 
 
     def clean(self, pdb, uniprot_code = ''):
@@ -642,7 +643,7 @@ class PDB(object):
                 line = line.replace(line[17:20], list_prev_mod_resids[line[21] + line[22:26].strip()])
             elif (line[:4] == 'ATOM' or line[:6] == 'HETATM') and line[17:20].upper() not in standard_resids:
 
-                if (line[21] + line[17:20]) not in modres_sites:
+                if (line[21] + line[22:26].strip()) not in modres_sites:
                     continue
                 if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
                     continue
@@ -686,6 +687,8 @@ class PDB(object):
 
                         # edit the fasta file to change the position
                         fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
+                        if os.path.getsize(fasta_name) == 0:
+                            self.download_fasta(pdb=pdb)
                         try:
                             f = open(fasta_name, 'r')
                             fasta_headers = []
@@ -736,7 +739,8 @@ class PDB(object):
                                     for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
                                         fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
                                     
-                                    seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:] + '\n'
+                                    seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:]
+                                seq = seq + '\n'
                                 new_fasta.write(seq)
                             new_fasta.close()
 
@@ -885,6 +889,7 @@ class PDB(object):
             #Next it checks if there are any alternate amino acid conformations present (i.e. if line[16 == A, B or C]).
             read_file = open(f, 'r')
             alt_loc_vals = sorted({line[16] for line in read_file if line[:4] == 'ATOM' and line[16] != ' '})
+            read_file.close()
 
             # If there are none for this file it moves on to the next.
             if not alt_loc_vals:
@@ -934,7 +939,6 @@ class PDB(object):
                     raise Exception(f'{str(e)}')
 
             #The original is then removed if it has been replaced.
-            read_file.close()
             os.remove(f)
 
         return

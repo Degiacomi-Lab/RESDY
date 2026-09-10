@@ -77,7 +77,7 @@ class SASA():
         .. todo::
 
            Generalise the atom selection to amino acids other than lysine: the element codes used here
-           are specific to LYS (GW, 23.07.26).
+           are specific to LYS (GW, 23.07.26) -  probably needs full lookup dict for all general atoms within file
         '''
 
         try:
