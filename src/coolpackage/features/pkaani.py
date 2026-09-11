@@ -62,20 +62,6 @@ class PKAANI():
                 Chain   Resid   pkaani
                 x       x       x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(calculate_pkaani(1ubq.pdb))
-              Chain  Resid pkaani
-            0     A      6      x
-            1     A     11      x
-            2     A     27      x
-            3     A     29      x
-            4     A     33      x
-            5     A     48      x
-            6     A     63      x
         '''
         code_for_df = os.path.basename(path).split(".")[0]
         pdb_path = path.split(".")[0]

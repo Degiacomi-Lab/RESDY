@@ -7,8 +7,7 @@ import importlib
 import inspect
 
 __all__ = []
-# resolved from __file__ rather than from the working directory, so that the package can be
-# imported from anywhere (Sphinx, for instance, builds from the docs folder)
+
 feature_folder = os.path.dirname(os.path.abspath(__file__))
 scripts_to_ignore = ['feature.py', '__init__.py', 'error_reporting.py']
 feat_folder_scripts = [a for a in os.listdir(feature_folder) if a not in scripts_to_ignore

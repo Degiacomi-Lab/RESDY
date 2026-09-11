@@ -1,14 +1,6 @@
 import csv
 import os
 import requests
-from openmm.app.modeller import Modeller
-from openmm.app.forcefield import ForceField
-from openmm.app.pdbfile import PDBFile
-from openmm.app import NoCutoff
-from openmm.openmm import LangevinMiddleIntegrator
-from openmm.app.simulation import Simulation
-from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
-from .helper import get_download_tool
 
 
 def download_AF_struc(pdb, outfolder="result"):
@@ -24,13 +16,6 @@ def download_AF_struc(pdb, outfolder="result"):
     :type pdb: str
     :param outfolder: The output directory used to know where the downloaded files should be
         written to
-    :type outfolder: str
-
-    .. rubric:: Example
-
-    ::
-
-        >>> download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='test_plddt')
     '''
 
     download_path = os.path.join(outfolder, "curated")
@@ -78,17 +63,6 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     :returns: A dictionary matching up all the lysines with their corresponding PLDDT values for the
         given AF structure.
     :rtype: dict
-
-    .. rubric:: Example
-
-    ::
-
-        >>>find_af_plddt('AF-P0CG48-F1-model_v4', outfolder='test_plddt')
-        > Finding plddt
-        AF-P0CG48-F1-model_v4; Resid No. A6; PLDDT: 93.79
-        AF-P0CG48-F1-model_v4; Resid No. A11; PLDDT: 89.45
-        AF-P0CG48-F1-model_v4; Resid No. A27; PLDDT: 94.28
-        ...
     '''
     cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
@@ -136,69 +110,6 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     finally:
         plddt_out_file.close()
     return dict_plddt
-
-
-def apply_minimisation(pdb, outfolder="result"):
-    '''
-    Utilise openmm to apply an energy minimisation in implicit solvent to relax the
-    structure in a more realistic state than in vacuum as AF structures are. 
-
-    :param pdb: The AF code for the structure to extract the PLDDT values from
-    :type pdb: str
-    :param outfolder: The output directory used to know where the minimised structure 
-        files should be written to.
-    :type outfolder: str
-
-    .. rubric:: Example
-
-    ::
-
-        >>> apply_minimisation('AF-P0CG48-F1-model_v6', outfolder='result')
-    '''
-    try:
-        print(f'> Minimising AF structure: {pdb}')
-        af_inst = PDBFile(f'{outfolder}{os.sep}curated{os.sep}{pdb}.pdb')
-
-        forcefield = ForceField("amber14-all.xml",
-                                "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
-        modeller = Modeller(af_inst.topology, af_inst.positions)
-        modeller.addHydrogens(forcefield)
-        system = forcefield.createSystem(modeller.topology,
-                                        nonbondedMethod=NoCutoff)
-
-        integrator = LangevinMiddleIntegrator(300*kelvin,
-                                            1/picosecond,
-                                            0.002*picoseconds)
-
-        simulation = Simulation(modeller.topology,
-                                system,
-                                integrator)
-
-        simulation.context.setPositions(modeller.positions)
-        simulation.minimizeEnergy(tolerance=10*kilojoule_per_mole/nanometer,
-                                maxIterations=1000)
-
-        sim_out = simulation.context.getState(getPositions=True)
-        sim_out_positions = sim_out.getPositions()
-        sim_out_topology = simulation.topology
-        modeller = Modeller(sim_out_topology, sim_out_positions)
-
-        all_hydrogens = [a for a in modeller.topology.atoms() if a.element.symbol == 'H']
-        modeller.delete(all_hydrogens)
-
-        PDBFile.writeFile(modeller.topology,
-                        modeller.getPositions(),
-                        open(f'{outfolder}{os.sep}curated{os.sep}{pdb}_relaxed.pdb', "w"))
-        os.rename(f'{outfolder}{os.sep}curated{os.sep}{pdb}_relaxed.pdb',
-                  f'{outfolder}{os.sep}curated{os.sep}{pdb}.pdb')
-        print(f'> Finished minising AF structure: {pdb}')
-
-    except Exception as e:
-        print(f'Failed to minimise the AF structure for {pdb}; structure removed. Error: {e}')
-        if os.path.exists(f'{outfolder}{os.sep}curated{os.sep}{pdb}.pdb'):
-            os.remove(f'{outfolder}{os.sep}curated{os.sep}{pdb}.pdb')
-        if os.path.exists(f'{outfolder}{os.sep}curated{os.sep}{pdb}_relaxed.pdb'):
-            os.remove(f'{outfolder}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
 
 
 if __name__ == '__main__':

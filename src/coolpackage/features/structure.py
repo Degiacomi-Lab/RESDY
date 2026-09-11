@@ -74,14 +74,6 @@ class Structure():
                 Chain   Resid   curvature   writhing    torsion   arc-length  phi psi
                 x           x           x          x          x            x    x   x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(self.calculate_melodia(1ubq.pdb))
-            Chain   Resid    curvature  writhing    torsion  arc-length  phi psi
-            0
         '''
         # Melodia 1 - Calculating geometry using melodia-py
         try:

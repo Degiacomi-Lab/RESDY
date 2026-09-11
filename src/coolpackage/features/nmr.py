@@ -80,20 +80,6 @@ class NMR():
 
         :param path: The path of the pdb file that legolas is being calculated for.
         :type path: str
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(self.calculate_legolas(1ubq.pdb))
-                                 PDB_Code   Chain  Resid   legolas
-            0     data/curated/1UBQ-alt-1       A      6   121.614
-            1     data/curated/1UBQ-alt-1       A     11   121.192
-            2     data/curated/1UBQ-alt-1       A     27   118.507
-            3     data/curated/1UBQ-alt-1       A     29   119.557
-            4     data/curated/1UBQ-alt-1       A     33   117.238
-            5     data/curated/1UBQ-alt-1       A     48   119.989
-            6     data/curated/1UBQ-alt-1       A     63   121.946
         '''
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:

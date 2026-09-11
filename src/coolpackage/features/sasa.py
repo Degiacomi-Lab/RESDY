@@ -60,20 +60,6 @@ class SASA():
                 x       x       x
         :rtype: pandas.DataFrame
 
-        .. rubric:: Example
-
-        ::
-
-            >>> print(calculate_sasa(1ubq.pdb))
-            Chain  Resid  sasa
-            0     A      6   x
-            1     A     11   x
-            2     A     27   x
-            3     A     29   x
-            4     A     33   x
-            5     A     48   x
-            6     A     63   x
-
         .. todo::
 
            Generalise the atom selection to amino acids other than lysine: the element codes used here

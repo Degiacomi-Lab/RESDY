@@ -59,20 +59,6 @@ class DAS():
                 Chain   Resid   das
                 x       x       x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(calculate_das(1ubq.pdb))
-            Chain  Resid  das
-            0     A      6   36
-            1     A     11   47
-            2     A     27   22
-            3     A     29   37
-            4     A     33   46
-            5     A     48   34
-            6     A     63   30
         '''
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this

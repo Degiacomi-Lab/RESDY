@@ -85,11 +85,29 @@ class Analysis(object):
 
 
     def get_data(self, uniprot_entry, resid):
+        '''
+        Retrieve data from the given dataframe which match up to a given uniprot
+        entry and residue.
+
+        :param uniprot_entry: Code for the uniprot entry to subset
+        :type  uniprot_entry: str
+        :param resid: Residue number to subset
+        :type resid: str
+
+        :returns: Dataframe containing only information from an alphafold structure
+        :rtype: pandas.DataFrame
+        '''
         df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
         return df_query
 
 
     def get_data_alphafold(self):
+        '''
+        Retrieve data from the given dataframe to the class which were produced by alphafold.
+
+        :returns: Dataframe containing only information from an alphafold structure
+        :rtype: pandas.DataFrame
+        '''
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
 
@@ -97,6 +115,13 @@ class Analysis(object):
     def GO_search_term(self, df, code = '', name = ''):
         '''
         List the subset of UNIPROT codes associated with a GO Term
+
+        :param df: Dataframe to get matches to GO term from
+        :type  df: pandas.DataFrame
+        :param code: Code of the Go term to analyse; format: 
+        :type code: str
+        :param name: Name corresponding to the GO term
+        :type name: str
         '''
         if code == '' and name == '':
             return 'Insufficient input!'
@@ -312,23 +337,26 @@ class Analysis(object):
 
 
     def get_extreme_values(self, feature, lower = 1, upper = 14):
-        df_query = self.df[(self.df[feature] < lower) | (self.df[feature] > upper)]
+        '''
+        Retrieve data from the given dataframe which are outside the lower and upper
+        boundaries for that feature of interest.
+
+        :param feature: Feature of interest to examine
+        :type feature: str
+        :param lower: Lower boundary for a value for the feature to not be considered extreme
+        :type lower: int
+        :param upper: Upper boundary for a value for the feature to not be considered extreme
+        :type upper: int
+
+        :returns: Dataframe containing only information from an alphafold structure
+        :rtype: pandas.DataFrame
+        '''
+        df_query = self.df[(self.df[feature] < int(lower)) | (self.df[feature] > int(upper))]
         return df_query
 
 
-    def remove_df(self, df_to_remove):
-        '''
-        '''
-        len_one = len(self.df)
-        remove_list = df_to_remove.index.tolist()
-        self.df = self.df.drop(index = remove_list)
-        len_two = len(self.df)
-        print(f'Original num of rows: {len_one}')
-        print(f'Current num of rows: {len_two}')
-        print(f'Num of rows removed: {len(df_to_remove)}')
-
-
-    def add_extra_measures(self, extra_measures_filename, write_new_file = False, out_filename='measures_new.csv'):
+    def add_extra_measures(self, extra_measures_filename, write_new_file = False,
+                           out_filename='measures_new.csv'):
         '''
         Function to add in extra measurements to the measures frame that has been autoloaded into
         the analysis class on defining this. This will match up the measurements in each case and
@@ -374,7 +402,9 @@ class Analysis(object):
                                 chain_value = r["Chain"]
                                 resid_value = r["Resid"]
 
-                                idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                                idx = np.where((new_df["PDB_Code"] == protein_code) &
+                                               (new_df["Chain"] == chain_value) &
+                                               (new_df["Resid"].astype(int) == resid_value))
                                 if len(idx[0]) == 0:
                                     continue
 
@@ -397,7 +427,9 @@ class Analysis(object):
                     chain_value = r["Chain"]
                     resid_value = r["Resid"]
 
-                    idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                    idx = np.where((new_df["PDB_Code"] == protein_code) &
+                                   (new_df["Chain"] == chain_value) &
+                                   (new_df["Resid"].astype(int) == resid_value))
                     if len(idx[0]) == 0:
                         continue
 
@@ -705,6 +737,7 @@ class Analysis(object):
             df = pd.concat([df, df_dictionary], ignore_index=True)
 
         return df
+
 
 
 if __name__ == '__main__':

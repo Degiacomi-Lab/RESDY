@@ -65,14 +65,6 @@ class Charge():
                 x           x           x
         :rtype: pandas.DataFrame
 
-        .. rubric:: Example
-
-        ::
-
-            >>> print(self.calculate_seqcharge(1M2F-alt-1.pdb))
-            Chain   Resid  seqcharge
-            0     A      95         -3
-
         .. todo::
 
            Add the ability to use 3 letter codes and their charges rather than the 1 letter codes, which

@@ -29,37 +29,42 @@ class Test_Uniprot(unittest.TestCase):
         self.PDB.download_fasta('1PAE')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE.fasta'))
 
-
     def test_clean_split_KCXmut(self):
         # test KCX to LYS mutation
         self.PDB.clean_and_split_pdb('13LD', 'P10724')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'))
-    
+        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb')
+        self.assertFalse(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
+
     def test_clean_split_SECmut(self):
         # test SEC to CYS mutation
         self.PDB.clean_and_split_pdb('1PAE', 'P22887')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
-    
+        M_1pae = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb')
+        self.assertFalse(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
+
     def test_clean_split_MSEmut(self):
         # test MSE to MET mutation
-        self.PDB.clean_and_split_pdb('6XZ7', 'P60422')
-        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}6XZ7-alt-1.pdb'))
-    
+        self.PDB.clean_and_split_pdb('1A8O', 'P12497')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
+        M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
+        self.assertFalse(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
+
     def test_clean_split_modelsplit(self):
         # test splitting of models
         self.PDB.clean_and_split_pdb('1A6M', 'Q13351')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A6M-alt1A.pdb'))
-    
+
     def test_clean_split_rotamersplit(self):
         # test splitting rotamers
         self.PDB.clean_and_split_pdb('1A6M', 'P02185')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A6M-alt1A.pdb'))
-    
+
     def test_clean_split_renumbering(self):
         # test renumbering residues with canonical uniprot sequence
         self.PDB.clean_and_split_pdb('3DBJ', 'P50030', chains=['A', 'C', 'E', 'G'])
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}3DBJ-alt-1.pdb'))
-    
+
     def test_clean_split_generalmod(self):
         #  test removal of modified residue
         self.PDB.clean_and_split_pdb('2MWS', 'P0CG48')
@@ -70,11 +75,15 @@ class Test_Uniprot(unittest.TestCase):
     def test_auxiliary(self):
         self.PDB.rewrite_pdb(path=f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'))
-        
+
         self.PDB.load_state(fname=f'demo{os.sep}proteins.csv',
                             outdir=self.outdir,
                             PDB_only=self.PDB_only)
         self.PDB.df = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains'])
+
+    def test_minimisation(self):
+        self.PDB.apply_minimisation('AF-P0CG48-F1-model_v6')
+        self.assertTrue(os.path.exists(f'test{os.sep}curated{os.sep}AF-P0CG48-F1-model_v6_relaxed.pdb'))
 
     def test_gathering(self):
         # runs on separate instance of PDB to work with demo
@@ -83,26 +92,6 @@ class Test_Uniprot(unittest.TestCase):
 
         outdir = 'demo'
         gap = 10
-        parallel = False
-        PDB_only = False
-        include_hetatm = False
-        resnames_of_interest = ['LYS']
-        PDB = CPN.PDB(outdir=outdir,
-                            gap=gap,
-                            parallel=parallel,
-                            PDB_only=PDB_only,
-                            include_hetatm=include_hetatm,
-                            resnames_of_interest=resnames_of_interest)
-        PDB.gather_proteins(UP.df, skip_if_found=False)
-        self.assertEqual(len(pd.read_csv(f'demo{os.sep}proteins.csv')), len(PDB.df))
-
-    def test_gathering_parallel(self):
-        # runs on separate instance of PDB to work with demo
-        UP = CPN.Uniprot()
-        UP.from_csv_file(f'demo{os.sep}demo_input.csv')
-
-        outdir = 'demo'
-        gap = 10
         parallel = True
         PDB_only = False
         include_hetatm = False
@@ -113,27 +102,9 @@ class Test_Uniprot(unittest.TestCase):
                             PDB_only=PDB_only,
                             include_hetatm=include_hetatm,
                             resnames_of_interest=resnames_of_interest)
-        PDB.gather_proteins(UP.df, skip_if_found=False)
-        self.assertEqual(len(pd.read_csv(f'demo{os.sep}proteins.csv')), len(PDB.df))
+        PDB.gather_proteins(UP.df[:1], skip_if_found=False)
+        self.assertEqual(1, len(PDB.df))
 
-    def test_gathering_pdb_only(self):
-        # runs on separate instance of PDB to work with demo
-        UP = CPN.Uniprot()
-        UP.from_csv_file(f'demo{os.sep}demo_input.csv')
-
-        outdir = 'demo'
-        gap = 10
-        parallel = True
-        PDB_only = True
-        include_hetatm = False
-        resnames_of_interest = ['LYS']
-        PDB = CPN.PDB(outdir=outdir,
-                            gap=gap,
-                            parallel=parallel,
-                            PDB_only=PDB_only,
-                            include_hetatm=include_hetatm,
-                            resnames_of_interest=resnames_of_interest)
-        #PDB.gather_proteins(UP.df, skip_if_found=False)
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,14 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
+from openmm.app.modeller import Modeller
+from openmm.app.forcefield import ForceField
+from openmm.app.pdbfile import PDBFile
+from openmm.app import NoCutoff
+from openmm.openmm import LangevinMiddleIntegrator
+from openmm.app.simulation import Simulation
+from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
+from .helper import get_download_tool
 from . import alphafold as af
 from . import patcher
 from .helper import get_download_tool, ShutUp
@@ -29,7 +37,7 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
-                 resnames_of_interest = ['LYS'], minimise_af=True):
+                 resnames_of_interest = ['LYS'], minimise_strucs='AF'):
         '''
         Initialise the PDB class.
 
@@ -50,9 +58,14 @@ class PDB(object):
         :param resnames_of_interest: List of residues to investigate, only used for curating list of
             PLDDT values for the residues of interest here.
         :type resnames_of_interest: list
-        :param minimise_af: Toggleable option to re-minimise AF structures in implicit solvent rather
-            than vacuum as standard AF structures are. Default is set to True. 
-        :type minimise_af: bool
+        :param minimise_strucs: Option to run a energy minimisastion on the structures curated
+            through openmm, option is to minimise nothing, just alphafold, just RCSB PDB or all.
+            Options:
+                - '' or None: Don't run minimisation
+                - 'AF': Just run on alphafold structures
+                - 'PDB': Just run on PDB
+                - 'ALL': Run on all structures
+        :type minimise_strucs: str
         '''
 
         self.outdir = outdir
@@ -60,7 +73,26 @@ class PDB(object):
         self.parallel = parallel
         self.include_hetatm = include_hetatm
         self.resnames_of_interest = resnames_of_interest
-        self.minimise_af = minimise_af
+        if isinstance(minimise_strucs, str):
+            match minimise_strucs:
+                case 'AF':
+                    self.minimise_af = True
+                    self.minimise_pdb = False
+                case 'PDB':
+                    self.minimise_af = False
+                    self.minimise_pdb = True
+                case 'ALL':
+                    self.minimise_af = True
+                    self.minimise_pdb = True
+                case _:
+                    print(f'>> Minimisation method given as input (input: {minimise_strucs}) not '
+                          f'recognised: options are None, AF, PDB, ALL; Using default method of '
+                          f'only minimising AF structures.')
+                    self.minimise_af = True
+                    self.minimise_pdb = False
+        else:
+            self.minimise_af = False
+            self.minimise_pdb = False
 
         # create folder of curated protein structures
         self.curated_dir = os.path.join(outdir, "curated")
@@ -325,13 +357,12 @@ class PDB(object):
 
                 try:
                     if self.minimise_af:
-                        # apply minimisation to AF structure
                         out_print_trap_af_minimisation = io.StringIO()
                         with redirect_stdout(out_print_trap_af_minimisation):
-                            af.apply_minimisation(pdb_code, outfolder=self.outdir)
+                            self.apply_minimisation(pdb_code)
                         print_statements.append(out_print_trap_af_minimisation.getvalue())
                 except Exception as e:
-                    print(f'>> Failed on af.apply_minimisation() for pdb {pdb_code} with error: {str(e)}')
+                    print(f'>> Failed on af.apply_minimisation() for AF {pdb_code} with error: {str(e)}')
                     finish_curate_jobs(failed=True)
                     return None
 
@@ -372,10 +403,11 @@ class PDB(object):
                     return pd.DataFrame.from_records(data, index=[0])
 
             # load, clean, and split it in alternate conformations
-            out_print_trap = io.StringIO()
+            clean_split_print_trap = io.StringIO()
+            minimisation_print_trap = io.StringIO()
             data = None
             try:
-                with redirect_stdout(out_print_trap):
+                with redirect_stdout(clean_split_print_trap):
                     if not self.PDB_only:
                         largest_gap = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
@@ -384,7 +416,7 @@ class PDB(object):
                         largest_gap = self.clean_and_split_pdb(pdb_code)
                         data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
             except Exception as e:
-                print_statements.append(out_print_trap.getvalue())
+                print_statements.append(clean_split_print_trap.getvalue())
                 broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': f'{type(e).__name__}: {str(e)}'}])
                 broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
                 with lock:
@@ -393,7 +425,7 @@ class PDB(object):
                 finish_curate_jobs(failed=True)
                 return None
 
-            print_statements.append(out_print_trap.getvalue())
+            print_statements.append(clean_split_print_trap.getvalue())
             finish_curate_jobs(failed=False)
             return pd.DataFrame.from_records(data, index=[0])
 
@@ -421,11 +453,9 @@ class PDB(object):
            (24.03.26).
         '''
         try:
-            #download and clean the structure
             self.download_pdb(pdb)
             replacement_dict = self.clean(pdb, uniprot_code=uniprot_code)
 
-            #splits into all alternative conformations into independent structures
             self.split_struc_nmr(pdb)
             self.split_struc_alt_aa(pdb)
 
@@ -434,7 +464,7 @@ class PDB(object):
 
 
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
-        test = False
+        test_patch = False
         largest_gap = np.NaN
         for cnt, f in enumerate(files):
             mypath = os.path.split(f)[0]
@@ -454,7 +484,7 @@ class PDB(object):
                     except Exception as e:
                         print(f'>> Renumbering skipped for conformer {cnt} with error: {str(e)}')
 
-                test = True
+                test_patch = True
 
             except Exception as e:
                 tmp_name = f'tmp_{os.path.splitext(os.path.basename(f))[0]}'
@@ -462,7 +492,13 @@ class PDB(object):
                 print(f">> Patching failed for conformer {cnt}. Error: {str(e)}")
                 continue
 
-        if not test:
+            try:
+                if self.minimise_pdb:
+                    self.apply_minimisation(os.path.basename(f).split('.')[0])
+            except Exception as e:
+                print(f'Failed to apply minimisation to file {f}')
+
+        if not test_patch:
             raise Exception("Patching failed for all conformers")
 
         return largest_gap
@@ -471,21 +507,11 @@ class PDB(object):
     def download_pdb(self, pdb):
         '''
         Download the required PDB file for the PDB code specified. This is used for the coordinates
-        of the protein to extract the featurised data for each protein from.
-
-        .. rubric:: Method
-
-        Identify the download tool that is available for use. Check if PDB file has already been
-        downloaded, if so skip. Otherwise download the PDB file from the RCSB website.
+        of the protein to extract the featurised data for each protein from. If a pdb is found that
+        has already been downloaded for this case, it will keep the downloaded copy.
 
         :param pdb: the PDB code for the PDB file to be downloaded
         :type pdb: str
-
-        .. rubric:: Example
-
-        ::
-
-            >>> self.download_pdb('1ubq')
         '''
         files=glob.glob(os.path.join(self.raw_dir, "*pdb"))
         test_file = os.path.join(self.raw_dir, f'{pdb}.pdb')
@@ -505,21 +531,12 @@ class PDB(object):
     def download_fasta(self, pdb):
         '''
         Download the required fasta file for the PDB code specified. This is used to align the
-        structures and check for missing residues and extract sequences for comparison.
-
-        .. rubric:: Method
-
-        Identify the download tool that is available for use. Check if fasta file has already been
-        downloaded, if so skip. Otherwise download the fasta file from the RCSB website.
+        structures and check for missing residues and extract sequences for comparison. If a
+        fasta is found that has already been downloaded for this case and has data in it, it
+        will keep the downloaded copy.
 
         :param pdb: the PDB code for the fasta file to be downloaded
         :type pdb: str
-
-        .. rubric:: Example
-
-        ::
-
-            >>> self.download_fasta('1ubq')
         '''
         def get_data():
             try:
@@ -701,7 +718,7 @@ class PDB(object):
                         line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
                         list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
 
-                        # edit the fasta file to change the position
+                        # edit the fasta file to change the code at desired position
                         fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
                         if os.path.getsize(fasta_name) == 0:
                             self.download_fasta(pdb=pdb)
@@ -1247,6 +1264,58 @@ class PDB(object):
             os.remove(path)
             print(f'Failed rewriting pdb file with error: {str(e)}')
 
+
+    def apply_minimisation(self, pdb):
+        '''
+        Utilise openmm to apply an energy minimisation in implicit solvent to relax the
+        structure in a more realistic state than in vacuum as AF structures are. 
+
+        :param pdb: The AF code for the structure to extract the PLDDT values from
+        :type pdb: str
+        :param outfolder: The output directory used to know where the minimised structure 
+            files should be written to.
+        :type outfolder: str
+        '''
+        try:
+            print(f'>> Minimising structure: {pdb}')
+            af_inst = PDBFile(f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb')
+
+            forcefield = ForceField("amber14-all.xml",
+                                    "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
+            modeller = Modeller(af_inst.topology, af_inst.positions)
+            modeller.addHydrogens(forcefield)
+            system = forcefield.createSystem(modeller.topology,
+                                            nonbondedMethod=NoCutoff)
+
+            integrator = LangevinMiddleIntegrator(300*kelvin,
+                                                1/picosecond,
+                                                0.002*picoseconds)
+
+            simulation = Simulation(modeller.topology,
+                                    system,
+                                    integrator)
+
+            simulation.context.setPositions(modeller.positions)
+            simulation.minimizeEnergy(tolerance=10*kilojoule_per_mole/nanometer,
+                                    maxIterations=1000)
+
+            sim_out = simulation.context.getState(getPositions=True)
+            sim_out_positions = sim_out.getPositions()
+            sim_out_topology = simulation.topology
+            modeller = Modeller(sim_out_topology, sim_out_positions)
+
+            all_hydrogens = [a for a in modeller.topology.atoms() if a.element.symbol == 'H']
+            modeller.delete(all_hydrogens)
+
+            PDBFile.writeFile(modeller.topology,
+                            modeller.getPositions(),
+                            open(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb', "w"))
+            print(f'>> Finished minising structure: {pdb}')
+
+        except Exception as e:
+            print(f'Failed to minimise the structure for {pdb}; Error: {e}')
+            if os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb'):
+                os.remove(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
 
 
 if __name__ == "__main__":

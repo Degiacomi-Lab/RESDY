@@ -146,19 +146,16 @@ class Aggregation:
 
     def aggregate_data(self):
         '''
-        Match aggregation type up to the relevant aggregation function
+        Match aggregation type up to the relevant aggregation function. Calls
+        _calculate_statistics() to get the dataframe of statistics data on each residue key.
+        Uses the input parameter of aggregation_method and matches this to a case, this case
+        the drops any columns in the dataframe which aren't related to the aggregation
+        method.
 
-        .. rubric:: Method
-
-        Uses the input parameter of aggregation_method and calls the relevant function. If no cases
-        match, assumes average and prints to terminal to state this.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> self.aggregate_data()
+        :returns: Dataframe with aggregated data accoriding to the aggregation method
+        :rtype: pandas.DataFrame
         '''
+
         bad_feature_sets = [('depth', 0, 20)]  # add to as more confinements on features needed
         for bad_feat, feat_low, feat_up in bad_feature_sets:
             if bad_feat in self.df_measurements.columns:
@@ -270,18 +267,6 @@ class Aggregation:
         below. The first method is to use the standard deviation of the individual features of the
         AEV to work out which features show variation and will be likely to be good choices to take
         through to the model. This is currently setup to find the top 100 from the base aevs fed in.
-
-        .. rubric:: Method
-
-        Take the dataframe and perform a standard deviation over the AEVs, take the top required
-        number of structures in terms of standard deviation as the new input dataframe going
-        forward.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> self.reduce_aevs()
         '''
         print('>> Reducing AEV dimensions with standard deviation...')
         aev_stds = {}
@@ -318,18 +303,6 @@ class Aggregation:
         the columns within the AEVs and remove the columns which are highly correlated together such
         that it is the minimum number of columns without correlation. Non-correlation was taken to
         be a VIF value of less than 5.
-
-        .. rubric:: Method
-
-        Take the dataframe of columns of the AEV and plug this into the preprocessing module to
-        calculate the VIF values for each of these. This will return a list of de-correlated columns
-        which can be used to cut down the dataframe.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> self._prepare_vif_aev()
         '''
         print('>> Reducing AEV dimensions using VIF analysis...')
         aev_cols = [a for a in self.df_measurements.columns if 'AEV_' in a]
@@ -527,12 +500,6 @@ class Aggregation:
 
         :param outname: the name of the csv file that the output is written to
         :type outname: str
-
-        .. rubric:: Example
-
-        ::
-
-            agg.save_state(outname='measures_aggregated.csv')
         '''
         self.df_agg.to_csv(outname, index_label=False, index=False)
 

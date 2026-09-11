@@ -73,14 +73,6 @@ class RMSF():
                 Chain   Resid   rmsf
                 x           x      x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(self.calculate_rmsf(1M2F-alt-1.pdb))
-                Chain   Resid     rmsf
-            0     A      95       -3
         '''
         try:
             # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time

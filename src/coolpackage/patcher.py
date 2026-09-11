@@ -623,10 +623,6 @@ def curate(pdb, fasta, outdir="result", gap=10,
     :type include_hetatm: bool
     :returns: The final name of the curated pdb file
     :rtype: str
-
-    .. todo::
-
-       Establish whether Modeller needs to be launched at all when there are no gaps.
     '''
     pdb_tmp_name = f'tmp_{os.path.splitext(os.path.basename(pdb))[0]}'
     tmp_folder = os.path.join(outdir, pdb_tmp_name)
@@ -690,7 +686,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
 
     return outname, largest
 
-##############################################################################
+
 
 if __name__ == "__main__":
 

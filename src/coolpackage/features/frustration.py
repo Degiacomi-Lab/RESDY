@@ -69,24 +69,6 @@ class Frustration():
                 Chain   Resid   frustration   density
                 x           x             x         x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(self.calculate_frustration(1ubq.pdb))
-                resid chain  Modified  frustration   density
-            5       6     A     False    -1.180647  4.474738
-            10     11     A     False    -1.277059  1.951710
-            26     27     A     False    -0.584062  4.216964
-            28     29     A     False    -0.721478  3.747545
-            32     33     A     False    -0.706590  2.437673
-            47     48     A     False    -0.974550  3.083861
-            62     63     A     False    -0.532853  1.358850
-
-        .. todo::
-
-           Add the modules required by this feature (openmm, pdbfixer) to the readme.
         '''
         df_frustration = pd.DataFrame()
         try:

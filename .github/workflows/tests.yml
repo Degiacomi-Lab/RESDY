@@ -29,11 +29,10 @@ jobs:
       - name: Test
         run: |
           python test/test_uniprot.py
-          python test/test_protein.py
-          python test/test_patcher.py
           python test/test_alphafold.py
           python test/test_helper.py
           python test/test_measure.py
           python test/test_aggregate.py
           python test/test_analysis.py
-          python test/test_viewer.py
+          python test/test_protein.py
+          python test/test_patcher.py

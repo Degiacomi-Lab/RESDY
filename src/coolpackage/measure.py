@@ -62,8 +62,8 @@ class Measure(object):
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
-                 residue_of_interest='LYS',
-                 parallel=False, include_modified=False, report_errors= True):
+                 residue_of_interest='LYS', parallel=False, include_modified=False,
+                 report_errors= True):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -92,8 +92,16 @@ class Measure(object):
             folder can also be requested by its class name. 'all' is a shorthand for the preset
             list defined in _setup_measures().
         :type features: list
-        :param residue_of_interest: 3 letter code of the residue to measure features over
-        :type residue_of_interest: str
+        :param residue_of_interest: The residue of interest to calculate measurements for, if
+            investigating LYS or CYS, can enter a string with either of these as code is setup
+            to handle them. If you are investigating other resiudes or would like more control
+            over LYS or CYS properties for calculation, please enter a dictionary of the following
+            format:
+            {'non_modified_codes': [residue codes of standard state],
+            'modified_codes': [codes of modfified state, can be left as '' if not investigating],
+            'atom_select_names_nonmod': [atom names of interest in standard state],
+            'atom_select_names_modified': [atom names of interest in modified residues]}
+        :type residue_of_interest: str, dict
         :param parallel: Option to run the measurements in parallel.
         :type parallel: bool
         :param include_modified: Option to include lysines that have been seen to be modified in the
@@ -136,7 +144,21 @@ class Measure(object):
         if self.report_errors: self.error_filename = self._setup_report_errors_file()
         else: self.error_filename = 'no_record'
 
-        self.aa_properties = self._match_resid_codes(residue_of_interest)
+        self.residue_of_interest = residue_of_interest
+        if isinstance(residue_of_interest, str):
+            self.aa_properties = self._match_resid_codes(residue_of_interest)
+        elif isinstance(residue_of_interest, dict):
+            self.aa_properties = residue_of_interest
+            dict_keys = ['non_modified_codes', 'modified_codes',
+                         'atom_select_names_nonmod', 'atom_select_names_modified']
+            if list(residue_of_interest) != dict_keys:
+                raise KeyError(f'Not all keys required for aa_properties dict given; please '
+                               f'ensure that all keys required ({", ".join(dict_keys)}) are '
+                               f'included (can be set to \'\' if nothing required in the parameter)')
+        else:
+            raise ValueError(f'Unknown option give to residue_of_interest parameter: '
+                            f'{residue_of_interest}; please enter either string or dict. '
+                            f'See class documentation.')
         self.features = list(features)
         self.legolas_aevs = True
         self._setup_measures(list(features))
@@ -154,12 +176,9 @@ class Measure(object):
         self.parallel_items = {}
 
         # Check that all files in DataFrame appear at least once in folder
-        # find all AlphaFold entries
         files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        print(files_af)
-        # find all PDB entries
         files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        for f in df_input["PDB_Code"].values:
+        for f in df_input['PDB_Code'].values:
             if f not in files_af and f not in files_pdb:
                 print(f'WARNING: {f} not found in folder {self.folder}')
 
@@ -367,11 +386,6 @@ class Measure(object):
 
         .. todo::
 
-           Change this so that it does not default to the carbamylation work, and stops the
-           codebase instead.
-
-        .. todo::
-
            Add a check on which residue is taken through to the measurements, so that it can be
            established which programmes can actually be run on it. The residues covered are
            PROPKA (ASP, GLU, HIS, CYS, TYR, LYS, ARG) and pkaANI (ASP, GLU, HIS, TYR, LYS)
@@ -386,51 +400,17 @@ class Measure(object):
             case 'CYS':
                 aa_properties = {'non_modified_codes': ['CYS'],
                                 'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'ARG':
-                aa_properties = {'non_modified_codes': ['ARG'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'SER':
-                aa_properties = {'non_modified_codes': ['SER'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'THR':
-                aa_properties = {'non_modified_codes': ['THR'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'TYR':
-                aa_properties = {'non_modified_codes': ['TYR'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'ASN':
-                aa_properties = {'non_modified_codes': ['ASN'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'ASP':
-                aa_properties = {'non_modified_codes': ['ASP'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'GLU':
-                aa_properties = {'non_modified_codes': ['GLU'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_nonmod': ['SG'],
                                 'atom_select_names_modified': []}
             case _:
                 print(f'>> Residue of interest given not known; using LYS as default')
                 if self.report_errors:
                     self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_code}) not known; using LYS as default')
-                aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                'modified_codes': ['LYE', 'KCX'],
-                                'atom_select_names_nonmod': ['NZ'],
-                                'atom_select_names_modified': ['NZ', 'N07']}
+                raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
+                                f'match to any cases, stopping calculations. Please modify input '
+                                f'parameter residue of interest with either LYS or CYS or give a full '
+                                f'dictionary of properties for your custom investigation into another '
+                                f'residue.')
 
         return aa_properties
 
@@ -456,14 +436,8 @@ class Measure(object):
     def measure_data(self):
         '''
         Determine the appropriate measures function to call based on the combination of running
-        PDB_only and in parallel, reducing the number of individual functions that the user will have
-        to call themselves.
-
-        .. rubric:: Example
-
-        ::
-
-            M.measure_data()
+        PDB_only and in parallel, reducing the number of individual functions that the user will
+        have to call themselves.
         '''
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
@@ -528,12 +502,6 @@ class Measure(object):
         :param error: The error that has been produced at that step of the measurement when it has
             been attempted to extract features from the pdb file
         :type error: str
-
-        .. rubric:: Example
-
-        ::
-
-            self._report_error_to_file('propka 1', path, e)
         '''
         with open(self.error_filename, 'a', encoding='utf-8') as e_f:
             e_f.writelines('--------------------------------------------------------------------------\n')
@@ -551,12 +519,6 @@ class Measure(object):
 
         :param outname: the name of the csv file that the output is written to
         :type outname: str
-
-        .. rubric:: Example
-
-        ::
-
-            M.save_state(outname='measures.csv')
         '''
         # sort by uniprot code to give order to output after parallel run
         if not self.PDB_only:
@@ -577,12 +539,6 @@ class Measure(object):
 
         Create list of files that have been curated into the self.outdir directory. Iterate over the
         list of the files, check if structure file is
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M.measure_dataframe()
         '''
         if self.PDB_only:
             return 'Call PDB_only method instead'
@@ -673,12 +629,6 @@ class Measure(object):
         :param lock: lock used to stop processes writing to output files and dataframes at the same
             time
         :type lock: multiprocessing manager lock
-
-        .. rubric:: Example
-
-        ::
-
-            self._measure_file(file_details, files_list)
         '''
         uniprot_code, pdb_code, method, res, chains = file_details
 
@@ -746,20 +696,12 @@ class Measure(object):
                     continue
 
             processing_time = round((time.time()-tstart), 2)
-            #print(f">> file processed in {processing_time} seconds.")
             terminal_out_statements.append(f">> file processed in {processing_time} seconds.")
-            #average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
-            #print(f'>> Time average per file: {average_time_per_file} seconds.')
-            #sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
-            #time_remaining_str = str(datetime.timedelta(seconds=sec_remaining))
-            #print(f'Predicted time remaining: {time_remaining_str}')
 
             with lock:
-                # write all terminal outputs for file
                 for statement in terminal_out_statements:
                     print(statement)
 
-                # document the data to a log file
                 if self.activate_log:
                     if df_currentfile.empty is False:
                         pd.set_option('display.max_colwidth', None,
@@ -806,12 +748,6 @@ class Measure(object):
         :type log_path: str
         :returns: Dataframe containing all the measurements that were in the given log file
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            M.recover_from_log()
         '''
         if self.PDB_only:
             return 'Function not callable.'
@@ -909,12 +845,6 @@ class Measure(object):
         :param log_path: The name of the measures log file By default takes the name
             'measures_log.txt'
         :type log_path: str
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M.restart_measure()
         '''
 
         if self.PDB_only:
@@ -959,12 +889,6 @@ class Measure(object):
         :type to_merge: pandas.DataFrame
         :param col_name: Name of the column which the new data is from.
         :type col_name: str
-
-        .. rubric:: Example
-
-        ::
-
-            self._combine_dataframes(df, result, meas[0])
         '''
         to_merge = to_merge.reset_index(drop=True)
 
@@ -1027,12 +951,6 @@ class Measure(object):
         saved to memory and a log file produced at the same time if required. Timing is kept to
         update the predicted time remaining as it goes along. M.save_state() can be used to save
         the data to a csv.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M.measure_PDB_only()
         '''
         if not self.PDB_only:
             print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
@@ -1172,12 +1090,6 @@ class Measure(object):
             'measures_log.txt'
         :type log_path: str
 
-        .. rubric:: Example
-
-        ::
-
-            >>> M.restart_measure_pdb_only()
-
         .. todo::
 
            Use a 'completed' column for everything here, rather than removing the rows from df_input
@@ -1273,12 +1185,6 @@ class Measure(object):
         :type log_path: str
         :returns: Dataframe containing all the measurements that were in the given log file
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            M.recover_from_log_PDB_only()
         '''
         if not self.PDB_only:
             return 'Function not callable.'
@@ -1383,18 +1289,8 @@ class Measure(object):
         '''
         Function to remove any temporary or result files created through the calculation of the
         measurements within this class. While all are meant to have been moved at the time of
-        calculation, occasionally this fails and leaves some behind. Note: please add specific
-        subprocesses if need to add extra cleanup items into this function.
-
-        .. rubric:: Method
-
-        Call subprocess calls to move specific sets of files to a specific directory.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M._cleanup_calculation_files()
+        calculation, occasionally this fails and leaves some behind. This applies particularly
+        with Modeller, Legolas and propka.
         '''
         def _mv_files(files, dest):
             '''

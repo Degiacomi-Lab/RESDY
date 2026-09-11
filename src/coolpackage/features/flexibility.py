@@ -57,20 +57,6 @@ class Flexibility():
                 Chain   Resid   Flexibility
                 x       x       x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(calculate_flexibility(1ubq.pdb))
-              Chain  Resid  flexibility
-            0     A      6    10.776667
-            1     A     11    15.058889
-            2     A     27     7.253333
-            3     A     29    13.685556
-            4     A     33    20.076667
-            5     A     48    13.066667
-            6     A     63    15.998889
         '''
 
         try:
