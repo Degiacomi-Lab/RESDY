@@ -63,7 +63,7 @@ class Measure(object):
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True):
+                 report_errors= True, only_relaxed=True):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -114,6 +114,10 @@ class Measure(object):
             measures calculations are being performed. This will write the file and the error to a
             separate text document labelled "measures_errors_{date}.txt".
         :type report_errors: bool
+        :param only_relaxed: Option to only calculate measurements for structures that are relaxed if
+            there is a relaxed structure available for the structure. If set to False, measures will
+            be calculated to both original and relaxed form. Default is True.
+        :type only_relaxed: bool
         '''
 
         self.activate_log = False
@@ -134,6 +138,7 @@ class Measure(object):
         self.outdir = outdir
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
+        self.only_relaxed = only_relaxed
 
         # modified lysine management
         self.include_mod = include_modified
@@ -635,8 +640,17 @@ class Measure(object):
         # calculate features values from all PDB files associated with specific DataFrame entry
         frames_df_list = []
         for f in self.files_to_analyse:
-            if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
-                continue
+            if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
+                if 'AF-' in f and 'AF-' in pdb_code:
+                    if pdb_code.split("-")[1].lower() != os.path.splitext(os.path.basename(f))[0].split("-")[1].lower():
+                        continue
+                else:
+                    continue
+
+            if self.only_relaxed:
+                if ('_relaxed' not in f and
+                    os.path.exists(os.path.join(self.folder, f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
+                    continue
 
             terminal_out_statements = []
             tstart = time.time()

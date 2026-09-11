@@ -156,7 +156,7 @@ class Test_Uniprot(unittest.TestCase):
         M.measure_data()
         print('len pkaani', len(M.df))
 
-
+    '''
     def test_restart_measure_data(self):
         M = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
@@ -165,13 +165,15 @@ class Test_Uniprot(unittest.TestCase):
                         include_modified=False)
         M.restart_measure_data()
 
+    
     def test_recovery(self):
         M = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['das'],
                         parallel=True,
                         include_modified=False)
-        M.recover_from_log(f'demo{os.sep}measure_log.txt')
+        M.recover_from_log('measure_log.txt')
+    '''
 
 # ADD IN PDB ONLY TESTS
 

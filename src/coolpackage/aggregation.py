@@ -15,7 +15,8 @@ class Aggregation:
 
     def __init__(self, df_measurements, aggregation_method='minmax',
                  features_to_include=['all'], aev_red_method='pca',
-                 num_sd_aev_features=100, include_chain=False):
+                 num_sd_aev_features=100, include_chain=False,
+                 get_nan_df=False):
         '''
         Initialisation of the Aggregation class.
 
@@ -67,6 +68,10 @@ class Aggregation:
             aggregate on 'Uniprot_Entry', 'Chain', 'Resid' else will aggregate on 'Uniprot_Entry',
             'Resid' (default)
         :type include_chain: bool, optional
+        :param get_nan_df: Option to create a dataframe (saved as csv) which contains all the rows
+            that are being removed when aggregating, this allows curation of the data being removed
+            for investigations into potential problems.
+        :type get_nan_df: bool, optional
         '''
         # Note: current preference is to ignore aev_legolas given aev is more likely to be calculated
         if isinstance(df_measurements, str):
@@ -78,8 +83,9 @@ class Aggregation:
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
         self.include_chain = include_chain
+        self.get_nan_df = get_nan_df
         self.df_agg = pd.DataFrame()
-        
+
         self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
                                  'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
 
@@ -129,6 +135,10 @@ class Aggregation:
             self.features_to_include = [a for a in self.features_to_include if a not in always_na_cols]
 
         len_before_df = len(self.df_measurements)
+
+        if self.get_nan_df:
+            df_nan = self.df_measurements[self.df_measurements[self.features_to_include].isna()]
+            df_nan.to_csv('measures_nan_feature_data_removed.csv')
 
         na_per_feature = {c: int(self.df_measurements[c].isna().sum()) for c in self.features_to_include}
         keep = self.df_measurements.dropna(subset=self.features_to_include)
