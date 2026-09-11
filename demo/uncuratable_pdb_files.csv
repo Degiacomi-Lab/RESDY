@@ -1,35 +1,3 @@
 Uniprot,PDB,Error
-P40616,5J5C,Exception: Patching failed for all conformers
-P40616,5EE5,Exception: Patching failed for all conformers
-P40616,1UPT,Exception: Error cleaning 1UPT: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '1UPT'
-P40616,4DCN,Exception: Error cleaning 4DCN: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '4DCN'
-P40616,5EE5,Exception: Error cleaning 5EE5: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '5EE5'
-P40616,5J5C,Exception: Error cleaning 5J5C: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '5J5C'
-Q16825,8GVL,Exception: Error cleaning 8GVL: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GVL'
-Q16825,8GVV,Exception: Error cleaning 8GVV: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GVV'
-Q16825,8GWH,Exception: Error cleaning 8GWH: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GWH'
-Q16825,8GXE,Exception: Error cleaning 8GXE: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GXE'
-Q16825,8Y8Y,Exception: Error cleaning 8Y8Y: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8Y8Y'
-P0CG48,2MWS,Exception: Error cleaning 2MWS: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '2MWS'
-P02185,1A6M,Exception: Error cleaning 1A6M: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '1A6M'
-P40616,5EE5,Exception: Error cleaning 5EE5: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '5EE5'
-P40616,5J5C,Exception: Error cleaning 5J5C: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '5J5C'
-P40616,1UPT,Exception: Error cleaning 1UPT: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '1UPT'
-P40616,4DCN,Exception: Error cleaning 4DCN: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '4DCN'
-Q16825,8GVV,Exception: Error cleaning 8GVV: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GVV'
-Q16825,8GVL,Exception: Error cleaning 8GVL: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GVL'
-Q16825,8GWH,Exception: Error cleaning 8GWH: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GWH'
-P0CG48,2MWS,Exception: Error cleaning 2MWS: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '2MWS'
-Q16825,8GXE,Exception: Error cleaning 8GXE: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8GXE'
-Q16825,8Y8Y,Exception: Error cleaning 8Y8Y: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '8Y8Y'
-P02185,1A6M,Exception: Error cleaning 1A6M: Error renaming chains. Could not download FASTA file. Error: [Errno 2] No such file or directory: '1A6M'
-P40616,5J5C,Exception: Patching failed for all conformers
-P40616,5EE5,Exception: Patching failed for all conformers
 P40616,5EE5,Exception: Patching failed for all conformers
 P40616,5J5C,Exception: Patching failed for all conformers
-P40616,5J5C,Exception: Patching failed for all conformers
-P40616,5EE5,Exception: Patching failed for all conformers
-P40616,5EE5,Exception: Patching failed for all conformers
-P40616,5J5C,Exception: Patching failed for all conformers
-P40616,5J5C,Exception: Patching failed for all conformers
-P40616,5EE5,Exception: Patching failed for all conformers
