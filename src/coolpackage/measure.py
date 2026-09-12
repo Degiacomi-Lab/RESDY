@@ -86,7 +86,7 @@ class Measure(object):
         :type log_path: str
         :param features: The list of measurements that you wish to use on the given structures.
             Select which of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth',
-            'aev', 'aev_legolas', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
+            'aev', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
             'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'frustration',
             'density', 'evolution', 'rmsf'. Any class defined in a script added to the features
             folder can also be requested by its class name. 'all' is a shorthand for the preset
@@ -165,7 +165,6 @@ class Measure(object):
                             f'{residue_of_interest}; please enter either string or dict. '
                             f'See class documentation.')
         self.features = list(features)
-        self.legolas_aevs = True
         self._setup_measures(list(features))
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
@@ -216,13 +215,12 @@ class Measure(object):
         # functions must return a dataframe [chain, resid, measure]
         if 'all' in features_list:
             features_list = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
-                        'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
-                        'evolution',
+                        'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
                         'rmsf']
             self.features = list(features_list)
         self.measures = []
         melodia_features = []
-        melodia_added = False; frustration_added = False; legolas_added = False
+        melodia_added = False; frustration_added = False
         for m in features_list:
             if m == 'propka':
                 P = PROPKA(outdir=self.outdir,
@@ -277,28 +275,13 @@ class Measure(object):
                 self.measures.append([m, flex.calculate])
             elif m == 'legolas':
                 try:
-                    if self.legolas_aevs:
-                        if 'aev_legolas' not in self.features:
-                            self.features.append('aev_legolas')
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=self.legolas_aevs,
+                    nmr = NMR(outdir=self.outdir,
                             include_modified=self.include_mod,
                             error_filename=self.error_filename,
                             aa_properties=self.aa_properties)
                     self.measures.append([m, nmr.calculate_legolas])
-                    legolas_added = True
                 except Exception as e:
-                    for f in (m, 'aev_legolas'):
-                        if f in self.features: self.features.remove(f)
-                    print(f'>> Failed to add legolas to features calculation list; '
-                          f'removed from list; error: {e}')
-            elif m == 'aev_legolas':
-                if not legolas_added:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
-                              include_modified=self.include_mod,
-                              error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                    self.measures.append(['legolas', nmr.calculate_legolas])
-                    legolas_added = True
+                    print(f'>> Failed to add legolas for features calculation list; error: {e}')
             elif m in ['frustration', 'density']:
                 try:
                     if not frustration_added:
@@ -580,7 +563,7 @@ class Measure(object):
             base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Method']
             df_parallel = pd.DataFrame()
 
-            gpu_feats = ['aev', 'evolution', 'legolas', 'aev_legolas']
+            gpu_feats = ['aev', 'evolution', 'legolas']
             gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
             cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
 
@@ -945,11 +928,6 @@ class Measure(object):
                 frust_features = ['frustration', 'density']
                 for feature in self.features:
                     if feature in frust_features:
-                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
-            elif col_name == 'legolas':
-                legolas_features = ['legolas', 'aev_legolas']
-                for feature in self.features:
-                    if feature in legolas_features and feature in to_merge.columns:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]

@@ -16,13 +16,14 @@ dependencies:
   - propka
   - ase
   - pytorch
-  - torchani
+  - torchani<=2.2.4
   - openmm
   - pdbfixer
   - msms
   - plotly
   - mdtraj
-  
+  - nglview
+  - numba
   - pip:
     - melodia-py==0.1.8
     - fair-esm

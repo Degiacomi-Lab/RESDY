@@ -12,7 +12,8 @@ try:
     import torch
     import torchani
 except Exception as e:
-    print(f'Packages required for AEV calculation are not available, will not be able to calculate AEVs. Error: {e}')
+    print(f'Packages required for AEV calculation are not available, '
+          f'will not be able to calculate AEVs. Error: {e}')
 
 
 class NMR():
@@ -20,7 +21,7 @@ class NMR():
     15N NMR values for structures.
     '''
 
-    def __init__(self, outdir, legolas_aevs=False, include_modified=False,
+    def __init__(self, outdir, include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
@@ -31,9 +32,6 @@ class NMR():
 
         :param outdir: The output directory that measurements will be saved to.
         :type outdir: str
-        :param legolas_aevs: Toggle setting to indicate if you want the legolas programme to dump
-            the AEVs from the calculation of the 15N nmr values. Default is False.
-        :type legolas_aevs: bool
         :param include_modified: Toggle to include residues which have been modified within the
             featurisation
         :type include_modified: bool
@@ -49,7 +47,6 @@ class NMR():
         '''
 
         self.outdir = outdir
-        self.legolas_aevs = legolas_aevs
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
@@ -148,39 +145,6 @@ class NMR():
                 if modified_struc:
                     os.remove(f'{tmp__file_stem}.pdb')
 
-            if self.legolas_aevs:
-                try:
-                    new_aev_filename = f'{path.split(f"{os.sep}")[-1].split(".")[0]}_legolasaev.txt'
-                    if already_exists:
-                        if os.path.exists(os.path.join(self.legolas_output_path, new_aev_filename)):
-                            with open(os.path.join(self.legolas_output_path, new_aev_filename)) as f:
-                                aevs = f.readlines()
-                            aevs = [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]
-                        else:
-                            aevs = []
-                    elif os.path.exists('tmp_aevs_protein.txt'):
-                        with open('tmp_aevs_protein.txt', 'r') as f:
-                            aevs = f.readlines()
-                        os.rename('tmp_aevs_protein.txt', new_aev_filename)
-                        shutil.move(new_aev_filename, self.legolas_output_path)
-                        aevs = [str(aevs[i]) for i in list(M.atomselect('*', '*', 'N', use_resname=True, get_index=True)[1])]
-                    else:
-                        print('Legolas AEVs: tmp_aevs_protein.txt file not found')
-                        aevs = []
-
-                    if aevs != [] and len(aevs) == len(df_legolas):
-                        df_legolas = df_legolas.assign(**{'aev_legolas': aevs})
-
-                    if os.path.exists('tmp_aevs_protein.txt'):
-                        os.remove('tmp_aevs_protein.txt')
-
-                except Exception as e:
-                    print(f'Legolas AEVs: failed to extract aev data from legolas: {e}')
-                    if self.record_errors: report_error_to_file('LEGOLAS AEV 1', path, str(e), self.error_filename)
-
-                if os.path.exists(os.path.join(self.legolas_output_path, new_aev_filename)):
-                    os.remove(os.path.join(self.legolas_output_path, new_aev_filename))
-
             df_legolas = df_legolas.assign(**{'_of_interest':[i in set(idx_n_res_interest) for i in range(len(df_legolas))]})
 
             if len(df_legolas) != len(df_nmr):
@@ -204,7 +168,5 @@ class NMR():
 
 
 if __name__ == '__main__':
-    nmr = NMR(outdir='result', legolas_aevs=True, include_modified=False)
+    nmr = NMR(outdir='result', include_modified=False)
     print(nmr.calculate_legolas(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(nmr.calculate_legolas(path=f'2I1V-alt-1.pdb'))
-    #print(nmr.calculate_legolas(path=f'1nsk_AmberMod0000.pdb'))

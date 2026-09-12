@@ -20,141 +20,155 @@ class Test_Uniprot(unittest.TestCase):
                         features=self.all_features)
 
     def test_propka(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_propka = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['propka'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len propka', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_propka.measure_data()
+        print(M_propka.df)
+        print('len propka', len(M_propka.df))
+        self.assertTrue(len(M_propka.df) > 0)
 
     def test_sasa(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_sasa = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['sasa'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len sasa', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_sasa.measure_data()
+        print(M_sasa.df)
+        print('len sasa', len(M_sasa.df))
+        self.assertTrue(len(M_sasa.df) > 0)
 
     def test_depth(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_depth = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['depth'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len depth', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_depth.measure_data()
+        print(M_depth.df)
+        print('len depth', len(M_depth.df))
+        self.assertTrue(len(M_depth.df) > 0)
 
     def test_aev(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_aev = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['aev'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len aev', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_aev.measure_data()
+        print(M_aev.df)
+        print('len aev', len(M_aev.df))
+        self.assertTrue(len(M_aev.df) > 0)
 
     def test_das(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_das = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['das'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len das', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_das.measure_data()
+        print(M_das.df)
+        print('len das', len(M_das.df))
+        self.assertTrue(len(M_das.df) > 0)
 
     def test_seqcharge(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_seqcharge = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['seqcharge'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len seqcharge', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_seqcharge.measure_data()
+        print(M_seqcharge.df)
+        print('len seqcharge', len(M_seqcharge.df))
+        self.assertTrue(len(M_seqcharge.df) > 0)
 
     def test_flexibility(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_flex = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['flexibility'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len flexibility', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_flex.measure_data()
+        print(M_flex.df)
+        print('len flexibility', len(M_flex.df))
+        self.assertTrue(len(M_flex.df) > 0)
 
     def test_legolas(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_nmr = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['legolas'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len legolas', len(M.df))
+        M_nmr.measure_data()
+        print(M_nmr.df)
+        print('len legolas:', len(M_nmr.df))
 
     def test_frustration(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_frustration = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['frustration', 'density'],
-                        parallel=True,
+                        parallel=False,
                         include_modified=False)
-        M.measure_data()
-        print('len frustration', len(M.df))
+        M_frustration.measure_data()
+        print(M_frustration.df)
+        print('len frustration', len(M_frustration.df))
 
     def test_melodia(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_melodia = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['melodia'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len propka', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_melodia.measure_data()
+        print(M_melodia.df)
+        print('len propka', len(M_melodia.df))
+        self.assertTrue(len(M_melodia.df) > 0)
 
     def test_phi(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_phi = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['phi'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len phi', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_phi.measure_data()
+        print(M_phi.df)
+        print('len phi', len(M_phi.df))
+        self.assertTrue(len(M_phi.df) > 0)
 
     def test_evolution(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_evolution = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['evolution'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len evolution', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_evolution.measure_data()
+        print(M_evolution.df)
+        print('len evolution', len(M_evolution.df))
+        self.assertTrue(len(M_evolution.df) > 0)
 
     def test_rmsf(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_rmsf = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['rmsf'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len rmsf', len(M.df))
-        self.assertTrue(len(M.df) > 0)
+        M_rmsf.measure_data()
+        print(M_rmsf.df)
+        print('len rmsf', len(M_rmsf.df))
+        self.assertTrue(len(M_rmsf.df) > 0)
 
     def test_pkaani(self):
-        M = CPN.Measure(df_input=self.df_prot,
+        M_pkaani = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features=['pkaANI'],
                         parallel=True,
                         include_modified=False)
-        M.measure_data()
-        print('len pkaani', len(M.df))
+        M_pkaani.measure_data()
+        print(M_pkaani.df)
+        print('len pkaani', len(M_pkaani.df))
 
     '''
     def test_restart_measure_data(self):
@@ -175,7 +189,6 @@ class Test_Uniprot(unittest.TestCase):
         M.recover_from_log('measure_log.txt')
     '''
 
-# ADD IN PDB ONLY TESTS
 
 
 if __name__ == "__main__":
