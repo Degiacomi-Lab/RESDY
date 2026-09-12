@@ -21,5 +21,8 @@ dependencies:
   - pdbfixer
   - msms
   - plotly
+  - mdtraj
+  
   - pip:
     - melodia-py==0.1.8
+    - fair-esm

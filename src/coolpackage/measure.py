@@ -200,8 +200,6 @@ class Measure(object):
             self.PDB_only = True
             columns = ['PDB_Code', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns = columns)
-            
-        print(self.df_input)
 
 
     def _setup_measures(self, features_list):
