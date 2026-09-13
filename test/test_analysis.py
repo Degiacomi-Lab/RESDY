@@ -73,6 +73,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_plotting(self):
         self.A.plot_feature_histogram(plot_type='single', feature='depth', save_name='hist_depth.svg')
         self.A.plot_feature_histogram(plot_type='all', save_name='hist_all.svg')
+        self.A.plot_feature_histogram(plot_type='agg', feature='depth', save_name='hist_agg.svg')
 
 
 

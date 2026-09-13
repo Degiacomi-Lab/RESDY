@@ -195,7 +195,7 @@ class Analysis(object):
         self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
 
-    def plot_feature_histogram(self, plot_type='all', feature='', agg_type='avg', uniprot='',
+    def plot_feature_histogram(self, plot_type='all', feature='', agg_type='', uniprot='',
                                chain='', resid='', save_name=''):
         '''
         Create a basic plot showing the distribution of values for the specified feature
@@ -203,9 +203,11 @@ class Analysis(object):
         method will be employed to reduce biases, default here is avg unless other
         method passed.
 
-        :param plot_type: Asks for while type of plot you want; options are either 'all' which
-            will include graphs for all possible features or 'single' which will just plot
-            a single graph for the selected feature.
+        :param plot_type: Asks for while type of plot you want; options are 'all' which
+            will include graphs for all possible features, 'single' which will just plot
+            a single graph for the selected feature or 'agg' which will plot a collation
+            of histograms of distribution of data after different aggregation methods
+            for a single feature.
         :type plot_type: str
         :param feature: Name of the feature to produce histogram of data for
         :type feature: str
@@ -229,7 +231,7 @@ class Analysis(object):
             plt.clf()
         except Exception:
             pass
-    
+
         if plot_type == 'single' and feature == '':
             print('Selected single feature for plot type but no feature given as input. '
                   'Please enter a feature when calling the function.')
@@ -238,6 +240,10 @@ class Analysis(object):
             print(f'Selected single feature for plot type but feature given as input (input: '
                   f'{feature}) not in the dataframe given to the class. Please enter a feature '
                   f'when calling the function.')
+            return
+        elif plot_type == 'agg' and feature == '':
+            print('Selected agg for plot type but no feature given as input. Please '
+                  'enter a feature when calling the function.')
             return
 
         if uniprot != '' and chain != '' and resid != '':
@@ -272,6 +278,14 @@ class Analysis(object):
                         'writhing': 'Writhing',
                         'frustration': 'Frustration',
                         'rmsf': 'RMSF'}
+        
+        agg_labels = {'avg': 'Average',
+                      'med': 'Median',
+                      'min': 'Minimum',
+                      'max': 'Maximum',
+                      'rand': 'Random',
+                      'sd': 'Standard Deviation',
+                      'range': 'Range'}
 
         feature_histwidths = {'depth': 0.1,
                             'sasa': 2,
@@ -291,8 +305,12 @@ class Analysis(object):
 
         match plot_type:
             case 'single':
+                if agg_type == '':
+                    print('No aggregation type given, using avg')
+                    agg_type = 'avg'
+
                 agg_feature = f'{feature}_{agg_type}'
-                
+
                 agg = Aggregation(df_measurements=df_plot,
                                 aggregation_method=agg_type,
                                 features_to_include=[feature])
@@ -330,7 +348,11 @@ class Analysis(object):
                     print(f'> Feature \'evolution\' in dataframe, ignoring for scalar feature histogram creation')
                     feat_cols.remove('evolution')
 
-                agg = Aggregation(df_measurements=self.df,
+                if agg_type == '':
+                    print('No aggregation type given, using avg')
+                    agg_type = 'avg'
+
+                agg = Aggregation(df_measurements=df_plot,
                                 aggregation_method=agg_type,
                                 features_to_include=feat_cols)
                 df_plot = agg.aggregate_data()
@@ -344,7 +366,7 @@ class Analysis(object):
                 fig, axs = plt.subplots(row_len, col_len)
                 fig.set_figheight(12)
                 fig.set_figwidth(12)
-                fig.suptitle(f'Histogram Feature Analysis: All Potential Features')
+                fig.suptitle(f'Histogram All Features Analysis: Aggregation Type={agg_type}')
                 fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0.27, hspace=0.25)
 
                 used_plots = []
@@ -371,6 +393,60 @@ class Analysis(object):
                     col = i % col_len
                     if [row, col] not in used_plots:
                         fig.delaxes(axs[row][col])
+
+            case 'agg':
+                agg_types = ['avg', 'med', 'sd', 'range', 'rand', 'max', 'min']
+                if agg_type == '':
+                    print('No aggregation type given, using all for aggregation histogram plot')
+                    agg_type = 'all'
+
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=[feature])
+                df_plot = agg.aggregate_data()
+
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                                'Resolution', 'Modified', 'class']
+                agg_types = [a.split('_')[-1] for a in df_plot.columns if a not in non_feat_cols]
+
+                if len(agg_types) <= 4: col_len = 2
+                else: col_len = 3
+
+                row_len = math.ceil(len(agg_types) / col_len)
+
+                fig, axs = plt.subplots(row_len, col_len)
+                fig.set_figheight(12)
+                fig.set_figwidth(12)
+                fig.suptitle(f'Histogram All Aggregation Analysis; Feature: {feature_labels[feature]}')
+                fig.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.05, wspace=0.27, hspace=0.27)
+
+                used_plots = []
+                for i, agg in enumerate(agg_types):
+                    agg_feature = f'{feature}_{agg}'
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    used_plots.append([row, col])
+
+                    x_left = df_plot[agg_feature].min()
+                    x_right = df_plot[agg_feature].max()
+                    step=feature_histwidths[feature]
+
+                    palatinate_colour = '#682860'
+                    axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                            bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                            alpha=0.5, label='')
+                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=axs[row,col])
+                    axs[row,col].set_xlabel(feature_labels[feature])
+                    axs[row,col].set_xlim(x_left, x_right)
+                    axs[row,col].set_title(agg_labels[agg])
+
+                for i in range(row_len * col_len):
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    if [row, col] not in used_plots:
+                        fig.delaxes(axs[row][col])
+            case _:
+                print(f'>> Plot type give ({plot_type}) not recognised, please choose either all, single, agg')
 
         if save_name != '':
             plt.savefig(save_name)
