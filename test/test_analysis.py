@@ -38,14 +38,18 @@ class Test_Uniprot(unittest.TestCase):
         self.assertEqual(len(df_cut), 4)
 
     def test_add_extra_measures(self):
-        self.A.add_extra_measures(extra_measures_filename=self.df_measures,
-                                  write_new_file=False)
-        #self.assertEqual(len(self.A.df), 10)
+        responses = {'Enter old or new for data to keep: ': 'old'}
+        fake_input = Mock(side_effect=responses.get)
+
+        with patch('builtins.input', fake_input):
+            self.A.add_extra_measures(extra_measures_filename=self.df_measures,
+                                    write_new_file=False)
+            self.assertEqual(len(self.A.df.drop_duplicates(subset=['Uniprot_Entry'])), 4)
 
     def test_GO_analysis(self):
         self.A.GO_get_data()
         df_term = self.A.GO_search_term(df=pd.read_csv(self.df_measures),
-                                        code='0003674',
+                                        code='0031982',
                                         name='')
         go_list = self.A.GO_search_protein(uniprot_entry='P02185')
         df_enrichment = self.A.enrichment_analysis(feature_one = ['propka', 7, 11],
@@ -57,7 +61,7 @@ class Test_Uniprot(unittest.TestCase):
         resp_end = ' (enter "min" or "max"): '
         responses = {f'{resp_base}curvature{resp_end}': 'min'}
         fake_input = Mock(side_effect=responses.get)
-        
+
         with patch('builtins.input', fake_input):
             self.A.relative_best(df=pd.read_csv(self.df_measures),
                                 weights=0.5,
@@ -65,6 +69,11 @@ class Test_Uniprot(unittest.TestCase):
             self.A.relative_best(df=pd.read_csv(self.df_measures),
                                 weights=[0.5, 0.3, 0.1, 0.4],
                                 features=['depth', 'sasa', 'propka', 'das', 'curvature'])
+
+    def test_plotting(self):
+        self.A.plot_feature_histogram(plot_type='single', feature='depth', save_name='hist_depth.svg')
+        self.A.plot_feature_histogram(plot_type='all', save_name='hist_all.svg')
+
 
 
 if __name__ == "__main__":

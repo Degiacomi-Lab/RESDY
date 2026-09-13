@@ -3,11 +3,6 @@ General notes on the work still outstanding in this file. There may be more furt
 
 .. todo::
 
-   Most of the GO term analysis currently only works for propka and not for pkaani, look into
-   adding this in (GW, 13.09.24).
-
-.. todo::
-
    Look into the GO term functions and see if these still actually work with all the extra
    material that has been added in (GW, 13.09.24).
 
@@ -23,6 +18,7 @@ import re
 import urllib.request
 import threading
 import concurrent.futures
+import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -199,7 +195,7 @@ class Analysis(object):
         self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
 
-    def plot_feature_histogram(self, feature, agg_type='avg', uniprot='',
+    def plot_feature_histogram(self, plot_type='all', feature='', agg_type='avg', uniprot='',
                                chain='', resid='', save_name=''):
         '''
         Create a basic plot showing the distribution of values for the specified feature
@@ -207,6 +203,10 @@ class Analysis(object):
         method will be employed to reduce biases, default here is avg unless other
         method passed.
 
+        :param plot_type: Asks for while type of plot you want; options are either 'all' which
+            will include graphs for all possible features or 'single' which will just plot
+            a single graph for the selected feature.
+        :type plot_type: str
         :param feature: Name of the feature to produce histogram of data for
         :type feature: str
         :param agg_type: Name of aggregation method to use when plotting the histogram.
@@ -215,40 +215,47 @@ class Analysis(object):
         :param uniprot: Uniprot code given if a specific analysis of feature data for a
             uniprot code is required. Default is left as '' and will take full dataframe
             unless code given.
-        :type uniprot: str
+        :type uniprot: str, optional
         :param chain: Chain given if a specific analysis of feature data for a chain is 
             required. Default is left as '' and will take full dataframe unless code given.
-        :type chain: str
+        :type chain: str, optional
         :param resid: Resid given if a specific analysis of feature data for a resid is 
             required. Default is left as '' and will take full dataframe unless code given.
-        :type resid: str
+        :type resid: str, optional
         :param save_name: File name to save the histogram to.
-        :type save_name: str
+        :type save_name: str, optional
         '''
         try:
             plt.clf()
         except Exception:
             pass
-
-        agg = Aggregation(df_measurements=self.df,
-                          aggregation_method=agg_type,
-                          features_to_include=[feature])
-        df_plot = agg.aggregate_data()
+    
+        if plot_type == 'single' and feature == '':
+            print('Selected single feature for plot type but no feature given as input. '
+                  'Please enter a feature when calling the function.')
+            return
+        elif plot_type == 'single' and feature not in self.df.columns:
+            print(f'Selected single feature for plot type but feature given as input (input: '
+                  f'{feature}) not in the dataframe given to the class. Please enter a feature '
+                  f'when calling the function.')
+            return
 
         if uniprot != '' and chain != '' and resid != '':
-            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot) & (df_plot['Chain'] == chain) & (df_plot['Resid'] == resid)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
         elif uniprot != '' and chain != '' and resid == '':
-            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot) & (df_plot['Chain'] == chain)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain)]
         elif uniprot != '' and chain == '' and resid != '':
-            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot) & (df_plot['Resid'] == resid)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Resid'] == resid)]
         elif uniprot == '' and chain != '' and resid != '':
-            df_plot = df_plot[(df_plot['Chain'] == chain) & (df_plot['Resid'] == resid)]
+            df_plot = self.df[(self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
         elif uniprot != '' and chain == '' and resid == '':
-            df_plot = df_plot[(df_plot['Uniprot_Entry'] == uniprot)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot)]
         elif uniprot == '' and chain != '' and resid == '':
-            df_plot = df_plot[(df_plot['Chain'] == chain)]
+            df_plot = self.df[(self.df['Chain'] == chain)]
         elif uniprot == '' and chain == '' and resid != '':
-            df_plot = df_plot[(df_plot['Resid'] == resid)]
+            df_plot = self.df[(self.df['Resid'] == resid)]
+        else:
+            df_plot = self.df
 
         feature_labels = {'depth': 'Depth (Å)',
                         'sasa': 'SASA (Å\u00b2)',
@@ -282,25 +289,88 @@ class Analysis(object):
                             'frustration': 0.5,
                             'rmsf': 0.2}
 
-        agg_feature = f'{feature}_{agg_type}'
+        match plot_type:
+            case 'single':
+                agg_feature = f'{feature}_{agg_type}'
+                
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=[feature])
+                df_plot = agg.aggregate_data()
 
-        fig, ax = plt.plot()
-        fig.set_figheight(12)
-        fig.set_figwidth(12)
+                fig, ax = plt.subplots()
+                fig.set_figheight(8)
+                fig.set_figwidth(8)
 
-        x_left = df_plot[agg_feature].min()
-        x_right = df_plot[agg_feature].max()
-        step=feature_histwidths[feature]
+                x_left = df_plot[agg_feature].min()
+                x_right = df_plot[agg_feature].max()
+                step=feature_histwidths[feature]
 
-        palatinate_colour = '#682860'
-        ax.hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
-                bins=np.arange(x_left, x_right, step), color=palatinate_colour,
-                alpha=0.5, label='')
-        sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=ax)
-        ax.set_xlabel(feature_labels[feature])
-        ax.set_xlim(x_left, x_right)
+                palatinate_colour = '#682860'
+                ax.hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                        bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                        alpha=0.5, label='')
+                sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=ax)
+                ax.set_xlabel(feature_labels[feature])
+                ax.set_xlim(x_left, x_right)
 
-        ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
+                ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
+
+            case 'all':
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                                 'Resolution', 'Modified', 'class']
+                feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
+                if 'arc' in feat_cols:
+                    feat_cols.remove('arc')
+                    feat_cols.append('arc_length')
+                if 'aev' in feat_cols:
+                    print(f'> Feature \'aev\' in dataframe, ignoring for scalar feature histogram creation')
+                    feat_cols.remove('aev')
+                if 'evolution' in feat_cols:
+                    print(f'> Feature \'evolution\' in dataframe, ignoring for scalar feature histogram creation')
+                    feat_cols.remove('evolution')
+
+                agg = Aggregation(df_measurements=self.df,
+                                aggregation_method=agg_type,
+                                features_to_include=feat_cols)
+                df_plot = agg.aggregate_data()
+
+                if len(feat_cols) <= 9: col_len = 3
+                elif len(feat_cols) <= 16: col_len = 4
+                else: col_len = 5
+
+                row_len = math.ceil(len(feat_cols) / col_len)
+
+                fig, axs = plt.subplots(row_len, col_len)
+                fig.set_figheight(12)
+                fig.set_figwidth(12)
+                fig.suptitle(f'Histogram Feature Analysis: All Potential Features')
+                fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0.27, hspace=0.25)
+
+                used_plots = []
+                for i, feat in enumerate(feat_cols):
+                    agg_feature = f'{feat}_{agg_type}'
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    used_plots.append([row, col])
+
+                    x_left = df_plot[agg_feature].min()
+                    x_right = df_plot[agg_feature].max()
+                    step=feature_histwidths[feat]
+
+                    palatinate_colour = '#682860'
+                    axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                            bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                            alpha=0.5, label='')
+                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=axs[row,col])
+                    axs[row,col].set_xlabel(feature_labels[feat])
+                    axs[row,col].set_xlim(x_left, x_right)
+
+                for i in range(row_len * col_len):
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    if [row, col] not in used_plots:
+                        fig.delaxes(axs[row][col])
 
         if save_name != '':
             plt.savefig(save_name)
@@ -377,7 +447,7 @@ class Analysis(object):
         # Step 1: read in new dataframe, extract column names, check for overlap and
         #         deal if is, otherwise add new column in
         try:
-            if isinstance(new_df, str):
+            if isinstance(extra_measures_filename, str):
                 new_df = pd.read_csv(extra_measures_filename)
             if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
             base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
@@ -683,10 +753,10 @@ class Analysis(object):
         # get all the uniprot codes inside the range and the reference uniprot code list
         feat_one, feat_one_low, feat_one_upper = str(feature_one[0]), float(feature_one[1]), float(feature_one[2])
         feat_two, feat_two_low, feat_two_upper = str(feature_two[0]), float(feature_two[1]), float(feature_two[2])
-        selected_df = self.df_sub[(self.df_sub[feat_one] >= feat_one_low) & (self.df_sub[feat_one] <= feat_one_upper)]
+        selected_df = self.df[(self.df[feat_one] >= feat_one_low) & (self.df[feat_one] <= feat_one_upper)]
         selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
         uniprot_selected = selected_df['Uniprot_Entry'].unique()
-        uniprot_reference = self.df_sub['Uniprot_Entry'].unique()
+        uniprot_reference = self.df['Uniprot_Entry'].unique()
 
         # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
         GO_bacgou = [code for code in list(self.GO_dict.keys()) if len(self.GO_dict[code]) >= uniprot_cnt_cutoff]
