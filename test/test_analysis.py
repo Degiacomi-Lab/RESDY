@@ -74,6 +74,8 @@ class Test_Uniprot(unittest.TestCase):
         self.A.plot_feature_histogram(plot_type='single', feature='depth', save_name='hist_depth.svg')
         self.A.plot_feature_histogram(plot_type='all', save_name='hist_all.svg')
         self.A.plot_feature_histogram(plot_type='agg', feature='depth', save_name='hist_agg.svg')
+        self.A.plot_feature_violins(features='depth', save_name='violin_depth_allagg.svg')
+        self.A.plot_feature_violins(agg_type='all', save_name='violin_all_features_all.svg')
 
 
 

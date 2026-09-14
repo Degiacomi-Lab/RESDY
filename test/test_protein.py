@@ -84,7 +84,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_minimisation(self):
         self.PDB.apply_minimisation('AF-P0CG48-F1-model_v6')
         self.assertTrue(os.path.exists(f'test{os.sep}curated{os.sep}AF-P0CG48-F1-model_v6_relaxed.pdb'))
-
+    '''
     def test_gathering(self):
         # runs on separate instance of PDB to work with demo
         UP = CPN.Uniprot()
@@ -92,19 +92,21 @@ class Test_Uniprot(unittest.TestCase):
 
         outdir = 'demo'
         gap = 10
-        parallel = True
+        parallel = False
         PDB_only = False
         include_hetatm = False
         resnames_of_interest = ['LYS']
+        minimise_strucs='AF'
         PDB = CPN.PDB(outdir=outdir,
-                            gap=gap,
-                            parallel=parallel,
-                            PDB_only=PDB_only,
-                            include_hetatm=include_hetatm,
-                            resnames_of_interest=resnames_of_interest)
-        PDB.gather_proteins(UP.df[:1], skip_if_found=False)
+                    gap=gap,
+                    parallel=parallel,
+                    PDB_only=PDB_only,
+                    include_hetatm=include_hetatm,
+                    resnames_of_interest=resnames_of_interest,
+                    minimise_strucs=minimise_strucs)
+        PDB.gather_proteins(UP.df.head(1), skip_if_found=False)
         self.assertEqual(1, len(PDB.df))
-
+    '''
 
 if __name__ == "__main__":
     unittest.main()

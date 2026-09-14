@@ -278,7 +278,7 @@ class Analysis(object):
                         'writhing': 'Writhing',
                         'frustration': 'Frustration',
                         'rmsf': 'RMSF'}
-        
+
         agg_labels = {'avg': 'Average',
                       'med': 'Median',
                       'min': 'Minimum',
@@ -447,6 +447,164 @@ class Analysis(object):
                         fig.delaxes(axs[row][col])
             case _:
                 print(f'>> Plot type give ({plot_type}) not recognised, please choose either all, single, agg')
+
+        if save_name != '':
+            plt.savefig(save_name)
+
+        plt.show()
+
+
+    def plot_feature_violins(self, features='', agg_type='', uniprot='',
+                               chain='', resid='', save_name=''):
+        '''
+        Create a basic plot showing the distribution of values for the specified feature
+        across the set of measurements passed into the analysis class. An aggregation
+        method will be employed to reduce biases, default here is avg unless other
+        method passed.
+
+        :param features: Name of the feature or list of features to produce violins of
+            data for
+        :type features: str or list
+        :param agg_type: Name of aggregation method to use when plotting the histogram.
+            For more information, see documentation of aggregation class.
+        :type agg_type: str
+        :param uniprot: Uniprot code given if a specific analysis of feature data for a
+            uniprot code is required. Default is left as '' and will take full dataframe
+            unless code given.
+        :type uniprot: str, optional
+        :param chain: Chain given if a specific analysis of feature data for a chain is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type chain: str, optional
+        :param resid: Resid given if a specific analysis of feature data for a resid is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type resid: str, optional
+        :param save_name: File name to save the histogram to.
+        :type save_name: str, optional
+        '''
+        try:
+            plt.clf()
+        except Exception:
+            pass
+
+        if agg_type == '':
+            print('No aggregation type given as input; will include all options in the graphs')
+            agg_type = 'all'
+
+        if uniprot != '' and chain != '' and resid != '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+        elif uniprot != '' and chain != '' and resid == '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain)]
+        elif uniprot != '' and chain == '' and resid != '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Resid'] == resid)]
+        elif uniprot == '' and chain != '' and resid != '':
+            df_plot = self.df[(self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+        elif uniprot != '' and chain == '' and resid == '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot)]
+        elif uniprot == '' and chain != '' and resid == '':
+            df_plot = self.df[(self.df['Chain'] == chain)]
+        elif uniprot == '' and chain == '' and resid != '':
+            df_plot = self.df[(self.df['Resid'] == resid)]
+        else:
+            df_plot = self.df
+
+        feature_labels = {'depth': 'Depth (Å)',
+                        'sasa': 'SASA (Å\u00b2)',
+                        'propka': 'pKa (propka)',
+                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                        'curvature': 'Curvature',
+                        'arc_length': 'Arc Length',
+                        'das': 'Dynamically Accessible Surface',
+                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                        'phi': 'Phi',
+                        'psi': 'Psi',
+                        'seqcharge': 'Sequence Charge',
+                        'torsion': 'Torsion Angle',
+                        'writhing': 'Writhing',
+                        'frustration': 'Frustration',
+                        'rmsf': 'RMSF'}
+
+        agg_labels = {'avg': 'Average',
+                      'med': 'Median',
+                      'min': 'Minimum',
+                      'max': 'Maximum',
+                      'rand': 'Random',
+                      'sd': 'Standard Deviation',
+                      'range': 'Range'}
+
+        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                        'Resolution', 'Modified', 'class']
+
+        if features == '' or features == []:
+            print('No features given as input, using all possible scalar features')
+            features = [a for a in df_plot.columns if a not in non_feat_cols]
+
+        if isinstance(features, str):
+            features = [features]
+
+        features = [a for a in features if a not in ['aev', 'evolution']]
+        num_feats = len(features)
+
+        if num_feats == 1:
+            fig, ax = plt.subplots()
+            fig.set_figheight(6)
+            fig.set_figwidth(8)
+
+            for i, feat in enumerate(features):
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=feat)
+                df_plot_feat = agg.aggregate_data()
+
+                agg_non_feat_cols = [a for a in df_plot_feat.columns if a in non_feat_cols]
+                df_plot_feat = df_plot_feat.drop(columns=agg_non_feat_cols)
+                df_plot_feat = df_plot_feat.rename(columns={k: v for k, v in zip(list(df_plot_feat.columns),
+                                        [agg_labels[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
+
+                sns.violinplot(data=df_plot_feat,
+                            inner="quart",
+                            fill=False,
+                            color='#682860',
+                            ax=ax)
+
+                if i == num_feats - 1:
+                    ax.set(xlabel='Aggregation Types')
+                ax.set(ylabel=feature_labels[feat])
+                ax.set(title=f'Feature Aggregation Analysis: {feature_labels[features[0]]}')
+
+            plt.xticks(rotation=20)
+
+        else:
+            fig, axs = plt.subplots(num_feats)
+            fig.set_figheight(3*num_feats)
+            fig.set_figwidth(8)
+            fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0, hspace=0)
+
+            for i, feat in enumerate(features):
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=feat)
+                df_plot_feat = agg.aggregate_data()
+
+                agg_non_feat_cols = [a for a in df_plot_feat.columns if a in non_feat_cols]
+                df_plot_feat = df_plot_feat.drop(columns=agg_non_feat_cols)
+                df_plot_feat = df_plot_feat.rename(columns={k: v for k, v in zip(list(df_plot_feat.columns),
+                                        [agg_labels[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
+
+                sns.violinplot(data=df_plot_feat,
+                            inner="quart",
+                            fill=False,
+                            color='#682860',
+                            ax=axs[i])
+
+                if i == num_feats - 1:
+                    axs[i].set(xlabel='Aggregation Types')
+                else:
+                    axs[i].set(xticks=[])
+                axs[i].set(ylabel=feature_labels[feat])
+
+            fig.suptitle('Violin Feature Aggregation Analysis')
+            plt.xticks(rotation=20)
+
 
         if save_name != '':
             plt.savefig(save_name)

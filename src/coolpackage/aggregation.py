@@ -78,8 +78,13 @@ class Aggregation:
             self.df_measurements = pd.read_csv(df_measurements)
         else:
             self.df_measurements = df_measurements
+
+        if isinstance(features_to_include, str):
+            self.features_to_include = [features_to_include]
+        else:
+            self.features_to_include = features_to_include
+
         self.aggregation_method = aggregation_method
-        self.features_to_include = features_to_include
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
         self.include_chain = include_chain
