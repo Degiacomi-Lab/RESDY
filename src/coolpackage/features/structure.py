@@ -2,7 +2,6 @@ import os
 import pandas as pd
 from .error_reporting import report_error_to_file
 
-# Melodia packages
 try:
     import melodia_py as mel
     melodia_packages_available = True
@@ -10,19 +9,22 @@ except Exception as e:
     melodia_packages_available = False
     print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
 
+
+
 class Structure():
     '''
     Structural measurement values for structures.
     '''
 
-    def __init__(self, melodia_features=['all'], include_modified=False,
+    def __init__(self, melodia_features=['all'],
+                 include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the Structure class
+        Initialise the Structure class using melodia-py.
 
         :param melodia_features: List of features which are calculated through melodia which has
             been requested when the Measure class is initialised. Default is set to ['all'].
@@ -45,8 +47,10 @@ class Structure():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
         if self.melodia_features == ['all']:
             self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
 

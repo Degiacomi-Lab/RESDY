@@ -53,10 +53,11 @@ class Feature():
         :rtype: pandas.DataFrame
         '''
 
-        # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
+            A = M.get_subset(idxs=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+            df_feature = A.data[['resname', 'chain', 'resid']]
 
             if self.include_modified:
                 idx_atom_interest = M.atomselect('*',
@@ -78,28 +79,21 @@ class Feature():
                                       self.aa_properties['atom_select_names_nonmod'],
                                       use_resname=True, get_index=True)[1]
 
-            res_interest_nums = list(M.data['resid'][idx_atom_interest])
-            list_chains = list(M.data['chain'][idx_atom_interest])
-            list_modified = list(a in  self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_atom_interest]))
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname']))
+            if self.include_modified:
+                df_feature = df_feature.assign(**{'Modified': list_modified})
+
+            # sort calculating data and assign to dataframe before cutting down to size
+            feature_list = []
+            df_feature = df_feature.assign(**{'feature': feature_list})
+            df_feature = df_feature.iloc[idx_atom_interest]
+
+
         except Exception as e:
-            if self.record_errors: report_error_to_file('DAS 1', path, str(e), self.error_filename)
-            print(f'DAS Calculation: 1 - could not load and identify the atoms of interest in the target residues of the structure: {e}')
+            if self.record_errors: report_error_to_file('FEATURE 1', path, str(e), self.error_filename)
+            print(f'FEATURE Calculation: 1 - could not load and identify the atoms of interest in the target residues of the structure: {e}')
 
-        # 2: Calculate the feature values for each of the residues of interest identified
-        feature_output = []
-
-        # 3: Create dataframe to return
-        df_feature = pd.DataFrame(columns=["Chain", "Resid", "das"])
-        try:
-            df_feature['Chain'] = list_chains
-            df_feature['Resid'] = res_interest_nums
-            df_feature['das'] = feature_output
-            if self.include_modified: df_feature['Modified'] = list_modified
-        except Exception as e:
-            if self.record_errors: report_error_to_file('DAS 3', path, str(e), self.error_filename)
-            print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall measurements dataframe: {e}')
-
-        return df_feature
+        return df_feature.rename(columns={'chain': 'Chain', 'resid': 'Resid'}).reset_index(drop=True)
 
 
 if __name__ == '__main__':

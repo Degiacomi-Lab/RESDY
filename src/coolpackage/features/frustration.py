@@ -5,7 +5,6 @@ import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-# Frustration packages
 try:
     import frustratometer
     frustration_packages_available = True
@@ -14,6 +13,8 @@ except Exception as e:
     print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
 
 pd.set_option('display.max_rows', 200)
+
+
 class Frustration():
     '''
     Frustration metric values for structures.
@@ -99,7 +100,7 @@ class Frustration():
             df_frustration['frustration'] = None
             df_frustration['density'] = None
             report_error_to_file('Frustratometer 1', path, str(e), self.error_filename)
-            return df_frustration
+            return df_frustration.rename(columns={'chain': 'Chain', 'resid': 'Resid'})
 
         # Frustratometer 2 - use model to calculate outputs and sort output dataframe
         try:
@@ -119,7 +120,7 @@ class Frustration():
             report_error_to_file('Frustratometer 2', path, str(e), self.error_filename)
             print(f'Frustratometer calculation 2 - failed to extract frustratometer outputs or to append data to return dataframe: {e}')
 
-        return df_frustration_res_interest.reset_index(drop=True)
+        return df_frustration_res_interest.rename(columns={'chain': 'Chain', 'resid': 'Resid'}).reset_index(drop=True)
 
 
 if __name__ == '__main__':

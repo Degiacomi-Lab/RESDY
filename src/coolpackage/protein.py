@@ -21,7 +21,6 @@ from openmm.app import NoCutoff
 from openmm.openmm import LangevinMiddleIntegrator
 from openmm.app.simulation import Simulation
 from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
-from .helper import get_download_tool
 from . import alphafold as af
 from . import patcher
 from .helper import get_download_tool, ShutUp
@@ -37,7 +36,8 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
-                 resnames_of_interest = ['LYS'], minimise_strucs='AF'):
+                 resnames_of_interest = ['LYS'], minimise_strucs='AF',
+                 remove_all_modifications=False):
         '''
         Initialise the PDB class.
 
@@ -66,6 +66,12 @@ class PDB(object):
                 - 'PDB': Just run on PDB
                 - 'ALL': Run on all structures
         :type minimise_strucs: str
+        :param remove_all_modifications: Option to remove all other modifications from curated
+            protein structures. By default, modifications on the residue of interest will be
+            removed. Default for other removal of mutations is set to False, in this case only
+            residues which have unknown amino residue codes to allow for downstream pipelines
+            to work.
+        :type remove_all_modifications: bool
         '''
 
         self.outdir = outdir
@@ -73,6 +79,7 @@ class PDB(object):
         self.parallel = parallel
         self.include_hetatm = include_hetatm
         self.resnames_of_interest = resnames_of_interest
+        self.remove_all_modifications = remove_all_modifications
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
                 case 'AF':
@@ -395,7 +402,7 @@ class PDB(object):
                                     print_statements.append(f'>> Failed checking structure on previously curated structure with error {str(e)}')
                             print_statements.append(out_print_trap_check.getvalue())
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
-                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': np.NaN}
+                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': np.nan}
                     else:
                         data = {'PDB_Code': pdb_code}
 
@@ -448,9 +455,9 @@ class PDB(object):
 
         .. todo::
 
-           Renumbering is only possible for structures that have a Uniprot code associated with them, so
-           that a sequence to align to is available. Find a way of making it work with PDB_only
-           (24.03.26).
+        Renumbering is only possible for structures that have a Uniprot code associated with them, so
+        that a sequence to align to is available. Find a way of making it work with PDB_only
+        (24.03.26).
         '''
         try:
             self.download_pdb(pdb)
@@ -465,7 +472,7 @@ class PDB(object):
 
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
         test_patch = False
-        largest_gap = np.NaN
+        largest_gap = np.nan
         for cnt, f in enumerate(files):
             mypath = os.path.split(f)[0]
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
@@ -623,8 +630,12 @@ class PDB(object):
 
             # check for modified residues
             if line[:6] == 'MODRES':
-                # only add sites which have changed residue code (keeping mod residues with same code the same)
-                if line[12:15] != line[24:27]:
+                if self.remove_all_modifications:
+                    chain = line[16]
+                    res_num = line[18:22].strip()
+                    modres_sites[chain + res_num] = line[24:27]
+                elif line[12:15] != line[24:27]:
+                    # if not by default removing all residues with mutations, only modify ones with unkown resid codes
                     chain = line[16]
                     res_num = line[18:22].strip()
                     modres_sites[chain + res_num] = line[24:27]
@@ -689,7 +700,7 @@ class PDB(object):
                         tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
                         fasta_text = requests.get(tmp_url, timeout=20).text
                         uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
-                    
+
                     M = bb.Molecule()
                     M.import_pdb(pdb=read_file_path, include_hetatm=True)
                     M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
@@ -784,8 +795,8 @@ class PDB(object):
                             fasta_chains = {}
 
                 else:
-                    raise Exception(f'Error in patching file: could not get residue type for modified '
-                                    f'residue to convert to standard; file: {pdb}')
+                    raise Exception(f'Error in patching file: could not get residue type for '
+                                    f'modified residue to convert to standard; file: {pdb}')
 
             #neglect HETATM atoms, unless they are metal ions
             if line[:6] == 'HETATM':

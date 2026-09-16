@@ -7,7 +7,8 @@ from .error_reporting import report_error_to_file
 try:
     from ase import Atoms
     import torch
-    import torchani
+    from torchani.models import ANI2x
+    from torchani.aev import AEVComputer
     aev_packages_available = True
 except Exception as e:
     aev_packages_available = False
@@ -18,11 +19,7 @@ except Exception as e:
 class AEV():
     '''
     Representations of the local structure of lysines within the protein structure, termed atomic
-    environment vectors (AEVs). Potential AEV representations are currently:
-
-    1. ANI-2x AEVs
-    2. LEGOLAS ANI-2x AEVs - currently calculated through the LEGOLAS nmr package as an add-on
-    3. Coarse-grain representation AEVs
+    environment vectors (AEVs). This class looks into calculating these using ANI-2x
     '''
 
     def __init__(self, include_modified=False,
@@ -59,17 +56,17 @@ class AEV():
                               'not available, aev will be removed from features to calculate.')
 
         self.device = None
-        self.ANI = None
+        self.ANI_model = None
 
 
     def _ensure_aev_model(self):
         '''
         On the first use of the model, load the model in the desired process for the work
         '''
-        if self.ANI is not None:
+        if self.ANI_model is not None:
             return
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.ANI = torchani.models.ANI2x(periodic_table_index=True).to(device=self.device)
+        self.ANI_model = ANI2x(periodic_table_index=True).to(device=self.device)
 
 
     def calculate(self, path):
@@ -130,9 +127,7 @@ class AEV():
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
-            if self.record_errors: report_error_to_file('AEV 1', path, str(e), self.error_filename)
-            print(f'AEV Calculations: 1 - could not create atomic structure representation: {e}')
-            return
+            raise Exception(f'AEV Calculations: 1 - could not create atomic structure representation for file {path}: {e}')
 
         # 2: Iterate over the protein structure to cut out substructures and calculate an AEV at each of these.
         try:
@@ -152,9 +147,9 @@ class AEV():
 
                 # 2.2: calculate the AEV for the subset of the protein and add this to the output dataframe
                 try:
-                    species = self.ANI.species_to_tensor(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
+                    species = self.ANI_model.species_to_tensor(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
                     ani_coords = torch.tensor(temp_structure.get_positions(), dtype=torch.float32).unsqueeze(0).to(device=self.device)
-                    aevs = self.ANI.aev_computer((species, ani_coords)).aevs
+                    aevs = self.ANI_model.aev_computer((species, ani_coords)).aevs
                     # match up the position of the lysine of interest to inside the structure cutout
                     lys_nz_subloc = np.where(list_close_points == idx_nz[lys_idx])[0]
                     if len(lys_nz_subloc) != 1:

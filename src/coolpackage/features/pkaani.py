@@ -10,7 +10,7 @@ class PKAANI():
     pKa values for structures, calculated with pKaANI.
     '''
 
-    def __init__(self, outdir, calc_method='propka', include_modified=False,
+    def __init__(self, include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
@@ -39,8 +39,10 @@ class PKAANI():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
 
 
     def calculate(self, path):
@@ -122,5 +124,4 @@ class PKAANI():
 if __name__ == '__main__':
     P = PKAANI(outdir='result',
               include_modified=False)
-    #print(P._parse_propka_errors(path=f'data{os.sep}propkaoutput{os.sep}1A0F-alt-1_propka_errors.txt'))
     print(P.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

@@ -9,10 +9,11 @@ class Flexibility():
     Flexibility parameters for lysines within the protein structures.
     '''
 
-    def __init__(self, include_modified, aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                                        'modified_codes': ['LYE', 'KCX'],
-                                                        'atom_select_names_nonmod': ['NZ'],
-                                                        'atom_select_names_modified': ['NZ', 'N07']},
+    def __init__(self, include_modified=False,
+                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                  'modified_codes': ['LYE', 'KCX'],
+                                  'atom_select_names_nonmod': ['NZ'],
+                                  'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the Flexibility class, include any global variables that are required from
@@ -34,8 +35,10 @@ class Flexibility():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
 
     def calculate(self, path):
         '''

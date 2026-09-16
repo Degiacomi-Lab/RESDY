@@ -37,8 +37,10 @@ class SASA():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
 
     def calculate(self, path):
         '''

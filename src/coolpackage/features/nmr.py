@@ -4,9 +4,9 @@ import shutil
 import subprocess
 import pandas as pd
 import biobox as bb
-from .error_reporting import report_error_to_file
+from dotenv import load_dotenv
+#from .error_reporting import report_error_to_file
 
-# AEV packages
 try:
     from ase import Atoms
     import torch
@@ -50,16 +50,21 @@ class NMR():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
 
-        # Note: if you are not GW and running this, you will need to change this path to your own installation path!!
-        legolas_path = '/home/gweston/Documents/extra_packages/legolas-main/test/legolas.py'
-
-        self.legolas_prog = os.environ.get('LEGOLAS_PATH', legolas_path)
-        if not os.path.isfile(self.legolas_prog):
-            raise ImportError(f'>> legolas.py not found at {self.legolas_prog}, set LEGOLAS_PATH '
+        load_dotenv()
+        self.legolas_prog = os.getenv('LEGOLAS_PATH')
+        if self.legolas_prog is None:
+            raise ImportError('Searching for LEGOLAS path returned None, set LEGOLAS_PATH '
+                            'or pass legolas_path=, legolas will be removed from features.')
+        elif not os.path.isfile(self.legolas_prog):
+            raise ImportError(f'legolas.py not found at {self.legolas_prog}, set LEGOLAS_PATH '
                               f'or pass legolas_path=, legolas will be removed from features.')
+        else:
+            print(f'>> LEGOLAS_PATH read from .env file as: {self.legolas_prog}')
 
         self.legolas_output_path = os.path.join(self.outdir, 'legolas')
         os.makedirs(self.legolas_output_path, exist_ok=True)

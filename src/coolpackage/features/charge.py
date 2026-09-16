@@ -36,8 +36,10 @@ class Charge():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
     
     def calculate(self, path, num_add_aa=10):
         '''
@@ -67,10 +69,10 @@ class Charge():
 
         .. todo::
 
-           Add the ability to use 3 letter codes and their charges rather than the 1 letter codes, which
-           may run into problems when modified residues are used. The change would be to stop converting
-           to the classic 1 letter code sequence, and instead take the list of residues and map the
-           charges onto it to sum (GW, 16.04.25).
+        Add the ability to use 3 letter codes and their charges rather than the 1 letter codes, which
+        may run into problems when modified residues are used. The change would be to stop converting
+        to the classic 1 letter code sequence, and instead take the list of residues and map the
+        charges onto it to sum (GW, 16.04.25).
         '''
         # 1: Extract the overall sequence for the protein given
         try:
@@ -197,7 +199,6 @@ class Charge():
                     df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None}])], ignore_index=True)
 
         return df_seqcharge
-
 
 
 if __name__ == '__main__':

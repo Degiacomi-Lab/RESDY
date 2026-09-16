@@ -24,6 +24,7 @@ dependencies:
   - mdtraj
   - nglview
   - numba
+  - python-dotenv
   - pip:
     - melodia-py==0.1.8
     - fair-esm

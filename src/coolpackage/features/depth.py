@@ -3,7 +3,6 @@ import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-# Depth specific packages
 try:
     from Bio.PDB import PDBParser
     from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
@@ -51,8 +50,10 @@ class Depth():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else: 
+            self.record_errors = False
 
         if not depth_packages_available:
             raise ImportError('>> Packages required for depth calculations (biopython/msms) are '

@@ -170,6 +170,16 @@ class Test_Uniprot(unittest.TestCase):
         print(M_pkaani.df)
         print('len pkaani', len(M_pkaani.df))
 
+    def test_secondarystructure(self):
+        M_ss = CPN.Measure(df_input=self.df_prot,
+                        outdir=self.outdir,
+                        features=['SECONDARYSTRUCTURE'],
+                        parallel=True,
+                        include_modified=False)
+        M_ss.measure_data()
+        print(M_ss.df)
+        print('len secondarystructure', len(M_ss.df))
+
     '''
     def test_restart_measure_data(self):
         M = CPN.Measure(df_input=self.df_prot,

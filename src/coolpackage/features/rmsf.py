@@ -11,7 +11,8 @@ class RMSF():
     RMSF values for curated proteins.
     '''
 
-    def __init__(self, df_proteins, include_modified = False,
+    def __init__(self, df_proteins,
+                 include_modified = False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
@@ -41,8 +42,10 @@ class RMSF():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
 
         self.model_loaded = False
 

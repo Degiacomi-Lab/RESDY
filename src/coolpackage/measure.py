@@ -680,13 +680,13 @@ class Measure(object):
                 try:
                     out_print_trap = io.StringIO()
                     with redirect_stdout(out_print_trap):
-                        result = meas[1](f) # run measurement
+                        result = meas[1](f)
                     terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                 except Exception as e:
                     if self.report_errors:
-                        self._report_error_to_file('Meas feat error', 'measure file parallel', str(e))
+                        self._report_error_to_file('Meas feat error', f'measure file parallel; feature {meas[0]}', str(e))
                     terminal_out_statements.append(f"ERROR: {e}")
                     continue
 
