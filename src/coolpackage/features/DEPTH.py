@@ -12,7 +12,7 @@ except Exception as e:
     print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
 
 
-class Depth():
+class DEPTH():
     '''
     Depth values for structures.
     '''
@@ -147,5 +147,5 @@ class Depth():
         return df_depth
 
 if __name__ == '__main__':
-    depth = Depth(calculation_type='AtomDepth', include_modified=True)
+    depth = DEPTH(calculation_type='AtomDepth', include_modified=True)
     print(depth.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

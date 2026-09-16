@@ -4,7 +4,7 @@ import biobox as bb
 from .error_reporting import report_error_to_file
 
 
-class Flexibility():
+class FLEXIBILITY():
     '''
     Flexibility parameters for lysines within the protein structures.
     '''
@@ -118,5 +118,5 @@ class Flexibility():
 
 
 if __name__ == '__main__':
-    flex = Flexibility(include_modified=True)
+    flex = FLEXIBILITY(include_modified=True)
     print(flex.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

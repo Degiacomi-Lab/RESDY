@@ -61,7 +61,8 @@ class Measure(object):
     '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
+                 features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
+                                'aev': {}, 'das': {}, 'seqcharge': {}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
                  report_errors= True, only_relaxed=True):
         '''
@@ -84,14 +85,17 @@ class Measure(object):
             This file can be used to create the measurement csv file through using the
             recover_from_log() function.
         :type log_path: str
-        :param features: The list of measurements that you wish to use on the given structures.
+        :param features_dict: The list of measurements that you wish to use on the given structures.
             Select which of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth',
             'aev', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
             'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'frustration',
-            'density', 'evolution', 'rmsf'. Any class defined in a script added to the features
-            folder can also be requested by its class name. 'all' is a shorthand for the preset
-            list defined in _setup_measures().
-        :type features: list
+            'density', 'evolution', 'rmsf', 'secondarystructure'. Any class defined in a script
+            added to the features folder can also be requested by its class name. 'all' is a shorthand
+            for the preset list defined in _setup_measures(). A dict should be given here with a
+            dict per feature included eg {'depth': {}, etc...}, inside the dict per feature should
+            house any optional arguments available for that specific feature class, if defaults are
+            okay, leave as {}.
+        :type features_dict: dict
         :param residue_of_interest: The residue of interest to calculate measurements for, if
             investigating LYS or CYS, can enter a string with either of these as code is setup
             to handle them. If you are investigating other resiudes or would like more control
@@ -164,8 +168,8 @@ class Measure(object):
             raise ValueError(f'Unknown option give to residue_of_interest parameter: '
                             f'{residue_of_interest}; please enter either string or dict. '
                             f'See class documentation.')
-        self.features = list(features)
-        self._setup_measures(list(features))
+        self.features_dict = features_dict.copy()
+        self._setup_measures(features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
 
@@ -201,91 +205,33 @@ class Measure(object):
             self.df = pd.DataFrame(columns = columns)
 
 
-    def _setup_measures(self, features_list):
+    def _setup_measures(self, features_dict):
         '''
-        Convert a list of features into a measuring protocol. If ['all'] given as input for the
+        Convert a dict of features into a measuring protocol. If ['all'] given as input for the
         features, this will convert the features list to a list containing all current possible
-        features.
+        features. Dictionary is used for this such that the user can provide optional parameters
+        directly to the measurements classes without any manual editing.
 
-        :param features_list: The list of features that are required to measure over the set of
+        :param features_dict: The list of features that are required to measure over the set of
             proteins
-        :type features_list: list
+        :type features_dict: dict
         '''
-        # measures to carry out [label for DataFrame column, and function evaluating a file]
-        # functions must return a dataframe [chain, resid, measure]
-        if 'all' in features_list:
-            features_list = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
+        if 'all' in features_dict:
+            feature_all = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                         'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
                         'rmsf']
-            self.features = list(features_list)
+            features_dict = {k: {} for k in feature_all}
+            self.features_dict = list(features_dict)
         self.measures = []
         melodia_features = []
         melodia_added = False; frustration_added = False
-        for m in features_list:
-            if m == 'propka':
-                P = PROPKA(outdir=self.outdir,
-                          include_modified=self.include_mod,
-                          error_filename=self.error_filename,
-                          aa_properties=self.aa_properties)
-                self.measures.append([m, P.calculate])
-            elif m == 'pkaANI':
-                P = PKAANI(outdir=self.outdir,
-                          include_modified=self.include_mod,
-                          error_filename=self.error_filename,
-                          aa_properties=self.aa_properties)
-                self.measures.append([m, P.calculate])
-            elif m == 'sasa':
-                sasa = SASA(include_modified=self.include_mod,
-                            error_filename=self.error_filename,
-                            aa_properties=self.aa_properties)
-                self.measures.append([m, sasa.calculate])
-            elif m == "depth":
-                try:
-                    depth = Depth(calculation_type='ResidDepth',
-                                  include_modified=self.include_mod,
-                                  error_filename=self.error_filename,
-                                  aa_properties=self.aa_properties)
-                    self.measures.append([m, depth.calculate])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add depth for features calculation list; error: {e}')
-            elif m == 'aev':
-                try:
-                    aev = AEV(error_filename=self.error_filename,
-                              include_modified=self.include_mod,
-                              aa_properties=self.aa_properties)
-                    self.measures.append([m, aev.calculate])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add aev for features calculation list; error: {e}')
-            elif m == 'das':
-                das = DAS(include_modified=self.include_mod,
-                            error_filename=self.error_filename,
-                            aa_properties=self.aa_properties)
-                self.measures.append([m, das.calculate])
-            elif m == 'seqcharge':
-                charge = Charge(include_modified=self.include_mod,
-                                error_filename=self.error_filename,
-                                aa_properties=self.aa_properties)
-                self.measures.append([m, charge.calculate])
-            elif m == 'flexibility':
-                flex = Flexibility(include_modified=self.include_mod,
-                                   error_filename=self.error_filename,
-                                   aa_properties=self.aa_properties)
-                self.measures.append([m, flex.calculate])
-            elif m == 'legolas':
-                try:
-                    nmr = NMR(outdir=self.outdir,
-                            include_modified=self.include_mod,
-                            error_filename=self.error_filename,
-                            aa_properties=self.aa_properties)
-                    self.measures.append([m, nmr.calculate_legolas])
-                except Exception as e:
-                    print(f'>> Failed to add legolas for features calculation list; error: {e}')
-            elif m in ['frustration', 'density']:
+        meas_dict = {}
+        self.features = list(features_dict)
+        for m in features_dict:
+            if m in ['frustration', 'density']:
                 try:
                     if not frustration_added:
-                        frustration = Frustration(include_modified=self.include_mod,
+                        frustration = FRUSTRATION(include_modified=self.include_mod,
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
                         self.measures.append(['frustration', frustration.calculate_frustration])
@@ -295,7 +241,7 @@ class Measure(object):
                     print(f'>> Failed to add frustration/density for features calculation list; error: {e}')
             elif m == 'melodia':
                 try:
-                    structure = Structure(melodia_features=['all'],
+                    structure = STRUCTURE(melodia_features=['all'],
                                           include_modified=self.include_mod,
                                           error_filename=self.error_filename,
                                           aa_properties=self.aa_properties)
@@ -308,35 +254,31 @@ class Measure(object):
                     print(f'>> Failed to add melodia for features calculation list; error: {e}')
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 melodia_features += [m]
-            elif m == 'evolution':
-                try:
-                    E = Evolution(include_modified=self.include_mod,
-                                  error_filename=self.error_filename,
-                                  aa_properties=self.aa_properties)
-                    E._check_esm_model_available()
-                    self.measures.append(['evolution', E.calculate])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add esm for features calculation list; error: {e}')
-            elif m == 'rmsf':
-                R = RMSF(df_proteins=self.df_input,
-                        include_modified=self.include_mod,
-                        error_filename=self.error_filename,
-                        aa_properties=self.aa_properties)
-                self.measures.append(['rmsf', R.calculate])
             else:
-                if m in globals().keys():
-                    if inspect.isclass(globals()[m]) and hasattr(globals()[m], 'calculate') and callable(getattr(globals()[m], 'calculate')):
+                if m.upper() in globals().keys():
+                    if inspect.isclass(globals()[m.upper()]) and hasattr(globals()[m.upper()], 'calculate') and callable(getattr(globals()[m.upper()], 'calculate')):
                         try:
-                            XX = globals()[m](include_modified=self.include_mod,
+                            tmp_name = m.lower()
+                            kwargs = features_dict.get(m, {})
+                            if tmp_name in ['propka', 'legolas'] or 'outdir' in list(kwargs):
+                                kwargs['outdir'] = self.outdir
+                            if tmp_name == 'rmsf' and 'df_proteins' not in list(kwargs):
+                                kwargs['df_proteins'] = self.df_input
+
+                            meas_dict[tmp_name] = globals()[m.upper()](include_modified=self.include_mod,
                                                     error_filename=self.error_filename,
-                                                    aa_properties=self.aa_properties)
-                            self.measures.append([m, XX.calculate])
+                                                    aa_properties=self.aa_properties,
+                                                    **kwargs)
+
+                            if tmp_name == 'evolution':
+                                meas_dict[tmp_name]._check_esm_model_available()
+
+                            self.measures.append([m, meas_dict[tmp_name].calculate])
                         except Exception as e:
                             if self.report_errors:
                                 self._report_error_to_file('Setup measures: custom measure failed to be added', 'setup', f'Custom measure {m} failed to be added')
                             self.features.remove(m)
-                            print(f'Failed to add measure feature {m}, please check script follow the template correctly. Error: {e}')
+                            print(f'Failed to add measure feature {m}, please check new scripts follow the template correctly. Error: {e}')
                             continue
                 else:
                     if self.report_errors:
@@ -346,7 +288,7 @@ class Measure(object):
 
         if not melodia_added and melodia_features:
             try:
-                structure = Structure(melodia_features=melodia_features,
+                structure = STRUCTURE(melodia_features=melodia_features,
                                       include_modified=self.include_mod,
                                       error_filename=self.error_filename,
                                       aa_properties=self.aa_properties)
@@ -354,8 +296,8 @@ class Measure(object):
                 melodia_added = True
             except Exception as e:
                 for feat in melodia_features:
-                    if feat in self.features:
-                        self.features.remove(feat)
+                    if feat in self.features_dict:
+                        self.features_dict.remove(feat)
                 print(f'>> Failed to add melodia for features calculation list; error: {e}')
 
 
@@ -921,12 +863,12 @@ class Measure(object):
             # account for measurements that have special cases
             if col_name == 'melodia':
                 melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
-                for feature in self.features:
+                for feature in self.features_dict:
                     if feature in melodia_features:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             elif col_name == 'frustration':
                 frust_features = ['frustration', 'density']
-                for feature in self.features:
+                for feature in self.features_dict:
                     if feature in frust_features:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:

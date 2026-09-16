@@ -5,18 +5,18 @@ import subprocess
 import pandas as pd
 import biobox as bb
 from dotenv import load_dotenv
-#from .error_reporting import report_error_to_file
+from .error_reporting import report_error_to_file
 
 try:
     from ase import Atoms
     import torch
     import torchani
 except Exception as e:
-    print(f'Packages required for AEV calculation are not available, '
-          f'will not be able to calculate AEVs. Error: {e}')
+    print(f'Packages required for legolas calculation are not available, '
+          f'will not be able to calculate legolas data. Error: {e}')
 
 
-class NMR():
+class LEGOLAS():
     '''
     15N NMR values for structures.
     '''
@@ -28,7 +28,7 @@ class NMR():
                                 'atom_select_names_modified': ['NZ', 'N07']},
                  error_filename = 'measure_errors.txt'):
         '''
-        Initialise the NMR class
+        Initialise the legolas nmr calculation class
 
         :param outdir: The output directory that measurements will be saved to.
         :type outdir: str
@@ -173,5 +173,5 @@ class NMR():
 
 
 if __name__ == '__main__':
-    nmr = NMR(outdir='result', include_modified=False)
+    nmr = LEGOLAS(outdir='result', include_modified=False)
     print(nmr.calculate_legolas(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

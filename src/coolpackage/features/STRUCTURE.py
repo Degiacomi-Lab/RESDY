@@ -11,7 +11,7 @@ except Exception as e:
 
 
 
-class Structure():
+class STRUCTURE():
     '''
     Structural measurement values for structures.
     '''
@@ -110,5 +110,5 @@ class Structure():
 
 
 if __name__ == '__main__':
-    struc = Structure(include_modified=True)
+    struc = STRUCTURE(include_modified=True)
     print(struc.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

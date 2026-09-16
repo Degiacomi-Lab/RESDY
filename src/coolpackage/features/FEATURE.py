@@ -4,7 +4,7 @@ import numpy as np
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-class Feature():
+class FEATURE():
     '''
     Example class for adding your own features into the codebase. To allow the measuring parent
     script to pick it up, please ensure that the class name is the same as the filename.
@@ -97,5 +97,5 @@ class Feature():
 
 
 if __name__ == '__main__':
-    feat = Feature(include_modified=True)
+    feat = FEATURE(include_modified=True)
     print(feat.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

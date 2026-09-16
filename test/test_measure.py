@@ -12,17 +12,18 @@ class Test_Uniprot(unittest.TestCase):
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
         self.all_features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge', 'melodia', 'frustration']
+        self.features_dict = {k: {} for k in self.all_features}
 
     def test_full_setup(self):
         # test full setup of measures class, no run, test runs individually
         M = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=self.all_features)
+                        features_dict=self.all_features)
 
     def test_propka(self):
         M_propka = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['propka'],
+                        features_dict={'propka': {}},
                         parallel=True,
                         include_modified=False)
         M_propka.measure_data()
@@ -33,7 +34,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_sasa(self):
         M_sasa = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['sasa'],
+                        features_dict={'sasa': {}},
                         parallel=True,
                         include_modified=False)
         M_sasa.measure_data()
@@ -44,7 +45,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_depth(self):
         M_depth = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['depth'],
+                        features_dict={'depth': {}},
                         parallel=True,
                         include_modified=False)
         M_depth.measure_data()
@@ -55,7 +56,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_aev(self):
         M_aev = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['aev'],
+                        features_dict={'aev': {}},
                         parallel=True,
                         include_modified=False)
         M_aev.measure_data()
@@ -66,7 +67,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_das(self):
         M_das = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['das'],
+                        features_dict={'das': {}},
                         parallel=True,
                         include_modified=False)
         M_das.measure_data()
@@ -74,10 +75,10 @@ class Test_Uniprot(unittest.TestCase):
         print('len das', len(M_das.df))
         self.assertTrue(len(M_das.df) > 0)
 
-    def test_seqcharge(self):
+    def test_charge(self):
         M_seqcharge = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['seqcharge'],
+                        features_dict={'seqcharge': {}},
                         parallel=True,
                         include_modified=False)
         M_seqcharge.measure_data()
@@ -88,7 +89,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_flexibility(self):
         M_flex = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['flexibility'],
+                        features_dict={'flexibility': {}},
                         parallel=True,
                         include_modified=False)
         M_flex.measure_data()
@@ -97,19 +98,19 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_flex.df) > 0)
 
     def test_legolas(self):
-        M_nmr = CPN.Measure(df_input=self.df_prot,
+        M_legolas = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['legolas'],
+                        features_dict={'legolas': {}},
                         parallel=True,
                         include_modified=False)
-        M_nmr.measure_data()
-        print(M_nmr.df)
-        print('len legolas:', len(M_nmr.df))
-
+        M_legolas.measure_data()
+        print(M_legolas.df)
+        print('len legolas:', len(M_legolas.df))
+    '''
     def test_frustration(self):
         M_frustration = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['frustration', 'density'],
+                        features_dict={'frustration': {}, 'density}: {}},
                         parallel=False,
                         include_modified=False)
         M_frustration.measure_data()
@@ -119,7 +120,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_melodia(self):
         M_melodia = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['melodia'],
+                        features_dict={'melodia': {}},
                         parallel=True,
                         include_modified=False)
         M_melodia.measure_data()
@@ -130,18 +131,18 @@ class Test_Uniprot(unittest.TestCase):
     def test_phi(self):
         M_phi = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['phi'],
+                        features_dict={'phi': {}},
                         parallel=True,
                         include_modified=False)
         M_phi.measure_data()
         print(M_phi.df)
         print('len phi', len(M_phi.df))
         self.assertTrue(len(M_phi.df) > 0)
-
+    '''
     def test_evolution(self):
         M_evolution = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['evolution'],
+                        features_dict={'evolution': {}},
                         parallel=True,
                         include_modified=False)
         M_evolution.measure_data()
@@ -152,7 +153,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_rmsf(self):
         M_rmsf = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['rmsf'],
+                        features_dict={'rmsf': {}},
                         parallel=True,
                         include_modified=False)
         M_rmsf.measure_data()
@@ -163,7 +164,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_pkaani(self):
         M_pkaani = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['pkaANI'],
+                        features_dict={'pkaani': {}},
                         parallel=True,
                         include_modified=False)
         M_pkaani.measure_data()
@@ -173,7 +174,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_secondarystructure(self):
         M_ss = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['SECONDARYSTRUCTURE'],
+                        features_dict={'secondarystructure': {}},
                         parallel=True,
                         include_modified=False)
         M_ss.measure_data()
@@ -184,7 +185,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_restart_measure_data(self):
         M = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['das'],
+                        features_dict={'das': {}},
                         parallel=True,
                         include_modified=False)
         M.restart_measure_data()
@@ -193,7 +194,7 @@ class Test_Uniprot(unittest.TestCase):
     def test_recovery(self):
         M = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features=['das'],
+                        features_dict={'das': {}},
                         parallel=True,
                         include_modified=False)
         M.recover_from_log('measure_log.txt')

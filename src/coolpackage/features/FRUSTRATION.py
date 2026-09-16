@@ -15,7 +15,7 @@ except Exception as e:
 pd.set_option('display.max_rows', 200)
 
 
-class Frustration():
+class FRUSTRATION():
     '''
     Frustration metric values for structures.
     '''
@@ -124,7 +124,7 @@ class Frustration():
 
 
 if __name__ == '__main__':
-    frust = Frustration(include_modified=True)
+    frust = FRUSTRATION(include_modified=True)
     print(frust.calculate_frustration(path=f'data{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
     #print(frust.calculate_frustration(path=f'data{os.sep}curated{os.sep}1NSK-alt-1.pdb'))
     #print(frust.calculate_frustration(path=f'2I1V-alt-1.pdb'))

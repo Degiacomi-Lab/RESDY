@@ -5,7 +5,7 @@ from .error_reporting import report_error_to_file
 from collections import OrderedDict
 
 
-class Charge():
+class SEQCHARGE():
     '''
     Charge values for structures.
     '''
@@ -202,5 +202,5 @@ class Charge():
 
 
 if __name__ == '__main__':
-    C = Charge(include_modified=True)
+    C = SEQCHARGE(include_modified=True)
     print(C.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))

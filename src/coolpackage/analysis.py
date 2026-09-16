@@ -110,11 +110,11 @@ class Analysis(object):
 
     def GO_search_term(self, df, code = '', name = ''):
         '''
-        List the subset of UNIPROT codes associated with a GO Term
+        List the subset of Uniprot codes associated with a GO Term.
 
         :param df: Dataframe to get matches to GO term from
         :type  df: pandas.DataFrame
-        :param code: Code of the Go term to analyse; format: 
+        :param code: Code of the Go term to analyse; format: 7 numbers only
         :type code: str
         :param name: Name corresponding to the GO term
         :type name: str
@@ -126,9 +126,9 @@ class Analysis(object):
         elif code != '' and name != '':
             # check if they match
             if code != self.name_to_code[name]:
-                return f'Unmatched GO term code and name, wrong input code {code}, should be {self.GO_decode_dict[name]}.'
+                return f'Unmatched GO term code and name, wrong input code {code}.'
 
-        uni_list = self.GO_dict[code]
+        uni_list = self.GO_dict.get(code)
         df_out = pd.DataFrame()
         for uni in uni_list:
             cdf = df[df['Uniprot_Entry'] == uni]
@@ -139,19 +139,40 @@ class Analysis(object):
 
     def GO_search_protein(self, uniprot_entry):
         '''
-        List all the GO Terms associated with a UNIPROT code
+        List all the GO Terms associated with a specific UNIPROT code based
+        on previous work done by calling GO_get_data() to extract all the information
+        on the dataframe for GO terms. If GO_get_data() has not been already called,
+        this function will call it before searching the GO dictonary to give a list
+        of GO terms associated.
+        
+        :param uniprot_code: The uniprot code of interest to do an API call on to get
+            the GO terms associated with this code.
+        :type uniprot_code: str
         '''
-        GO_list = list()
+        if self.GO_dict == {}:
+            self.GO_get_data()
+        GO_list = []
         for code, uni_list in self.GO_dict.items():
             if uniprot_entry in uni_list:
                 GO_list.append(code)
-        GO_list = [self.code_to_name[code] for code in GO_list]
+        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list] if a is not None]
         return GO_list
 
 
     def _GO_get_data(self, uniprot_code, lock, index, total):
         '''
-        worker of the self.GO_get_data method
+        Worker function of the self.GO_get_data method.
+        
+        :param uniprot_code: The uniprot code of interest to do an API call on to get
+            the GO terms associated with this code.
+        :type uniprot_code: str
+        :param lock: Lock provided by the multithreading instance for adding data out to
+            the dicionaries
+        :type lock: multithreading process lock
+        :param index: Number of the protein to investigate in the dataframe
+        :type index: int
+        :param total: Total number of the proteins to investigate in the dataframe
+        :type total: int
         '''
 
         print(f'Searching for {index}/{total} protein.')
@@ -186,6 +207,12 @@ class Analysis(object):
 
 
     def GO_get_data(self):
+        '''
+        Go over the measures dataframe given as input and extract all possible GO terms
+        that have associated with the Uniprot codes within the dataframe. This calls a
+        worked function _GO_get_data iteratively to do this automatically and will create
+        class dictionaries for converting a GO code to a name and name to a GO code.
+        '''
         uniprot_codes = self.df['Uniprot_Entry'].unique()
         num = len(uniprot_codes)
         locks = [threading.Lock()]*num

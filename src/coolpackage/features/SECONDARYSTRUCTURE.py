@@ -138,6 +138,7 @@ class SECONDARYSTRUCTURE():
         except Exception as e:
             if self.record_errors: report_error_to_file('SECONDARYSTRUCTURE 1', path, str(e), self.error_filename)
             print(f'SECONDARYSTRUCTURE Calculation: 1 - could not calculate secondary structure for file {path}: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'secondarystructure'])
 
         return df_ss.rename(columns={'chain': 'Chain', 'resid': 'Resid'}).reset_index(drop=True)
 

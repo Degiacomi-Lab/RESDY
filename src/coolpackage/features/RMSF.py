@@ -12,6 +12,7 @@ class RMSF():
     '''
 
     def __init__(self, df_proteins,
+                 align_type='backbone',
                  include_modified = False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
@@ -25,6 +26,11 @@ class RMSF():
         :param df_proteins: Dataframe including the information passed into measures from protein
             about which structures correspond to the uniprot codes.
         :type df_proteins: pandas.DataFrame
+        :param align_type: The type of alignment to perform when calculating the RMSF values.
+            Options:
+            - 'local' - Aligns to backbone of lysine to calculate RMSF value for
+            - 'backbone' (DEFAULT) - Aligns to backbone of full structure
+        :type align_type: str
         :param include_modified: Toggle to include residues which have been modified within the
             featurisation
         :type include_modified: bool
@@ -39,6 +45,7 @@ class RMSF():
         :type error_filename: str
         '''
         self.df_proteins = df_proteins
+        self.align_type = align_type
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
@@ -50,7 +57,7 @@ class RMSF():
         self.model_loaded = False
 
 
-    def calculate(self, path, align_type='backbone'):
+    def calculate(self, path):
         '''
         Calculate the root mean square fluctuation of the lysines within the protein over all the
         structures which have been curated for the Uniprot code. This method uses biobox but doesn't
@@ -63,12 +70,6 @@ class RMSF():
 
         :param path: The path of the pdb file that the RMSF is being calculated for.
         :type path: str
-        :param align_type: The type of alignment to perform when calculating the RMSF values.
-            Options:
-
-            - 'local' - Aligns to backbone of lysine to calculate RMSF value for
-            - 'backbone' (DEFAULT) - Aligns to backbone of full structure
-        :type align_type: str
         :returns:
             Dataframe with information on chain, residue number and rmsf output.
             Outline::
@@ -138,7 +139,7 @@ class RMSF():
                     chain = r['chain']
                     resid = r['resid']
                     try:
-                        match align_type:
+                        match self.align_type:
                             case 'local':
                                 _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"], get_index=True)
                             case 'backbone' | _:
