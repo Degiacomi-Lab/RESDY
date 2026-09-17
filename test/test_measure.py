@@ -106,11 +106,11 @@ class Test_Uniprot(unittest.TestCase):
         M_legolas.measure_data()
         print(M_legolas.df)
         print('len legolas:', len(M_legolas.df))
-    '''
+
     def test_frustration(self):
         M_frustration = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features_dict={'frustration': {}, 'density}: {}},
+                        features_dict={'frustration': {}, 'density': {}},
                         parallel=False,
                         include_modified=False)
         M_frustration.measure_data()
@@ -138,7 +138,7 @@ class Test_Uniprot(unittest.TestCase):
         print(M_phi.df)
         print('len phi', len(M_phi.df))
         self.assertTrue(len(M_phi.df) > 0)
-    '''
+
     def test_evolution(self):
         M_evolution = CPN.Measure(df_input=self.df_prot,
                         outdir=self.outdir,

@@ -160,6 +160,40 @@ Features denoted in the table below with specific package requirements or progra
             <td><a href="https://github.com/roitberg-group/legolas">Legolas</a></td>
             <td>Follow the installation instructions at <a href="https://github.com/roitberg-group/legolas">GitHub repo</a>.</td>
         </tr>
+        <tr>
+            <td>Flexibility<br></td>
+            <td>Biobox</td>
+            <td>no extra requirements</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Root Mean Square Fluctuation<br></td>
+            <td>Biobox</td>
+            <td>no extra requirements</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Evolution<br></td>
+            <td>ESM</td>
+            <td>Fair-ESM</td>
+            <td><a href="https://anaconda.org/channels/conda-forge/packages/fair-esm/overview">fair-esm</a></td>
+        </tr>
+        <tr>
+            <td rowspan='2'>Secondary Structure<br></td>
+            <td rowspan='2'>Biobox</td>
+            <td>Biopython</td>
+            <td><a href="https://anaconda.org/conda-forge/biopython">anaconda</a></td>
+        </tr>
+        <tr>
+            <td>DSSP</td>
+            <td><a href="https://anaconda.org/channels/conda-forge/packages/dssp/overview">DSSP</a></td>
+        </tr>
+        <tr>
+            <td>Legolas (15N nmr prediction)<br></td>
+            <td>Legolas</td>
+            <td>Legolas</td>
+            <td><a href="https://github.com/roitberg-group/legolas">Install through their GitHub</a></td>
+        </tr>
     </tbody>
 </table>
 </div>
