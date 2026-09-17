@@ -1,7 +1,7 @@
 import csv
 import os
 import requests
-from .helper import get_download_tool
+
 
 def download_AF_struc(pdb, outfolder="result"):
     '''
@@ -16,13 +16,6 @@ def download_AF_struc(pdb, outfolder="result"):
     :type pdb: str
     :param outfolder: The output directory used to know where the downloaded files should be
         written to
-    :type outfolder: str
-
-    .. rubric:: Example
-
-    ::
-
-        >>> download_AF_struc('AF-P0CG48-F1-model_v6', outfolder='test_plddt')
     '''
 
     download_path = os.path.join(outfolder, "curated")
@@ -45,6 +38,7 @@ def download_AF_struc(pdb, outfolder="result"):
         raise Exception(f'AF structure not found for {pdb}: {e}') from e
 
     return
+
 
 def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     '''
@@ -69,17 +63,6 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     :returns: A dictionary matching up all the lysines with their corresponding PLDDT values for the
         given AF structure.
     :rtype: dict
-
-    .. rubric:: Example
-
-    ::
-
-        >>>find_af_plddt('AF-P0CG48-F1-model_v4', outfolder='test_plddt')
-        > Finding plddt
-        AF-P0CG48-F1-model_v4; Resid No. A6; PLDDT: 93.79
-        AF-P0CG48-F1-model_v4; Resid No. A11; PLDDT: 89.45
-        AF-P0CG48-F1-model_v4; Resid No. A27; PLDDT: 94.28
-        ...
     '''
     cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):

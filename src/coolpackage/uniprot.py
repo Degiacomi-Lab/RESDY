@@ -148,7 +148,6 @@ class Uniprot(object):
                 data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': af_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 
-            #search for available PDB structures
             except Exception as e:
                 print(f'Error {e}')
 
@@ -209,6 +208,7 @@ class Uniprot(object):
             print(f'Extracting protein information for protein {prot} in organism '
                   f'{code}; {i}/{len(prot_list)}')
             self.get_protein_data(uniprot_code=prot)
+        self.df = self.df.drop_duplicates()
 
 
     def from_csv_file(self, csv_file):
@@ -222,20 +222,17 @@ class Uniprot(object):
         :type csv_file: str
         '''
 
-        #read .csv file.
         try:
             csv_df = pd.read_csv(csv_file)
             print('.csv input file of Uniprot codes successfully opened')
         except Exception as e:
             raise Exception(f'Failed to read {csv_file}: {e}') from e
 
-        #Next abstract column names
         try:
             csv_df['PDB_Code'] = csv_df['PDB_Code'].fillna(0)
         except Exception as e:
             raise Exception(f'Failed to get data from .csv file. {e}') from e
 
-        #get the data about the protein and append it to the dataframe.
         for i, r in csv_df.iterrows():
             try:
                 uniprot_code = r['Uniprot_Entry']
@@ -256,6 +253,8 @@ class Uniprot(object):
             except Exception as e:
                 print(f'> Error {e}')
                 continue
+
+        self.df = self.df.drop_duplicates()
 
 
     def filter_by_technique(self, list_of_techniques):

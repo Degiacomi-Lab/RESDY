@@ -1,9 +1,9 @@
 '''
-Download files, patch them if necessary, and save result in folder "clean" 2 logfiles saved:
+Provide patching functions which are called from protein.py
+These interact with Modeller to perform patching on protein structures
 
-- gap_data.txt (reports on how many missing residues the protein had)
-- patch_data.txt (reports on which files had to be patched with modeller, and whether the operation
-  was successful)
+.. todo::
+    Check whether setting env.io.two_char_chain here has any effect.
 '''
 import fileinput
 import glob
@@ -107,10 +107,6 @@ def _fasta_to_pir(fbasename):
     :param fbasename: basename to use for the file being used. In the overall code this includes the
         path to the temporary folder
     :type fbasename: str
-
-    .. todo::
-
-       Check whether setting env.io.two_char_chain here has any effect.
     '''
     env = Environ()
     env.io.two_char_chain = True
@@ -129,10 +125,6 @@ def _full_align(tmp_folder, fbasename):
     :param fbasename: basename to use for the file being used. In the overall code this includes the
         path to the temporary folder
     :type fbasename: str
-
-    .. todo::
-
-       Check whether setting env.io.two_char_chain here has any effect.
     '''
     pir_fname = f'{fbasename}.pir'
     seq_fname = f'{fbasename}.seq'
@@ -298,10 +290,6 @@ def _patch_model(tmp_folder, fbasename, seq_name):
     :type seq_name: str
     :returns: patched chain name path
     :rtype: str
-
-    .. todo::
-
-       Check whether setting env.io.two_char_chain here has any effect.
     '''
     print(">> patching model...")
     log.verbose()
@@ -623,10 +611,6 @@ def curate(pdb, fasta, outdir="result", gap=10,
     :type include_hetatm: bool
     :returns: The final name of the curated pdb file
     :rtype: str
-
-    .. todo::
-
-       Establish whether Modeller needs to be launched at all when there are no gaps.
     '''
     pdb_tmp_name = f'tmp_{os.path.splitext(os.path.basename(pdb))[0]}'
     tmp_folder = os.path.join(outdir, pdb_tmp_name)
@@ -690,7 +674,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
 
     return outname, largest
 
-##############################################################################
+
 
 if __name__ == "__main__":
 

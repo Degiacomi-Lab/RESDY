@@ -1,35 +1,14 @@
-'''
-General notes on the work still outstanding in this file. There may be more further down.
-
-.. todo::
-
-   Most of the GO term analysis currently only works for propka and not for pkaani, look into
-   adding this in (GW, 13.09.24).
-
-.. todo::
-
-   Look into the GO term functions and see if these still actually work with all the extra
-   material that has been added in (GW, 13.09.24).
-
-.. todo::
-
-   The dropna function was removed on init, a function that cleans the dataframe at the start is
-   needed instead. All null rows should not be removed indiscriminately, in case they are only
-   null for some measurements and those measurements are not being used (GW, 16.04.25).
-'''
-
 import os
 import re
 import urllib.request
-import urllib.parse
-import urllib.error
 import threading
 import concurrent.futures
-from ast import literal_eval
+import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from .aggregation import Aggregation
 from scipy.stats import fisher_exact
 
 try:
@@ -42,6 +21,9 @@ except Exception as e:
           f'able to calculate this. Error: {e}')
 
 class Analysis(object):
+    '''
+    Class to handle nalysis of a measurements dataframe. GO term analysis, 
+    '''
 
     def __init__(self, df, outdir="result", features_to_analyse = []):
         '''
@@ -52,13 +34,23 @@ class Analysis(object):
         :type df: pandas.DataFrame
         :param outdir: Name of the directory to write to
         :type outdir: str
-        :param features_to_analyse: List of features which should be analysed over
+        :param features_to_analyse: List of features which should be analysed over. If ['all'] is
+            passed, all features available in the table will be used.
         :type features_to_analyse: list
         '''
-        if features_to_analyse == []:
-            self.df = df
+        if isinstance(df, str):
+            self.df = pd.read_csv(df)
         else:
-            self.df = df.dropna(subset=features_to_analyse)
+            self.df = df
+
+        if features_to_analyse == ['all']:
+            self.df = self.df
+        else:
+            self.df = self.df.dropna(subset=features_to_analyse)
+
+        standard_cols = ['Uniprot_Entry', 'Chain', 'Resid', 'Resolution', 'Method', 'Class',
+                        'Modified', 'PLDDT']
+        self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
 
@@ -73,20 +65,44 @@ class Analysis(object):
         self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
 
 
-    # GW 05.12.24 function potentially unused - remove?
     def get_data(self, uniprot_entry, resid):
+        '''
+        Retrieve data from the given dataframe which match up to a given uniprot
+        entry and residue.
+
+        :param uniprot_entry: Code for the uniprot entry to subset
+        :type  uniprot_entry: str
+        :param resid: Residue number to subset
+        :type resid: str
+
+        :returns: Dataframe containing only information from an alphafold structure
+        :rtype: pandas.DataFrame
+        '''
         df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
         return df_query
 
-    # GW 05.12.24 function potentially unused - remove?
+
     def get_data_alphafold(self):
+        '''
+        Retrieve data from the given dataframe to the class which were produced by alphafold.
+
+        :returns: Dataframe containing only information from an alphafold structure
+        :rtype: pandas.DataFrame
+        '''
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
 
 
     def GO_search_term(self, df, code = '', name = ''):
         '''
-        List the subset of UNIPROT codes associated with a GO Term
+        List the subset of Uniprot codes associated with a GO Term.
+
+        :param df: Dataframe to get matches to GO term from
+        :type  df: pandas.DataFrame
+        :param code: Code of the Go term to analyse; format: 7 numbers only
+        :type code: str
+        :param name: Name corresponding to the GO term
+        :type name: str
         '''
         if code == '' and name == '':
             return 'Insufficient input!'
@@ -95,9 +111,9 @@ class Analysis(object):
         elif code != '' and name != '':
             # check if they match
             if code != self.name_to_code[name]:
-                return f'Unmatched GO term code and name, wrong input code {code}, should be {self.GO_decode_dict[name]}.'
+                return f'Unmatched GO term code and name, wrong input code {code}.'
 
-        uni_list = self.GO_dict[code]
+        uni_list = self.GO_dict.get(code)
         df_out = pd.DataFrame()
         for uni in uni_list:
             cdf = df[df['Uniprot_Entry'] == uni]
@@ -105,20 +121,43 @@ class Analysis(object):
 
         return df_out
 
+
     def GO_search_protein(self, uniprot_entry):
         '''
-        List all the GO Terms associated with a UNIPROT code
+        List all the GO Terms associated with a specific UNIPROT code based
+        on previous work done by calling GO_get_data() to extract all the information
+        on the dataframe for GO terms. If GO_get_data() has not been already called,
+        this function will call it before searching the GO dictonary to give a list
+        of GO terms associated.
+        
+        :param uniprot_code: The uniprot code of interest to do an API call on to get
+            the GO terms associated with this code.
+        :type uniprot_code: str
         '''
-        GO_list = list()
+        if self.GO_dict == {}:
+            self.GO_get_data()
+        GO_list = []
         for code, uni_list in self.GO_dict.items():
             if uniprot_entry in uni_list:
                 GO_list.append(code)
-        GO_list = [self.code_to_name[code] for code in GO_list]
+        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list] if a is not None]
         return GO_list
+
 
     def _GO_get_data(self, uniprot_code, lock, index, total):
         '''
-        worker of the self.GO_get_data method
+        Worker function of the self.GO_get_data method.
+        
+        :param uniprot_code: The uniprot code of interest to do an API call on to get
+            the GO terms associated with this code.
+        :type uniprot_code: str
+        :param lock: Lock provided by the multithreading instance for adding data out to
+            the dicionaries
+        :type lock: multithreading process lock
+        :param index: Number of the protein to investigate in the dataframe
+        :type index: int
+        :param total: Total number of the proteins to investigate in the dataframe
+        :type total: int
         '''
 
         print(f'Searching for {index}/{total} protein.')
@@ -151,7 +190,14 @@ class Analysis(object):
         except Exception as e:
             print(f'Error analysis GO data for Uniprot: {uniprot_code} with error: {e}')
 
+
     def GO_get_data(self):
+        '''
+        Go over the measures dataframe given as input and extract all possible GO terms
+        that have associated with the Uniprot codes within the dataframe. This calls a
+        worked function _GO_get_data iteratively to do this automatically and will create
+        class dictionaries for converting a GO code to a name and name to a GO code.
+        '''
         uniprot_codes = self.df['Uniprot_Entry'].unique()
         num = len(uniprot_codes)
         locks = [threading.Lock()]*num
@@ -161,62 +207,422 @@ class Analysis(object):
         self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
 
-    def plot_graph(self, plot_type, feature, uniprot_entry = False, resid = False):
+    def plot_feature_histogram(self, plot_type='all', feature='', agg_type='', uniprot='',
+                               chain='', resid='', save_name=''):
         '''
-        Basic plot, show either a histogram or a boxplot
+        Create a basic plot showing the distribution of values for the specified feature
+        across the set of measurements passed into the analysis class. An aggregation
+        method will be employed to reduce biases, default here is avg unless other
+        method passed.
+
+        :param plot_type: Asks for while type of plot you want; options are 'all' which
+            will include graphs for all possible features, 'single' which will just plot
+            a single graph for the selected feature or 'agg' which will plot a collation
+            of histograms of distribution of data after different aggregation methods
+            for a single feature.
+        :type plot_type: str
+        :param feature: Name of the feature to produce histogram of data for
+        :type feature: str
+        :param agg_type: Name of aggregation method to use when plotting the histogram.
+            For more information, see documentation of aggregation class.
+        :type agg_type: str
+        :param uniprot: Uniprot code given if a specific analysis of feature data for a
+            uniprot code is required. Default is left as '' and will take full dataframe
+            unless code given.
+        :type uniprot: str, optional
+        :param chain: Chain given if a specific analysis of feature data for a chain is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type chain: str, optional
+        :param resid: Resid given if a specific analysis of feature data for a resid is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type resid: str, optional
+        :param save_name: File name to save the histogram to.
+        :type save_name: str, optional
         '''
         try:
             plt.clf()
         except Exception:
             pass
 
-        if not uniprot_entry and not resid:
-            try:
-                x = self.df[feature]
-            except Exception:
-                print(f'could not find feature {feature}')
-                return
+        if plot_type == 'single' and feature == '':
+            print('Selected single feature for plot type but no feature given as input. '
+                  'Please enter a feature when calling the function.')
+            return
+        elif plot_type == 'single' and feature not in self.df.columns:
+            print(f'Selected single feature for plot type but feature given as input (input: '
+                  f'{feature}) not in the dataframe given to the class. Please enter a feature '
+                  f'when calling the function.')
+            return
+        elif plot_type == 'agg' and feature == '':
+            print('Selected agg for plot type but no feature given as input. Please '
+                  'enter a feature when calling the function.')
+            return
 
-            if plot_type == 'histogram':
-                sns.displot(x, kde=True)
-
-            elif plot_type == 'boxplot':
-                sns.boxplot(x=x)
-            else:
-                print('No Such Plot Available.')
-                return
-
+        if uniprot != '' and chain != '' and resid != '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+        elif uniprot != '' and chain != '' and resid == '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain)]
+        elif uniprot != '' and chain == '' and resid != '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Resid'] == resid)]
+        elif uniprot == '' and chain != '' and resid != '':
+            df_plot = self.df[(self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+        elif uniprot != '' and chain == '' and resid == '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot)]
+        elif uniprot == '' and chain != '' and resid == '':
+            df_plot = self.df[(self.df['Chain'] == chain)]
+        elif uniprot == '' and chain == '' and resid != '':
+            df_plot = self.df[(self.df['Resid'] == resid)]
         else:
-            if uniprot_entry and resid:
-                if uniprot_entry not in self.df['Uniprot_Entry'].unique():
-                    print('Wrong Uniprot_Entry.')
-                    return
+            df_plot = self.df
 
-                else:
-                    if resid not in self.df[self.df['Uniprot_Entry'] == uniprot_entry]['Resid'].unique():
-                        print('Wrong Resid.')
-                        return
+        feature_labels = {'depth': 'Depth (Å)',
+                        'sasa': 'SASA (Å\u00b2)',
+                        'propka': 'pKa (propka)',
+                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                        'curvature': 'Curvature',
+                        'arc_length': 'Arc Length',
+                        'das': 'Dynamically Accessible Surface',
+                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                        'phi': 'Phi',
+                        'psi': 'Psi',
+                        'seqcharge': 'Sequence Charge',
+                        'torsion': 'Torsion Angle',
+                        'writhing': 'Writhing',
+                        'frustration': 'Frustration',
+                        'rmsf': 'RMSF'}
 
-                df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
+        agg_labels = {'avg': 'Average',
+                      'med': 'Median',
+                      'min': 'Minimum',
+                      'max': 'Maximum',
+                      'rand': 'Random',
+                      'sd': 'Standard Deviation',
+                      'range': 'Range'}
 
-                try:
-                    x = df_query[feature]
-                except Exception:
-                    print(f'could not find feature {feature}')
-                    return
+        feature_histwidths = {'depth': 0.1,
+                            'sasa': 2,
+                            'propka': 0.2,
+                            'flexibility': 0.1,
+                            'curvature': 0.1,
+                            'arc_length': 0.1,
+                            'das': 2,
+                            'legolas': 2,
+                            'phi': 2,
+                            'psi': 2,
+                            'seqcharge': 0.5,
+                            'torsion': 0.2,
+                            'writhing': 0.02,
+                            'frustration': 0.5,
+                            'rmsf': 0.2}
 
-                if plot_type == 'histogram':
-                    sns.displot(x, kde=True)
-                elif plot_type == 'boxplot':
-                    sns.boxplot(x=x)
-                else:
-                    print('No Such Plot Available.')
-                    return
-            else:
-                print('Lack of Input Information.')
-                return
+        match plot_type:
+            case 'single':
+                if agg_type == '':
+                    print('No aggregation type given, using avg')
+                    agg_type = 'avg'
+
+                agg_feature = f'{feature}_{agg_type}'
+
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=[feature])
+                df_plot = agg.aggregate_data()
+
+                fig, ax = plt.subplots()
+                fig.set_figheight(8)
+                fig.set_figwidth(8)
+
+                x_left = df_plot[agg_feature].min()
+                x_right = df_plot[agg_feature].max()
+                step=feature_histwidths[feature]
+
+                palatinate_colour = '#682860'
+                ax.hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                        bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                        alpha=0.5, label='')
+                sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=ax)
+                ax.set_xlabel(feature_labels[feature])
+                ax.set_xlim(x_left, x_right)
+
+                ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
+
+            case 'all':
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                                 'Resolution', 'Modified', 'class']
+                feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
+                if 'arc' in feat_cols:
+                    feat_cols.remove('arc')
+                    feat_cols.append('arc_length')
+                if 'aev' in feat_cols:
+                    print(f'> Feature \'aev\' in dataframe, ignoring for scalar feature histogram creation')
+                    feat_cols.remove('aev')
+                if 'evolution' in feat_cols:
+                    print(f'> Feature \'evolution\' in dataframe, ignoring for scalar feature histogram creation')
+                    feat_cols.remove('evolution')
+
+                if agg_type == '':
+                    print('No aggregation type given, using avg')
+                    agg_type = 'avg'
+
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=feat_cols)
+                df_plot = agg.aggregate_data()
+
+                if len(feat_cols) <= 9: col_len = 3
+                elif len(feat_cols) <= 16: col_len = 4
+                else: col_len = 5
+
+                row_len = math.ceil(len(feat_cols) / col_len)
+
+                fig, axs = plt.subplots(row_len, col_len)
+                fig.set_figheight(12)
+                fig.set_figwidth(12)
+                fig.suptitle(f'Histogram All Features Analysis: Aggregation Type={agg_type}')
+                fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0.27, hspace=0.25)
+
+                used_plots = []
+                for i, feat in enumerate(feat_cols):
+                    agg_feature = f'{feat}_{agg_type}'
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    used_plots.append([row, col])
+
+                    x_left = df_plot[agg_feature].min()
+                    x_right = df_plot[agg_feature].max()
+                    step=feature_histwidths[feat]
+
+                    palatinate_colour = '#682860'
+                    axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                            bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                            alpha=0.5, label='')
+                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=axs[row,col])
+                    axs[row,col].set_xlabel(feature_labels[feat])
+                    axs[row,col].set_xlim(x_left, x_right)
+
+                for i in range(row_len * col_len):
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    if [row, col] not in used_plots:
+                        fig.delaxes(axs[row][col])
+
+            case 'agg':
+                agg_types = ['avg', 'med', 'sd', 'range', 'rand', 'max', 'min']
+                if agg_type == '':
+                    print('No aggregation type given, using all for aggregation histogram plot')
+                    agg_type = 'all'
+
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=[feature])
+                df_plot = agg.aggregate_data()
+
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                                'Resolution', 'Modified', 'class']
+                agg_types = [a.split('_')[-1] for a in df_plot.columns if a not in non_feat_cols]
+
+                if len(agg_types) <= 4: col_len = 2
+                else: col_len = 3
+
+                row_len = math.ceil(len(agg_types) / col_len)
+
+                fig, axs = plt.subplots(row_len, col_len)
+                fig.set_figheight(12)
+                fig.set_figwidth(12)
+                fig.suptitle(f'Histogram All Aggregation Analysis; Feature: {feature_labels[feature]}')
+                fig.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.05, wspace=0.27, hspace=0.27)
+
+                used_plots = []
+                for i, agg in enumerate(agg_types):
+                    agg_feature = f'{feature}_{agg}'
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    used_plots.append([row, col])
+
+                    x_left = df_plot[agg_feature].min()
+                    x_right = df_plot[agg_feature].max()
+                    step=feature_histwidths[feature]
+
+                    palatinate_colour = '#682860'
+                    axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
+                            bins=np.arange(x_left, x_right, step), color=palatinate_colour,
+                            alpha=0.5, label='')
+                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=axs[row,col])
+                    axs[row,col].set_xlabel(feature_labels[feature])
+                    axs[row,col].set_xlim(x_left, x_right)
+                    axs[row,col].set_title(agg_labels[agg])
+
+                for i in range(row_len * col_len):
+                    row = math.floor(i / col_len)
+                    col = i % col_len
+                    if [row, col] not in used_plots:
+                        fig.delaxes(axs[row][col])
+            case _:
+                print(f'>> Plot type give ({plot_type}) not recognised, please choose either all, single, agg')
+
+        if save_name != '':
+            plt.savefig(save_name)
 
         plt.show()
+
+
+    def plot_feature_violins(self, features='', agg_type='', uniprot='',
+                               chain='', resid='', save_name=''):
+        '''
+        Create a basic plot showing the distribution of values for the specified feature
+        across the set of measurements passed into the analysis class. An aggregation
+        method will be employed to reduce biases, default here is avg unless other
+        method passed.
+
+        :param features: Name of the feature or list of features to produce violins of
+            data for
+        :type features: str or list
+        :param agg_type: Name of aggregation method to use when plotting the histogram.
+            For more information, see documentation of aggregation class.
+        :type agg_type: str
+        :param uniprot: Uniprot code given if a specific analysis of feature data for a
+            uniprot code is required. Default is left as '' and will take full dataframe
+            unless code given.
+        :type uniprot: str, optional
+        :param chain: Chain given if a specific analysis of feature data for a chain is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type chain: str, optional
+        :param resid: Resid given if a specific analysis of feature data for a resid is 
+            required. Default is left as '' and will take full dataframe unless code given.
+        :type resid: str, optional
+        :param save_name: File name to save the histogram to.
+        :type save_name: str, optional
+        '''
+        try:
+            plt.clf()
+        except Exception:
+            pass
+
+        if agg_type == '':
+            print('No aggregation type given as input; will include all options in the graphs')
+            agg_type = 'all'
+
+        if uniprot != '' and chain != '' and resid != '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+        elif uniprot != '' and chain != '' and resid == '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain)]
+        elif uniprot != '' and chain == '' and resid != '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Resid'] == resid)]
+        elif uniprot == '' and chain != '' and resid != '':
+            df_plot = self.df[(self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+        elif uniprot != '' and chain == '' and resid == '':
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot)]
+        elif uniprot == '' and chain != '' and resid == '':
+            df_plot = self.df[(self.df['Chain'] == chain)]
+        elif uniprot == '' and chain == '' and resid != '':
+            df_plot = self.df[(self.df['Resid'] == resid)]
+        else:
+            df_plot = self.df
+
+        feature_labels = {'depth': 'Depth (Å)',
+                        'sasa': 'SASA (Å\u00b2)',
+                        'propka': 'pKa (propka)',
+                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                        'curvature': 'Curvature',
+                        'arc_length': 'Arc Length',
+                        'das': 'Dynamically Accessible Surface',
+                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                        'phi': 'Phi',
+                        'psi': 'Psi',
+                        'seqcharge': 'Sequence Charge',
+                        'torsion': 'Torsion Angle',
+                        'writhing': 'Writhing',
+                        'frustration': 'Frustration',
+                        'rmsf': 'RMSF'}
+
+        agg_labels = {'avg': 'Average',
+                      'med': 'Median',
+                      'min': 'Minimum',
+                      'max': 'Maximum',
+                      'rand': 'Random',
+                      'sd': 'Standard Deviation',
+                      'range': 'Range'}
+
+        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                        'Resolution', 'Modified', 'class']
+
+        if features == '' or features == []:
+            print('No features given as input, using all possible scalar features')
+            features = [a for a in df_plot.columns if a not in non_feat_cols]
+
+        if isinstance(features, str):
+            features = [features]
+
+        features = [a for a in features if a not in ['aev', 'evolution']]
+        num_feats = len(features)
+
+        if num_feats == 1:
+            fig, ax = plt.subplots()
+            fig.set_figheight(6)
+            fig.set_figwidth(8)
+
+            for i, feat in enumerate(features):
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=feat)
+                df_plot_feat = agg.aggregate_data()
+
+                agg_non_feat_cols = [a for a in df_plot_feat.columns if a in non_feat_cols]
+                df_plot_feat = df_plot_feat.drop(columns=agg_non_feat_cols)
+                df_plot_feat = df_plot_feat.rename(columns={k: v for k, v in zip(list(df_plot_feat.columns),
+                                        [agg_labels[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
+
+                sns.violinplot(data=df_plot_feat,
+                            inner="quart",
+                            fill=False,
+                            color='#682860',
+                            ax=ax)
+
+                if i == num_feats - 1:
+                    ax.set(xlabel='Aggregation Types')
+                ax.set(ylabel=feature_labels[feat])
+                ax.set(title=f'Feature Aggregation Analysis: {feature_labels[features[0]]}')
+
+            plt.xticks(rotation=20)
+
+        else:
+            fig, axs = plt.subplots(num_feats)
+            fig.set_figheight(3*num_feats)
+            fig.set_figwidth(8)
+            fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0, hspace=0)
+
+            for i, feat in enumerate(features):
+                agg = Aggregation(df_measurements=df_plot,
+                                aggregation_method=agg_type,
+                                features_to_include=feat)
+                df_plot_feat = agg.aggregate_data()
+
+                agg_non_feat_cols = [a for a in df_plot_feat.columns if a in non_feat_cols]
+                df_plot_feat = df_plot_feat.drop(columns=agg_non_feat_cols)
+                df_plot_feat = df_plot_feat.rename(columns={k: v for k, v in zip(list(df_plot_feat.columns),
+                                        [agg_labels[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
+
+                sns.violinplot(data=df_plot_feat,
+                            inner="quart",
+                            fill=False,
+                            color='#682860',
+                            ax=axs[i])
+
+                if i == num_feats - 1:
+                    axs[i].set(xlabel='Aggregation Types')
+                else:
+                    axs[i].set(xticks=[])
+                axs[i].set(ylabel=feature_labels[feat])
+
+            fig.suptitle('Violin Feature Aggregation Analysis')
+            plt.xticks(rotation=20)
+
+
+        if save_name != '':
+            plt.savefig(save_name)
+
+        plt.show()
+
 
     def get_outliers(self, uniprot_entry, resid, feature, whis = 1.5):
         '''
@@ -245,23 +651,28 @@ class Analysis(object):
         df_outlier = df_query[(df_query[feature] < lower) | (df_query[feature] > upper)]
         return df_outlier
 
+
     def get_extreme_values(self, feature, lower = 1, upper = 14):
-        df_query = self.df[(self.df[feature] < lower) | (self.df[feature] > upper)]
+        '''
+        Retrieve data from the given dataframe which are outside the lower and upper
+        boundaries for that feature of interest.
+
+        :param feature: Feature of interest to examine
+        :type feature: str
+        :param lower: Lower boundary for a value for the feature to not be considered extreme
+        :type lower: int
+        :param upper: Upper boundary for a value for the feature to not be considered extreme
+        :type upper: int
+
+        :returns: Dataframe containing only information from an alphafold structure
+        :rtype: pandas.DataFrame
+        '''
+        df_query = self.df[(self.df[feature] < int(lower)) | (self.df[feature] > int(upper))]
         return df_query
 
-    def remove_df(self, df_to_remove):
-        '''
-        '''
-        len_one = len(self.df)
-        remove_list = df_to_remove.index.tolist()
-        self.df = self.df.drop(index = remove_list)
-        len_two = len(self.df)
-        print(f'Original num of rows: {len_one}')
-        print(f'Current num of rows: {len_two}')
-        print(f'Num of rows removed: {len(df_to_remove)}')
 
-
-    def add_extra_measures(self, extra_measures_filename, write_new_file = False, out_filename='measures_new.csv'):
+    def add_extra_measures(self, extra_measures_filename, write_new_file = False,
+                           out_filename='measures_new.csv'):
         '''
         Function to add in extra measurements to the measures frame that has been autoloaded into
         the analysis class on defining this. This will match up the measurements in each case and
@@ -282,7 +693,8 @@ class Analysis(object):
         # Step 1: read in new dataframe, extract column names, check for overlap and
         #         deal if is, otherwise add new column in
         try:
-            new_df = pd.read_csv(extra_measures_filename)
+            if isinstance(extra_measures_filename, str):
+                new_df = pd.read_csv(extra_measures_filename)
             if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
             base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
@@ -306,7 +718,9 @@ class Analysis(object):
                                 chain_value = r["Chain"]
                                 resid_value = r["Resid"]
 
-                                idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                                idx = np.where((new_df["PDB_Code"] == protein_code) &
+                                               (new_df["Chain"] == chain_value) &
+                                               (new_df["Resid"].astype(int) == resid_value))
                                 if len(idx[0]) == 0:
                                     continue
 
@@ -329,7 +743,9 @@ class Analysis(object):
                     chain_value = r["Chain"]
                     resid_value = r["Resid"]
 
-                    idx = np.where((new_df["PDB_Code"] == protein_code) & (new_df["Chain"] == chain_value) & (new_df["Resid"].astype(int) == resid_value))
+                    idx = np.where((new_df["PDB_Code"] == protein_code) &
+                                   (new_df["Chain"] == chain_value) &
+                                   (new_df["Resid"].astype(int) == resid_value))
                     if len(idx[0]) == 0:
                         continue
 
@@ -374,7 +790,10 @@ class Analysis(object):
         '''
         print('>> Removing unrequired residues')
         # Remove duplicated data from the measurements
-        df_req_res = req_resid_table
+        if isinstance(req_resid_table, str):
+            df_req_res = pd.read_csv(req_resid_table)
+        else:
+            df_req_res = req_resid_table
         initial_data_one = len(self.df)
         self.df = self.df.drop_duplicates()
         duplicate_rows_removed = initial_data_one - len(self.df)
@@ -580,10 +999,10 @@ class Analysis(object):
         # get all the uniprot codes inside the range and the reference uniprot code list
         feat_one, feat_one_low, feat_one_upper = str(feature_one[0]), float(feature_one[1]), float(feature_one[2])
         feat_two, feat_two_low, feat_two_upper = str(feature_two[0]), float(feature_two[1]), float(feature_two[2])
-        selected_df = self.df_sub[(self.df_sub[feat_one] >= feat_one_low) & (self.df_sub[feat_one] <= feat_one_upper)]
+        selected_df = self.df[(self.df[feat_one] >= feat_one_low) & (self.df[feat_one] <= feat_one_upper)]
         selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
         uniprot_selected = selected_df['Uniprot_Entry'].unique()
-        uniprot_reference = self.df_sub['Uniprot_Entry'].unique()
+        uniprot_reference = self.df['Uniprot_Entry'].unique()
 
         # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
         GO_bacgou = [code for code in list(self.GO_dict.keys()) if len(self.GO_dict[code]) >= uniprot_cnt_cutoff]
@@ -634,6 +1053,7 @@ class Analysis(object):
             df = pd.concat([df, df_dictionary], ignore_index=True)
 
         return df
+
 
 
 if __name__ == '__main__':

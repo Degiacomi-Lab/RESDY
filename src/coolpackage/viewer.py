@@ -59,15 +59,15 @@ class Viewer(object):
                     value='Welcome',
                     description='GO Terms: ',
                     disabled=False,)
-        
+
         # PDB file text box
         self.PDB_box = widgets.Text(
                             value='Welcome',
                             placeholder='Type something',
                             description='PDB file:',
                             disabled=True)
-        
-        
+
+
         # call back function for the export buttom
         def call_back_buttom_export(b_export):
             if self.temp_df.empty:
@@ -83,9 +83,9 @@ class Viewer(object):
                 data = ({'Uniprot_Entry':my_uniprot, 'Resid':my_resid, 'Num':len(df_query), 'pKa_mean': round(df_query['pKa'].mean(),2), 'sasa_mean':round(df_query['sasa'].mean(),2), 'GO_Terms': GO_Terms})
                 df_dictionary = pd.DataFrame([data])
                 df_out = pd.concat([df_out, df_dictionary], ignore_index=True)
-            
+
             df_out.to_csv(self.export_path, index = False)
-        
+
         # export buttom for exporting the data within a region including GO Terms
         self.b_export = widgets.Button(
                     description='EXPORT TO CSV',
@@ -94,14 +94,14 @@ class Viewer(object):
                     tooltip='Click me',
                     icon='check')
         self.b_export.on_click(call_back_buttom_export)
-        
+
         # clear buttom for clearing the region
         def call_back_buttom(b):
             self.p.value, self.s.value = [1, 14], [0, 100]
             self.GO.options = (['Welcome'] + list(self.analysis.GO_dict.keys()))
             self.GO.value = 'Welcome'
             self.uni_clicked = ''
-    
+
         self.b = widgets.Button(
                     description='RESET',
                     disabled=False,
@@ -110,7 +110,7 @@ class Viewer(object):
                     icon='check')
         
         self.b.on_click(call_back_buttom)
-        
+
         # clear buttom for clearing the 3D visualisation
         self.b_2 = widgets.Button(
                         description='CLEAR',
@@ -118,7 +118,7 @@ class Viewer(object):
                         button_style='info', # 'success', 'info', 'warning', 'danger' or ''
                         tooltip='Click me',
                         icon='check')
-        
+
         # buttom that once clicked will pop up the uniprot webpage
         def call_back_buttom_open_url(b_open_url):
             if self.uni_clicked == '':
@@ -128,26 +128,26 @@ class Viewer(object):
                 webbrowser.open(url)
             except:
                 print(f'access failed for {url}.')
-                
+   
         self.b_open_url = widgets.Button(
                         description='Go to Uniprot',
                         disabled=False,
                         button_style='info', # 'success', 'info', 'warning', 'danger' or ''
                         tooltip='Click me',
                         icon='check')
-        
+
         self.b_open_url.on_click(call_back_buttom_open_url)
-        
+
         # the very fundamental plot
         labels = ["UNIPROT: %s<br>resid: %i"%(self.analysis.df_sub["Uniprot_Entry"].values[i], self.analysis.df_sub["Resid"].values[i]) for i in range(len(self.analysis.df_sub))]
         self.f = go.FigureWidget([go.Scatter(x=self.analysis.df_sub["sasa"], y=self.analysis.df_sub["pKa"],
                                 mode='markers', name="aggregate", showlegend=False, opacity=0.75,
                                 text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}')])
-        
+
         self.f.update_layout(
         xaxis_title="SASA (A2)",
         yaxis_title="pKa")
-        
+
         self.f.update_xaxes(range=[0, 100])
         self.f.update_yaxes(range=[(int(self.df['pKa'].min())-1), (int(self.df['pKa'].max())+1)])
         self.f.update_xaxes(showspikes=True)
@@ -163,8 +163,7 @@ class Viewer(object):
         self.bar.update_layout(barmode='overlay',
                               xaxis_title='-log10(p value)',
                               yaxis_title='GO codes')
-        
-        
+
 
     
     def advanced_plot(self, export_path = 'Regional_Data.csv', cutoff=0):

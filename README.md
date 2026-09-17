@@ -1,5 +1,7 @@
 # CoolPackageName
 
+[![Tests](https://github.com/Degiacomi-Lab/carbamylation/actions/workflows/tests.yml/badge.svg)](https://github.com/Degiacomi-Lab/carbamylation/actions/workflows/tests.yml)
+
 ## Introduction
 
 This toolkit is subdivided in a set of classes that together operate as a pipeline enabling the rapid featurisation of aminoacids from collections of protein structures. Features and associated protein metadata can be explored with dedicated analysis and visualisation tools. In short, the pipeline will:
@@ -93,7 +95,8 @@ Features denoted in the table below with specific package requirements or progra
         </tr>
         <tr>
             <td>MSMS</td>
-            <td><a href="https://ccsb.scripps.edu/mgltools/">from this website</a></td>
+            <td><a href="https://ccsb.scripps.edu/mgltools/">from this website</a>
+                <a href="https://anaconda.org/channels/conda-forge/packages/msms/overview">anaconda</a></td>
         </tr>
         <tr>
             <td>Solvent Accessible Surface Area<br></td>
@@ -141,7 +144,7 @@ Features denoted in the table below with specific package requirements or progra
             <td rowspan='3'>Frustration, density<br></td>
             <td rowspan='3'>Frustratometer</td>
             <td><a href="https://github.com/HanaJaafari/Frustratometer?tab=readme-ov-file">Frustratometer</a></td>
-            <td><a href="https://github.com/rwmontalvao/Melodia_py">GitHub Repository</a></td>
+            <td><a href="https://github.com/HanaJaafari/Frustratometer">GitHub Repository</a></td>
         </tr>
         <tr>
             <td>openmm</td>
@@ -156,6 +159,40 @@ Features denoted in the table below with specific package requirements or progra
             <td>Legolas</td>
             <td><a href="https://github.com/roitberg-group/legolas">Legolas</a></td>
             <td>Follow the installation instructions at <a href="https://github.com/roitberg-group/legolas">GitHub repo</a>.</td>
+        </tr>
+        <tr>
+            <td>Flexibility<br></td>
+            <td>Biobox</td>
+            <td>no extra requirements</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Root Mean Square Fluctuation<br></td>
+            <td>Biobox</td>
+            <td>no extra requirements</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Evolution<br></td>
+            <td>ESM</td>
+            <td>Fair-ESM</td>
+            <td><a href="https://anaconda.org/channels/conda-forge/packages/fair-esm/overview">fair-esm</a></td>
+        </tr>
+        <tr>
+            <td rowspan='2'>Secondary Structure<br></td>
+            <td rowspan='2'>Biobox</td>
+            <td>Biopython</td>
+            <td><a href="https://anaconda.org/conda-forge/biopython">anaconda</a></td>
+        </tr>
+        <tr>
+            <td>DSSP</td>
+            <td><a href="https://anaconda.org/channels/conda-forge/packages/dssp/overview">DSSP</a></td>
+        </tr>
+        <tr>
+            <td>Legolas (15N nmr prediction)<br></td>
+            <td>Legolas</td>
+            <td>Legolas</td>
+            <td><a href="https://github.com/roitberg-group/legolas">Install through their GitHub</a></td>
         </tr>
     </tbody>
 </table>

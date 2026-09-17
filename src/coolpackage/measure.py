@@ -56,14 +56,15 @@ except Exception as e:
 
 class Measure(object):
     '''
-    Class to handle functions used in calling feature functions and managing how these are called
-    and return a dataframe which contains the results after.
+    Class to handle functions used in calling feature functions; returns a dataframe
+    containing the results at the end.
     '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features=['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge'],
-                 residue_of_interest='LYS',
-                 parallel=False, include_modified=False, report_errors= True):
+                 features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
+                                'aev': {}, 'das': {}, 'seqcharge': {}},
+                 residue_of_interest='LYS', parallel=False, include_modified=False,
+                 report_errors= True, only_relaxed=True, num_cores=0):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -84,16 +85,27 @@ class Measure(object):
             This file can be used to create the measurement csv file through using the
             recover_from_log() function.
         :type log_path: str
-        :param features: The list of measurements that you wish to use on the given structures.
+        :param features_dict: The list of measurements that you wish to use on the given structures.
             Select which of the following options to use: 'propka', 'pkaANI', 'sasa', 'depth',
-            'aev', 'aev_legolas', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
+            'aev', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
             'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'frustration',
-            'density', 'evolution', 'rmsf'. Any class defined in a script added to the features
-            folder can also be requested by its class name. 'all' is a shorthand for the preset
-            list defined in _setup_measures().
-        :type features: list
-        :param residue_of_interest: 3 letter code of the residue to measure features over
-        :type residue_of_interest: str
+            'density', 'evolution', 'rmsf', 'secondarystructure'. Any class defined in a script
+            added to the features folder can also be requested by its class name. 'all' is a shorthand
+            for the preset list defined in _setup_measures(). A dict should be given here with a
+            dict per feature included eg {'depth': {}, etc...}, inside the dict per feature should
+            house any optional arguments available for that specific feature class, if defaults are
+            okay, leave as {}.
+        :type features_dict: dict
+        :param residue_of_interest: The residue of interest to calculate measurements for, if
+            investigating LYS or CYS, can enter a string with either of these as code is setup
+            to handle them. If you are investigating other resiudes or would like more control
+            over LYS or CYS properties for calculation, please enter a dictionary of the following
+            format:
+            {'non_modified_codes': [residue codes of standard state],
+            'modified_codes': [codes of modfified state, can be left as '' if not investigating],
+            'atom_select_names_nonmod': [atom names of interest in standard state],
+            'atom_select_names_modified': [atom names of interest in modified residues]}
+        :type residue_of_interest: str, dict
         :param parallel: Option to run the measurements in parallel.
         :type parallel: bool
         :param include_modified: Option to include lysines that have been seen to be modified in the
@@ -106,6 +118,15 @@ class Measure(object):
             measures calculations are being performed. This will write the file and the error to a
             separate text document labelled "measures_errors_{date}.txt".
         :type report_errors: bool
+        :param only_relaxed: Option to only calculate measurements for structures that are relaxed
+            if there is a relaxed structure available for the structure. If set to False, measures
+            will be calculated to both original and relaxed form. Default is True.
+        :type only_relaxed: bool
+        :param num_cores: Number of cores to use when running parallel, if this is not set (or
+            equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
+            available will be used. Otherwise it will try and use the number of cores given
+            if this is possible.
+        :type num_cores: int
         '''
 
         self.activate_log = False
@@ -126,6 +147,7 @@ class Measure(object):
         self.outdir = outdir
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
+        self.only_relaxed = only_relaxed
 
         # modified lysine management
         self.include_mod = include_modified
@@ -136,10 +158,23 @@ class Measure(object):
         if self.report_errors: self.error_filename = self._setup_report_errors_file()
         else: self.error_filename = 'no_record'
 
-        self.aa_properties = self._match_resid_codes(residue_of_interest)
-        self.features = list(features)
-        self.legolas_aevs = True
-        self._setup_measures(list(features))
+        self.residue_of_interest = residue_of_interest
+        if isinstance(residue_of_interest, str):
+            self.aa_properties = self._match_resid_codes(residue_of_interest)
+        elif isinstance(residue_of_interest, dict):
+            self.aa_properties = residue_of_interest
+            dict_keys = ['non_modified_codes', 'modified_codes',
+                         'atom_select_names_nonmod', 'atom_select_names_modified']
+            if list(residue_of_interest) != dict_keys:
+                raise KeyError(f'Not all keys required for aa_properties dict given; please '
+                               f'ensure that all keys required ({", ".join(dict_keys)}) are '
+                               f'included (can be set to \'\' if nothing required in the parameter)')
+        else:
+            raise ValueError(f'Unknown option give to residue_of_interest parameter: '
+                            f'{residue_of_interest}; please enter either string or dict. '
+                            f'See class documentation.')
+        self.features_dict = features_dict.copy()
+        self._setup_measures(features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
 
@@ -150,15 +185,14 @@ class Measure(object):
 
         # for parallel measurements
         self.parallel = parallel
+        self.num_cores = num_cores
         self.files_to_analyse = []
         self.parallel_items = {}
 
         # Check that all files in DataFrame appear at least once in folder
-        # find all AlphaFold entries
         files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        # find all PDB entries
         files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        for f in df_input["PDB_Code"].values:
+        for f in df_input['PDB_Code'].values:
             if f not in files_af and f not in files_pdb:
                 print(f'WARNING: {f} not found in folder {self.folder}')
 
@@ -175,107 +209,35 @@ class Measure(object):
             self.PDB_only = True
             columns = ['PDB_Code', 'Chain', 'Resid']
             self.df = pd.DataFrame(columns = columns)
-            
-        print(self.df_input)
 
 
-    def _setup_measures(self, features_list):
+    def _setup_measures(self, features_dict):
         '''
-        Convert a list of features into a measuring protocol. If ['all'] given as input for the
+        Convert a dict of features into a measuring protocol. If ['all'] given as input for the
         features, this will convert the features list to a list containing all current possible
-        features.
+        features. Dictionary is used for this such that the user can provide optional parameters
+        directly to the measurements classes without any manual editing.
 
-        :param features_list: The list of features that are required to measure over the set of
+        :param features_dict: The list of features that are required to measure over the set of
             proteins
-        :type features_list: list
+        :type features_dict: dict
         '''
-        # measures to carry out [label for DataFrame column, and function evaluating a file]
-        # functions must return a dataframe [chain, resid, measure]
-        if 'all' in features_list:
-            features_list = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
-                        'melodia', 'aev_legolas', 'frustration', 'density', 'das', 'flexibility',
-                        'esm', 'rmsf']
-            self.features = list(features_list)
+        if 'all' in features_dict:
+            feature_all = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
+                        'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
+                        'rmsf']
+            features_dict = {k: {} for k in feature_all}
+            self.features_dict = list(features_dict)
         self.measures = []
         melodia_features = []
-        melodia_added = False; frustration_added = False; legolas_added = False
-        for m in features_list:
-            if m == 'propka':
-                P = PROPKA(outdir=self.outdir,
-                          include_modified=self.include_mod,
-                          error_filename=self.error_filename,
-                          aa_properties=self.aa_properties)
-                self.measures.append([m, P.calculate])
-            elif m == 'pkaANI':
-                P = PKAANI(outdir=self.outdir,
-                          include_modified=self.include_mod,
-                          aa_properties=self.aa_properties)
-                self.measures.append([m, P.calculate])
-            elif m == 'sasa':
-                sasa = SASA(include_modified=self.include_mod,
-                            error_filename=self.error_filename,
-                            aa_properties=self.aa_properties)
-                self.measures.append([m, sasa.calculate])
-            elif m == "depth":
-                try:
-                    depth = Depth(calculation_type='ResidDepth',
-                                  include_modified=self.include_mod,
-                                  error_filename=self.error_filename,
-                                  aa_properties=self.aa_properties)
-                    self.measures.append([m, depth.calculate])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add depth for features calculation list; error: {e}')
-            elif m == 'aev':
-                try:
-                    aev = AEV(error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                    self.measures.append([m, aev.calculate])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add aev for features calculation list; error: {e}')
-            elif m == 'das':
-                das = DAS(include_modified=self.include_mod,
-                            error_filename=self.error_filename,
-                            aa_properties=self.aa_properties)
-                self.measures.append([m, das.calculate])
-            elif m == 'seqcharge':
-                charge = Charge(include_modified=self.include_mod,
-                                error_filename=self.error_filename,
-                                aa_properties=self.aa_properties)
-                self.measures.append([m, charge.calculate])
-            elif m == 'flexibility':
-                flex = Flexibility(include_modified=self.include_mod,
-                                   error_filename=self.error_filename,
-                                   aa_properties=self.aa_properties)
-                self.measures.append([m, flex.calculate])
-            elif m == 'legolas':
-                if self.legolas_aevs:
-                    if 'aev_legolas' not in self.features:
-                        self.features.append('aev_legolas')
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
-                              include_modified=self.include_mod,
-                              error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                else:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=False,
-                              include_modified=self.include_mod,
-                              error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                self.measures.append([m, nmr.calculate_legolas])
-                legolas_added = True
-            elif m == 'aev_legolas':
-                if not legolas_added:
-                    nmr = NMR(outdir=self.outdir, legolas_aevs=True,
-                              include_modified=self.include_mod,
-                              error_filename=self.error_filename,
-                              aa_properties=self.aa_properties)
-                    self.measures.append(['legolas', nmr.calculate_legolas])
-                    legolas_added = True
-            elif m in ['frustration', 'density']:
+        melodia_added = False; frustration_added = False
+        meas_dict = {}
+        self.features = list(features_dict)
+        for m in features_dict:
+            if m in ['frustration', 'density']:
                 try:
                     if not frustration_added:
-                        frustration = Frustration(include_modified=self.include_mod,
+                        frustration = FRUSTRATION(include_modified=self.include_mod,
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
                         self.measures.append(['frustration', frustration.calculate_frustration])
@@ -285,7 +247,7 @@ class Measure(object):
                     print(f'>> Failed to add frustration/density for features calculation list; error: {e}')
             elif m == 'melodia':
                 try:
-                    structure = Structure(melodia_features=['all'],
+                    structure = STRUCTURE(melodia_features=['all'],
                                           include_modified=self.include_mod,
                                           error_filename=self.error_filename,
                                           aa_properties=self.aa_properties)
@@ -298,45 +260,41 @@ class Measure(object):
                     print(f'>> Failed to add melodia for features calculation list; error: {e}')
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 melodia_features += [m]
-            elif m == 'evolution':
-                try:
-                    E = Evolution(include_modified=self.include_mod,
-                                  error_filename=self.error_filename,
-                                  aa_properties=self.aa_properties)
-                    E._check_esm_model_available()
-                    self.measures.append(['evolution', E.calculate])
-                except Exception as e:
-                    self.features.remove(m)
-                    print(f'>> Failed to add esm for features calculation list; error: {e}')
-            elif m == 'rmsf':
-                R = RMSF(df_proteins=self.df_input,
-                        include_modified=self.include_mod,
-                        error_filename=self.error_filename,
-                        aa_properties=self.aa_properties)
-                self.measures.append(['rmsf', R.calculate])
             else:
-                if m in globals().keys():
-                    if inspect.isclass(globals()[m]) and hasattr(globals()[m], 'calculate') and callable(getattr(globals()[m], 'calculate')):
+                if m.upper() in globals().keys():
+                    if inspect.isclass(globals()[m.upper()]) and hasattr(globals()[m.upper()], 'calculate') and callable(getattr(globals()[m.upper()], 'calculate')):
                         try:
-                            XX = globals()[m](include_modified=self.include_mod,
+                            tmp_name = m.lower()
+                            kwargs = features_dict.get(m, {})
+                            if tmp_name in ['propka', 'legolas'] or 'outdir' in list(kwargs):
+                                kwargs['outdir'] = self.outdir
+                            if tmp_name == 'rmsf' and 'df_proteins' not in list(kwargs):
+                                kwargs['df_proteins'] = self.df_input
+
+                            meas_dict[tmp_name] = globals()[m.upper()](include_modified=self.include_mod,
                                                     error_filename=self.error_filename,
-                                                    aa_properties=self.aa_properties)
-                            self.measures.append([m, XX.calculate])
+                                                    aa_properties=self.aa_properties,
+                                                    **kwargs)
+
+                            if tmp_name == 'evolution':
+                                meas_dict[tmp_name]._check_esm_model_available()
+
+                            self.measures.append([m, meas_dict[tmp_name].calculate])
                         except Exception as e:
                             if self.report_errors:
                                 self._report_error_to_file('Setup measures: custom measure failed to be added', 'setup', f'Custom measure {m} failed to be added')
                             self.features.remove(m)
-                            print(f'Failed to add measure feature {m}, please check script follow the template correctly. Error: {e}')
+                            print(f'Failed to add measure feature {m}, please check new scripts follow the template correctly. Error: {e}')
                             continue
                 else:
                     if self.report_errors:
                         self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
                     self.features.remove(m)
-                    raise Exception(f"measure {m} unknown")
+                    raise Exception(f'measure {m} unknown, removed from features list to calculate')
 
         if not melodia_added and melodia_features:
             try:
-                structure = Structure(melodia_features=melodia_features,
+                structure = STRUCTURE(melodia_features=melodia_features,
                                       include_modified=self.include_mod,
                                       error_filename=self.error_filename,
                                       aa_properties=self.aa_properties)
@@ -344,8 +302,8 @@ class Measure(object):
                 melodia_added = True
             except Exception as e:
                 for feat in melodia_features:
-                    if feat in self.features:
-                        self.features.remove(feat)
+                    if feat in self.features_dict:
+                        self.features_dict.remove(feat)
                 print(f'>> Failed to add melodia for features calculation list; error: {e}')
 
 
@@ -359,11 +317,6 @@ class Measure(object):
 
         :param res_code: 3 letter code of the residue to match up other 3 letter codes for
         :type res_code: str
-
-        .. todo::
-
-           Change this so that it does not default to the carbamylation work, and stops the
-           codebase instead.
 
         .. todo::
 
@@ -381,51 +334,17 @@ class Measure(object):
             case 'CYS':
                 aa_properties = {'non_modified_codes': ['CYS'],
                                 'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'ARG':
-                aa_properties = {'non_modified_codes': ['ARG'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'SER':
-                aa_properties = {'non_modified_codes': ['SER'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'THR':
-                aa_properties = {'non_modified_codes': ['THR'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'TYR':
-                aa_properties = {'non_modified_codes': ['TYR'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'ASN':
-                aa_properties = {'non_modified_codes': ['ASN'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'ASP':
-                aa_properties = {'non_modified_codes': ['ASP'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
-                                'atom_select_names_modified': []}
-            case 'GLU':
-                aa_properties = {'non_modified_codes': ['GLU'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['CA'],
+                                'atom_select_names_nonmod': ['SG'],
                                 'atom_select_names_modified': []}
             case _:
                 print(f'>> Residue of interest given not known; using LYS as default')
                 if self.report_errors:
                     self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_code}) not known; using LYS as default')
-                aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                'modified_codes': ['LYE', 'KCX'],
-                                'atom_select_names_nonmod': ['NZ'],
-                                'atom_select_names_modified': ['NZ', 'N07']}
+                raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
+                                f'match to any cases, stopping calculations. Please modify input '
+                                f'parameter residue of interest with either LYS or CYS or give a full '
+                                f'dictionary of properties for your custom investigation into another '
+                                f'residue.')
 
         return aa_properties
 
@@ -436,13 +355,13 @@ class Measure(object):
         written to such that they are easier to look over after running, rather than trawling
         through output.
         '''
-        new_file_name = f'meaures_errors_{date.today()}.txt'
+        new_file_name = os.path.join(self.outdir, f'meaures_errors_{date.today()}.txt')
         while os.path.exists(new_file_name):
             if '_no' in new_file_name:
                 error_file_num = int(os.path.splitext(new_file_name)[0].split('_no')[-1])
-                new_file_name = f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt'
+                new_file_name = os.path.join(self.outdir, f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt')
             else:
-                new_file_name = f'measure_errors_{date.today()}_no{1}.txt'
+                new_file_name = os.path.join(self.outdir, f'measure_errors_{date.today()}_no{1}.txt')
         with open(new_file_name, 'w') as error_f1:
             error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
         return new_file_name
@@ -451,14 +370,8 @@ class Measure(object):
     def measure_data(self):
         '''
         Determine the appropriate measures function to call based on the combination of running
-        PDB_only and in parallel, reducing the number of individual functions that the user will have
-        to call themselves.
-
-        .. rubric:: Example
-
-        ::
-
-            M.measure_data()
+        PDB_only and in parallel, reducing the number of individual functions that the user will
+        have to call themselves.
         '''
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
@@ -472,8 +385,13 @@ class Measure(object):
                 print('This setup does not currently have a method, please change the setup')
                 return
 
-        df_af_plddt = pd.read_csv(os.path.join(self.folder, 'AF_PLDDT_Output.csv'))
-        self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
+        plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
+        if os.path.exists(plddt_record_path):
+            df_af_plddt = pd.read_csv(plddt_record_path)
+            self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
+        else:
+            print(f'>> No PLDDT record file available at {plddt_record_path}, '
+                  f'no PLDDT column added to measurement dataframe')
 
         self._cleanup_calculation_files()
 
@@ -518,12 +436,6 @@ class Measure(object):
         :param error: The error that has been produced at that step of the measurement when it has
             been attempted to extract features from the pdb file
         :type error: str
-
-        .. rubric:: Example
-
-        ::
-
-            self._report_error_to_file('propka 1', path, e)
         '''
         with open(self.error_filename, 'a', encoding='utf-8') as e_f:
             e_f.writelines('--------------------------------------------------------------------------\n')
@@ -541,12 +453,6 @@ class Measure(object):
 
         :param outname: the name of the csv file that the output is written to
         :type outname: str
-
-        .. rubric:: Example
-
-        ::
-
-            M.save_state(outname='measures.csv')
         '''
         # sort by uniprot code to give order to output after parallel run
         if not self.PDB_only:
@@ -567,12 +473,6 @@ class Measure(object):
 
         Create list of files that have been curated into the self.outdir directory. Iterate over the
         list of the files, check if structure file is
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M.measure_dataframe()
         '''
         if self.PDB_only:
             return 'Call PDB_only method instead'
@@ -584,13 +484,24 @@ class Measure(object):
         total_structures = len(files)
         print(f'Total number of structures to analyse: {total_structures}')
 
-        match self.parallel:
-            case True:
-                n_cores_to_use = max(1, int(round(cpu_count() * 0.9)))
-                print('>> Measurements running in parallel')
-            case False:
-                n_cores_to_use = 1
-                print('>> Measurements running in series')
+        if self.parallel:
+            print('>> Measurements running in parallel')
+            if isinstance(self.num_cores, int):
+                if self.num_cores == 0:
+                    n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+                else:
+                    if self.num_cores <= os.cpu_count():
+                        n_cores_to_use = self.num_cores
+                    else:
+                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
+                                f'possible on current setup; defaulting to 0.75 times max possible')
+                        n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+            else:
+                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
+                        f'defaulting to 0.75 times max possible.')
+                n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+        else:
+            print('>> Measurements running in series')
 
         with Manager() as manager:
             lock = manager.Lock()
@@ -611,7 +522,7 @@ class Measure(object):
             base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Method']
             df_parallel = pd.DataFrame()
 
-            gpu_feats = ['aev', 'evolution', 'legolas', 'aev_legolas']
+            gpu_feats = ['aev', 'evolution', 'legolas']
             gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
             cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
 
@@ -630,7 +541,7 @@ class Measure(object):
                     df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in df_parallel.columns and a not in base_cols])
                     df_parallel = df_parallel.merge(df_gpu, how='left', on=[a for a in base_cols if a in df_gpu.columns])
 
-            if not cpu_measurements and gpu_measurements:
+            if not cpu_measurements and not gpu_measurements:
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
@@ -663,30 +574,36 @@ class Measure(object):
         :param lock: lock used to stop processes writing to output files and dataframes at the same
             time
         :type lock: multiprocessing manager lock
-
-        .. rubric:: Example
-
-        ::
-
-            self._measure_file(file_details, files_list)
         '''
         uniprot_code, pdb_code, method, res, chains = file_details
 
         # calculate features values from all PDB files associated with specific DataFrame entry
         frames_df_list = []
         for f in self.files_to_analyse:
-            if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
-                continue
+            if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
+                if 'AF-' in f and 'AF-' in pdb_code:
+                    if pdb_code.split("-")[1].lower() != os.path.splitext(os.path.basename(f))[0].split("-")[1].lower():
+                        continue
+                else:
+                    continue
+
+            if self.only_relaxed:
+                if ('_relaxed' not in f and
+                    os.path.exists(os.path.join(self.folder, f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
+                    continue
 
             terminal_out_statements = []
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Modified']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            if self.include_mod:
+                columns.append('Modified')
             df_currentfile = pd.DataFrame(columns=columns)
 
             try:
-                M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                M = bb.Molecule()
+                M.import_pdb(f, include_hetatm=True)
             except Exception as e:
                 self.wrong_pdb_file.append(f)
                 if self.report_errors:
@@ -722,31 +639,23 @@ class Measure(object):
                 try:
                     out_print_trap = io.StringIO()
                     with redirect_stdout(out_print_trap):
-                        result = meas[1](f) # run measurement
+                        result = meas[1](f)
                     terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
 
                 except Exception as e:
                     if self.report_errors:
-                        self._report_error_to_file('Meas feat error', 'measure file parallel', str(e))
+                        self._report_error_to_file('Meas feat error', f'measure file parallel; feature {meas[0]}', str(e))
                     terminal_out_statements.append(f"ERROR: {e}")
                     continue
 
             processing_time = round((time.time()-tstart), 2)
-            #print(f">> file processed in {processing_time} seconds.")
             terminal_out_statements.append(f">> file processed in {processing_time} seconds.")
-            #average_time_per_file = round(((time.time()- overall_st) / current_structure), 2)
-            #print(f'>> Time average per file: {average_time_per_file} seconds.')
-            #sec_remaining = average_time_per_file * (total_structures + 1 - current_structure)
-            #time_remaining_str = str(datetime.timedelta(seconds=sec_remaining))
-            #print(f'Predicted time remaining: {time_remaining_str}')
 
             with lock:
-                # write all terminal outputs for file
                 for statement in terminal_out_statements:
                     print(statement)
 
-                # document the data to a log file
                 if self.activate_log:
                     if df_currentfile.empty is False:
                         pd.set_option('display.max_colwidth', None,
@@ -793,12 +702,6 @@ class Measure(object):
         :type log_path: str
         :returns: Dataframe containing all the measurements that were in the given log file
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            M.recover_from_log()
         '''
         if self.PDB_only:
             return 'Function not callable.'
@@ -896,12 +799,6 @@ class Measure(object):
         :param log_path: The name of the measures log file By default takes the name
             'measures_log.txt'
         :type log_path: str
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M.restart_measure()
         '''
 
         if self.PDB_only:
@@ -946,45 +843,50 @@ class Measure(object):
         :type to_merge: pandas.DataFrame
         :param col_name: Name of the column which the new data is from.
         :type col_name: str
-
-        .. rubric:: Example
-
-        ::
-
-            self._combine_dataframes(df, result, meas[0])
         '''
         to_merge = to_merge.reset_index(drop=True)
+
+        if self.include_mod and 'Modified' not in to_merge.columns:
+            raise KeyError(f'>> Running include modified but Modified column not present for feature: {col_name}')
+
         for i, r in target.iterrows():
 
             chain_value = r["Chain"]
             resid_value = r["Resid"]
-            if self.include_mod: modified_value = r['Modified']
+            if self.include_mod:
+                modified_value = r['Modified']
 
-            if self.include_mod: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value) & (to_merge["Modified"].astype(bool) == modified_value))
-            else: idx = np.where((to_merge["Chain"] == chain_value) & (to_merge["Resid"].astype(int) == resid_value))
+            if self.include_mod:
+                idx = np.where((to_merge["Chain"] == chain_value) &
+                               (to_merge["Resid"].astype(int) == resid_value) &
+                               (to_merge["Modified"].astype(bool) == modified_value))
+            else:
+                idx = np.where((to_merge["Chain"] == chain_value) &
+                               (to_merge["Resid"].astype(int) == resid_value))
 
             if len(idx[0]) == 0:
                 continue
             
             if len(idx[0]) > 1:
-                print(f'>> Multiple rows match when trying to combine dataframes, {col_name}: {len(idx[0])} rows match; '
-                      f'for Chain: {chain_value}, Resid: {resid_value}, only taking first instance.')
+                out_print = (f'{col_name}: {len(idx[0])} rows match Chain {chain_value}, Resid '
+                             f'{resid_value}; an insertion code has been not managed properly, '
+                             f'no guess employed; continuing')
+                if self.report_errors:
+                    self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes', col_name, out_print)
+                print('>> ' + out_print)
+                continue
+
 
             # account for measurements that have special cases
             if col_name == 'melodia':
                 melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
-                for feature in self.features:
+                for feature in self.features_dict:
                     if feature in melodia_features:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             elif col_name == 'frustration':
                 frust_features = ['frustration', 'density']
-                for feature in self.features:
+                for feature in self.features_dict:
                     if feature in frust_features:
-                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
-            elif col_name == 'legolas':
-                legolas_features = ['legolas', 'aev_legolas']
-                for feature in self.features:
-                    if feature in legolas_features and feature in to_merge.columns:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
@@ -998,12 +900,6 @@ class Measure(object):
         saved to memory and a log file produced at the same time if required. Timing is kept to
         update the predicted time remaining as it goes along. M.save_state() can be used to save
         the data to a csv.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M.measure_PDB_only()
         '''
         if not self.PDB_only:
             print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
@@ -1038,11 +934,14 @@ class Measure(object):
                 tstart = time.time()
                 print(f"\n> File: {f}")
 
-                columns = ['PDB_Code', 'Chain', 'Resid', 'Modified']
+                columns = ['PDB_Code', 'Chain', 'Resid']
+                if self.include_mod:
+                    columns.append('Modified')
                 df_currentfile = pd.DataFrame(columns=columns)
 
                 try:
-                    M = bb.Molecule(f) # sometimes bb does not work with a pdb file
+                    M = bb.Molecule()
+                    M.import_pdb(f, include_hetatm=True)
                 except Exception as e:
                     print(f'Failed to create biobox molecule for file {f} with error: {e}')
                     if self.report_errors:
@@ -1140,17 +1039,6 @@ class Measure(object):
             'measures_log.txt'
         :type log_path: str
 
-        .. rubric:: Example
-
-        ::
-
-            >>> M.restart_measure_pdb_only()
-
-        .. todo::
-
-           Use a 'completed' column for everything here, rather than removing the rows from df_input
-           (GW, 16.01.25).
-
         .. todo::
 
            Remove the discarded measurement from measures_log.txt. Currently this does not matter much,
@@ -1241,12 +1129,6 @@ class Measure(object):
         :type log_path: str
         :returns: Dataframe containing all the measurements that were in the given log file
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            M.recover_from_log_PDB_only()
         '''
         if not self.PDB_only:
             return 'Function not callable.'
@@ -1351,18 +1233,8 @@ class Measure(object):
         '''
         Function to remove any temporary or result files created through the calculation of the
         measurements within this class. While all are meant to have been moved at the time of
-        calculation, occasionally this fails and leaves some behind. Note: please add specific
-        subprocesses if need to add extra cleanup items into this function.
-
-        .. rubric:: Method
-
-        Call subprocess calls to move specific sets of files to a specific directory.
-
-        .. rubric:: Example
-
-        ::
-
-            >>> M._cleanup_calculation_files()
+        calculation, occasionally this fails and leaves some behind. This applies particularly
+        with Modeller, Legolas and propka.
         '''
         def _mv_files(files, dest):
             '''

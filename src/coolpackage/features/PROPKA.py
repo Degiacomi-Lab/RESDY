@@ -14,7 +14,8 @@ class PROPKA():
     pKa values for structures, calculated with PROPKA3.
     '''
 
-    def __init__(self, outdir, include_modified=False,
+    def __init__(self, outdir,
+                 include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
@@ -43,8 +44,10 @@ class PROPKA():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
-        if self.error_filename != 'no_record': self.record_errors = True
-        else: self.record_errors = False
+        if self.error_filename != 'no_record':
+            self.record_errors = True
+        else:
+            self.record_errors = False
         self.pka_outdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pka_outdir):
             os.makedirs(self.pka_outdir)
@@ -70,20 +73,6 @@ class PROPKA():
                 Chain   Resid   propka
                 x       x       x
         :rtype: pandas.DataFrame
-
-        .. rubric:: Example
-
-        ::
-
-            >>> print(calculate(1ubq.pdb))
-              Chain  Resid  propka
-            0     A      6       x
-            1     A     11       x
-            2     A     27       x
-            3     A     29       x
-            4     A     33       x
-            5     A     48       x
-            6     A     63       x
         '''
         if self.include_modified:
             df_mod = pd.DataFrame()
