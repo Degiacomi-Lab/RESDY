@@ -56,15 +56,15 @@ except Exception as e:
 
 class Measure(object):
     '''
-    Class to handle functions used in calling feature functions and managing how these are called
-    and return a dataframe which contains the results after.
+    Class to handle functions used in calling feature functions; returns a dataframe
+    containing the results at the end.
     '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
                  features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
                                 'aev': {}, 'das': {}, 'seqcharge': {}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True, only_relaxed=True):
+                 report_errors= True, only_relaxed=True, num_cores=0):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -118,10 +118,15 @@ class Measure(object):
             measures calculations are being performed. This will write the file and the error to a
             separate text document labelled "measures_errors_{date}.txt".
         :type report_errors: bool
-        :param only_relaxed: Option to only calculate measurements for structures that are relaxed if
-            there is a relaxed structure available for the structure. If set to False, measures will
-            be calculated to both original and relaxed form. Default is True.
+        :param only_relaxed: Option to only calculate measurements for structures that are relaxed
+            if there is a relaxed structure available for the structure. If set to False, measures
+            will be calculated to both original and relaxed form. Default is True.
         :type only_relaxed: bool
+        :param num_cores: Number of cores to use when running parallel, if this is not set (or
+            equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
+            available will be used. Otherwise it will try and use the number of cores given
+            if this is possible.
+        :type num_cores: int
         '''
 
         self.activate_log = False
@@ -180,6 +185,7 @@ class Measure(object):
 
         # for parallel measurements
         self.parallel = parallel
+        self.num_cores = num_cores
         self.files_to_analyse = []
         self.parallel_items = {}
 
@@ -478,13 +484,24 @@ class Measure(object):
         total_structures = len(files)
         print(f'Total number of structures to analyse: {total_structures}')
 
-        match self.parallel:
-            case True:
-                n_cores_to_use = max(1, int(round(cpu_count() * 0.9)))
-                print('>> Measurements running in parallel')
-            case False:
-                n_cores_to_use = 1
-                print('>> Measurements running in series')
+        if self.parallel:
+            print('>> Measurements running in parallel')
+            if isinstance(self.num_cores, int):
+                if self.num_cores == 0:
+                    n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+                else:
+                    if self.num_cores <= os.cpu_count():
+                        n_cores_to_use = self.num_cores
+                    else:
+                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
+                                f'possible on current setup; defaulting to 0.75 times max possible')
+                        n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+            else:
+                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
+                        f'defaulting to 0.75 times max possible.')
+                n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+        else:
+            print('>> Measurements running in series')
 
         with Manager() as manager:
             lock = manager.Lock()
@@ -1021,11 +1038,6 @@ class Measure(object):
         :param log_path: The name of the measures log file By default takes the name
             'measures_log.txt'
         :type log_path: str
-
-        .. todo::
-
-           Use a 'completed' column for everything here, rather than removing the rows from df_input
-           (GW, 16.01.25).
 
         .. todo::
 

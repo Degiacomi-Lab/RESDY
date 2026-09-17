@@ -37,7 +37,8 @@ class PDB(object):
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
                  resnames_of_interest = ['LYS'], minimise_strucs='AF',
-                 remove_all_modifications=False):
+                 remove_all_modifications=False,
+                 num_cores=0):
         '''
         Initialise the PDB class.
 
@@ -72,11 +73,17 @@ class PDB(object):
             residues which have unknown amino residue codes to allow for downstream pipelines
             to work.
         :type remove_all_modifications: bool
+        :param num_cores: Number of cores to use when running parallel, if this is not set (or
+            equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
+            available will be used. Otherwise it will try and use the number of cores given
+            if this is possible.
+        :type num_cores: int
         '''
 
         self.outdir = outdir
         self.PDB_only = PDB_only
         self.parallel = parallel
+        self.num_cores = num_cores
         self.include_hetatm = include_hetatm
         self.resnames_of_interest = resnames_of_interest
         self.remove_all_modifications = remove_all_modifications
@@ -101,17 +108,14 @@ class PDB(object):
             self.minimise_af = False
             self.minimise_pdb = False
 
-        # create folder of curated protein structures
         self.curated_dir = os.path.join(outdir, "curated")
         if not os.path.exists(self.curated_dir):
             os.makedirs(self.curated_dir)
 
-        # create working folder
         self.raw_dir = os.path.join(outdir, "conformations")
         if not os.path.exists(self.raw_dir):
             os.makedirs(self.raw_dir)
 
-        # dataframe storing data
         if self.PDB_only:
             columns = ['PDB_Code']
             self.df = pd.DataFrame(columns=columns)
@@ -210,8 +214,23 @@ class PDB(object):
                 return e
 
         if self.parallel:
-            n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+            print('>> Protein curation running in parallel')
+            if isinstance(self.num_cores, int):
+                if self.num_cores == 0:
+                    n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+                else:
+                    if self.num_cores <= os.cpu_count():
+                        n_cores_to_use = self.num_cores
+                    else:
+                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
+                              f'possible on current setup; defaulting to 0.75 times max possible')
+                        n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+            else:
+                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
+                      f'defaulting to 0.75 times max possible.')
+                n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
         else:
+            print('>> Protein curation running in series')
             n_cores_to_use = 1
 
         with Manager() as manager:
@@ -580,7 +599,7 @@ class PDB(object):
         - modified methionine (MSE) -> replace SE with S and rename to MET
         - element codes -> if not present in pdb file, add these in based on guess from atomtype col
         - neglect HETATMs unless metal ions and hydrogens
-        - check for modified residues in structure, convert back to
+        - check for modified residues in structure, convert back to backbone for patching
 
         :param pdb: pdb code for the structure of interest
         :type pdb: str

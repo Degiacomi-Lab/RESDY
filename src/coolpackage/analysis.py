@@ -1,18 +1,3 @@
-'''
-General notes on the work still outstanding in this file. There may be more further down.
-
-.. todo::
-
-   Look into the GO term functions and see if these still actually work with all the extra
-   material that has been added in (GW, 13.09.24).
-
-.. todo::
-
-   The dropna function was removed on init, a function that cleans the dataframe at the start is
-   needed instead. All null rows should not be removed indiscriminately, in case they are only
-   null for some measurements and those measurements are not being used (GW, 16.04.25).
-'''
-
 import os
 import re
 import urllib.request

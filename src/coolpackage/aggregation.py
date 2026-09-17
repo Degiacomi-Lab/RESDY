@@ -30,8 +30,6 @@ class Aggregation:
             - 'max': Take the maximum value of each feature for the lysine
             - 'min': Take the minimum value of each feature for the lysine
             - 'median': Take the median value of each feature for the lysine
-            - 'average subtract aev': Take the average of all aev features except the aevs WHAT
-              IS USED HERE
             - 'mixmatch': Takes the predicted metric which will work best for each feature. The
               max is used for features where a high value is likely to be important and min for
               features where less of it is required.
@@ -73,7 +71,6 @@ class Aggregation:
             for investigations into potential problems.
         :type get_nan_df: bool, optional
         '''
-        # Note: current preference is to ignore aev_legolas given aev is more likely to be calculated
         if isinstance(df_measurements, str):
             self.df_measurements = pd.read_csv(df_measurements)
         else:
@@ -93,10 +90,6 @@ class Aggregation:
 
         self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
                                  'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
-
-        if 'aev_legolas' in self.df_measurements.columns:
-            if 'aev' in self.df_measurements.columns:
-                self.df_measurements.drop(columns=['aev_legolas'], inplace=True)
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
@@ -125,7 +118,7 @@ class Aggregation:
 
         if 'Method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
         if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
-        len_df_measures = len(self.df_measurements)
+
         print('>> Finding numbers of na values present in each feature column in the dataframe')
         always_na_cols = []
         for col in self.features_to_include:
@@ -188,8 +181,6 @@ class Aggregation:
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'min' not in b] if a not in not_cols])
             case 'median':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'med' not in b] if a not in not_cols])
-            case 'average subtract aev':
-                self.df_agg = self._aggregate_avg_less_avgaev()
             case 'mixmatch':
                 max_features = ['sasa', 'das', 'frustration', 'seqcharge']
                 min_features = ['propka', 'pkaANI', 'depth', 'density', 'legolas']
@@ -241,12 +232,11 @@ class Aggregation:
         - 'sd': Standard Deviation of the AEV
         - 'vif': Variance Inflation Factor Correlation analysis to remove features which are
           correlated
-        - 'autoencoder': Autoencoder dimension reduction method, try and capture any non-linearity
         - 'null': Remove all the columns within the AEVs which are always zero
 
         .. todo::
 
-           Implement the 'autoencoder' reduction method: the branch is currently empty (GW, 21.08.25).
+           Implement the 'autoencoder' reduction method - Autoencoder dimension reduction method, try and capture any non-linearity (GW, 21.08.25).
         '''
         if 'aev' in self.features_to_include:
             df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.df_measurements['aev']]))
@@ -260,12 +250,11 @@ class Aggregation:
                     self._prepare_aev_sd()
                 case 'vif':
                     self._prepare_vif_aev()
-                case 'autoencoder':
-                    i = 1
                 case 'null':
                     self._cut_null_aev_columns()
                 case _:
-                    print(f'>> AEV dimensionality reduction method: {self.aev_red_method}, was not recognised, using PCA method.')
+                    print(f'>> AEV dimensionality reduction method: {self.aev_red_method}, '
+                          f'was not recognised, using PCA method.')
                     self._prepare_pca()
         if 'evolution' in self.features_to_include:
             df_evolution = pd.DataFrame(list([literal_eval(evol) for evol in self.df_measurements['evolution']]))
@@ -296,7 +285,6 @@ class Aggregation:
         cols_to_remove = [a for a in aev_cols if a not in top_n_features]
         self.df_measurements.drop(cols_to_remove, axis=1, inplace=True)
         print(f'>> Removed {len(cols_to_remove)} from AEVs, {len(top_n_features)} kept instead of the AEVs.')
-
 
 
     def _cut_null_aev_columns(self):
@@ -341,7 +329,6 @@ class Aggregation:
         aev_data = self.df_measurements[aev_col_names].values.tolist()
         pca_data = pca.fit_transform(aev_data)
 
-        #classification_values = self.X_final['class'].values
         variance_data = pca.explained_variance_ratio_
 
         self.df_measurements.drop(aev_col_names, axis=1, inplace=True)
@@ -357,6 +344,9 @@ class Aggregation:
         Function for creating a dataframe which includes all the potential statistics which could
         then be used for aggregation later on. This can then be shortened as desired based on which
         method of aggregation is required for this.
+        AEVs following the handling that was given in the class creation. Evolution vectors are
+        treated as almost identical due to being a sequence effect, therefore take AF file which
+        uses canonical sequence as the one for the aggregated dataframe.
         '''
         print('>> Calculating statistics for measurements data provided...')
         if 'class' not in self.df_measurements.columns:
@@ -365,7 +355,7 @@ class Aggregation:
         cols_key = self.lys_key + ['class']
         df_stats = pd.DataFrame(columns=cols_key)
 
-        if 'aev' in self.features_to_include or 'evolution' in self.features_to_include or 'aev_legolas' in self.features_to_include:
+        if 'aev' in self.features_to_include or 'evolution' in self.features_to_include:
             self._reduce_aev_dimensions()
 
         for (entry, resid), df_query in self.df_measurements.groupby(self.lys_key):
@@ -381,7 +371,7 @@ class Aggregation:
                     'class': class_val}
             features = [a for a in self.features_to_include if a not in self.non_feature_cols]
             for feature in features:
-                if feature == 'aev' or feature == 'aev_legolas':
+                if feature == 'aev':
                     df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
                     min_row = df_query['sumaev'].idxmin()
                     max_row = df_query['sumaev'].idxmax()
@@ -400,7 +390,7 @@ class Aggregation:
                         data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
                 elif feature == 'evolution':
                     for feat in [a for a in df_query.columns if 'EVL_' in a]:
-                        data[feat] = df_query[feat].loc[0]
+                        data[feat] = df_query.loc[df_query['Method'] == 'Predicted', feat].iloc[0]
 
                 else:
                     data[feature + '_min'] = round(float(df_query[feature].min()), 2)
@@ -469,44 +459,6 @@ class Aggregation:
         range_feat_cols = [a for a in self.features_to_include if any(b in a for b in range_features) and 'range' in a]
         rand_feat_cols = [a for a in self.features_to_include if any(b in a for b in rand_features) and 'rand' in a]
         return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + med_feat_cols + avg_feat_cols + sd_feat_cols + range_feat_cols + rand_feat_cols])
-
-    def _aggregate_avg_less_avgaev(self):
-        '''
-        Create an aggregate of the AEVs whilst subtracting an average AEV of a general lysine to the
-        changes employed from this.
-        '''
-
-        seperate_lys = self.df_measurements.drop_duplicates(subset=['Uniprot_Entry', 'Resid', 'class'])
-        df_data_agg = pd.DataFrame(columns=['Uniprot_Entry', 'Resid', 'class'])
-        for idx, row in seperate_lys.iterrows():
-            entry = row['Uniprot_Entry']
-            resid = row['Resid']
-            class_val = row['class']
-            # create a subset of the dataframe of measurements where the uniprot and resid match
-            df_query = self.df_measurements[(self.df_measurements['Uniprot_Entry'] == entry) & (self.df_measurements['Resid'] == resid)]
-            # calculate all the values of interest from the subset dataframe (df_query)
-            data = {'Uniprot_Entry': entry,
-                    'Resid' : resid,
-                    'class' : class_val}
-            df_query = df_query.copy()
-            for feature in self.features_to_include:
-                if feature == 'aev':
-                    list_aevs = df_query['aev'].tolist()
-                    aev_avg = np.average(list_aevs, axis=0)
-                    data['aev'] = aev_avg
-                else:
-                    temp_avg = round(df_query[feature].mean(),2)
-                    data[feature] = temp_avg
-
-            df_data_agg = pd.concat([df_data_agg, pd.DataFrame([data])], ignore_index=True)
-
-        if 'aev' in self.features_to_include:
-            df_out = pd.DataFrame(df_data_agg['aev'].to_list())
-            df_out = df_out.add_prefix('AEV_')
-            df_data_agg = pd.concat([df_data_agg, df_out], axis=1)
-            df_data_agg = df_data_agg.drop('aev', axis=1)
-
-        return df_data_agg
 
 
     def save_state(self, outname="measures_aggregated.csv"):

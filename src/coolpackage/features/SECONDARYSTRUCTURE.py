@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import pandas as pd
 import biobox as bb
 from Bio.PDB import PDBParser
@@ -86,14 +87,29 @@ class SECONDARYSTRUCTURE():
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
+            #create temporary pdb file with headers to satisfy dssp
+            with open(file=path, mode='r') as orig_pdb:
+                orig_lines = orig_pdb.readlines()
+
+            if not orig_lines[0].startswith('HEADER'):
+                orig_lines.insert(0, f"HEADER    TEMPORARY                               "
+                                f"{datetime.today().strftime('%d-%m-%Y')}  {os.path.basename(path)[0]}")
+
+                tmp_file_name = f"{path.split('.')[0]}_tmpdssp.pdb"
+                with open(file=tmp_file_name, mode='w') as new_pdb:
+                    new_pdb.writelines(orig_lines)
+            else:
+                tmp_file_name = path
+
+            #run analysis
             M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            M.import_pdb(tmp_file_name, include_hetatm=True)
             M = M.get_subset(idxs=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
 
             p = PDBParser()
-            struc = p.get_structure(id=os.path.basename(path), file=path)
+            struc = p.get_structure(id=os.path.basename(tmp_file_name), file=tmp_file_name)
             model = struc[0]
-            dssp = DSSP(model=model, in_file=path, file_type='PDB')
+            dssp = DSSP(model=model, in_file=tmp_file_name, file_type='PDB')
             sequence = ''
             sec_structure_eight_bit = ''
             for z in range(len(dssp)):
@@ -135,7 +151,11 @@ class SECONDARYSTRUCTURE():
             df_ss = df_ss.assign(**{'secondarystructure': sec_structure_list})
             df_ss = df_ss.iloc[idx_atom_interest]
 
+            os.remove(path=tmp_file_name)
+
         except Exception as e:
+            if os.path.exists(tmp_file_name):
+                os.remove(tmp_file_name)
             if self.record_errors: report_error_to_file('SECONDARYSTRUCTURE 1', path, str(e), self.error_filename)
             print(f'SECONDARYSTRUCTURE Calculation: 1 - could not calculate secondary structure for file {path}: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'secondarystructure'])
