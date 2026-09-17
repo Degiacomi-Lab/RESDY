@@ -73,6 +73,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
     def test_auxiliary(self):
+        if not os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'):
+            self.PDB.clean_and_split_pdb('13LD', 'P10724')
         self.PDB.rewrite_pdb(path=f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'))
 
