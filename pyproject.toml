@@ -35,7 +35,7 @@ propka = ["propka"]                 # the 'propka' feature
 docs = ["sphinx", "sphinx-autoapi"]
 
 [project.urls]
-Homepage = "https://github.com/Degiacomi-Lab/carbamylation"
+Homepage = "https://github.com/Degiacomi-Lab/RESDY"
 
 [tool.setuptools.packages.find]
 where = ["src"]

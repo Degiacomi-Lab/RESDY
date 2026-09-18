@@ -59,7 +59,7 @@ The pipeline is constituted by five steps, each documented in its own section be
    FAQ
 
 
-Please see RESDY's `Github page <https://github.com/Degiacomi-Lab/carbamylation>`_
+Please see RESDY's `Github page <https://github.com/Degiacomi-Lab/RESDY>`_
 for installation instructions and example scripts.
 
 
