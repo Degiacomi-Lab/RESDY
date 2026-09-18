@@ -7,13 +7,13 @@ import resdy as RD
 
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
-        # NEEDS FINISHING ONCE VIEWER UPDATED
-        self.V = RD.Viewer()
-        self.demo_csv = f'demo{os.sep}demo_input.csv'
-
-    def test_organism_funcs(self):
-        self.UP.count_organism_proteins(code='UP000007445', reviewed_only=True)
-        self.UP.count_organism_proteins(code='UP000007445', reviewed_only=False)
+        self.outdir = 'demo'
+        self.df_input = f'{self.outdir}{os.sep}demo_input.csv'
+        self.df_measures = f'{self.outdir}{os.sep}measures.csv'
+        self.A = RD.Analysis(df=self.df_measures,
+                             outdir=self.outdir)
+        self.V = RD.Viewer(outdir=self.outdir,
+                           analysis=self.A)
 
 
 if __name__ == "__main__":

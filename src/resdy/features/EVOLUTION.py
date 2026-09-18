@@ -57,7 +57,7 @@ class EVOLUTION():
         self.model_loaded = False
 
 
-    def _check_esm_model_available(self):
+    def check_esm_model_available(self):
         '''
         Check that the esm package is available, set model loaded to be False.
         '''
@@ -102,7 +102,7 @@ class EVOLUTION():
         '''
 
         if not self.model_loaded:
-            self._check_esm_model_available()
+            self.check_esm_model_available()
 
         self._ensure_esm_model()
 

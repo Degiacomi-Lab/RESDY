@@ -4,13 +4,13 @@ import shutil
 import subprocess
 import pandas as pd
 import biobox as bb
-from dotenv import load_dotenv
 from .error_reporting import report_error_to_file
 
 try:
     from ase import Atoms
     import torch
     import torchani
+    from dotenv import load_dotenv
 except Exception as e:
     print(f'Packages required for legolas calculation are not available, '
           f'will not be able to calculate legolas data. Error: {e}')

@@ -158,7 +158,7 @@ class RMSF():
 
             else:
                 print('>> The only matching structure is itself, therefore rmsf cannot be calculated')
-                df_rmsf = df_rmsf.assign(**{'rmsf': np.NaN})
+                df_rmsf = df_rmsf.assign(**{'rmsf': np.nan})
 
         except Exception as e:
             if self.record_errors: report_error_to_file('RMSF 2', path, str(e), self.error_filename)

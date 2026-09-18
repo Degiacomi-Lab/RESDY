@@ -186,6 +186,7 @@ class Measure(object):
         # for parallel measurements
         self.parallel = parallel
         self.num_cores = num_cores
+        self.measures = []
         self.files_to_analyse = []
         self.parallel_items = {}
 
@@ -277,7 +278,7 @@ class Measure(object):
                                                     **kwargs)
 
                             if tmp_name == 'evolution':
-                                meas_dict[tmp_name]._check_esm_model_available()
+                                meas_dict[tmp_name].check_esm_model_available()
 
                             self.measures.append([m, meas_dict[tmp_name].calculate])
                         except Exception as e:
@@ -290,7 +291,8 @@ class Measure(object):
                     if self.report_errors:
                         self._report_error_to_file('Setup measures: measure unknown', 'setup', f'Measure {m} unknown')
                     self.features.remove(m)
-                    raise Exception(f'measure {m} unknown, removed from features list to calculate')
+                    print(f'>> Measure {m} unknown and could not load in, removed this from features to calculate'
+                          f'Available features: {sorted(a for a in globals() if a.isupper())}')
 
         if not melodia_added and melodia_features:
             try:
@@ -302,8 +304,8 @@ class Measure(object):
                 melodia_added = True
             except Exception as e:
                 for feat in melodia_features:
-                    if feat in self.features_dict:
-                        self.features_dict.remove(feat)
+                    if feat in self.features:
+                        self.features.remove(feat)
                 print(f'>> Failed to add melodia for features calculation list; error: {e}')
 
 
@@ -337,7 +339,9 @@ class Measure(object):
                                 'atom_select_names_nonmod': ['SG'],
                                 'atom_select_names_modified': []}
             case _:
-                print(f'>> Residue of interest given not known; using LYS as default')
+                print(f'>> Residue of interest given not known: {res_code}; Please modify the input '
+                      f'to give either LYS or CYS or a pass a custom parameters dictionary to the '
+                      f'class.')
                 if self.report_errors:
                     self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_code}) not known; using LYS as default')
                 raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
@@ -501,6 +505,7 @@ class Measure(object):
                         f'defaulting to 0.75 times max possible.')
                 n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
         else:
+            n_cores_to_use = 1
             print('>> Measurements running in series')
 
         with Manager() as manager:
@@ -528,13 +533,16 @@ class Measure(object):
 
             self.measures = cpu_measurements
             if cpu_measurements:
-                with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                    df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
+                if self.parallel:
+                    with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                        df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
+                else:
+                    df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items], ignore_index=True)
 
             self.measures = gpu_measurements
             if gpu_measurements:
                 df_gpu = pd.concat([self._measure_file(d, lock) for d, lock in items], ignore_index=True)
-                
+
                 if df_parallel.empty:
                     df_parallel = df_gpu
                 else:
@@ -927,6 +935,11 @@ class Measure(object):
             for f in files:
                 if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
                     continue
+                
+                if self.only_relaxed:
+                    f_stem = os.path.splitext(os.path.basename(f))[0]
+                    if '_relaxed' not in f and os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
+                        continue
 
                 if f in self.pdb_only_files_to_ignore:
                     continue

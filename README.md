@@ -30,7 +30,7 @@ Clone the repository and install it from its root:
 
 ```
 git clone https://github.com/Degiacomi-Lab/RESDY.git
-cd carbamylation
+cd RESDY
 pip install -e .
 ```
 
@@ -233,8 +233,8 @@ UP = RD.Uniprot()
 * The `Analysis` class (<a href="https://github.com/Degiacomi-Lab/RESDY/blob/main/src/resdy/analysis.py">src/resdy/analysis.py</a>) is responsible for aggregating the data (calculating mean, std, range for the feature of each lysine), scrape GO Terms from the Uniprot Database for each protein.
   - `Analysis` class takes the `Measure.df` pandas dataframe as the input.
   - method `aggregate` will aggregate data and calculate descriptive statistics for each lysine. The resulting dataframe will be stored in `self.df_aggregated`. 
-  - method `subset` will aggregate data in two ways using either 'average' or 'south_east': (1) only include the average values of the two features for each lysine (2) only include the measure of the lysine with relatively lower pKa and higher sasa. The resulting dataframe will be stored in `self.df_sub`.
-  - method `Go_Get_Data` will extract GO Terms associated with each distinct lysine from the Uniprot Database. This operation is sped up by applying multi-threading. The data will be stored in a dictionary (GO ID: a list of uniprot codes).
+  - method `relative_best` will aggregate data in a way that aims to find the row of measurements for each subset of data based on Uniprot_Entry and Resid number key, that has the best relative statistics. Eg balance of smallest depth and propka values, but biggest value for das. Weights can be passed to bias the decision towards specific features. The resulting dataframe will be stored in `self.df_sub`.
+  - method `Go_get_data` will extract GO Terms associated with each distinct lysine from the Uniprot Database. This operation is sped up by applying multi-threading. The data will be stored in a dictionary (GO ID: a list of uniprot codes).
 
 * The `Viewer` class (<a href="https://github.com/Degiacomi-Lab/RESDY/blob/main/src/resdy/viewer.py">src/resdy/viewer.py</a>) can integrate different functionalities all together in an interactive plot.
   - `Viewer` class takes an instance of the `Analysis` class as the input.

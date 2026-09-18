@@ -14,16 +14,23 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from openmm.app.modeller import Modeller
-from openmm.app.forcefield import ForceField
-from openmm.app.pdbfile import PDBFile
-from openmm.app import NoCutoff
-from openmm.openmm import LangevinMiddleIntegrator
-from openmm.app.simulation import Simulation
-from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
 from . import alphafold as af
 from . import patcher
 from .helper import get_download_tool, ShutUp
+
+try:
+    from openmm.app.modeller import Modeller
+    from openmm.app.forcefield import ForceField
+    from openmm.app.pdbfile import PDBFile
+    from openmm.app import NoCutoff
+    from openmm.openmm import LangevinMiddleIntegrator
+    from openmm.app.simulation import Simulation
+    from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
+    openmm_available = True
+except Exception as e:
+    print('Could not import openmm modules for running minimisations, please ensure '
+          'that openmm has been installed')
+    openmm_available = False
 
 
 class PDB(object):
@@ -36,7 +43,7 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
-                 resnames_of_interest = ['LYS'], minimise_strucs='AF',
+                 resnames_of_interest = ['LYS'], minimise_strucs='',
                  remove_all_modifications=False,
                  num_cores=0):
         '''
@@ -87,6 +94,7 @@ class PDB(object):
         self.include_hetatm = include_hetatm
         self.resnames_of_interest = resnames_of_interest
         self.remove_all_modifications = remove_all_modifications
+
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
                 case 'AF':
@@ -99,14 +107,18 @@ class PDB(object):
                     self.minimise_af = True
                     self.minimise_pdb = True
                 case _:
-                    print(f'>> Minimisation method given as input (input: {minimise_strucs}) not '
-                          f'recognised: options are None, AF, PDB, ALL; Using default method of '
-                          f'only minimising AF structures.')
+                    print(f'>> Minimisation method given as input (input: {minimise_strucs}) '
+                            f'not recognised: options are None, AF, PDB, ALL; Using default '
+                            f'method of only minimising AF structures.')
                     self.minimise_af = True
                     self.minimise_pdb = False
         else:
             self.minimise_af = False
             self.minimise_pdb = False
+
+        if (self.minimise_af or self.minimise_pdb) and not openmm_available:
+            raise ImportError('Minimisation of structures requested but openmm not available, '
+                              'either install openmm or change minimise_strucs parameter to \'\'')
 
         self.curated_dir = os.path.join(outdir, "curated")
         if not os.path.exists(self.curated_dir):
@@ -1308,6 +1320,10 @@ class PDB(object):
         '''
         try:
             print(f'>> Minimising structure: {pdb}')
+            M = bb.Molecule()
+            M.import_pdb(pdb, include_hetatm=self.include_hetatm)
+            df_beta = M.data[['chain', 'resid', 'beta']]
+
             af_inst = PDBFile(f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb')
 
             forcefield = ForceField("amber14-all.xml",
@@ -1340,6 +1356,12 @@ class PDB(object):
             PDBFile.writeFile(modeller.topology,
                             modeller.getPositions(),
                             open(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb', "w"))
+
+            N = bb.Molecule()
+            N.import_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+            N.data = N.data.drop(columns=['beta']).merge(df_beta, how='left', on=['chain', 'resid'])
+            N.write_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+
             print(f'>> Finished minising structure: {pdb}')
 
         except Exception as e:

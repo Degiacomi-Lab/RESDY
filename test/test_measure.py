@@ -11,14 +11,17 @@ class Test_Uniprot(unittest.TestCase):
         self.outdir = 'demo'
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
-        self.all_features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge', 'melodia', 'frustration']
+        self.all_features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev',
+                             'das', 'seqcharge', 'melodia', 'frustration']
         self.features_dict = {k: {} for k in self.all_features}
 
     def test_full_setup(self):
         # test full setup of measures class, no run, test runs individually
         M = RD.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features_dict=self.all_features)
+                        features_dict=self.features_dict)
+        self.assertTrue(set(M.features) <= set(self.all_features))
+        self.assertTrue(len(M.measures) > 0)
 
     def test_propka(self):
         M_propka = RD.Measure(df_input=self.df_prot,
