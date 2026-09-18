@@ -2,5 +2,5 @@ Uniprot
 -------
 
 
-.. autoclass:: coolpackage.uniprot.Uniprot
+.. autoclass:: resdy.uniprot.Uniprot
    :members:

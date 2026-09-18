@@ -1,5 +1,5 @@
 Structure patching
 ------------------
 
-.. automodule:: coolpackage.patcher
+.. automodule:: resdy.patcher
    :members:

@@ -5,14 +5,14 @@ import os
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
-import coolpackage as CPN
+import resdy as RD
 
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
         self.df_measures = f'demo{os.sep}measures.csv'
         self.outdir = 'demo'
         self.features_to_analyse = ['depth', 'sasa', 'propka', 'das', 'curvature']
-        self.A = CPN.Analysis(df=self.df_measures,
+        self.A = RD.Analysis(df=self.df_measures,
                               outdir=self.outdir,
                               features_to_analyse=self.features_to_analyse)
 

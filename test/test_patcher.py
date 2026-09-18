@@ -3,7 +3,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
-from coolpackage import patcher
+from resdy import patcher
 
 class Test_Uniprot(unittest.TestCase):
     def test_patcher_pipeline(self):

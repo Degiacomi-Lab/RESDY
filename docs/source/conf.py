@@ -14,7 +14,7 @@ import os
 import sys
 
 # The package lives in the "src" layout, i.e. "src" is a container rather than a package
-# and "coolpackage" sits inside it. Putting "src" on sys.path lets the documentation build
+# and "resdy" sits inside it. Putting "src" on sys.path lets the documentation build
 # without the package having been installed first; if it has been installed
 # ("pip install -e ."), this line is harmless.
 REPO_ROOT = os.path.abspath('../..')
@@ -25,7 +25,7 @@ if SRC_DIR not in sys.path:
 
 # -- Project information -----------------------------------------------------
 
-project = 'coolpackage'
+project = 'RESDY'
 copyright = '2026, G. Weston, M. T. Degiacomi'
 author = 'G. Weston, M. T. Degiacomi'
 
@@ -48,7 +48,7 @@ extensions = ['sphinx.ext.autodoc',
 ]
 
 autoapi_type = "python"
-autoapi_dirs = [os.path.join(SRC_DIR, 'coolpackage', 'features')]
+autoapi_dirs = [os.path.join(SRC_DIR, 'resdy', 'features')]
 
 # "feature.py" is the template users copy when adding a feature of their own, not a feature
 # the user can request, so it is skipped outright. "error_reporting.py" is skipped further
@@ -94,15 +94,15 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 #
-# "coolpackage" and "coolpackage.features" are packages, so AutoAPI generates a page for
+# "resdy" and "resdy.features" are packages, so AutoAPI generates a page for
 # each carrying nothing but a toctree of its submodules. Dropping them lets the
 # "Feature measurements" landing page (see _templates/autoapi/index.rst) link straight to
 # each feature, rather than through two intermediate lists. "error_reporting" is the shared
 # error log writer, internal machinery rather than a feature, so its page goes too.
 exclude_patterns = [
-    'autoapi/coolpackage/index.rst',
-    'autoapi/coolpackage/features/index.rst',
-    'autoapi/coolpackage/features/error_reporting/index.rst',
+    'autoapi/resdy/index.rst',
+    'autoapi/resdy/features/index.rst',
+    'autoapi/resdy/features/error_reporting/index.rst',
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.
@@ -124,7 +124,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'coolpackagedoc'
+htmlhelp_basename = 'resdydoc'
 
 # -- Options for Texinfo output -------------------------------------------
 add_module_names = False

@@ -2,19 +2,19 @@
 Rapid featurisation of amino acids from collections of protein structures.
 
 The pipeline is constituted by five steps, one class each:
-:class:`Uniprot <coolpackage.uniprot.Uniprot>` gathers the list of structures to work on,
-:class:`PDB <coolpackage.protein.PDB>` downloads and curates them,
-:class:`Measure <coolpackage.measure.Measure>` calculates the features,
-:class:`Analysis <coolpackage.analysis.Analysis>` explores the results, and
-:class:`Viewer <coolpackage.viewer.Viewer>` displays them interactively.
+:class:`Uniprot <resdy.uniprot.Uniprot>` gathers the list of structures to work on,
+:class:`PDB <resdy.protein.PDB>` downloads and curates them,
+:class:`Measure <resdy.measure.Measure>` calculates the features,
+:class:`Analysis <resdy.analysis.Analysis>` explores the results, and
+:class:`Viewer <resdy.viewer.Viewer>` displays them interactively.
 
 All of them are reachable from the package itself::
 
-    import coolpackage as CPN
+    import resdy as RD
 
-    UP = CPN.Uniprot()
+    UP = RD.Uniprot()
 
-They are resolved on first use rather than on import, so that ``import coolpackage``
+They are resolved on first use rather than on import, so that ``import resdy``
 succeeds on a machine where the optional dependency of one step is missing. The
 ImportError of a step is raised when that step is first reached, naming the package that
 is absent.

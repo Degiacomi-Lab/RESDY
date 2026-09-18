@@ -3,11 +3,11 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
-import coolpackage as CPN
+import resdy as RD
 
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
-        self.UP = CPN.Uniprot()
+        self.UP = RD.Uniprot()
         self.demo_csv = f'demo{os.sep}demo_input.csv'
 
     def test_organism_funcs(self):

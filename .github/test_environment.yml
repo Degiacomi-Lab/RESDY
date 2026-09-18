@@ -1,4 +1,4 @@
-name: cpn_test
+name: resdy_test
 channels:
   - conda-forge
   - salilab

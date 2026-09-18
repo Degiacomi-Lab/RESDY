@@ -3,7 +3,7 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "coolpackage"
+name = "resdy"
 version = "1.0"
 description = "Rapid featurisation of amino acids from collections of protein structures"
 readme = "README.md"
@@ -25,7 +25,7 @@ dependencies = [
     "biobox",
 ]
 
-# Modeller is required by the structure patching step (coolpackage.patcher) but is not
+# Modeller is required by the structure patching step (resdy.patcher) but is not
 # installable from PyPI and needs a licence key, so it is not listed above. See the
 # Dependencies section of README.md.
 [project.optional-dependencies]

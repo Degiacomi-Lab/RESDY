@@ -5,7 +5,7 @@ import pandas as pd
 import biobox as bb
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
-import coolpackage as CPN
+import resdy as RD
 
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
@@ -15,7 +15,7 @@ class Test_Uniprot(unittest.TestCase):
         self.PDB_only = False
         self.include_hetatm = False
         self.resnames_of_interest = ['LYS']
-        self.PDB = CPN.PDB(outdir=self.outdir,
+        self.PDB = RD.PDB(outdir=self.outdir,
                            gap=self.gap,
                            parallel=self.parallel,
                            PDB_only=self.PDB_only,
@@ -89,7 +89,7 @@ class Test_Uniprot(unittest.TestCase):
     '''
     def test_gathering(self):
         # runs on separate instance of PDB to work with demo
-        UP = CPN.Uniprot()
+        UP = RD.Uniprot()
         UP.from_csv_file(f'demo{os.sep}demo_input.csv')
 
         outdir = 'demo'
@@ -99,7 +99,7 @@ class Test_Uniprot(unittest.TestCase):
         include_hetatm = False
         resnames_of_interest = ['LYS']
         minimise_strucs='AF'
-        PDB = CPN.PDB(outdir=outdir,
+        PDB = RD.PDB(outdir=outdir,
                     gap=gap,
                     parallel=parallel,
                     PDB_only=PDB_only,

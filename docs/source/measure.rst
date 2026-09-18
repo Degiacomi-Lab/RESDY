@@ -2,5 +2,5 @@
 Measure
 -------
 
-.. autoclass:: coolpackage.measure.Measure
+.. autoclass:: resdy.measure.Measure
    :members:

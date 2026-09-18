@@ -1,5 +1,5 @@
 Viewer
 ------
 
-.. autoclass:: coolpackage.viewer.Viewer
+.. autoclass:: resdy.viewer.Viewer
    :members:

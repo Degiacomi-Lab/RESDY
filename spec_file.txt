@@ -1,4 +1,4 @@
-name: cpn
+name: resdy
 channels:
   - conda-forge
   - salilab

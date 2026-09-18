@@ -2,9 +2,9 @@
 Protein structure processing
 ----------------------------
 
-.. autoclass:: coolpackage.protein.PDB
+.. autoclass:: resdy.protein.PDB
    :members:
 
-.. automodule:: coolpackage.alphafold
+.. automodule:: resdy.alphafold
    :members:
 

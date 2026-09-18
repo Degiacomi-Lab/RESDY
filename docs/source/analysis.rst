@@ -1,7 +1,7 @@
 Analysis
 --------
 
-.. automodule:: coolpackage.analysis
+.. automodule:: resdy.analysis
 
-.. autoclass:: coolpackage.analysis.Analysis
+.. autoclass:: resdy.analysis.Analysis
    :members:

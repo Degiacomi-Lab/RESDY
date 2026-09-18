@@ -1,6 +1,6 @@
 Aggregation
 -----------
 
-.. autoclass:: coolpackage.aggregation.Aggregation
+.. autoclass:: resdy.aggregation.Aggregation
    :members:
    :private-members:

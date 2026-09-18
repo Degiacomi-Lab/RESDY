@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
-from coolpackage import alphafold as af
+from resdy import alphafold as af
 
 class Test_Uniprot(unittest.TestCase):
     def test_plddt(self):

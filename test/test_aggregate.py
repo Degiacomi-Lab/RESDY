@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
-import coolpackage as CPN
+import resdy as RD
 
 
 class Test_Uniprot(unittest.TestCase):
@@ -15,7 +15,7 @@ class Test_Uniprot(unittest.TestCase):
     # TEST SCALAR AGGREGATION
 
     def test_min(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                    aggregation_method='min',
                                    features_to_include=['all'],
                                    aev_red_method='pca')
@@ -23,7 +23,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_max(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='max',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -31,7 +31,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_avg(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='avg',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -39,7 +39,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_random(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='random',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -47,7 +47,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_median(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='median',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -55,7 +55,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_mixmatch(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='mixmatch',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -63,7 +63,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_minmax(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='minmax',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -71,7 +71,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_minmaxavg(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='minmaxavg',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -80,7 +80,7 @@ class Test_Uniprot(unittest.TestCase):
         Agg.save_state(outname=f'demo{os.sep}measures_aggregated.csv')
 
     def test_all(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='all',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -89,7 +89,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_avglessaev(self):
         #might need to be removed soon
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                     aggregation_method='all',
                                     features_to_include=['all'],
                                     aev_red_method='average_subtract_aev')
@@ -122,7 +122,7 @@ class Test_Uniprot(unittest.TestCase):
                             'das_range', 'das_rand', 'flexibility_max', 'rmsf_med']
 
         with patch('builtins.input', fake_input):
-            Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+            Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                         aggregation_method='choose',
                                         features_to_include=['all'],
                                         aev_red_method='pca')
@@ -131,7 +131,7 @@ class Test_Uniprot(unittest.TestCase):
             self.assertListEqual(expected_columns, list(df_agg.columns))
 
     def test_unknown(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                         aggregation_method='x',
                                         features_to_include=['all'],
                                         aev_red_method='pca')
@@ -142,7 +142,7 @@ class Test_Uniprot(unittest.TestCase):
 
     # TEST VECTOR FEATURES AGGREGATION
     def test_pca(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='pca')
@@ -150,7 +150,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_sd(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='sd')
@@ -158,7 +158,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_autoencoder(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='autoencoder')
@@ -166,7 +166,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(df_agg) > 0)
 
     def test_null(self):
-        Agg = CPN.Aggregation(df_measurements=self.demo_measure,
+        Agg = RD.Aggregation(df_measurements=self.demo_measure,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='null')
