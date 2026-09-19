@@ -13,6 +13,10 @@ dependencies:
   - seaborn
   - Modeller
   - propka
+  # analysis.enrichment_analysis raises ImportError without statsmodels
+  - statsmodels
+  # the 'frustration' and 'density' features are silently dropped without this
+  - frustratometer
   - ase
   - pytorch
   - torchani=2.2.4
@@ -20,6 +24,9 @@ dependencies:
   - pdbfixer
   - msms
   - mdtraj
+  # melodia-py imports nglview at module load but does not declare it as a
+  # dependency, so removing it silently disables the melodia feature.
+  - nglview
   - numba
   - python-dotenv
   - pip:

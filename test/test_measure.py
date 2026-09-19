@@ -125,7 +125,7 @@ class Test_Uniprot(unittest.TestCase):
                         include_modified=False)
         M_melodia.measure_data()
         print(M_melodia.df)
-        print('len propka', len(M_melodia.df))
+        print('len melodia', len(M_melodia.df))
         self.assertTrue(len(M_melodia.df) > 0)
 
     def test_phi(self):
