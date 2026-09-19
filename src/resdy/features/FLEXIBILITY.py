@@ -93,28 +93,30 @@ class FLEXIBILITY():
         except Exception as e:
             if self.record_errors: report_error_to_file('Flex 1', path, str(e), self.error_filename)
             print(f'Flex Calculation: 1 - Could not load and identify targets within the lysines for calculations: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'Flexibility'])
 
-        try:
-            mod_struc = os.path.basename(path).startswith('AF-')
-            if mod_struc:
-                print(f'>> {path} is an AF structure which means the Beta factor column is the PLDDT '
-                      f'value, therefore B-factors set to NaN for this file')
-                avg_beta_output = [np.nan] * len(lys_res_nums)
-            else:
-                avg_beta_output = []
-                for lys_res, lys_chain in zip(lys_res_nums, list_chains):
+        mod_struc = os.path.basename(path).startswith('AF-')
+        if mod_struc:
+            print(f'>> {path} is an AF structure which means the Beta factor column is the PLDDT '
+                f'value, therefore B-factors set to NaN for this file')
+            avg_beta_output = [np.nan] * len(lys_res_nums)
+        else:
+            avg_beta_output = []
+            for lys_res, lys_chain in zip(lys_res_nums, list_chains):
+                try:
                     tmp_lys_data = M.data[(M.data['resid'] == lys_res) & (M.data['chain'] == lys_chain)]
                     tmp_lys_beta_vals = list(tmp_lys_data['beta'])
                     avg_beta = sum(tmp_lys_beta_vals) / len(tmp_lys_beta_vals)
                     avg_beta_output.append(avg_beta)
+                except Exception as e:
+                    if self.record_errors: report_error_to_file('Flex 2', path, str(e), self.error_filename)
+                    print(f'Flex Calculation: 2 - Failed to obtain the beta value for residue at position '
+                          f'{lys_res}, set to NaN; error: {str(e)}')
+                    avg_beta_output.append(np.nan)
 
-            if all(b == 0 for b in avg_beta_output):
-                print(f'>> All Beta factors are 0 in {path}, flexibility set to NaN for all residues of interest')
-                avg_beta_output = [np.nan] * len(avg_beta_output)
-
-        except Exception as e:
-            if self.record_errors: report_error_to_file('Flex 2', path, str(e), self.error_filename)
-            print(f'Flex Calculation: 2 - Failed to obtain the beta values and create an average for the lysine of interest at position {lys_res}: {e}')
+        if all(b == 0 for b in avg_beta_output):
+            print(f'>> All Beta factors are 0 in {path}, flexibility set to NaN for all residues of interest')
+            avg_beta_output = [np.nan] * len(avg_beta_output)
 
         try:
             df_flex = pd.DataFrame(columns=['Chain', 'Resid', 'flexibility'])

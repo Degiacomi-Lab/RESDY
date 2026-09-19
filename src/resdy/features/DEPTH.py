@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import biobox as bb
+import numpy as np
 from .error_reporting import report_error_to_file
 
 try:
@@ -122,6 +123,8 @@ class DEPTH():
 
         depth_results = []
         for i, idx in enumerate(idx_nz):
+            mychain = ''
+            myres = ''
             try:
                 mychain = structure[0][list_chains[i]]
                 myres = mychain[int(lys_res_nums[i])]
@@ -130,10 +133,13 @@ class DEPTH():
                         rd = residue_depth(myres, surface)  # average atom depth for all heavy atoms in residue of interest
                     case 'AtomDepth' | _:
                         rd = min_dist(M.coordinates[0][idx], surface)  # NZ atom depth
+                depth_results.append(rd)
             except Exception as e:
+                depth_results.append(np.nan)
                 if self.record_errors: report_error_to_file('Depth 3', path, str(e), self.error_filename)
-                raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
-            depth_results.append(rd)
+                print(f'>> Failed to obtain depth for resid at position: Chain: {mychain}, '
+                      f'Resid Num: {myres}; Setting to NaN; error: {str(e)}')
+
 
         df_depth = pd.DataFrame(columns=["Chain", "Resid", "depth"])
         try:

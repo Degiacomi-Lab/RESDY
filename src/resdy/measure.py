@@ -186,7 +186,6 @@ class Measure(object):
         # for parallel measurements
         self.parallel = parallel
         self.num_cores = num_cores
-        self.measures = []
         self.files_to_analyse = []
         self.parallel_items = {}
 
@@ -228,10 +227,12 @@ class Measure(object):
                         'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
                         'rmsf']
             features_dict = {k: {} for k in feature_all}
-            self.features_dict = list(features_dict)
+            self.features_dict = features_dict
+            self.features = list(features_dict)
         self.measures = []
         melodia_features = []
-        melodia_added = False; frustration_added = False
+        melodia_added = False
+        frustration_added = False
         meas_dict = {}
         self.features = list(features_dict)
         for m in features_dict:
@@ -307,6 +308,7 @@ class Measure(object):
                     if feat in self.features:
                         self.features.remove(feat)
                 print(f'>> Failed to add melodia for features calculation list; error: {e}')
+
 
 
     def _match_resid_codes(self, res_code):
@@ -391,7 +393,7 @@ class Measure(object):
 
         plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
         if os.path.exists(plddt_record_path):
-            df_af_plddt = pd.read_csv(plddt_record_path)
+            df_af_plddt = pd.read_csv(plddt_record_path).drop_duplicates(subset=['PDB_Code', 'Chain', 'Resid'], keep='last')
             self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
         else:
             print(f'>> No PLDDT record file available at {plddt_record_path}, '
@@ -888,13 +890,12 @@ class Measure(object):
             # account for measurements that have special cases
             if col_name == 'melodia':
                 melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
-                for feature in self.features_dict:
-                    if feature in melodia_features:
+                for feature in melodia_features:
+                    if feature in self.features and feature in to_merge.columns:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             elif col_name == 'frustration':
-                frust_features = ['frustration', 'density']
-                for feature in self.features_dict:
-                    if feature in frust_features:
+                for feature in ('frustration', 'density'):
+                    if feature in self.features and feature in to_merge.columns:
                         target.at[i, feature] = to_merge.loc[idx[0][0], feature]
             else:
                 target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
@@ -970,12 +971,13 @@ class Measure(object):
                                            ['CA'], get_index=True, use_resname=True)
 
                 for i in idxs:
-
-                    mod_stat = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
                     data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
                         'Chain': M.data['chain'].values[i],
-                        'Resid': M.data['resid'].values[i],
-                        'Modified': mod_stat})
+                        'Resid': M.data['resid'].values[i]})
+
+                    if self.include_mod:
+                        data['Modified'] = (M.data['resname'].values[i]
+                                            in self.aa_properties['modified_codes'])
 
                     df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
 

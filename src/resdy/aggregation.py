@@ -300,11 +300,11 @@ class Aggregation:
         nothing to the model except noise.
         '''
         print('>> Removing null AEV columns...')
-        num_cols_to_keep = sum((self.df_measurements != 0).any(axis=0))
         aev_col_names = [a for a in list(self.df_measurements.columns) if 'AEV_' in a]
         cols_to_remove = [a for a in aev_col_names if (self.df_measurements[a] == 0).all()]
         self.df_measurements = self.df_measurements.drop(columns=cols_to_remove, axis=0)
-        print(f'>> Removed {len(cols_to_remove)} null AEV columns, {num_cols_to_keep} AEV columns left.')
+        print(f'>> Removed {len(cols_to_remove)} null AEV columns, '
+              f'{len(aev_col_names) - len(cols_to_remove)} AEV columns left.')
 
 
     def _prepare_vif_aev(self):
