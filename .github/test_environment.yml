@@ -2,7 +2,6 @@ name: resdy_test
 channels:
   - conda-forge
   - salilab
-  - defaults
 dependencies:
   - python=3.12
   - pip
@@ -16,13 +15,11 @@ dependencies:
   - propka
   - ase
   - pytorch
-  - torchani<=2.2.4
+  - torchani=2.2.4
   - openmm
   - pdbfixer
   - msms
-  - plotly
   - mdtraj
-  - nglview
   - numba
   - python-dotenv
   - pip:
