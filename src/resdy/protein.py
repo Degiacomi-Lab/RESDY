@@ -1295,13 +1295,16 @@ class PDB(object):
             print(f'Failed rewriting pdb file with error: {str(e)}')
 
 
-    def apply_minimisation(self, pdb):
+    def apply_minimisation(self, pdb, max_iterations=1000):
         '''
         Utilise openmm to apply an energy minimisation in implicit solvent to relax the
         structure in a more realistic state than in vacuum as AF structures are. 
 
         :param pdb: The AF code for the structure to extract the PLDDT values from
         :type pdb: str
+        :param max_iterations: Maximum number of minimisation iterations. Minimisation
+            stops earlier if the force tolerance is reached. Defaults to 1000.
+        :type max_iterations: int
         :param outfolder: The output directory used to know where the minimised structure 
             files should be written to.
         :type outfolder: str
@@ -1327,7 +1330,7 @@ class PDB(object):
 
             simulation.context.setPositions(modeller.positions)
             simulation.minimizeEnergy(tolerance=10*kilojoule_per_mole/nanometer,
-                                    maxIterations=1000)
+                                    maxIterations=max_iterations)
 
             sim_out = simulation.context.getState(getPositions=True)
             sim_out_positions = sim_out.getPositions()
