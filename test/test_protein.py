@@ -6,6 +6,7 @@ import biobox as bb
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
+from resdy import alphafold as af
 
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
@@ -84,8 +85,12 @@ class Test_Uniprot(unittest.TestCase):
         self.PDB.df = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains'])
 
     def test_minimisation(self):
-        self.PDB.apply_minimisation('AF-P0CG48-F1-model_v6')
-        self.assertTrue(os.path.exists(f'test{os.sep}curated{os.sep}AF-P0CG48-F1-model_v6_relaxed.pdb'))
+        # AF-P40616-F1 (181 residues) rather than AF-P0CG48-F1 (685): minimisation uses
+        # implicit solvent with NoCutoff, so cost grows with the square of the atom count.
+        code = 'AF-P40616-F1-model_v6'
+        af.download_AF_struc(code, outfolder=self.outdir)
+        self.PDB.apply_minimisation(code, max_iterations=10)
+        self.assertTrue(os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}{code}_relaxed.pdb'))
     '''
     def test_gathering(self):
         # runs on separate instance of PDB to work with demo
