@@ -17,7 +17,7 @@ class Aggregation:
     def __init__(self, df_measurements, outdir='reuslt', aggregation_method='minmax',
                  features_to_include=['all'], aev_red_method='pca',
                  num_sd_aev_features=100, include_chain=False,
-                 get_nan_df=False):
+                 max_feature_nan_fraction=0.5, get_nan_df=False):
         '''
         Initialisation of the Aggregation class.
 
@@ -69,6 +69,10 @@ class Aggregation:
             aggregate on 'Uniprot_Entry', 'Chain', 'Resid' else will aggregate on 'Uniprot_Entry',
             'Resid' (default)
         :type include_chain: bool, optional
+        :param max_feature_nan_fraction: The max fraction of values in a feature column that would
+            allow a feature to remain in the measures dataframe for aggregation. If set to 1.0 then
+            the feature will be kept and all rows containing NaN will be removed before aggregation.
+        :type max_feature_nan_fraction: float
         :param get_nan_df: Option to create a dataframe (saved as csv) which contains all the rows
             that are being removed when aggregating, this allows curation of the data being removed
             for investigations into potential problems.
@@ -92,6 +96,7 @@ class Aggregation:
         self.include_chain = include_chain
         self.get_nan_df = get_nan_df
         self.df_agg = pd.DataFrame()
+        self.max_feature_nan_fraction = max_feature_nan_fraction
 
         self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
                                  'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
@@ -146,6 +151,17 @@ class Aggregation:
                   f'aggregation data to \'measures_nan_feature_data_removed.csv\'')
 
         na_per_feature = {c: int(self.df_measurements[c].isna().sum()) for c in self.features_to_include}
+        n_meas = len(self.df_measurements)
+        sparse_features = [c for c, k in na_per_feature.items() if n_meas and
+                                k / n_meas > self.max_feature_nan_fraction]
+        if sparse_features:
+            print(f'>> Features {", ".join(sparse_features)} are missing values on more than '
+                  f'{self.max_feature_nan_fraction:.0%} of rows; dropping the features instead '
+                  f'of the rows. If you would like to keep the feature and get rid of the rows '
+                  f'pass 1.0 as the value for max_feature_nan_fraction.')
+            self.features_to_include = [feat for feat in self.features_to_include
+                                        if feat not in sparse_features]
+
         keep = self.df_measurements.dropna(subset=self.features_to_include)
         del_lysines = (self.df_measurements[self.lys_key].drop_duplicates().shape[0] - keep[self.lys_key].drop_duplicates().shape[0])
         if len_before_df and keep.empty:

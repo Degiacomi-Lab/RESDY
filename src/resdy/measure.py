@@ -98,7 +98,7 @@ class Measure(object):
         :type features_dict: dict
         :param residue_of_interest: The residue of interest to calculate measurements for, if
             investigating LYS or CYS, can enter a string with either of these as code is setup
-            to handle them. If you are investigating other resiudes or would like more control
+            to handle them. If you are investigating other residues or would like more control
             over LYS or CYS properties for calculation, please enter a dictionary of the following
             format:
             {'non_modified_codes': [residue codes of standard state],
@@ -159,21 +159,9 @@ class Measure(object):
         else: self.error_filename = 'no_record'
 
         self.residue_of_interest = residue_of_interest
-        if isinstance(residue_of_interest, str):
-            self.aa_properties = self._match_resid_codes(residue_of_interest)
-        elif isinstance(residue_of_interest, dict):
-            self.aa_properties = residue_of_interest
-            dict_keys = ['non_modified_codes', 'modified_codes',
-                         'atom_select_names_nonmod', 'atom_select_names_modified']
-            if list(residue_of_interest) != dict_keys:
-                raise KeyError(f'Not all keys required for aa_properties dict given; please '
-                               f'ensure that all keys required ({", ".join(dict_keys)}) are '
-                               f'included (can be set to \'\' if nothing required in the parameter)')
-        else:
-            raise ValueError(f'Unknown option give to residue_of_interest parameter: '
-                            f'{residue_of_interest}; please enter either string or dict. '
-                            f'See class documentation.')
         self.features_dict = features_dict.copy()
+
+        self.aa_properties = self._setup_aa_properties(residue_of_interest)
         self._setup_measures(features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
@@ -310,8 +298,7 @@ class Measure(object):
                 print(f'>> Failed to add melodia for features calculation list; error: {e}')
 
 
-
-    def _match_resid_codes(self, res_code):
+    def _setup_aa_properties(self, res_details):
         '''
         Adding in the function required for the codebase to have the potential to be used with
         residues other than lysines. Matches up a 3 letter code given as input to measures to a list
@@ -319,40 +306,77 @@ class Measure(object):
         states) and modified codes for self.include_modified options. If a rogue 3 letter code is
         given, it defaults to carbamylation data.
 
-        :param res_code: 3 letter code of the residue to match up other 3 letter codes for
-        :type res_code: str
-
-        .. todo::
-
-           Add a check on which residue is taken through to the measurements, so that it can be
-           established which programmes can actually be run on it. The residues covered are
-           PROPKA (ASP, GLU, HIS, CYS, TYR, LYS, ARG) and pkaANI (ASP, GLU, HIS, TYR, LYS)
-           (GW, 23/07/26).
+        :param res_details: 3 letter code of the residue to match up other 3 letter codes for
+        :type res_details: str
         '''
-        match res_code:
-            case 'LYS':
-                aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                 'modified_codes': ['LYE', 'KCX'],
-                                 'atom_select_names_nonmod': ['NZ'],
-                                 'atom_select_names_modified': ['NZ', 'N07']}
-            case 'CYS':
-                aa_properties = {'non_modified_codes': ['CYS'],
-                                'modified_codes': [],
-                                'atom_select_names_nonmod': ['SG'],
-                                'atom_select_names_modified': []}
-            case _:
-                print(f'>> Residue of interest given not known: {res_code}; Please modify the input '
-                      f'to give either LYS or CYS or a pass a custom parameters dictionary to the '
-                      f'class.')
-                if self.report_errors:
-                    self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_code}) not known; using LYS as default')
-                raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
-                                f'match to any cases, stopping calculations. Please modify input '
-                                f'parameter residue of interest with either LYS or CYS or give a full '
-                                f'dictionary of properties for your custom investigation into another '
-                                f'residue.')
+        propka_res = ['ASP', 'GLU', 'HIS', 'CYS', 'TYR', 'LYS', 'ARG']
+        pkaani_res = ['ASP', 'GLU', 'HIS', 'TYR', 'LYS']
+        
+        if isinstance(res_details, str):
+            match res_details:
+                case 'LYS':
+                    aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
+                                        'modified_codes': ['LYE', 'KCX'],
+                                        'atom_select_names_nonmod': ['NZ'],
+                                        'atom_select_names_modified': ['NZ', 'N07']}
+                case 'CYS':
+                    aa_properties = {'non_modified_codes': ['CYS'],
+                                    'modified_codes': [],
+                                    'atom_select_names_nonmod': ['SG'],
+                                    'atom_select_names_modified': []}
+                case _:
+                    print(f'>> Residue of interest given not known: {res_details}; Please modify the input '
+                            f'to give either LYS or CYS or a pass a custom parameters dictionary to the '
+                            f'class.')
+                    if self.report_errors:
+                        self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_details}) not known; using LYS as default')
+                    raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
+                                    f'match to any cases, stopping calculations. Please modify input '
+                                    f'parameter residue of interest with either LYS or CYS or give a full '
+                                    f'dictionary of properties for your custom investigation into another '
+                                    f'residue.')
+
+            if res_details not in propka_res and res_details in list(self.features_dict):
+                print(f'>> Residue entered for analysis ({res_details}) is not possible to run analysis '
+                      f'for in PROPKA3, removing from features to calculate.')
+                self.features_dict.pop('propka')
+
+            if res_details not in pkaani_res and res_details in list(self.features_dict):
+                print(f'>> Residue entered for analysis ({res_details}) is not possible to run analysis '
+                        f'for in pKaANI, removing from features to calculate.')
+                self.features_dict.pop('pkaani')
+
+        elif isinstance(res_details, dict):
+            dict_keys = ['non_modified_codes', 'modified_codes',
+                            'atom_select_names_nonmod', 'atom_select_names_modified']
+            if list(res_details) != dict_keys:
+                raise KeyError(f'Not all keys required for aa_properties dict given; please '
+                                f'ensure that all keys required ({", ".join(dict_keys)}) are '
+                                f'included (can be set to \'\' if nothing required in the parameter)')
+            aa_properties = res_details
+
+            len_nonmod = len(aa_properties['non_modified_codes'])
+            if (any(aa_properties['non_modified_codes'] == propka_res[i:i + len_nonmod] for i in range(len(propka_res) - len_nonmod + 1))
+                        and res_details in list(self.features_dict)):
+                print(f'>> Residues entered for analysis in non modified codes of amino acid properties '
+                        f'({", ".join(aa_properties["non_modified_codes"])}) are not possible to run analysis '
+                        f'for in PROPKA3, removing from features to calculate.')
+                self.features_dict.pop('propka')
+
+            if (any(aa_properties['non_modified_codes'] == pkaani_res[i:i + len_nonmod] for i in range(len(pkaani_res) - len_nonmod + 1))
+                        and res_details in list(self.features_dict)):
+                print(f'>> Residues entered for analysis in non modified codes of amino acid properties '
+                      f'({", ".join(aa_properties["non_modified_codes"])}) are not possible to run analysis '
+                      f'for in pKaANI, removing from features to calculate.')
+                self.features_dict.pop('pkaani')
+
+        else:
+            raise ValueError(f'Unknown option give to residue_of_interest parameter: '
+                            f'{str(res_details)}; please enter either string or dict. '
+                            f'See class documentation.')
 
         return aa_properties
+
 
 
     def _setup_report_errors_file(self):
