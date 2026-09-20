@@ -9,6 +9,7 @@ try:
     import torch
     from torchani.models import ANI2x
     from torchani.aev import AEVComputer
+    from torchani.utils import ChemicalSymbolsToInts
     aev_packages_available = True
 except Exception as e:
     aev_packages_available = False
@@ -57,6 +58,7 @@ class AEV():
 
         self.device = None
         self.ANI_model = None
+        self.species_converter = None
 
 
     def _ensure_aev_model(self):
@@ -67,6 +69,7 @@ class AEV():
             return
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ANI_model = ANI2x(periodic_table_index=True).to(device=self.device)
+        self.species_converter = ChemicalSymbolsToInts(['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
 
 
     def calculate(self, path):
@@ -147,9 +150,10 @@ class AEV():
 
                 # 2.2: calculate the AEV for the subset of the protein and add this to the output dataframe
                 try:
-                    species = self.ANI_model.species_to_tensor(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
+                    species = self.species_converter(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
                     ani_coords = torch.tensor(temp_structure.get_positions(), dtype=torch.float32).unsqueeze(0).to(device=self.device)
-                    aevs = self.ANI_model.aev_computer((species, ani_coords)).aevs
+                    aevs = self.ANI_model.aev_computer(species, ani_coords)
+
                     # match up the position of the lysine of interest to inside the structure cutout
                     lys_nz_subloc = np.where(list_close_points == idx_nz[lys_idx])[0]
                     if len(lys_nz_subloc) != 1:
@@ -184,5 +188,5 @@ class AEV():
 
 
 if __name__ == '__main__':
-    aev_a = AEV(include_modified=False)
-    print(aev_a.calculate(f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    aev = AEV(include_modified=False)
+    print(aev.calculate(f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))
