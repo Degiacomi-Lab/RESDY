@@ -86,7 +86,7 @@ class Test_Uniprot(unittest.TestCase):
                                     aev_red_method='pca')
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
-        Agg.save_state(outname=f'demo{os.sep}measures_aggregated.csv')
+        Agg.save_state(outname=f'measures_aggregated.csv')
 
     def test_all(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
@@ -120,7 +120,7 @@ class Test_Uniprot(unittest.TestCase):
                             'torsion_range', 'phi_min', 'phi_max', 'phi_avg', 'phi_sd', 'phi_range',
                             'phi_rand', 'psi_min', 'psi_max', 'psi_med', 'psi_avg', 'psi_sd',
                             'psi_range', 'psi_rand', 'das_min', 'das_max', 'das_avg', 'das_sd',
-                            'das_range', 'das_rand', 'flexibility_max', 'rmsf_med']
+                            'das_range', 'das_rand', 'flexibility_max']
 
         with patch('builtins.input', fake_input):
             Agg = RD.Aggregation(df_measurements=self.demo_measure,

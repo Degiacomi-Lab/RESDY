@@ -370,12 +370,25 @@ class Analysis(object):
                                 aggregation_method=agg_type,
                                 features_to_include=feat_cols)
                 df_plot = agg.aggregate_data()
+                new_feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
+                print(new_feat_cols)
+                if 'arc' in new_feat_cols:
+                    new_feat_cols.remove('arc')
+                    new_feat_cols.append('arc_length')
 
-                if len(feat_cols) <= 9: col_len = 3
-                elif len(feat_cols) <= 16: col_len = 4
-                else: col_len = 5
+                lost_cols = [a for a in feat_cols if a not in new_feat_cols]
+                if lost_cols:
+                    print(f'>> Lost feature columns {", ".join(lost_cols)} when aggregating, '
+                          f'will not be included in the graph output')
 
-                row_len = math.ceil(len(feat_cols) / col_len)
+                if len(new_feat_cols) <= 9:
+                    col_len = 3
+                elif len(new_feat_cols) <= 16:
+                    col_len = 4
+                else:
+                    col_len = 5
+
+                row_len = math.ceil(len(new_feat_cols) / col_len)
 
                 fig, axs = plt.subplots(row_len, col_len)
                 fig.set_figheight(12)
@@ -384,7 +397,7 @@ class Analysis(object):
                 fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0.27, hspace=0.25)
 
                 used_plots = []
-                for i, feat in enumerate(feat_cols):
+                for i, feat in enumerate(new_feat_cols):
                     agg_feature = f'{feat}_{agg_type}'
                     row = math.floor(i / col_len)
                     col = i % col_len
@@ -715,7 +728,7 @@ class Analysis(object):
                     match col_to_keep.lower():
                         case 'new':
                             print(f'Keeping new measurements for {column}')
-                            if column in ['aev', 'aev_legolas']:
+                            if column in ['aev', 'evolution']:
                                 self.df[column] = self.df[column].astype('object')
                             for i, r in self.df.iterrows():
 

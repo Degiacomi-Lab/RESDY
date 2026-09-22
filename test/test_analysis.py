@@ -63,16 +63,14 @@ class Test_Uniprot(unittest.TestCase):
         fake_input = Mock(side_effect=responses.get)
 
         with patch('builtins.input', fake_input):
-            self.A.relative_best(df=pd.read_csv(self.df_measures),
-                                weights=0.5,
+            self.A.relative_best(weights=0.5,
                                 features=['depth', 'sasa', 'propka', 'das', 'curvature'])
-            self.A.relative_best(df=pd.read_csv(self.df_measures),
-                                weights=[0.5, 0.3, 0.1, 0.4],
+            self.A.relative_best(weights=[0.5, 0.3, 0.1, 0.4],
                                 features=['depth', 'sasa', 'propka', 'das', 'curvature'])
 
     def test_plotting(self):
         self.A.plot_feature_histogram(plot_type='single', feature='depth', save_name='hist_depth.svg')
-        self.A.plot_feature_histogram(plot_type='all', save_name='hist_all.svg')
+        self.A.plot_feature_histogram(plot_type='all', agg_type='avg', save_name='hist_all.svg')
         self.A.plot_feature_histogram(plot_type='agg', feature='depth', save_name='hist_agg.svg')
         self.A.plot_feature_violins(features='depth', save_name='violin_depth_allagg.svg')
         self.A.plot_feature_violins(agg_type='all', save_name='violin_all_features_all.svg')

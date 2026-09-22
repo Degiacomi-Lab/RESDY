@@ -106,6 +106,11 @@ class PDB(object):
                 case 'ALL':
                     self.minimise_af = True
                     self.minimise_pdb = True
+                case '':
+                    print('>> Minimisation method left unchanged (\'\'), therefore default '
+                          'method of minimising only AF structures is applied')
+                    self.minimise_af = True
+                    self.minimise_pdb = False
                 case _:
                     print(f'>> Minimisation method given as input (input: {minimise_strucs}) '
                             f'not recognised: options are None, AF, PDB, ALL; Using default '
@@ -745,7 +750,7 @@ class PDB(object):
                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                     aligner.open_gap_score = -11
                     aligner.extend_gap_score = -11
-                    aligner.target_end_gap_score = 0.0
+                    aligner.end_insertion_score = 0.0
                     alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
 
                     res_mapper = {}
@@ -808,7 +813,7 @@ class PDB(object):
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                                     aligner.open_gap_score = -11
                                     aligner.extend_gap_score = -11
-                                    aligner.target_end_gap_score = 0.0
+                                    aligner.end_insertion_score = 0.0
                                     alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
 
                                     for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
@@ -1069,7 +1074,7 @@ class PDB(object):
                 aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                 aligner.open_gap_score = -11
                 aligner.extend_gap_score = -11
-                aligner.target_end_gap_score = 0.0
+                aligner.end_insertion_score = 0.0
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
 
                 res_mapper = {}
@@ -1323,15 +1328,16 @@ class PDB(object):
         '''
         try:
             print(f'>> Minimising structure: {pdb}')
-            M = bb.Molecule()
-            M.import_pdb(pdb, include_hetatm=self.include_hetatm)
-            df_beta = M.data[['chain', 'resid', 'beta']]
+            pdb_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb'
+            pdb_inst = PDBFile(pdb_path)
 
-            af_inst = PDBFile(f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb')
+            M = bb.Molecule()
+            M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
+            df_beta = M.data[['chain', 'resid', 'beta']]
 
             forcefield = ForceField("amber14-all.xml",
                                     "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
-            modeller = Modeller(af_inst.topology, af_inst.positions)
+            modeller = Modeller(pdb_inst.topology, pdb_inst.positions)
             modeller.addHydrogens(forcefield)
             system = forcefield.createSystem(modeller.topology,
                                             nonbondedMethod=NoCutoff)
@@ -1365,7 +1371,7 @@ class PDB(object):
             N.data = N.data.drop(columns=['beta']).merge(df_beta, how='left', on=['chain', 'resid'])
             N.write_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
 
-            print(f'>> Finished minising structure: {pdb}')
+            print(f'>> Finished minimising structure: {pdb}')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
