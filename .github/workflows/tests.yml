@@ -22,12 +22,12 @@ jobs:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up conda
         env:
           KEY_MODELLER : ${{ secrets.KEY_MODELLER }}
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           activate-environment: resdy_test
           environment-file: .github/test_environment.yml

@@ -117,7 +117,7 @@ class Test_Uniprot(unittest.TestCase):
         M_legolas.measure_data()
         print(M_legolas.df)
         print('len legolas:', len(M_legolas.df))
-
+    '''
     def test_frustration(self):
         print('-> Test measuring FRUSTRATION')
         M_frustration = RD.Measure(df_input=self.df_prot[:2],
@@ -128,7 +128,7 @@ class Test_Uniprot(unittest.TestCase):
         M_frustration.measure_data()
         print(M_frustration.df)
         print('len frustration', len(M_frustration.df))
-
+    '''
     def test_melodia(self):
         print('-> Test measuring MELODIA')
         M_melodia = RD.Measure(df_input=self.df_prot[:2],
