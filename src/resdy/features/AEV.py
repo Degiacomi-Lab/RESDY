@@ -4,18 +4,6 @@ import numpy as np
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-try:
-    from ase import Atoms
-    import torch
-    from torchani.models import ANI2x
-    from torchani.aev import AEVComputer
-    from torchani.utils import ChemicalSymbolsToInts
-    aev_packages_available = True
-except Exception as e:
-    aev_packages_available = False
-    print(f'Packages required for AEV calculation are not available, '
-          f'will not be able to calculate AEVs. Error: {e}')
-
 
 class AEV():
     '''
@@ -46,15 +34,29 @@ class AEV():
             any errors from calculating features out to.
         :type error_filename: str
         '''
+
+        try:
+            from ase import Atoms
+            import torch
+            from torchani.models import ANI2x
+            from torchani.aev import AEVComputer
+            from torchani.utils import ChemicalSymbolsToInts
+
+            self.Atoms = Atoms
+            self.torch = torch
+            self.ANI2x = ANI2x
+            self.AEVComputer = AEVComputer
+            self.ChemicalSymbolsToInts = ChemicalSymbolsToInts
+        except ImportError as e:
+            raise ImportError(f'>> Packages required for AEV calculations (ase/torch/torchani) are '
+                              f'not available, aev will be removed from features to calculate. '
+                              f'Error: {str(e)}') from e
+
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
-
-        if not aev_packages_available:
-            raise ImportError('>> Packages required for AEV calculations (ase/torch/torchani) are '
-                              'not available, aev will be removed from features to calculate.')
 
         self.device = None
         self.ANI_model = None
@@ -67,9 +69,9 @@ class AEV():
         '''
         if self.ANI_model is not None:
             return
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.ANI_model = ANI2x(periodic_table_index=True).to(device=self.device)
-        self.species_converter = ChemicalSymbolsToInts(['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
+        self.device = self.torch.device('cuda' if self.torch.cuda.is_available() else 'cpu')
+        self.ANI_model = self.ANI2x(periodic_table_index=True).to(device=self.device)
+        self.species_converter = self.ChemicalSymbolsToInts(['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
 
 
     def calculate(self, path):
@@ -125,7 +127,7 @@ class AEV():
                                                  self.aa_properties['atom_select_names_nonmod'],
                                                  use_resname=True, get_index=True)
 
-            all_coords, idx = M.atomselect('*','*','*', get_index=True)
+            all_coords, _ = M.atomselect('*','*','*', get_index=True)
             list_resids = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
@@ -145,13 +147,13 @@ class AEV():
                 resid = list_resids[lys_idx]
                 temp_atom_species = S.data['atomtype']
                 temp_coords = S.coordinates[0]
-                temp_structure = Atoms(temp_atom_species, temp_coords)
+                temp_structure = self.Atoms(temp_atom_species, temp_coords)
                 aevs = None
 
                 # 2.2: calculate the AEV for the subset of the protein and add this to the output dataframe
                 try:
                     species = self.species_converter(temp_structure.get_chemical_symbols()).unsqueeze(0).to(device=self.device)
-                    ani_coords = torch.tensor(temp_structure.get_positions(), dtype=torch.float32).unsqueeze(0).to(device=self.device)
+                    ani_coords = self.torch.tensor(temp_structure.get_positions(), dtype=self.torch.float32).unsqueeze(0).to(device=self.device)
                     aevs = self.ANI_model.aev_computer(species, ani_coords)
 
                     # match up the position of the lysine of interest to inside the structure cutout
@@ -168,7 +170,7 @@ class AEV():
                 else: aev_to_append = {'Chain': chain, 'Resid': resid, 'aev': aevs}
                 df_aevs = pd.concat([df_aevs, pd.DataFrame([aev_to_append])], ignore_index=True)
 
-        except torch.cuda.OutOfMemoryError:
+        except self.torch.cuda.OutOfMemoryError:
             # potential that calculating the AEVs could overload the gpu, if too much memory, catch this and skip the file
             print(f'AEV calc error: CUDA memory error with file: {path}, skipping')
             if self.record_errors: report_error_to_file('AEV 2', path, 'CUDA memory error with file', self.error_filename)

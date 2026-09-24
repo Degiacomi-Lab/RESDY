@@ -738,19 +738,10 @@ class Analysis(object):
                             print(f'Keeping new measurements for {column}')
                             if column in ['aev', 'evolution']:
                                 self.df[column] = self.df[column].astype('object')
-                            for i, r in self.df.iterrows():
 
-                                protein_code = r['PDB_Code']
-                                chain_value = r["Chain"]
-                                resid_value = r["Resid"]
-
-                                idx = np.where((new_df["PDB_Code"] == protein_code) &
-                                               (new_df["Chain"] == chain_value) &
-                                               (new_df["Resid"].astype(int) == resid_value))
-                                if len(idx[0]) == 0:
-                                    continue
-
-                                self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                            self.df = self.df.drop(columns=[column])
+                            self.df = self.df.merge(new_df['PDB_Code', 'Chain', 'Resid', column],
+                                                    how='left', on=['PDB_Code', 'Chain', 'Resid'])
 
                             proper_answer = True
                         case 'old':
@@ -759,30 +750,15 @@ class Analysis(object):
                         case _:
                             print(f'{col_to_keep} was not recognised')
 
-            num_lines_selfdf = len(self.df)
+            if new_nonoverlap_columns:
+                if column == 'aev':
+                    new_df['aev'] = new_df['aev'].astype('object')
+                elif column == 'aev_legolas':
+                    new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
 
-            for column in new_nonoverlap_columns:
-                print(f'\nAdding new measurement {column} to the dataframe \n')
-                for i, r in self.df.iterrows():
-
-                    protein_code = r['PDB_Code']
-                    chain_value = r["Chain"]
-                    resid_value = r["Resid"]
-
-                    idx = np.where((new_df["PDB_Code"] == protein_code) &
-                                   (new_df["Chain"] == chain_value) &
-                                   (new_df["Resid"].astype(int) == resid_value))
-                    if len(idx[0]) == 0:
-                        continue
-
-                    # account for measurements that have special cases
-                    # aevs - add the list of aevs in one column to the overall dataframe
-                    if column == 'aev':
-                        new_df['aev'] = new_df['aev'].astype('object')
-                    elif column == 'aev_legolas':
-                        new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
-                    self.df.at[i, column] = new_df.loc[idx[0][0], column]
-                    print(f'Progress adding {column} data: {round(((i+1)/num_lines_selfdf)*100, 2)} %\r', end='', flush=True)
+                cols_to_use = ['PDB_Code', 'Chain', 'Resid'] + new_nonoverlap_columns
+                self.df = self.df.merge(new_df[cols_to_use], how='left',
+                                        on=['PDB_Code', 'Chain', 'Resid'])
 
             print(f'\nFinished adding extra measures data to dataframe')
 

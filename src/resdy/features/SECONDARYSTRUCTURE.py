@@ -4,7 +4,7 @@ import pandas as pd
 import biobox as bb
 from Bio.PDB import PDBParser
 from Bio.PDB.DSSP import DSSP
-#from .error_reporting import report_error_to_file
+from .error_reporting import report_error_to_file
 
 class SECONDARYSTRUCTURE():
     '''

@@ -251,7 +251,7 @@ class Measure(object):
                         frustration = FRUSTRATION(include_modified=self.include_mod,
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
-                        self.measures.append(['frustration', frustration.calculate_frustration])
+                        self.measures.append(['frustration', frustration.calculate])
                         frustration_added = True
                 except Exception as e:
                     self.features.remove(m)

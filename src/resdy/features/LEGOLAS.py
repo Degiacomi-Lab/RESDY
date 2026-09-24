@@ -6,15 +6,6 @@ import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-    from dotenv import load_dotenv
-except Exception as e:
-    print(f'Packages required for legolas calculation are not available, '
-          f'will not be able to calculate legolas data. Error: {e}')
-
 
 class LEGOLAS():
     '''
@@ -46,6 +37,20 @@ class LEGOLAS():
         :type error_filename: str
         '''
 
+        try:
+            from ase import Atoms
+            import torch
+            import torchani
+            from dotenv import load_dotenv
+
+            self.Atoms = Atoms
+            self.torch = torch
+            self.torchani = torchani
+            self.load_dotenv = load_dotenv
+        except ImportError as e:
+            raise ImportError(f'Packages required for legolas calculation are not available, '
+                            f'will not be able to calculate legolas data. Error: {e}') from e
+
         self.outdir = outdir
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -55,7 +60,7 @@ class LEGOLAS():
         else:
             self.record_errors = False
 
-        load_dotenv()
+        self.load_dotenv()
         self.legolas_prog = os.getenv('LEGOLAS_PATH')
         if self.legolas_prog is None:
             raise ImportError('Searching for LEGOLAS path returned None, set LEGOLAS_PATH '
@@ -173,5 +178,5 @@ class LEGOLAS():
 
 
 if __name__ == '__main__':
-    nmr = LEGOLAS(outdir='result', include_modified=False)
-    print(nmr.calculate_legolas(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    nmr = LEGOLAS(outdir='demo', include_modified=False)
+    print(nmr.calculate_legolas(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))

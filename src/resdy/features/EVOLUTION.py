@@ -4,16 +4,6 @@ import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-try:
-    import torch
-    import torch.nn as nn
-    import esm
-    esm_packages_available = True
-except Exception as e:
-    esm_packages_available = False
-    print(f'>> Failed to import packages required for esm calculations, '
-          f'will not be able to calculate sequence features based on esm. Error: {e}')
-
 
 class EVOLUTION():
     '''
@@ -46,6 +36,22 @@ class EVOLUTION():
             any errors from calculating features out to.
         :type error_filename: str
         '''
+
+        try:
+            import torch
+            import torch.nn as nn
+            import esm
+
+            self.torch = torch
+            self.nn = nn
+            self.esm = esm
+
+            self.esm_packages_available = True
+        except ImportError as e:
+            self.esm_packages_available = False
+            raise ImportError(f'>> Failed to import packages required for esm calculations, '
+                f'will not be able to calculate sequence features based on esm. Error: {e}') from e
+
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
@@ -61,7 +67,7 @@ class EVOLUTION():
         '''
         Check that the esm package is available, set model loaded to be False.
         '''
-        if not esm_packages_available:
+        if not self.esm_packages_available:
             raise ImportError(f'>> Failed to import the packages required (esm/torch) '
                               f'for esm calculations, esm will be removed from features.')
         self.model_loaded = False
@@ -74,18 +80,18 @@ class EVOLUTION():
         if self.model_loaded:
             return
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.esm2_model_650M, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+        self.device = self.torch.device('cuda' if self.torch.cuda.is_available() else 'cpu')
+        self.esm2_model_650M, self.alphabet = self.esm.pretrained.esm2_t33_650M_UR50D()
         self.esm2_model_650M = self.esm2_model_650M.to(device=self.device)
         self.batch_converter = self.alphabet.get_batch_converter()
         self.esm2_model_650M.eval()
 
-        torch.manual_seed(25)
+        self.torch.manual_seed(25)
         if self.device.type == 'cuda':
-            torch.cuda.manual_seed(25)
-            torch.cuda.manual_seed_all(25)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+            self.torch.cuda.manual_seed(25)
+            self.torch.cuda.manual_seed_all(25)
+        self.torch.backends.cudnn.deterministic = True
+        self.torch.backends.cudnn.benchmark = False
 
         self.model_loaded = True
 
@@ -197,7 +203,7 @@ class EVOLUTION():
                 data = [("1", seq)]
                 batch_labels, batch_strings, batch_tokens = self.batch_converter(data)
                 batch_tokens = batch_tokens.to(device=self.device)
-                with torch.no_grad():
+                with self.torch.no_grad():
                     results = self.esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=False)
                     seq_encode_tokens = results["representations"][33]
                     seq_out = seq_encode_tokens[0, num_add_aa + 1, :]  # this bit of code can be used to extract a direct lysine representation without dimension reduction
