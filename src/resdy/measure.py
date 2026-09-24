@@ -174,6 +174,27 @@ class Measure(object):
         # for parallel measurements
         self.parallel = parallel
         self.num_cores = num_cores
+        self.n_cores_to_use = 1
+        if self.parallel:
+            print('>> Measurements running in parallel')
+            if isinstance(self.num_cores, int):
+                if self.num_cores == 0:
+                    self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+                else:
+                    if self.num_cores <= os.cpu_count():
+                        self.n_cores_to_use = self.num_cores
+                    else:
+                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
+                                f'possible on current setup; defaulting to 0.75 times max possible')
+                        self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+            else:
+                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
+                        f'defaulting to 0.75 times max possible.')
+                self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
+        else:
+            self.n_cores_to_use = 1
+            print('>> Measurements running in series')
+
         self.files_to_analyse = []
         self.parallel_items = {}
 
@@ -378,20 +399,19 @@ class Measure(object):
         return aa_properties
 
 
-
     def _setup_report_errors_file(self):
         '''
         Function to set up the file where errors produced through running the Measure class will be
         written to such that they are easier to look over after running, rather than trawling
         through output.
         '''
-        new_file_name = os.path.join(self.outdir, f'meaures_errors_{date.today()}.txt')
+        new_file_name = os.path.join(self.outdir, f'measures_errors_{date.today()}.txt')
         while os.path.exists(new_file_name):
             if '_no' in new_file_name:
                 error_file_num = int(os.path.splitext(new_file_name)[0].split('_no')[-1])
-                new_file_name = os.path.join(self.outdir, f'measure_errors_{date.today()}_no{(error_file_num + 1)}.txt')
+                new_file_name = os.path.join(self.outdir, f'measures_errors_{date.today()}_no{(error_file_num + 1)}.txt')
             else:
-                new_file_name = os.path.join(self.outdir, f'measure_errors_{date.today()}_no{1}.txt')
+                new_file_name = os.path.join(self.outdir, f'measures_errors_{date.today()}_no{1}.txt')
         with open(new_file_name, 'w') as error_f1:
             error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
         return new_file_name
@@ -407,13 +427,9 @@ class Measure(object):
             case (False, True) | (False, False):
                 # not PDB only and parallel or series:
                 self.measure_dataframe()
-            case (True, False):
-                # PDB only and not parallel
+            case (True, True) | (True, False):
+                # PDB only and parallel or series:
                 self.measure_PDB_only()
-            case (True, True):
-                # PDB only and parallel
-                print('This setup does not currently have a method, please change the setup')
-                return
 
         plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
         if os.path.exists(plddt_record_path):
@@ -432,23 +448,14 @@ class Measure(object):
         PDB_only and in parallel, reducing the number of individual functions that the user will have
         to call themselves. Different to measure_data() as this will restart the measurements from
         final previous point rather than starting again.
-
-        .. rubric:: Example
-
-        ::
-
-            M.restart_measure_data()
         '''
         match (self.PDB_only, self.parallel):
             case (False, False) | (False, True):
-                # (not PDB only and not parallel) or (not PDB only and parallel):
+                # not PDB only and parallel or series
                 self.restart_measure()
-            case (True, False):
-                # PDB only and not parallel
+            case (True, True) | (True, False):
+                # PDB only and parallel or series
                 self.restart_measure_pdb_only()
-            case (True, True):
-                # PDB only and parallel
-                print('This setup does not currently have a method, please change the setup')
 
         self._cleanup_calculation_files()
 
@@ -514,26 +521,6 @@ class Measure(object):
         total_structures = len(files)
         print(f'Total number of structures to analyse: {total_structures}')
 
-        if self.parallel:
-            print('>> Measurements running in parallel')
-            if isinstance(self.num_cores, int):
-                if self.num_cores == 0:
-                    n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
-                else:
-                    if self.num_cores <= os.cpu_count():
-                        n_cores_to_use = self.num_cores
-                    else:
-                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
-                                f'possible on current setup; defaulting to 0.75 times max possible')
-                        n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
-            else:
-                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
-                        f'defaulting to 0.75 times max possible.')
-                n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
-        else:
-            n_cores_to_use = 1
-            print('>> Measurements running in series')
-
         with Manager() as manager:
             lock = manager.Lock()
             items = []
@@ -560,7 +547,7 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
                         df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
                 else:
                     df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items], ignore_index=True)
@@ -620,6 +607,9 @@ class Measure(object):
                         continue
                 else:
                     continue
+
+            if '_cleaned.pdb' in f:
+                continue
 
             if self.only_relaxed:
                 if ('_relaxed' not in f and
@@ -782,9 +772,8 @@ class Measure(object):
                 parts = re.split(r'([\w.,\/-]+)|(\[.+?\])', line)
                 if len(parts) == 0:
                     continue
-                # remove None elemnts from matching and reduce all space values to ''
+
                 parts = [elmnt.strip() for elmnt in parts if elmnt is not None]
-                # remove '' elements from the list
                 parts = [elmnt for elmnt in parts if elmnt != '']
                 parts = parts[1:]
 
@@ -858,10 +847,7 @@ class Measure(object):
 
         # 3. Restart the measure_dataframe() with the new file list
         print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
-        if self.parallel:
-            self.measure_dataframe()
-        else:
-            self.measure_dataframe()
+        self.measure_dataframe()
 
 
     def _combine_dataframes(self, target, to_merge, col_name):
@@ -935,130 +921,183 @@ class Measure(object):
         the data to a csv.
         '''
         if not self.PDB_only:
-            print('Called measure_PDB_only() when running not on PDB_only. Call measure_dataframe() instead or change to run PDB_only.')
+            print('Called measure_PDB_only() when running not on PDB_only. Call '
+                  'measure_dataframe() instead or change to run PDB_only.')
             return 'You have called the wrong method for measuring data, call the general measures function instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
-        tstart_overall = time.time()
-        num_pdb_files = len(self.df_input) + self.progress_index
+        files = [file for file in files if 'pkaani' not in file]
+        self.files_to_analyse = files
 
         self.df_input = self.df_input.drop_duplicates()
         if 'completed' not in self.df_input.columns:
             self.df_input['completed'] = False
 
-        pdb_count = 0
+        with Manager() as manager:
+            lock = manager.Lock()
+            items = []
+            for pdb_idx, row in self.df_input.iterrows():
 
-        for pdb_idx, row in self.df_input.iterrows():
-            pdb_code = row['PDB_Code']
+                if row['completed']:
+                    continue
 
-            if row['completed']:
+                pdb_code = row['PDB_Code']
+                items.append([pdb_code, lock])
+
+            base_cols = ['PDB_Code', 'Chain', 'Resid']
+            df_parallel = pd.DataFrame()
+
+            gpu_feats = ['aev', 'evolution', 'legolas']
+            gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
+            cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
+
+            self.measures = cpu_measurements
+            if cpu_measurements:
+                if self.parallel:
+                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+                        df_parallel = pd.concat(pool.starmap(self._measure_file_pdbonly, items, chunksize=4), ignore_index=True)
+                else:
+                    df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lk) for file_dets, lk in items], ignore_index=True)
+
+            self.measures = gpu_measurements
+            if gpu_measurements:
+                df_gpu = pd.concat([self._measure_file_pdbonly(d, lock) for d, lock in items], ignore_index=True)
+
+                if df_parallel.empty:
+                    df_parallel = df_gpu
+                else:
+                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in df_parallel.columns and a not in base_cols])
+                    df_parallel = df_parallel.merge(df_gpu, how='left', on=[a for a in base_cols if a in df_gpu.columns])
+
+            if not cpu_measurements and not gpu_measurements:
+                print('>> No measurements are registered, nothing to calculate')
+
+            self.measures = cpu_measurements + gpu_measurements
+            self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
+
+        try:
+            self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
+            print('\n>> Removed duplicates from measurement dataframe.')
+        except Exception as e:
+            print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
+            if self.report_errors:
+                self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
+
+
+
+    def _measure_file_pdbonly(self, pdb_code, lock):
+        '''
+        Take a file and calculate the required measurements for this. Return the dataframe of the
+        calculations to the overall self.df. This is the worked for measure_PDB_only.
+
+        :param file_details: list of details for the file that has been selected to be calculated,
+            taking the form of [pdb_code]
+        :type file_details: list
+        :param lock: lock used to stop processes writing to output files and dataframes at the same
+            time
+        :type lock: multiprocessing manager lock
+        '''
+        file_df_list = []
+        for f in self.files_to_analyse:
+            if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
                 continue
 
-            pdb_count += 1
-
-            # calculate features values from all PDB files associated with specific DataFrame entry
-            for f in files:
-                if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
-                    continue
-                
-                if self.only_relaxed:
-                    f_stem = os.path.splitext(os.path.basename(f))[0]
-                    if '_relaxed' not in f and os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
-                        continue
-
-                if f in self.pdb_only_files_to_ignore:
+            if self.only_relaxed:
+                f_stem = os.path.splitext(os.path.basename(f))[0]
+                if '_relaxed' not in f and os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
                     continue
 
-                tstart = time.time()
-                print(f"\n> File: {f}")
+            if f in self.pdb_only_files_to_ignore:
+                continue
 
-                columns = ['PDB_Code', 'Chain', 'Resid']
+            terminal_out_statements = []
+            tstart = time.time()
+            terminal_out_statements.append(f"\n> File: {f}")
+
+            columns = ['PDB_Code', 'Chain', 'Resid']
+            if self.include_mod:
+                columns.append('Modified')
+            df_currentfile = pd.DataFrame(columns=columns)
+
+            try:
+                M = bb.Molecule()
+                M.import_pdb(f, include_hetatm=True)
+            except Exception as e:
+                terminal_out_statements.append(f'Failed to create biobox molecule for file {f} with error: {e}')
+                if self.report_errors:
+                    self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
+                self.wrong_pdb_file.append(f)
+                continue
+
+            if self.include_mod:
+                _, idxs = M.atomselect("*", (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
+                                        ['CA'], get_index=True, use_resname=True)
+            else:
+                _, idxs = M.atomselect("*",  self.aa_properties['non_modified_codes'],
+                                        ['CA'], get_index=True, use_resname=True)
+
+            for i in idxs:
+                data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
+                    'Chain': M.data['chain'].values[i],
+                    'Resid': M.data['resid'].values[i]})
+
                 if self.include_mod:
-                    columns.append('Modified')
-                df_currentfile = pd.DataFrame(columns=columns)
+                    data['Modified'] = (M.data['resname'].values[i]
+                                        in self.aa_properties['modified_codes'])
 
+                df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+
+            terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
+
+            for meas in self.measures:
+                terminal_out_statements.append(f">> evaluating {meas[0]}...")
                 try:
-                    M = bb.Molecule()
-                    M.import_pdb(f, include_hetatm=True)
+                    out_print_trap = io.StringIO()
+                    with redirect_stdout(out_print_trap):
+                        result = meas[1](f)
+                    terminal_out_statements.append(out_print_trap.getvalue())
+                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
+
                 except Exception as e:
-                    print(f'Failed to create biobox molecule for file {f} with error: {e}')
                     if self.report_errors:
-                        self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
-                    self.wrong_pdb_file.append(f)
+                        self._report_error_to_file('Meas feat error', f'measure file parallel; feature {meas[0]}', str(e))
+                    terminal_out_statements.append(f"ERROR: {e}")
                     continue
 
-                if self.include_mod:
-                    _, idxs = M.atomselect("*", (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
-                                           ['CA'], get_index=True, use_resname=True)
-                else:
-                    _, idxs = M.atomselect("*",  self.aa_properties['non_modified_codes'],
-                                           ['CA'], get_index=True, use_resname=True)
+            processing_time = round((time.time()-tstart), 2)
+            terminal_out_statements.append(f">> file processed in {processing_time} sec.")
 
-                for i in idxs:
-                    data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
-                        'Chain': M.data['chain'].values[i],
-                        'Resid': M.data['resid'].values[i]})
-
-                    if self.include_mod:
-                        data['Modified'] = (M.data['resname'].values[i]
-                                            in self.aa_properties['modified_codes'])
-
-                    df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
-
-                print(f">> {len(df_currentfile)} lysines of interest found")
-
-                for meas in self.measures:
-                    print(f">> evaluating {meas[0]}...")
-                    try:
-                        result = meas[1](f)
-                        df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
-
-                    except Exception as e:
-                        if self.report_errors:
-                            self._report_error_to_file(f'Error adding the measurements for file {f} to the dataframe', 'measure pdb only', str(e))
-                        print(f"ERROR adding the measurements for file {f} to the dataframe: {e}")
-                        continue
-
-                processing_time = round((time.time()-tstart), 2)
-                print(f">> file processed in {processing_time} sec.")
+            with lock:
+                for statement in terminal_out_statements:
+                    print(statement)
 
                 if self.activate_log:
                     if df_currentfile.empty is False:
-                        try:
-                            # display settings for df are changed while writing and reverted after
-                            pd.set_option('display.max_colwidth', None,
-                                        'display.width', None,
-                                        'max_seq_items', None,
-                                        "display.max_rows", None)
-                            try:
-                                self.logger.info(df_currentfile)
-                                self.logger.info('--------------------------------------------------------------------------')
-                            except Exception as e:
-                                print(f'Error in logging: {e}')
 
-                            pd.reset_option('display.max_colwidth')
-                            pd.reset_option('display.width')
-                            pd.reset_option('max_seq_items')
-                            pd.reset_option('display.max_rows')
+                        pd.set_option('display.max_colwidth', None,
+                                    'display.width', None,
+                                    'max_seq_items', None,
+                                    "display.max_rows", None)
+                        try:
+                            self.logger.info(df_currentfile)
+                            self.logger.info('--------------------------------------------------------------------------')
                         except Exception as e:
                             if self.report_errors:
                                 self._report_error_to_file('logging error', 'measure pdb only', str(e))
-                            print(f'Error in logging measurements: {e}')
+                            print(f'Error in logging measurement: {e}')
 
-                if not df_currentfile.empty:
-                    self.df = pd.concat([self.df, df_currentfile], ignore_index=True)
+                        pd.reset_option('display.max_colwidth')
+                        pd.reset_option('display.width')
+                        pd.reset_option('max_seq_items')
+                        pd.reset_option('display.max_rows')
 
-            self.df_input.at[pdb_idx, 'completed'] = True
+            if not df_currentfile.empty:
+                file_df_list.append(df_currentfile)
 
-            try:
-                avg_time_per_file = (time.time() - tstart_overall) / pdb_count
-                time_remaining = datetime.timedelta(seconds=int(round((len(self.df_input) - pdb_count) * avg_time_per_file, 0)))
-                perc_prog_measure = round(((pdb_count + self.progress_index)/num_pdb_files)*100, 2)
-                print(f'>> Progress calculating measurements: {perc_prog_measure}%. Predicted time remaining: {time_remaining}s \r', end='', flush=True)
-            except Exception as e:
-                if self.report_errors:
-                    self._report_error_to_file('broken progress updater', 'measure pdb only', str(e))
-                print(f'>> Broken progress updater: {e} \r', end='', flush=True)
+        if not file_df_list:
+            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid'])
+
+        return pd.concat(file_df_list, ignore_index=True)
 
 
     def restart_measure_pdb_only(self, log_path='measure_log.txt'):
@@ -1077,11 +1116,6 @@ class Measure(object):
         :param log_path: The name of the measures log file By default takes the name
             'measures_log.txt'
         :type log_path: str
-
-        .. todo::
-
-           Remove the discarded measurement from measures_log.txt. Currently this does not matter much,
-           as the entry is removed with the duplicates later on (GW, 14.01.25).
         '''
 
         if not self.PDB_only:
@@ -1090,6 +1124,7 @@ class Measure(object):
 
         print('>> Preparing to restart measurements on PDB only')
         # 1. Analyse the measures log file to create a list of files that were analysed
+        tmp_log_path = os.path.join(self.outdir, f'{log_path.split('.')[0]}_tmp.txt')
         log_path = os.path.join(self.outdir, log_path)
         print(f'>> Finding measured proteins from log file: {log_path}')
         proteins_completed = []
@@ -1098,9 +1133,10 @@ class Measure(object):
 
         if num_lines == 0:
             print('>> No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.')
-            return 'No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.'
+            return
 
         curr_line = 0
+        final_prot_start_line = None
         with open(file=log_path, mode='r') as lpf:
             for line in lpf:
                 curr_line += 1
@@ -1110,8 +1146,18 @@ class Measure(object):
                 protein_code = parts[1].split('/')[-1]
                 proteins_completed.append(protein_code)
                 percent_prog = round((curr_line/num_lines)*100, 2)
+                final_prot_start_line = curr_line
                 print(f'Progress analysing log file: {percent_prog} %\r', end='', flush=True)
         print('>> Measured proteins recovered from log file')
+
+        curr_line = 0
+        with open(file=log_path, mode='r') as lpf, open(file=tmp_log_path, mode='w') as npf:
+            for line in lpf:
+                curr_line += 1
+                if line < final_prot_start_line:
+                    npf.write(line)
+        os.rename(src=tmp_log_path, dst=log_path)
+
 
         # 2. remove the last protein from list incase it wasn't completed fully
         final_protein = proteins_completed[-1]
@@ -1146,8 +1192,10 @@ class Measure(object):
         new_len_df_input = len(self.df_input)
         lines_df_input_removed = old_len_df_input - new_len_df_input
         files_left_to_calc = len(self.df_input) - len(self.pdb_only_files_to_ignore)
-        print(f'>> {lines_df_input_removed} exact matches in PDB codes removed from the input list that have already been calculated.')
-        print(f'>> {len(self.pdb_only_files_to_ignore)} files to ignore in measurements that have already been calculated.')
+        print(f'>> {lines_df_input_removed} exact matches in PDB codes removed from the input '
+              f'list that have already been calculated.')
+        print(f'>> {len(self.pdb_only_files_to_ignore)} files to ignore in measurements that '
+              f'have already been calculated.')
         print(f'>> Continuing measurements. {files_left_to_calc} proteins to measure.')
         self.measure_PDB_only()
 

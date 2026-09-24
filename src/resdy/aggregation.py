@@ -14,7 +14,7 @@ class Aggregation:
     with only one set of measurements per lysine residue according to the aggregation method.
     '''
 
-    def __init__(self, df_measurements, outdir='reuslt', aggregation_method='minmax',
+    def __init__(self, df_measurements, outdir='result', aggregation_method='minmax',
                  features_to_include=['all'], aev_red_method='pca',
                  num_sd_aev_features=100, include_chain=False,
                  max_feature_nan_fraction=0.5, get_nan_df=False):

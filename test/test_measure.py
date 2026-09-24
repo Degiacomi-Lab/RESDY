@@ -6,7 +6,7 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
-class Test_Uniprot(unittest.TestCase):
+class Test_Measure(unittest.TestCase):
     def setUp(self):
         print('-> Setting up measures tests')
         self.outdir = 'demo'

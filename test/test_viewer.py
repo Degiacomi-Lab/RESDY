@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
-class Test_Uniprot(unittest.TestCase):
+class Test_Viewer(unittest.TestCase):
     def setUp(self):
         self.outdir = 'demo'
         self.df_input = f'{self.outdir}{os.sep}demo_input.csv'
