@@ -45,7 +45,7 @@ class PDB(object):
                  PDB_only=False, include_hetatm=False,
                  resnames_of_interest = ['LYS'], minimise_strucs='',
                  remove_all_modifications=False,
-                 num_cores=0):
+                 num_cores=0, max_nmr_conformers=''):
         '''
         Initialise the PDB class.
 
@@ -85,6 +85,11 @@ class PDB(object):
             available will be used. Otherwise it will try and use the number of cores given
             if this is possible.
         :type num_cores: int
+        :param max_nmr_conformers: The maximum number of conformers you would like splitting out
+            from the original pdb file. This will take the first n conformers through to curated
+            structures. Default is no cap and will curate all. '' or None will also take all
+            while an integer will limit.
+        :type max_nmr_conformers: int
         '''
 
         self.outdir = outdir
@@ -124,6 +129,24 @@ class PDB(object):
         if (self.minimise_af or self.minimise_pdb) and not openmm_available:
             raise ImportError('Minimisation of structures requested but openmm not available, '
                               'either install openmm or change minimise_strucs parameter to \'\'')
+
+        if isinstance(max_nmr_conformers, int):
+            self.max_nmr_conformers = max_nmr_conformers
+        elif isinstance(max_nmr_conformers, str):
+            if max_nmr_conformers == '':
+                self.max_nmr_conformers = None
+            else:
+                try:
+                    self.max_nmr_conformers = int(max_nmr_conformers)
+                except Exception as e:
+                    print(f'>> Could not infer the max number of nmr conformers desired with '
+                          f'input value {max_nmr_conformers}, taking all conformers as '
+                          f'default; Error: {e}')
+        else:
+            if max_nmr_conformers != None:
+                print(f'>> Unknown option given as input for max_nmr_conformers '
+                      f'({max_nmr_conformers}), taking all conformers as default.')
+            self.max_nmr_conformers = None
 
         self.curated_dir = os.path.join(outdir, "curated")
         if not os.path.exists(self.curated_dir):
@@ -179,11 +202,6 @@ class PDB(object):
         :param PDB_only: run the curation based on pdb files alone without curating for full uniprot
             codes
         :type PDB_only: str
-
-        .. todo::
-
-           Consider inferring the PDB_only state from the format of the measures dataframe
-           (GW, 30.07.26).
         '''
         if outdir == '':
             outdir = os.path.dirname(fname) if self.outdir == '' else self.outdir
@@ -193,8 +211,6 @@ class PDB(object):
         self.raw_dir = os.path.join(outdir, 'conformations')
         os.makedirs(self.curated_dir, exist_ok=True)
         os.makedirs(self.raw_dir, exist_ok=True)
-
-        self.PDB_only = PDB_only
         self.gap = gap
 
         try:
@@ -204,6 +220,20 @@ class PDB(object):
 
         except Exception as e:
             print(f"Could not load csv file, error: {str(e)}")
+
+        if isinstance(PDB_only, bool):
+            self.PDB_only = PDB_only
+        else:
+            print(f'>> Value given for PDB_only run was not recognised as bool: {PDB_only}; '
+                    f'Will try and infer state from the dataframe given.')
+            if self.df.columns == ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']:
+                self.PDB_only = False
+            elif self.df.columns == ['PDB_Code']:
+                self.PDB_only = True
+            else:
+                raise ValueError('>> Could not setup PDB_only settings from the given dataframe. '
+                                 'Please run again and enter either True/False on PDB_only to '
+                                 'determine method for continuing.')
 
 
     def gather_proteins(self, uniprot_df, skip_if_found=True):
@@ -881,7 +911,6 @@ class PDB(object):
         :type pdb: str
         '''
 
-        #define the name format which will be followed for each file.
         number = 1
         name = f'{pdb}-alt-{str(number)}.pdb'
 
@@ -907,21 +936,17 @@ class PDB(object):
         elif endmdl_instances:
 
             print(">> Alternate model(s) found. Splitting...")
-
-            #First it opens the clean file in the conformations folder and opens a new folder to write in
             f = open(path)
 
             path_rename = os.path.join(self.raw_dir, name)
             f_write = open(path_rename, 'w')
 
-            #Next it writes the new file.
-            #It includes every line until it gets to 'ENDMDL', where it opens a new file to write in.
-            #The process stops when it gets to 'MASTER'
             for line in f:
+
                 try:
                     line = str(line)
 
-                    if re.search('^END\s*$', line):
+                    if re.search(r'^END\s*$', line):
                         f.close()
                         f_write.write(line)
                         f_write.close()
@@ -933,14 +958,20 @@ class PDB(object):
                         f_write.write(line)
                         f_write.close()
                         number = number + 1
-                        name = pdb + '-alt-' + str(number) + '.pdb'
 
+                        if number > self.max_nmr_conformers:
+                            f_write.close()
+                            f.close()
+                            os.remove(path)
+                            break
+
+                        name = pdb + '-alt-' + str(number) + '.pdb'
                         path_rename = os.path.join(self.raw_dir, name)
                         f_write = open(path_rename, 'w')
 
                     else:
                         f_write.write(line)
-                except Exception as e:
+                except Exception:
                     continue
 
             f_write.close()

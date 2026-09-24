@@ -121,6 +121,7 @@ class FLEXIBILITY():
                 std_beta = M.data.loc[M.data['MAD'] <= 3.5, 'beta'].std()
 
             M.data['normalised_beta'] = (M.data['beta'] - mean_beta) / std_beta
+            M.data.loc[M.data['MAD'] > 3.5, 'normalised_beta'] = np.nan
 
             for lys_res, lys_chain in zip(lys_res_nums, list_chains):
                 try:

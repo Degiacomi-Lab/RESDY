@@ -78,7 +78,7 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
         if (df_plddt_already['PDB_Code'] == af_code_full).any():
             print(f'>> AF PLDDT values for {af_code_full} have already been recorded to {plddt_file_path}, not repeating')
             return dict(zip(df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Chain'].astype(str) +
-                            df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Resid'].astype(str) +
+                            df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Resid'].astype(str),
                             df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'PLDDT']))
 
     plddt_out_file = open(plddt_file_path, 'a', newline='')

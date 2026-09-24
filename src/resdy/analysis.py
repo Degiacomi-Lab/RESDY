@@ -208,7 +208,7 @@ class Analysis(object):
 
 
     def plot_feature_histogram(self, plot_type='all', feature='', agg_type='', uniprot='',
-                               chain='', resid='', save_name=''):
+                               chain='', resid='', save_name='', show_graph=True):
         '''
         Create a basic plot showing the distribution of values for the specified feature
         across the set of measurements passed into the analysis class. An aggregation
@@ -238,9 +238,12 @@ class Analysis(object):
         :type resid: str, optional
         :param save_name: File name to save the histogram to.
         :type save_name: str, optional
+        :param show_graph: Toggleable option for whether to show the graph as a popup.
+        :type show_graph: bool, optional
         '''
         try:
             plt.clf()
+            plt.close()
         except Exception:
             pass
 
@@ -479,11 +482,12 @@ class Analysis(object):
         if save_name != '':
             plt.savefig(save_name)
 
-        plt.show()
+        if show_graph:
+            plt.show()
 
 
     def plot_feature_violins(self, features='', agg_type='', uniprot='',
-                               chain='', resid='', save_name=''):
+                               chain='', resid='', save_name='', show_graph=True):
         '''
         Create a basic plot showing the distribution of values for the specified feature
         across the set of measurements passed into the analysis class. An aggregation
@@ -508,9 +512,12 @@ class Analysis(object):
         :type resid: str, optional
         :param save_name: File name to save the histogram to.
         :type save_name: str, optional
+        :param show_graph: Toggleable option for whether to show the graph as a popup.
+        :type show_graph: bool, optional
         '''
         try:
             plt.clf()
+            plt.close()
         except Exception:
             pass
 
@@ -639,7 +646,8 @@ class Analysis(object):
         if save_name != '':
             plt.savefig(save_name)
 
-        plt.show()
+        if show_graph:
+            plt.show()
 
 
     def get_outliers(self, uniprot_entry, resid, feature, whis = 1.5):
