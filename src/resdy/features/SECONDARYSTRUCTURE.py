@@ -88,6 +88,7 @@ class SECONDARYSTRUCTURE():
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             #create temporary pdb file with headers to satisfy dssp
+            tmp_file_name = path
             with open(file=path, mode='r') as orig_pdb:
                 orig_lines = orig_pdb.readlines()
 
@@ -151,11 +152,12 @@ class SECONDARYSTRUCTURE():
             df_ss = df_ss.assign(**{'secondarystructure': sec_structure_list})
             df_ss = df_ss.iloc[idx_atom_interest]
 
-            os.remove(path=tmp_file_name)
+            if tmp_file_name != path and os.path.exists(tmp_file_name):
+                os.remove(path=tmp_file_name)
 
         except Exception as e:
-            if os.path.exists(tmp_file_name):
-                os.remove(tmp_file_name)
+            if tmp_file_name != path and os.path.exists(tmp_file_name):
+                os.remove(path=tmp_file_name)
             if self.record_errors: report_error_to_file('SECONDARYSTRUCTURE 1', path, str(e), self.error_filename)
             print(f'SECONDARYSTRUCTURE Calculation: 1 - could not calculate secondary structure for file {path}: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'secondarystructure'])

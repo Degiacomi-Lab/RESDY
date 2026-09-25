@@ -50,6 +50,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.coveragerc
 
 # Translations
 *.mo
@@ -91,15 +92,6 @@ ipython_config.py
 #   install all needed dependencies.
 #Pipfile.lock
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
 
 # Environments
 .env
@@ -110,9 +102,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
 
 # Rope project settings
 .ropeproject
@@ -125,8 +114,6 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
-.pyre/
 
 # project-specific
 result/
@@ -159,22 +146,15 @@ gw*
 
 
 # Temporary files to ignore
-analyse_charge_data.py
-3d_seq_logo_creator.py
-sequence_logo_creator*
-sequence_secondary_structure.py
-test_find_broken_curated_files.py
 model_output_graphs/
 Demo/
-Demo_test/
-feature_analysis_graphs/
 *_test/
 .vscode/
-*pnas*
 pred_tracking*
 feature_ranking*
 temp*
-test*
 measures_*
 *.svg
 *.png
+test/curated/
+test/conformations/

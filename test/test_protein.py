@@ -21,7 +21,8 @@ class Test_Uniprot(unittest.TestCase):
                            parallel=self.parallel,
                            PDB_only=self.PDB_only,
                            include_hetatm=self.include_hetatm,
-                           resnames_of_interest=self.resnames_of_interest)
+                           resnames_of_interest=self.resnames_of_interest,
+                           max_nmr_conformers=3)
 
     def test_downloads(self):
         self.PDB.download_pdb('1PAE')
@@ -32,9 +33,9 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_clean_split_KCXmut(self):
         # test KCX to LYS mutation
-        self.PDB.clean_and_split_pdb('13LD', 'P10724')
-        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'))
-        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb')
+        self.PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb'))
+        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb')
         self.assertFalse(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
 
     def test_clean_split_SECmut(self):
@@ -74,6 +75,7 @@ class Test_Uniprot(unittest.TestCase):
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
     def test_auxiliary(self):
+        # test all other random functions from protein class
         if not os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'):
             self.PDB.clean_and_split_pdb('13LD', 'P10724')
         self.PDB.rewrite_pdb(path=f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb')
@@ -85,8 +87,7 @@ class Test_Uniprot(unittest.TestCase):
         self.PDB.df = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains'])
 
     def test_minimisation(self):
-        # AF-P40616-F1 (181 residues) rather than AF-P0CG48-F1 (685): minimisation uses
-        # implicit solvent with NoCutoff, so cost grows with the square of the atom count.
+        # test the minimisation of the protein structure with openmm
         code = 'AF-P40616-F1-model_v6'
         af.download_AF_struc(code, outfolder=self.outdir)
         self.PDB.apply_minimisation(code, max_iterations=10)

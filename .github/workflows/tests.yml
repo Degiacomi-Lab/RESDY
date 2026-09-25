@@ -9,26 +9,25 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         include:
-          # test_measure is ~8 min on its own (test_evolution alone is ~6.5 min
-          # of CPU inference), so it runs beside the rest rather than before it.
           - group: measure
+          - group: protein
           - group: rest
     defaults:
       run:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up conda
         env:
           KEY_MODELLER : ${{ secrets.KEY_MODELLER }}
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           activate-environment: resdy_test
           environment-file: .github/test_environment.yml
@@ -44,6 +43,15 @@ jobs:
         if: matrix.group == 'measure'
         run: |
           python test/test_measure.py
+
+      - name: Test Protein
+        if: matrix.group == 'protein'
+        run: |
+          python test/test_protein.py
+      - name: Test Patcher
+        if: ${{ matrix.group == 'protein' && !cancelled() }}
+        run: |
+          python test/test_patcher.py
 
       - name: Test Uniprot
         if: matrix.group == 'rest'
@@ -65,11 +73,3 @@ jobs:
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_analysis.py
-      - name: Test Protein
-        if: ${{ matrix.group == 'rest' && !cancelled() }}
-        run: |
-          python test/test_protein.py
-      - name: Test Patcher
-        if: ${{ matrix.group == 'rest' && !cancelled() }}
-        run: |
-          python test/test_patcher.py

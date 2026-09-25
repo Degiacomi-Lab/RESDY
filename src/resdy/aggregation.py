@@ -1,3 +1,4 @@
+import os
 import random
 from ast import literal_eval
 import numpy as np
@@ -13,15 +14,17 @@ class Aggregation:
     with only one set of measurements per lysine residue according to the aggregation method.
     '''
 
-    def __init__(self, df_measurements, aggregation_method='minmax',
+    def __init__(self, df_measurements, outdir='result', aggregation_method='minmax',
                  features_to_include=['all'], aev_red_method='pca',
                  num_sd_aev_features=100, include_chain=False,
-                 get_nan_df=False):
+                 max_feature_nan_fraction=0.5, get_nan_df=False):
         '''
         Initialisation of the Aggregation class.
 
         :param df_measurements: The dataframe of measurements which need to be aggregated for use
         :type df_measurements: pandas.DataFrame
+        :param outdir: Name of the directory to write any data to
+        :type outdir: str
         :param aggregation_method: The aggregation method chosen to reduce the measurements into a
             usable format for training on. Options are:
 
@@ -66,6 +69,10 @@ class Aggregation:
             aggregate on 'Uniprot_Entry', 'Chain', 'Resid' else will aggregate on 'Uniprot_Entry',
             'Resid' (default)
         :type include_chain: bool, optional
+        :param max_feature_nan_fraction: The max fraction of values in a feature column that would
+            allow a feature to remain in the measures dataframe for aggregation. If set to 1.0 then
+            the feature will be kept and all rows containing NaN will be removed before aggregation.
+        :type max_feature_nan_fraction: float
         :param get_nan_df: Option to create a dataframe (saved as csv) which contains all the rows
             that are being removed when aggregating, this allows curation of the data being removed
             for investigations into potential problems.
@@ -81,12 +88,15 @@ class Aggregation:
         else:
             self.features_to_include = features_to_include
 
+        self.outdir = outdir
+        os.makedirs(outdir, exist_ok=True)
         self.aggregation_method = aggregation_method
         self.aev_red_method = aev_red_method
         self.num_sd_aev_features = num_sd_aev_features
         self.include_chain = include_chain
         self.get_nan_df = get_nan_df
         self.df_agg = pd.DataFrame()
+        self.max_feature_nan_fraction = max_feature_nan_fraction
 
         self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
                                  'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
@@ -116,8 +126,8 @@ class Aggregation:
                   f'input files, will not be included: {cols_removed}')
         self.df_measurements = self.df_measurements[cols_required + self.features_to_include]
 
-        if 'Method' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Method')
-        if 'Resolution' in self.df_measurements.columns: self.df_measurements = self.df_measurements.drop(columns='Resolution')
+        self.meta_data_cols = [a for a in ['Method', 'Resolution'] if a in self.df_measurements.columns]
+        self.features_to_include = [a for a in self.features_to_include if a not in self.meta_data_cols]
 
         print('>> Finding numbers of na values present in each feature column in the dataframe')
         always_na_cols = []
@@ -135,10 +145,23 @@ class Aggregation:
         len_before_df = len(self.df_measurements)
 
         if self.get_nan_df:
-            df_nan = self.df_measurements[self.df_measurements[self.features_to_include].isna()]
-            df_nan.to_csv('measures_nan_feature_data_removed.csv')
+            df_nan = self.df_measurements[self.df_measurements[self.features_to_include].isna().any(axis=1)]
+            df_nan.to_csv(f'{self.outdir}{os.sep}measures_nan_feature_data_removed.csv', index=False)
+            print(f'>> Wrote {len(df_nan)} rows carrying a NaN of data which have been removed from the '
+                  f'aggregation data to \'measures_nan_feature_data_removed.csv\'')
 
         na_per_feature = {c: int(self.df_measurements[c].isna().sum()) for c in self.features_to_include}
+        n_meas = len(self.df_measurements)
+        sparse_features = [c for c, k in na_per_feature.items() if n_meas and
+                                k / n_meas > self.max_feature_nan_fraction]
+        if sparse_features:
+            print(f'>> Features {", ".join(sparse_features)} are missing values on more than '
+                  f'{self.max_feature_nan_fraction:.0%} of rows; dropping the features instead '
+                  f'of the rows. If you would like to keep the feature and get rid of the rows '
+                  f'pass 1.0 as the value for max_feature_nan_fraction.')
+            self.features_to_include = [feat for feat in self.features_to_include
+                                        if feat not in sparse_features]
+
         keep = self.df_measurements.dropna(subset=self.features_to_include)
         del_lysines = (self.df_measurements[self.lys_key].drop_duplicates().shape[0] - keep[self.lys_key].drop_duplicates().shape[0])
         if len_before_df and keep.empty:
@@ -293,11 +316,11 @@ class Aggregation:
         nothing to the model except noise.
         '''
         print('>> Removing null AEV columns...')
-        num_cols_to_keep = sum((self.df_measurements != 0).any(axis=0))
         aev_col_names = [a for a in list(self.df_measurements.columns) if 'AEV_' in a]
         cols_to_remove = [a for a in aev_col_names if (self.df_measurements[a] == 0).all()]
         self.df_measurements = self.df_measurements.drop(columns=cols_to_remove, axis=0)
-        print(f'>> Removed {len(cols_to_remove)} null AEV columns, {num_cols_to_keep} AEV columns left.')
+        print(f'>> Removed {len(cols_to_remove)} null AEV columns, '
+              f'{len(aev_col_names) - len(cols_to_remove)} AEV columns left.')
 
 
     def _prepare_vif_aev(self):
@@ -358,17 +381,18 @@ class Aggregation:
         if 'aev' in self.features_to_include or 'evolution' in self.features_to_include:
             self._reduce_aev_dimensions()
 
-        for (entry, resid), df_query in self.df_measurements.groupby(self.lys_key):
+        for row_key, df_query in self.df_measurements.groupby(self.lys_key):
+            if not isinstance(row_key, tuple):
+                row_key = (row_key,)
             df_query = df_query.reset_index(drop=True)
             if len(set(df_query['class'])) != 1:
-                print(f'>> Not all instances of resid assigned to same class (instances: {list(set(df_query["class"]))}), '
-                      f'using class -1 instead: Uniprot: {entry}, Resid: {resid}')
+                print(f'>> Not all instances of resid assigned to same class (instances: '
+                      f'{list(set(df_query["class"]))}), using class -1 instead')
                 class_val = -1
             else:
                 class_val = df_query['class'].iloc[0]  # take first value of class as overall class for resid
-            data = {'Uniprot_Entry': entry,
-                    'Resid': resid,
-                    'class': class_val}
+            data = dict(zip(self.lys_key, row_key))
+            data['class'] = class_val
             features = [a for a in self.features_to_include if a not in self.non_feature_cols]
             for feature in features:
                 if feature == 'aev':
@@ -389,8 +413,13 @@ class Aggregation:
                         data[feat + '_sd'] = round(df_query[feat].std(ddof=0), 2)
                         data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
                 elif feature == 'evolution':
-                    for feat in [a for a in df_query.columns if 'EVL_' in a]:
-                        data[feat] = df_query.loc[df_query['Method'] == 'Predicted', feat].iloc[0]
+                    pred_query = df_query[df_query.get('Method', pd.Series(dtype=object)) == 'Predicted']
+                    if not pred_query.empty:
+                        for feat in [a for a in df_query.columns if 'EVL_' in a]:
+                            data[feat] = pred_query[feat].iloc[0]
+                    else:
+                        for feat in [a for a in df_query.columns if 'EVL_' in a]:
+                            data[feat] = df_query[feat].iloc[0]
 
                 else:
                     data[feature + '_min'] = round(float(df_query[feature].min()), 2)
@@ -468,7 +497,7 @@ class Aggregation:
         :param outname: the name of the csv file that the output is written to
         :type outname: str
         '''
-        self.df_agg.to_csv(outname, index_label=False, index=False)
+        self.df_agg.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
 if __name__ == "__main__":

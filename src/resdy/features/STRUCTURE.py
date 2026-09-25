@@ -2,14 +2,6 @@ import os
 import pandas as pd
 from .error_reporting import report_error_to_file
 
-try:
-    import melodia_py as mel
-    melodia_packages_available = True
-except Exception as e:
-    melodia_packages_available = False
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
-
-
 
 class STRUCTURE():
     '''
@@ -43,6 +35,14 @@ class STRUCTURE():
         :type error_filename: str
         '''
 
+        try:
+            import melodia_py as mel
+            self.mel = mel
+        except ImportError as e:
+            print(f'>> Packages required for melodia calculations (melodia_py) are '
+                f'not available, melodia will be removed from features to calculate. '
+                f'Error: {str(e)}')
+
         self.melodia_features = melodia_features
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -54,9 +54,6 @@ class STRUCTURE():
         if self.melodia_features == ['all']:
             self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
 
-        if not melodia_packages_available:
-            raise ImportError('>> Packages required for melodia calculations (melodia_py) are '
-                              'not available, melodia will be removed from features to calculate.')
 
     def calculate(self, path):
         '''
@@ -81,7 +78,7 @@ class STRUCTURE():
         '''
         # Melodia 1 - Calculating geometry using melodia-py
         try:
-            melodia_results = mel.geometry_from_structure_file(path)
+            melodia_results = self.mel.geometry_from_structure_file(path)
             if isinstance(melodia_results, pd.Series):
                 melodia_results = melodia_results.to_frame().T
 

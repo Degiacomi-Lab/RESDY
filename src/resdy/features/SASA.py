@@ -61,11 +61,6 @@ class SASA():
                 Chain   Resid   sasa
                 x       x       x
         :rtype: pandas.DataFrame
-
-        .. todo::
-
-           Generalise the atom selection to amino acids other than lysine: the element codes used here
-           are specific to LYS (GW, 23.07.26) -  probably needs full lookup dict for all general atoms within file
         '''
 
         try:
@@ -116,12 +111,11 @@ class SASA():
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
 
-                if self.include_modified:
-                    pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ", 'C03', 'C04', 'C05', 'C06', 'N07'],
-                                            use_resname=False, get_index=True)
-                else:
-                    pts_2, indx_2 = S.atomselect(chain, [resid], ["CB", "CG", "CD", "CE", "NZ"],
-                                                                use_resname=False, get_index=True)
+                non_backbone_res_atoms = [an for an in list(S.data.loc[(S.data['chain'] == chain) &
+                                                                        (S.data['resid'] == resid), 'name'])
+                                            if an not in ['CA', 'C', 'N', 'O']]
+                pts_2, indx_2 = S.atomselect(chain, [resid], non_backbone_res_atoms,
+                                                            use_resname=False, get_index=True)
 
                 x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
                 list_of_sasa.append(x[0])
@@ -148,5 +142,4 @@ class SASA():
 
 if __name__ == '__main__':
     sasa = SASA(include_modified=True)
-    print(sasa.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(sasa.calculate(path=f'result{os.sep}curated{os.sep}6XZ7-alt1A.pdb'))
+    print(sasa.calculate(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))

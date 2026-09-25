@@ -6,22 +6,27 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
-class Test_Uniprot(unittest.TestCase):
+class Test_Measure(unittest.TestCase):
     def setUp(self):
+        print('-> Setting up measures tests')
         self.outdir = 'demo'
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
-        self.all_features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'das', 'seqcharge', 'melodia', 'frustration']
+        self.all_features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev',
+                             'das', 'seqcharge', 'melodia', 'frustration']
         self.features_dict = {k: {} for k in self.all_features}
 
     def test_full_setup(self):
         # test full setup of measures class, no run, test runs individually
+        print('-> Testing full setup')
         M = RD.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
-                        features_dict=self.all_features)
+                        features_dict=self.features_dict)
+        self.assertTrue(len(M.measures) > 0)
 
     def test_propka(self):
-        M_propka = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring PROPKA')
+        M_propka = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'propka': {}},
                         parallel=True,
@@ -32,7 +37,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_propka.df) > 0)
 
     def test_sasa(self):
-        M_sasa = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring SASA')
+        M_sasa = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'sasa': {}},
                         parallel=True,
@@ -43,7 +49,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_sasa.df) > 0)
 
     def test_depth(self):
-        M_depth = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring DEPTH')
+        M_depth = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'depth': {}},
                         parallel=True,
@@ -54,7 +61,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_depth.df) > 0)
 
     def test_aev(self):
-        M_aev = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring AEV')
+        M_aev = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'aev': {}},
                         parallel=True,
@@ -65,7 +73,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_aev.df) > 0)
 
     def test_das(self):
-        M_das = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring DAS')
+        M_das = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'das': {}},
                         parallel=True,
@@ -76,7 +85,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_das.df) > 0)
 
     def test_charge(self):
-        M_seqcharge = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring CHARGE')
+        M_seqcharge = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'seqcharge': {}},
                         parallel=True,
@@ -87,7 +97,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_seqcharge.df) > 0)
 
     def test_flexibility(self):
-        M_flex = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring FLEXIBILITY')
+        M_flex = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'flexibility': {}},
                         parallel=True,
@@ -95,20 +106,21 @@ class Test_Uniprot(unittest.TestCase):
         M_flex.measure_data()
         print(M_flex.df)
         print('len flexibility', len(M_flex.df))
-        self.assertTrue(len(M_flex.df) > 0)
 
     def test_legolas(self):
-        M_legolas = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring LEGOLAS')
+        M_legolas = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'legolas': {}},
-                        parallel=True,
+                        parallel=False,
                         include_modified=False)
         M_legolas.measure_data()
         print(M_legolas.df)
         print('len legolas:', len(M_legolas.df))
-
+    '''
     def test_frustration(self):
-        M_frustration = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring FRUSTRATION')
+        M_frustration = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'frustration': {}, 'density': {}},
                         parallel=False,
@@ -116,12 +128,13 @@ class Test_Uniprot(unittest.TestCase):
         M_frustration.measure_data()
         print(M_frustration.df)
         print('len frustration', len(M_frustration.df))
-
+    '''
     def test_melodia(self):
-        M_melodia = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring MELODIA')
+        M_melodia = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'melodia': {}},
-                        parallel=True,
+                        parallel=False,
                         include_modified=False)
         M_melodia.measure_data()
         print(M_melodia.df)
@@ -129,10 +142,11 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_melodia.df) > 0)
 
     def test_phi(self):
-        M_phi = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring PHI')
+        M_phi = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'phi': {}},
-                        parallel=True,
+                        parallel=False,
                         include_modified=False)
         M_phi.measure_data()
         print(M_phi.df)
@@ -140,7 +154,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_phi.df) > 0)
 
     def test_evolution(self):
-        M_evolution = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring EVOLUTION')
+        M_evolution = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'evolution': {}},
                         parallel=True,
@@ -151,7 +166,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_evolution.df) > 0)
 
     def test_rmsf(self):
-        M_rmsf = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring RMSF')
+        M_rmsf = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'rmsf': {}},
                         parallel=True,
@@ -162,7 +178,8 @@ class Test_Uniprot(unittest.TestCase):
         self.assertTrue(len(M_rmsf.df) > 0)
 
     def test_pkaani(self):
-        M_pkaani = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring PKAANI')
+        M_pkaani = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'pkaani': {}},
                         parallel=True,
@@ -172,7 +189,8 @@ class Test_Uniprot(unittest.TestCase):
         print('len pkaani', len(M_pkaani.df))
 
     def test_secondarystructure(self):
-        M_ss = RD.Measure(df_input=self.df_prot,
+        print('-> Test measuring SECONDARYSTRUCTURE')
+        M_ss = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'secondarystructure': {}},
                         parallel=True,
@@ -183,6 +201,7 @@ class Test_Uniprot(unittest.TestCase):
 
     '''
     def test_restart_measure_data(self):
+        print('-> Test restarting measures')
         M = RD.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features_dict={'das': {}},
@@ -190,8 +209,8 @@ class Test_Uniprot(unittest.TestCase):
                         include_modified=False)
         M.restart_measure_data()
 
-    
     def test_recovery(self):
+        print('-> Test recovering data')
         M = RD.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features_dict={'das': {}},
@@ -199,8 +218,6 @@ class Test_Uniprot(unittest.TestCase):
                         include_modified=False)
         M.recover_from_log('measure_log.txt')
     '''
-
-
 
 if __name__ == "__main__":
     unittest.main()

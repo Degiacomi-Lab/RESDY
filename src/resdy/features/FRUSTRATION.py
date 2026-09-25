@@ -5,13 +5,6 @@ import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
 
-try:
-    import frustratometer
-    frustration_packages_available = True
-except Exception as e:
-    frustration_packages_available = False
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
 pd.set_option('display.max_rows', 200)
 
 
@@ -43,15 +36,21 @@ class FRUSTRATION():
             any errors from calculating features out to.
         :type error_filename: str
         '''
+
+        try:
+            import frustratometer
+            self.frustratometer = frustratometer
+        except ImportError as e:
+            raise ImportError(f'>> Packages required for calculating frustation or density '
+                              f'(Frustratometer) are not available. Frustration or Density will '
+                              f'be removed from feature list. Error: {e}') from e
+
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
 
-        if not frustration_packages_available:
-            raise ImportError('>> Packages required for calculating frustation or density (Frustratometer) '
-                              'are not available. Frustration or Density will be removed from feature list.')
 
-    def calculate_frustration(self, path):
+    def calculate(self, path):
         '''
         Use the Frustratometer package to identify the frustration metric for the lysines of
         interest.
@@ -92,8 +91,8 @@ class FRUSTRATION():
 
             out_print_trap = io.StringIO()
             with redirect_stdout(out_print_trap):
-                frust_struc = frustratometer.Structure(path)
-                model_single_resids = frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
+                frust_struc = self.frustratometer.Structure(path)
+                model_single_resids = self.frustratometer.AWSEM(frust_struc, min_sequence_separation_contact=2)
             del out_print_trap
         except Exception as e:
             print(f'Frustratometer calculation 1 - failed to create frustratometer structure or AWSEM model with error: {e}')
@@ -113,7 +112,8 @@ class FRUSTRATION():
 
             try:
                 cleaned_code_to_remove = os.path.splitext(os.path.basename(path))[0] + '_cleaned.pdb'
-                os.remove(cleaned_code_to_remove)
+                if os.path.exists(cleaned_code_to_remove):
+                    os.remove(cleaned_code_to_remove)
             except Exception as ef:
                 print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
         except Exception as e:
@@ -125,6 +125,4 @@ class FRUSTRATION():
 
 if __name__ == '__main__':
     frust = FRUSTRATION(include_modified=True)
-    print(frust.calculate_frustration(path=f'data{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
-    #print(frust.calculate_frustration(path=f'data{os.sep}curated{os.sep}1NSK-alt-1.pdb'))
-    #print(frust.calculate_frustration(path=f'2I1V-alt-1.pdb'))
+    print(frust.calculate(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))

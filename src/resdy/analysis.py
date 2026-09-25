@@ -208,7 +208,7 @@ class Analysis(object):
 
 
     def plot_feature_histogram(self, plot_type='all', feature='', agg_type='', uniprot='',
-                               chain='', resid='', save_name=''):
+                               chain='', resid='', save_name='', show_graph=True):
         '''
         Create a basic plot showing the distribution of values for the specified feature
         across the set of measurements passed into the analysis class. An aggregation
@@ -238,9 +238,12 @@ class Analysis(object):
         :type resid: str, optional
         :param save_name: File name to save the histogram to.
         :type save_name: str, optional
+        :param show_graph: Toggleable option for whether to show the graph as a popup.
+        :type show_graph: bool, optional
         '''
         try:
             plt.clf()
+            plt.close()
         except Exception:
             pass
 
@@ -324,6 +327,7 @@ class Analysis(object):
                 agg_feature = f'{feature}_{agg_type}'
 
                 agg = Aggregation(df_measurements=df_plot,
+                                  outdir=self.outdir,
                                 aggregation_method=agg_type,
                                 features_to_include=[feature])
                 df_plot = agg.aggregate_data()
@@ -365,15 +369,29 @@ class Analysis(object):
                     agg_type = 'avg'
 
                 agg = Aggregation(df_measurements=df_plot,
+                                  outdir=self.outdir,
                                 aggregation_method=agg_type,
                                 features_to_include=feat_cols)
                 df_plot = agg.aggregate_data()
+                new_feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
+                print(new_feat_cols)
+                if 'arc' in new_feat_cols:
+                    new_feat_cols.remove('arc')
+                    new_feat_cols.append('arc_length')
 
-                if len(feat_cols) <= 9: col_len = 3
-                elif len(feat_cols) <= 16: col_len = 4
-                else: col_len = 5
+                lost_cols = [a for a in feat_cols if a not in new_feat_cols]
+                if lost_cols:
+                    print(f'>> Lost feature columns {", ".join(lost_cols)} when aggregating, '
+                          f'will not be included in the graph output')
 
-                row_len = math.ceil(len(feat_cols) / col_len)
+                if len(new_feat_cols) <= 9:
+                    col_len = 3
+                elif len(new_feat_cols) <= 16:
+                    col_len = 4
+                else:
+                    col_len = 5
+
+                row_len = math.ceil(len(new_feat_cols) / col_len)
 
                 fig, axs = plt.subplots(row_len, col_len)
                 fig.set_figheight(12)
@@ -382,7 +400,7 @@ class Analysis(object):
                 fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0.27, hspace=0.25)
 
                 used_plots = []
-                for i, feat in enumerate(feat_cols):
+                for i, feat in enumerate(new_feat_cols):
                     agg_feature = f'{feat}_{agg_type}'
                     row = math.floor(i / col_len)
                     col = i % col_len
@@ -413,6 +431,7 @@ class Analysis(object):
                     agg_type = 'all'
 
                 agg = Aggregation(df_measurements=df_plot,
+                                  outdir=self.outdir,
                                 aggregation_method=agg_type,
                                 features_to_include=[feature])
                 df_plot = agg.aggregate_data()
@@ -463,11 +482,12 @@ class Analysis(object):
         if save_name != '':
             plt.savefig(save_name)
 
-        plt.show()
+        if show_graph:
+            plt.show()
 
 
     def plot_feature_violins(self, features='', agg_type='', uniprot='',
-                               chain='', resid='', save_name=''):
+                               chain='', resid='', save_name='', show_graph=True):
         '''
         Create a basic plot showing the distribution of values for the specified feature
         across the set of measurements passed into the analysis class. An aggregation
@@ -492,9 +512,12 @@ class Analysis(object):
         :type resid: str, optional
         :param save_name: File name to save the histogram to.
         :type save_name: str, optional
+        :param show_graph: Toggleable option for whether to show the graph as a popup.
+        :type show_graph: bool, optional
         '''
         try:
             plt.clf()
+            plt.close()
         except Exception:
             pass
 
@@ -563,6 +586,7 @@ class Analysis(object):
 
             for i, feat in enumerate(features):
                 agg = Aggregation(df_measurements=df_plot,
+                                  outdir=self.outdir,
                                 aggregation_method=agg_type,
                                 features_to_include=feat)
                 df_plot_feat = agg.aggregate_data()
@@ -593,6 +617,7 @@ class Analysis(object):
 
             for i, feat in enumerate(features):
                 agg = Aggregation(df_measurements=df_plot,
+                                  outdir=self.outdir,
                                 aggregation_method=agg_type,
                                 features_to_include=feat)
                 df_plot_feat = agg.aggregate_data()
@@ -621,7 +646,8 @@ class Analysis(object):
         if save_name != '':
             plt.savefig(save_name)
 
-        plt.show()
+        if show_graph:
+            plt.show()
 
 
     def get_outliers(self, uniprot_entry, resid, feature, whis = 1.5):
@@ -710,21 +736,12 @@ class Analysis(object):
                     match col_to_keep.lower():
                         case 'new':
                             print(f'Keeping new measurements for {column}')
-                            if column in ['aev', 'aev_legolas']:
+                            if column in ['aev', 'evolution']:
                                 self.df[column] = self.df[column].astype('object')
-                            for i, r in self.df.iterrows():
 
-                                protein_code = r['PDB_Code']
-                                chain_value = r["Chain"]
-                                resid_value = r["Resid"]
-
-                                idx = np.where((new_df["PDB_Code"] == protein_code) &
-                                               (new_df["Chain"] == chain_value) &
-                                               (new_df["Resid"].astype(int) == resid_value))
-                                if len(idx[0]) == 0:
-                                    continue
-
-                                self.df.at[i, column] = new_df.loc[idx[0][0], column]
+                            self.df = self.df.drop(columns=[column])
+                            self.df = self.df.merge(new_df['PDB_Code', 'Chain', 'Resid', column],
+                                                    how='left', on=['PDB_Code', 'Chain', 'Resid'])
 
                             proper_answer = True
                         case 'old':
@@ -733,30 +750,15 @@ class Analysis(object):
                         case _:
                             print(f'{col_to_keep} was not recognised')
 
-            num_lines_selfdf = len(self.df)
+            if new_nonoverlap_columns:
+                if column == 'aev':
+                    new_df['aev'] = new_df['aev'].astype('object')
+                elif column == 'aev_legolas':
+                    new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
 
-            for column in new_nonoverlap_columns:
-                print(f'\nAdding new measurement {column} to the dataframe \n')
-                for i, r in self.df.iterrows():
-
-                    protein_code = r['PDB_Code']
-                    chain_value = r["Chain"]
-                    resid_value = r["Resid"]
-
-                    idx = np.where((new_df["PDB_Code"] == protein_code) &
-                                   (new_df["Chain"] == chain_value) &
-                                   (new_df["Resid"].astype(int) == resid_value))
-                    if len(idx[0]) == 0:
-                        continue
-
-                    # account for measurements that have special cases
-                    # aevs - add the list of aevs in one column to the overall dataframe
-                    if column == 'aev':
-                        new_df['aev'] = new_df['aev'].astype('object')
-                    elif column == 'aev_legolas':
-                        new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
-                    self.df.at[i, column] = new_df.loc[idx[0][0], column]
-                    print(f'Progress adding {column} data: {round(((i+1)/num_lines_selfdf)*100, 2)} %\r', end='', flush=True)
+                cols_to_use = ['PDB_Code', 'Chain', 'Resid'] + new_nonoverlap_columns
+                self.df = self.df.merge(new_df[cols_to_use], how='left',
+                                        on=['PDB_Code', 'Chain', 'Resid'])
 
             print(f'\nFinished adding extra measures data to dataframe')
 
@@ -787,6 +789,9 @@ class Analysis(object):
         :param outname: The name of the file to give in output for the new updated measures file.
             Auto set to measures_cut.csv
         :type outname: str
+
+        :returns: Resulting dataframe containing only residues of interest given from the req_resid_table
+        :rtype: pandas.DataFrame
         '''
         print('>> Removing unrequired residues')
         # Remove duplicated data from the measurements
@@ -842,20 +847,22 @@ class Analysis(object):
         return self.df
 
 
-    def relative_best(self, df, weights, features=['depth']):
+    def relative_best(self, weights, features=['depth']):
         '''
         Function to extract the best relative list of features for all combinations of uniprot entry
         and residues based on a given list of metrics to do the calculation over and the desired
         weightings for each of those features.
 
-        :param df: Dataframe of measurements to do the analysis over
-        :type df: pandas.DataFrame
         :param weights: List of floats which sum to 1 of the weights for each of the given features.
             Length should match the list of features given
         :type weights: list
         :param features: List of features that the analysis should extract the relative best values
             for.
         :type features: list
+
+        :returns: Dataframe containing 1 row per lysine which has the relative best options based on
+            optimal values of features and weightings applied
+        :rtype: pandas.DataFrame
         '''
         # go over the weights to make sure the values are good and then matches the number of features
         try:
@@ -889,16 +896,18 @@ class Analysis(object):
         except Exception as e:
                 print(f'Error sorting the weights for the analysis: {e}')
 
-        df = df.dropna(subset=features)
+        df_rb = self.df.copy()
+        df_rb = df_rb.dropna(subset=features)
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
 
         # if features not known which trend is best, ask user which is required
-        unsure_feats = ['phi', 'psi', 'curvture', 'writhing', 'arc_length']
+        unsure_feats = ['phi', 'psi', 'curvture', 'writhing', 'arc_length', 'rmsf', 'secondarystructure']
         min_feats = ['propka', 'pkaANI', 'legolas', 'depth']
-        max_feats = ['sasa', 'das', 'seqcharge', 'frustration'] + unsure_feats  # unsure feats added to max feats for now
+        max_feats = ['sasa', 'das', 'seqcharge', 'frustration']
         for feat in features:
-            if feat in ['aev', 'aev_legolas']:
-                print(f'>> Feature {feat} is not supported with this analysis. Dropping feature from ')
+            if feat in ['aev', 'aev_legolas', 'evolution']:
+                print(f'>> Feature {feat} is not supported with this analysis. '
+                      f'Dropping feature from list to analyse')
             if feat not in min_feats + max_feats:
                 pref = 'tmp'
                 while pref not in ['min', 'max']:
@@ -906,7 +915,7 @@ class Analysis(object):
                 if pref == 'min': min_feats.append(feat)
                 elif pref == 'max': max_feats.append(feat)
 
-        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df.groupby(self.lys_key):
+        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df_rb.groupby(self.lys_key):
             if len(df_query) > 1:
                 df_query = df_query.reset_index(drop=True)
 
@@ -964,23 +973,37 @@ class Analysis(object):
             self.df_sub = pd.concat([self.df_sub, row_to_append], axis=0, ignore_index=True)
             self.df_sub['Resid'] = self.df_sub['Resid'].astype(int)
 
+        return self.df_sub
 
-    def get_contingency_table(self, GO_code, my_list, reference):
+
+    def get_contingency_table(self, GO_code, uniprot_list, reference):
         '''
         Compute contingency table given a GO Term, the list of interest, and a reference list
+        
+        :param GO_code: 7 digit code for the GO code to calculate the contingency table for
+        :type GO_code: str
+        :param uniprot_list: list of uniprot codes to search in the known uniprot codes associated
+            with the given GO_code
+        :type uniprot_list: list
+        :param reference: Reference list to use for comparisons. ADD MORE
+        :type reference: list
+        
+        :returns: Dataframe containing 1 row per lysine which has the relative best options based on
+            optimal values of features and weightings applied
+        :rtype: pandas.DataFrame
         '''
 
         bp_list = 0
-        for uni in my_list:
+        for uni in uniprot_list:
             if uni in self.GO_dict[GO_code]:
                 bp_list += 1
 
         bp_not_list = len([p for p in reference if p in self.GO_dict[GO_code]]) - bp_list
-        not_bp_list = len(my_list) - bp_list
+        not_bp_list = len(uniprot_list) - bp_list
 
         not_bp_not_list = 0
         for uni in reference:
-            if (uni not in my_list) and (uni not in self.GO_dict[GO_code]):
+            if (uni not in uniprot_list) and (uni not in self.GO_dict[GO_code]):
                 not_bp_not_list += 1
 
         table = [[bp_list, bp_not_list], [not_bp_list, not_bp_not_list]]
@@ -991,6 +1014,21 @@ class Analysis(object):
     def enrichment_analysis(self, feature_one = ['propka', 7, 11], feature_two = ['sasa', 0, 10], uniprot_cnt_cutoff=1):
         '''
         Analyse prevalence of GO-terms in sub-regions of the SASA vs pKa graph
+
+        :param feature_one: List of 3 parts, first part is a string of the feature name, second
+            is a float of the lower value for the feature, third is a float of the upper value
+            for the feature.
+        :type feature_one: list
+        :param feature_two: List of 3 parts, first part is a string of the feature name, second
+            is a float of the lower value for the feature, third is a float of the upper value
+            for the feature.
+        :type feature_two: list
+        :param uniprot_cnt_cutoff: 
+        :type uniprot_cnt_cutoff: int
+
+        :returns: Dataframe containing details on which GO terms are enriched or reduced when a
+            subset of features is applied to the data.
+        :rtype: pandas.DataFrame
         '''
 
         if not statsmodel_available:
@@ -1059,5 +1097,5 @@ class Analysis(object):
 if __name__ == '__main__':
     df_test = pd.read_csv(f'data{os.sep}measures_CannData_all_12.05.25.csv')
     analysis = Analysis(df_test, outdir='result')
-    analysis.relative_best(analysis.df, weights=0.5, features=['depth', 'sasa', 'phi', 'das'])
+    analysis.relative_best(weights=0.5, features=['depth', 'sasa', 'phi', 'das'])
     print(analysis.df_sub)

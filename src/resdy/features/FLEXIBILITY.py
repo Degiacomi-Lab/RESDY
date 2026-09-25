@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
@@ -14,7 +15,8 @@ class FLEXIBILITY():
                                   'modified_codes': ['LYE', 'KCX'],
                                   'atom_select_names_nonmod': ['NZ'],
                                   'atom_select_names_modified': ['NZ', 'N07']},
-                 error_filename = 'measure_errors.txt'):
+                 error_filename = 'measure_errors.txt',
+                 remove_outliers=False):
         '''
         Initialise the Flexibility class, include any global variables that are required from
         measures in here.
@@ -31,10 +33,16 @@ class FLEXIBILITY():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param remove_outliers: Toggleable option to remove any beta values which are likely
+            outliers from the calculations to avoid bias in normalisation. If set to true, values
+            which are outliers will be set to NaN. Default is False and will treat all Beta values
+            as valid.
+        type remove_outliers: bool
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        self.remove_outliers = remove_outliers
         if self.error_filename != 'no_record':
             self.record_errors = True
         else:
@@ -65,6 +73,7 @@ class FLEXIBILITY():
         try:
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
+            M.atomselect('*', '*', ['C', 'CA', 'N', 'O'], get_index=True)
 
             if self.include_modified:
                 idx_nz = M.atomselect('*',
@@ -92,17 +101,43 @@ class FLEXIBILITY():
         except Exception as e:
             if self.record_errors: report_error_to_file('Flex 1', path, str(e), self.error_filename)
             print(f'Flex Calculation: 1 - Could not load and identify targets within the lysines for calculations: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'Flexibility'])
 
-        try:
+        af_struc = os.path.basename(path).startswith('AF-')
+        if af_struc:
+            print(f'>> {path} is an AF structure which means the Beta factor column is the PLDDT '
+                f'value, therefore B-factors set to NaN for this file')
+            avg_beta_output = [np.nan] * len(lys_res_nums)
+        else:
             avg_beta_output = []
+            mean_beta = M.data['beta'].mean()
+            med_beta = M.data['beta'].median()
+            std_beta = M.data['beta'].std()
+
+            if self.remove_outliers:
+                mad = np.median([np.sqrt((a - mean_beta)**2) for a in list(M.data['beta'])])
+                M.data['MAD'] = (0.6745*(M.data['beta'] - med_beta)) / mad
+                mean_beta = M.data.loc[M.data['MAD'] <= 3.5, 'beta'].mean()
+                std_beta = M.data.loc[M.data['MAD'] <= 3.5, 'beta'].std()
+
+            M.data['normalised_beta'] = (M.data['beta'] - mean_beta) / std_beta
+            M.data.loc[M.data['MAD'] > 3.5, 'normalised_beta'] = np.nan
+
             for lys_res, lys_chain in zip(lys_res_nums, list_chains):
-                tmp_lys_data = M.data[(M.data['resid'] == lys_res) & (M.data['chain'] == lys_chain)]
-                tmp_lys_beta_vals = list(tmp_lys_data['beta'])
-                avg_beta = sum(tmp_lys_beta_vals) / len(tmp_lys_beta_vals)
-                avg_beta_output.append(avg_beta)
-        except Exception as e:
-            if self.record_errors: report_error_to_file('Flex 2', path, str(e), self.error_filename)
-            print(f'Flex Calculation: 2 - Failed to obtain the beta values and create an average for the lysine of interest at position {lys_res}: {e}')
+                try:
+                    tmp_lys_data = M.data[(M.data['resid'] == lys_res) & (M.data['chain'] == lys_chain)]
+                    tmp_lys_beta_vals = list(tmp_lys_data['normalised_beta'])
+                    avg_beta = sum(tmp_lys_beta_vals) / len(tmp_lys_beta_vals)
+                    avg_beta_output.append(avg_beta)
+                except Exception as e:
+                    if self.record_errors: report_error_to_file('Flex 2', path, str(e), self.error_filename)
+                    print(f'Flex Calculation: 2 - Failed to obtain the beta value for residue at position '
+                          f'{lys_res}, set to NaN; error: {str(e)}')
+                    avg_beta_output.append(np.nan)
+
+        if all(b == 0 for b in avg_beta_output):
+            print(f'>> All Beta factors are 0 in {path}, flexibility set to NaN for all residues of interest')
+            avg_beta_output = [np.nan] * len(avg_beta_output)
 
         try:
             df_flex = pd.DataFrame(columns=['Chain', 'Resid', 'flexibility'])
@@ -118,5 +153,5 @@ class FLEXIBILITY():
 
 
 if __name__ == '__main__':
-    flex = FLEXIBILITY(include_modified=True)
-    print(flex.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    flex = FLEXIBILITY(include_modified=True, remove_outliers=True)
+    print(flex.calculate(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))

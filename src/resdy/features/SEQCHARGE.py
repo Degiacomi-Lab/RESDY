@@ -40,7 +40,8 @@ class SEQCHARGE():
             self.record_errors = True
         else:
             self.record_errors = False
-    
+
+
     def calculate(self, path, num_add_aa=10):
         '''
         Calculate the Sequence Charge of the local sequence around a LYS of interest. This is a

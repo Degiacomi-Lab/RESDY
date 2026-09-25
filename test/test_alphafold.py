@@ -6,7 +6,7 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 from resdy import alphafold as af
 
-class Test_Uniprot(unittest.TestCase):
+class Test_Alphafold(unittest.TestCase):
     def test_plddt(self):
         af.find_af_plddt('AF-P0CG48-F1-model_v6', outfolder='test')
         self.assertTrue(os.path.isfile(f'test{os.sep}curated{os.sep}AF_PLDDT_Output.csv'))

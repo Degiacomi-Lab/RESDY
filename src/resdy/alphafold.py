@@ -1,6 +1,7 @@
 import csv
 import os
 import requests
+import pandas as pd
 
 
 def download_AF_struc(pdb, outfolder="result"):
@@ -70,7 +71,17 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
             plddt_writer = csv.writer(plddt_out_file)
             plddt_writer.writerow(['PDB_Code', 'Chain', 'Resid', 'PLDDT'])
 
-    plddt_out_file = open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'a', newline='')
+    plddt_file_path = os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")
+
+    if os.path.isfile(plddt_file_path):
+        df_plddt_already = pd.read_csv(plddt_file_path)
+        if (df_plddt_already['PDB_Code'] == af_code_full).any():
+            print(f'>> AF PLDDT values for {af_code_full} have already been recorded to {plddt_file_path}, not repeating')
+            return dict(zip(df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Chain'].astype(str) +
+                            df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Resid'].astype(str),
+                            df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'PLDDT']))
+
+    plddt_out_file = open(plddt_file_path, 'a', newline='')
     plddt_writer = csv.DictWriter(plddt_out_file, fieldnames=cols)
 
     print(f'>> Finding plddt for AF structure {af_code_full}')

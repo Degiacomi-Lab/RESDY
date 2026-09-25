@@ -1,9 +1,6 @@
 '''
 Provide patching functions which are called from protein.py
-These interact with Modeller to perform patching on protein structures
-
-.. todo::
-    Check whether setting env.io.two_char_chain here has any effect.
+These interact with Modeller to perform patching on protein structures.
 '''
 import fileinput
 import glob

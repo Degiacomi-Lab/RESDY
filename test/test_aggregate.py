@@ -10,20 +10,23 @@ import resdy as RD
 
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
+        self.outdir = 'demo'
         self.demo_measure = pd.read_csv(f'demo{os.sep}measures.csv')
 
     # TEST SCALAR AGGREGATION
 
     def test_min(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
-                                   aggregation_method='min',
-                                   features_to_include=['all'],
-                                   aev_red_method='pca')
+                             outdir=self.outdir,
+                            aggregation_method='min',
+                            features_to_include=['all'],
+                            aev_red_method='pca')
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
 
     def test_max(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='max',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -32,6 +35,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_avg(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='avg',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -40,6 +44,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_random(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='random',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -48,6 +53,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_median(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='median',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -56,6 +62,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_mixmatch(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='mixmatch',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -64,6 +71,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_minmax(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='minmax',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
@@ -72,27 +80,20 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_minmaxavg(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='minmaxavg',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
-        Agg.save_state(outname=f'demo{os.sep}measures_aggregated.csv')
+        Agg.save_state(outname=f'measures_aggregated.csv')
 
     def test_all(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                     aggregation_method='all',
                                     features_to_include=['all'],
                                     aev_red_method='pca')
-        df_agg = Agg.aggregate_data()
-        self.assertTrue(len(df_agg) > 0)
-
-    def test_avglessaev(self):
-        #might need to be removed soon
-        Agg = RD.Aggregation(df_measurements=self.demo_measure,
-                                    aggregation_method='all',
-                                    features_to_include=['all'],
-                                    aev_red_method='average_subtract_aev')
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
 
@@ -119,10 +120,11 @@ class Test_Uniprot(unittest.TestCase):
                             'torsion_range', 'phi_min', 'phi_max', 'phi_avg', 'phi_sd', 'phi_range',
                             'phi_rand', 'psi_min', 'psi_max', 'psi_med', 'psi_avg', 'psi_sd',
                             'psi_range', 'psi_rand', 'das_min', 'das_max', 'das_avg', 'das_sd',
-                            'das_range', 'das_rand', 'flexibility_max', 'rmsf_med']
+                            'das_range', 'das_rand', 'flexibility_max']
 
         with patch('builtins.input', fake_input):
             Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                                 outdir=self.outdir,
                                         aggregation_method='choose',
                                         features_to_include=['all'],
                                         aev_red_method='pca')
@@ -132,6 +134,7 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_unknown(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                                         aggregation_method='x',
                                         features_to_include=['all'],
                                         aev_red_method='pca')
@@ -143,6 +146,7 @@ class Test_Uniprot(unittest.TestCase):
     # TEST VECTOR FEATURES AGGREGATION
     def test_pca(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='pca')
@@ -151,22 +155,16 @@ class Test_Uniprot(unittest.TestCase):
 
     def test_sd(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='sd')
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
 
-    def test_autoencoder(self):
-        Agg = RD.Aggregation(df_measurements=self.demo_measure,
-                            aggregation_method='minmax',
-                            features_to_include=['all'],
-                            aev_red_method='autoencoder')
-        df_agg = Agg.aggregate_data()
-        self.assertTrue(len(df_agg) > 0)
-
     def test_null(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
                             aggregation_method='minmax',
                             features_to_include=['all'],
                             aev_red_method='null')

@@ -1,15 +1,8 @@
 import os
 import pandas as pd
 import biobox as bb
+import numpy as np
 from .error_reporting import report_error_to_file
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-    depth_packages_available = True
-except Exception as e:
-    depth_packages_available = False
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
 
 
 class DEPTH():
@@ -46,6 +39,21 @@ class DEPTH():
             any errors from calculating features out to.
         :type error_filename: str
         '''
+
+        try:
+            from Bio.PDB import PDBParser
+            from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
+
+            self.PDBParser = PDBParser
+            self.min_dist = min_dist
+            self.get_surface = get_surface
+            self.residue_depth = residue_depth
+
+        except ImportError as e:
+            raise ImportError(f'>> Packages required for depth calculations (biopython/msms) are '
+                            f'not available, depth will be removed from features to calculate. '
+                            f'Error: {str(e)}') from e
+
         self.calculation_type = calculation_type
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -55,9 +63,6 @@ class DEPTH():
         else: 
             self.record_errors = False
 
-        if not depth_packages_available:
-            raise ImportError('>> Packages required for depth calculations (biopython/msms) are '
-                                'not available, depth will be removed from features to calculate.')
 
     def calculate(self, path):
         '''
@@ -113,27 +118,32 @@ class DEPTH():
             raise Exception(f">> DEPTH error: could not find NZ atoms within atomic structure - {e}")
 
         try:
-            parser = PDBParser()
+            parser = self.PDBParser()
             structure = parser.get_structure('structure', path)
-            surface = get_surface(structure[0])
+            surface = self.get_surface(structure[0])
         except Exception as e:
             if self.record_errors: report_error_to_file('Depth 2', path, str(e), self.error_filename)
             raise Exception(f">> DEPTH error: could not get biopython structure - {e}")
 
         depth_results = []
         for i, idx in enumerate(idx_nz):
+            mychain = ''
+            myres = ''
             try:
                 mychain = structure[0][list_chains[i]]
                 myres = mychain[int(lys_res_nums[i])]
                 match self.calculation_type:
                     case 'ResidDepth':
-                        rd = residue_depth(myres, surface)  # average atom depth for all heavy atoms in residue of interest
+                        rd = self.residue_depth(myres, surface)  # average atom depth for all heavy atoms in residue of interest
                     case 'AtomDepth' | _:
-                        rd = min_dist(M.coordinates[0][idx], surface)  # NZ atom depth
+                        rd = self.min_dist(M.coordinates[0][idx], surface)  # NZ atom depth
+                depth_results.append(rd)
             except Exception as e:
+                depth_results.append(np.nan)
                 if self.record_errors: report_error_to_file('Depth 3', path, str(e), self.error_filename)
-                raise Exception(f">> DEPTH error: failed getting min_dist - {e}")
-            depth_results.append(rd)
+                print(f'>> Failed to obtain depth for resid at position: Chain: {mychain}, '
+                      f'Resid Num: {myres}; Setting to NaN; error: {str(e)}')
+
 
         df_depth = pd.DataFrame(columns=["Chain", "Resid", "depth"])
         try:
@@ -147,5 +157,5 @@ class DEPTH():
         return df_depth
 
 if __name__ == '__main__':
-    depth = DEPTH(calculation_type='AtomDepth', include_modified=True)
-    print(depth.calculate(path=f'result{os.sep}curated{os.sep}1UBQ-alt-1.pdb'))
+    depth = DEPTH(calculation_type='ResidDepth', include_modified=True)
+    print(depth.calculate(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))

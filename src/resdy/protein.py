@@ -14,16 +14,23 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from openmm.app.modeller import Modeller
-from openmm.app.forcefield import ForceField
-from openmm.app.pdbfile import PDBFile
-from openmm.app import NoCutoff
-from openmm.openmm import LangevinMiddleIntegrator
-from openmm.app.simulation import Simulation
-from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
 from . import alphafold as af
 from . import patcher
 from .helper import get_download_tool, ShutUp
+
+try:
+    from openmm.app.modeller import Modeller
+    from openmm.app.forcefield import ForceField
+    from openmm.app.pdbfile import PDBFile
+    from openmm.app import NoCutoff
+    from openmm.openmm import LangevinMiddleIntegrator
+    from openmm.app.simulation import Simulation
+    from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
+    openmm_available = True
+except Exception as e:
+    print('Could not import openmm modules for running minimisations, please ensure '
+          'that openmm has been installed')
+    openmm_available = False
 
 
 class PDB(object):
@@ -36,9 +43,9 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
-                 resnames_of_interest = ['LYS'], minimise_strucs='AF',
+                 resnames_of_interest = ['LYS'], minimise_strucs='',
                  remove_all_modifications=False,
-                 num_cores=0):
+                 num_cores=0, max_nmr_conformers=''):
         '''
         Initialise the PDB class.
 
@@ -78,6 +85,11 @@ class PDB(object):
             available will be used. Otherwise it will try and use the number of cores given
             if this is possible.
         :type num_cores: int
+        :param max_nmr_conformers: The maximum number of conformers you would like splitting out
+            from the original pdb file. This will take the first n conformers through to curated
+            structures. Default is no cap and will curate all. '' or None will also take all
+            while an integer will limit.
+        :type max_nmr_conformers: int
         '''
 
         self.outdir = outdir
@@ -87,6 +99,7 @@ class PDB(object):
         self.include_hetatm = include_hetatm
         self.resnames_of_interest = resnames_of_interest
         self.remove_all_modifications = remove_all_modifications
+
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
                 case 'AF':
@@ -98,15 +111,42 @@ class PDB(object):
                 case 'ALL':
                     self.minimise_af = True
                     self.minimise_pdb = True
+                case '':
+                    print('>> Minimisation method left unchanged (\'\'), therefore default '
+                          'method of minimising only AF structures is applied')
+                    self.minimise_af = True
+                    self.minimise_pdb = False
                 case _:
-                    print(f'>> Minimisation method given as input (input: {minimise_strucs}) not '
-                          f'recognised: options are None, AF, PDB, ALL; Using default method of '
-                          f'only minimising AF structures.')
+                    print(f'>> Minimisation method given as input (input: {minimise_strucs}) '
+                            f'not recognised: options are None, AF, PDB, ALL; Using default '
+                            f'method of only minimising AF structures.')
                     self.minimise_af = True
                     self.minimise_pdb = False
         else:
             self.minimise_af = False
             self.minimise_pdb = False
+
+        if (self.minimise_af or self.minimise_pdb) and not openmm_available:
+            raise ImportError('Minimisation of structures requested but openmm not available, '
+                              'either install openmm or change minimise_strucs parameter to \'\'')
+
+        if isinstance(max_nmr_conformers, int):
+            self.max_nmr_conformers = max_nmr_conformers
+        elif isinstance(max_nmr_conformers, str):
+            if max_nmr_conformers == '':
+                self.max_nmr_conformers = None
+            else:
+                try:
+                    self.max_nmr_conformers = int(max_nmr_conformers)
+                except Exception as e:
+                    print(f'>> Could not infer the max number of nmr conformers desired with '
+                          f'input value {max_nmr_conformers}, taking all conformers as '
+                          f'default; Error: {e}')
+        else:
+            if max_nmr_conformers != None:
+                print(f'>> Unknown option given as input for max_nmr_conformers '
+                      f'({max_nmr_conformers}), taking all conformers as default.')
+            self.max_nmr_conformers = None
 
         self.curated_dir = os.path.join(outdir, "curated")
         if not os.path.exists(self.curated_dir):
@@ -162,11 +202,6 @@ class PDB(object):
         :param PDB_only: run the curation based on pdb files alone without curating for full uniprot
             codes
         :type PDB_only: str
-
-        .. todo::
-
-           Consider inferring the PDB_only state from the format of the measures dataframe
-           (GW, 30.07.26).
         '''
         if outdir == '':
             outdir = os.path.dirname(fname) if self.outdir == '' else self.outdir
@@ -176,8 +211,6 @@ class PDB(object):
         self.raw_dir = os.path.join(outdir, 'conformations')
         os.makedirs(self.curated_dir, exist_ok=True)
         os.makedirs(self.raw_dir, exist_ok=True)
-
-        self.PDB_only = PDB_only
         self.gap = gap
 
         try:
@@ -187,6 +220,20 @@ class PDB(object):
 
         except Exception as e:
             print(f"Could not load csv file, error: {str(e)}")
+
+        if isinstance(PDB_only, bool):
+            self.PDB_only = PDB_only
+        else:
+            print(f'>> Value given for PDB_only run was not recognised as bool: {PDB_only}; '
+                    f'Will try and infer state from the dataframe given.')
+            if self.df.columns == ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']:
+                self.PDB_only = False
+            elif self.df.columns == ['PDB_Code']:
+                self.PDB_only = True
+            else:
+                raise ValueError('>> Could not setup PDB_only settings from the given dataframe. '
+                                 'Please run again and enter either True/False on PDB_only to '
+                                 'determine method for continuing.')
 
 
     def gather_proteins(self, uniprot_df, skip_if_found=True):
@@ -733,7 +780,7 @@ class PDB(object):
                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                     aligner.open_gap_score = -11
                     aligner.extend_gap_score = -11
-                    aligner.target_end_gap_score = 0.0
+                    aligner.end_insertion_score = 0.0
                     alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
 
                     res_mapper = {}
@@ -796,7 +843,7 @@ class PDB(object):
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                                     aligner.open_gap_score = -11
                                     aligner.extend_gap_score = -11
-                                    aligner.target_end_gap_score = 0.0
+                                    aligner.end_insertion_score = 0.0
                                     alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
 
                                     for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
@@ -864,7 +911,6 @@ class PDB(object):
         :type pdb: str
         '''
 
-        #define the name format which will be followed for each file.
         number = 1
         name = f'{pdb}-alt-{str(number)}.pdb'
 
@@ -890,21 +936,17 @@ class PDB(object):
         elif endmdl_instances:
 
             print(">> Alternate model(s) found. Splitting...")
-
-            #First it opens the clean file in the conformations folder and opens a new folder to write in
             f = open(path)
 
             path_rename = os.path.join(self.raw_dir, name)
             f_write = open(path_rename, 'w')
 
-            #Next it writes the new file.
-            #It includes every line until it gets to 'ENDMDL', where it opens a new file to write in.
-            #The process stops when it gets to 'MASTER'
             for line in f:
+
                 try:
                     line = str(line)
 
-                    if re.search('^END\s*$', line):
+                    if re.search(r'^END\s*$', line):
                         f.close()
                         f_write.write(line)
                         f_write.close()
@@ -916,14 +958,20 @@ class PDB(object):
                         f_write.write(line)
                         f_write.close()
                         number = number + 1
-                        name = pdb + '-alt-' + str(number) + '.pdb'
 
+                        if number > self.max_nmr_conformers:
+                            f_write.close()
+                            f.close()
+                            os.remove(path)
+                            break
+
+                        name = pdb + '-alt-' + str(number) + '.pdb'
                         path_rename = os.path.join(self.raw_dir, name)
                         f_write = open(path_rename, 'w')
 
                     else:
                         f_write.write(line)
-                except Exception as e:
+                except Exception:
                     continue
 
             f_write.close()
@@ -1057,7 +1105,7 @@ class PDB(object):
                 aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                 aligner.open_gap_score = -11
                 aligner.extend_gap_score = -11
-                aligner.target_end_gap_score = 0.0
+                aligner.end_insertion_score = 0.0
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
 
                 res_mapper = {}
@@ -1311,11 +1359,16 @@ class PDB(object):
         '''
         try:
             print(f'>> Minimising structure: {pdb}')
-            af_inst = PDBFile(f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb')
+            pdb_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb'
+            pdb_inst = PDBFile(pdb_path)
+
+            M = bb.Molecule()
+            M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
+            df_beta = M.data[['chain', 'resid', 'beta']]
 
             forcefield = ForceField("amber14-all.xml",
                                     "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
-            modeller = Modeller(af_inst.topology, af_inst.positions)
+            modeller = Modeller(pdb_inst.topology, pdb_inst.positions)
             modeller.addHydrogens(forcefield)
             system = forcefield.createSystem(modeller.topology,
                                             nonbondedMethod=NoCutoff)
@@ -1343,7 +1396,13 @@ class PDB(object):
             PDBFile.writeFile(modeller.topology,
                             modeller.getPositions(),
                             open(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb', "w"))
-            print(f'>> Finished minising structure: {pdb}')
+
+            N = bb.Molecule()
+            N.import_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+            N.data = N.data.drop(columns=['beta']).merge(df_beta, how='left', on=['chain', 'resid'])
+            N.write_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+
+            print(f'>> Finished minimising structure: {pdb}')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
