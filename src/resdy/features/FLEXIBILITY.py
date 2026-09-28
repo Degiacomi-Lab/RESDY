@@ -109,19 +109,36 @@ class FLEXIBILITY():
                 f'value, therefore B-factors set to NaN for this file')
             avg_beta_output = [np.nan] * len(lys_res_nums)
         else:
+            def _variety_in_resid(c):
+                return M.data.groupby(['chain', 'resid'])[c].nunique().max() > 1
+
+            beta_col  ='beta'
+            if not _variety_in_resid('beta') and _variety_in_resid('occupancy'):
+                print(f'>> Data in the beta column is constant within residues, while occupancy '
+                      f'is not, reading beta values from occupancy instead. This is due to '
+                      f'correcting for known bug in biobox. File: {path}')
+                beta_col = 'occupancy'
+
             avg_beta_output = []
-            mean_beta = M.data['beta'].mean()
-            med_beta = M.data['beta'].median()
-            std_beta = M.data['beta'].std()
+            mean_beta = M.data[beta_col].mean()
+            med_beta = M.data[beta_col].median()
+            std_beta = M.data[beta_col].std()
 
             if self.remove_outliers:
-                mad = np.median([np.sqrt((a - mean_beta)**2) for a in list(M.data['beta'])])
-                M.data['MAD'] = (0.6745*(M.data['beta'] - med_beta)) / mad
-                mean_beta = M.data.loc[M.data['MAD'] <= 3.5, 'beta'].mean()
-                std_beta = M.data.loc[M.data['MAD'] <= 3.5, 'beta'].std()
+                mad = np.median([np.sqrt((a - med_beta)**2) for a in list(M.data[beta_col])])
+                M.data['MAD'] = (0.6745*(M.data[beta_col] - med_beta)) / mad
+                mean_beta = M.data.loc[M.data['MAD'] <= 3.5, beta_col].mean()
+                std_beta = M.data.loc[M.data['MAD'] <= 3.5, beta_col].std()
 
-            M.data['normalised_beta'] = (M.data['beta'] - mean_beta) / std_beta
-            M.data.loc[M.data['MAD'] > 3.5, 'normalised_beta'] = np.nan
+            if std_beta == 0 or np.isnan(std_beta):
+                print(f'>> B-factor column of file: {path} has no spread on flexibility, '
+                      f'all normalised flexibility values set to NaN')
+                M.data['normalised_beta'] = np.nan
+            else:
+                M.data['normalised_beta'] = (M.data[beta_col] - mean_beta) / std_beta
+
+            if self.remove_outliers:
+                M.data.loc[M.data['MAD'] > 3.5, 'normalised_beta'] = np.nan
 
             for lys_res, lys_chain in zip(lys_res_nums, list_chains):
                 try:
@@ -147,7 +164,9 @@ class FLEXIBILITY():
             if self.include_modified: df_flex['Modified'] = list_modified
         except Exception as e:
             if self.record_errors: report_error_to_file('Flex 3', path, str(e), self.error_filename)
-            print(f'Flex Calculation: 3 - Failed to create dataframe to append to overall measures dataframe: {e}')
+            print(f'Flex Calculation: 3 - Failed to create dataframe to append to '
+                  f'overall measures dataframe: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'flexibility'])
 
         return df_flex
 

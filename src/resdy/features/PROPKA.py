@@ -96,7 +96,15 @@ class PROPKA():
 
         propka_write_output = f'{code_for_df}.pka'
         propka_exist_output = os.path.join(self.pka_outdir, (code_for_df + '.pka'))
-        if not os.path.isfile(propka_exist_output):
+
+        reuse_propka = (os.path.isfile(propka_exist_output) and
+                        os.path.getmtime(propka_exist_output) >= os.path.getmtime(path))
+
+        if not reuse_propka:
+            if os.path.isfile(propka_exist_output):
+                print(f'>> PROPKA output for {code_for_df} is older than the curated structure '
+                      f'for {path}, recalculating propka values')
+
             f = None
             try:
                 f = open(propka_error_file_name, 'w')

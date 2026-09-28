@@ -56,13 +56,15 @@ class SECONDARYSTRUCTURE():
         Calculate the secondary structure for the protein given in path. Option to either report
         the output as numbers of as letters corresponding to the secondary structure. Options:
         - 0 or H
-        - 1 or B
-        - 2 or E
-        - 3 or G
-        - 4 or I
-        - 5 or T
-        - 6 or S
-        - 7 or -
+        - 1 or G
+        - 2 or I
+        - 3 or P
+        - 4 or E
+        - 5 or B
+        - 6 or T
+        - 7 or S
+        - 8 or -
+        - 9 or C
 
         :param path: The path of the pdb file that the feature is being calculated for.
         :type path: str
@@ -96,11 +98,29 @@ class SECONDARYSTRUCTURE():
                 orig_lines.insert(0, f"HEADER    TEMPORARY                               "
                                 f"{datetime.today().strftime('%d-%m-%Y')}  {os.path.basename(path)[0]}")
 
-                tmp_file_name = f"{path.split('.')[0]}_tmpdssp.pdb"
+                tmp_file_name = f"{os.path.splitext(path)[0]}_tmpdssp.pdb"
                 with open(file=tmp_file_name, mode='w') as new_pdb:
                     new_pdb.writelines(orig_lines)
             else:
                 tmp_file_name = path
+
+            protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
+                                    'CYS': 'C', 'GLU': 'E', 'GLN': 'Q', 'GLY': 'G',
+                                    'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
+                                    'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S',
+                                    'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V',
+                                    'HIE': 'H', 'HID': 'H', 'HIP': 'H', 'LYN': 'K',
+                                    'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
+                                    'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
+                                    'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
+                                    'LYSN': 'K'}
+
+            if self.include_modified:
+                expected_letters = {protein_letters_dict.get(c.upper(), 'X') for c in 
+                                    (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes'])}
+            else:
+                expected_letters = {protein_letters_dict.get(c.upper(), 'X') for c in 
+                                    (self.aa_properties['non_modified_codes'])}
 
             #run analysis
             M = bb.Molecule()
@@ -126,7 +146,8 @@ class SECONDARYSTRUCTURE():
                                     'CA',
                                     use_resname=True, get_index=True)[1]
                 # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
-                key_res_chain = zip(list(M.data['resid'].values[idx_atom_interest]), list(M.data['chain'].values[idx_atom_interest]))
+                key_res_chain = zip(list(M.data['resid'].values[idx_atom_interest]),
+                                    list(M.data['chain'].values[idx_atom_interest]))
                 pairs_seen, keep_pos = set(), []
                 for pair, pos in zip(key_res_chain, range(len(idx_atom_interest))):
                     if pair not in pairs_seen:
@@ -149,8 +170,19 @@ class SECONDARYSTRUCTURE():
             if self.include_modified:
                 df_ss = df_ss.assign(**{'Modified': list_modified})
 
-            df_ss = df_ss.assign(**{'secondarystructure': sec_structure_list})
+            if len(sec_structure_list) != len(df_ss):
+                raise Exception(f'>> DSSP returned {len(sec_structure_list)} residues while '
+                                f'structure only has {len(df_ss)} residues in {path}, cannot '
+                                f'assign secondary structure to avoid a potential mismatch.')
+
+            df_ss = df_ss.assign(**{'secondarystructure': sec_structure_list,
+                                    'dssp_resname': list(sequence)})
             df_ss = df_ss.iloc[idx_atom_interest]
+
+            if any(c not in expected_letters for c in list(df_ss['dssp_resname'])):
+                raise Exception(f'>> One or more of the residues selected did not match up '
+                                f'to the residue of interest for {path}, cannot assign secondary '
+                                f'structure to avoid potential wrong values.')
 
             if tmp_file_name != path and os.path.exists(tmp_file_name):
                 os.remove(path=tmp_file_name)

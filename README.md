@@ -48,13 +48,16 @@ python -c "import resdy; print(resdy.__version__)"
 
 ### Required
 
-The required dependencies are installed by `pip install -e .`, and are needed to run the overall pipeline:
+The following required dependencies are installed by `pip install -e .`, and are needed to run the overall pipeline:
 * <a href="https://anaconda.org/conda-forge/numpy">numpy</a>
 * <a href="https://anaconda.org/conda-forge/pandas">pandas</a>
 * <a href="https://anaconda.org/conda-forge/biobox">biobox</a>
 * <a href="https://anaconda.org/conda-forge/matplotlib">matplotlib</a>
 * <a href="https://anaconda.org/conda-forge/seaborn">seaborn</a>
-* <a href="https://anaconda.org/salilab/modeller">Modeller</a>
+
+There are also a couple of other required packages for running this pipeline and must be added by hand:
+* <a href="https://anaconda.org/salilab/modeller">Modeller</a> (conda, salilab channel) is needed to patch gaps in a structure, without it all protein curation is unavailable significantly limiting output.
+* <a href="https://anaconda.org/conda-forge/openmm">Openmm</a> (conda, conda-forge channel) is needed if energy minimisation of structures is requested within the pipeline, this is determined by setting the `minimise_strucs` parameter in `RD.PDB`
 
 > **Note**
 > Installation of Modeller requires a license key: https://salilab.org/modeller/registration.html.

@@ -1,6 +1,8 @@
 import unittest
 import sys
 import os
+import shutil
+import tempfile
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
@@ -9,12 +11,18 @@ import resdy as RD
 class Test_Measure(unittest.TestCase):
     def setUp(self):
         print('-> Setting up measures tests')
-        self.outdir = 'demo'
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        shutil.copytree(os.path.join('demo', 'curated'), os.path.join(self.outdir, 'curated'))
+        shutil.copyfile(os.path.join('demo', 'demo_input.csv'), os.path.join(self.outdir, 'demo_input.csv'))
+        shutil.copyfile(os.path.join('demo', 'proteins.csv'), os.path.join(self.outdir, 'proteins.csv'))
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
-        self.all_features = ['propka', 'pkaANI', 'sasa', 'depth', 'aev',
+        self.all_features = ['propka', 'sasa', 'depth', 'aev',
                              'das', 'seqcharge', 'melodia', 'frustration']
         self.features_dict = {k: {} for k in self.all_features}
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
 
     def test_full_setup(self):
         # test full setup of measures class, no run, test runs individually
@@ -22,7 +30,9 @@ class Test_Measure(unittest.TestCase):
         M = RD.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
                         features_dict=self.features_dict)
-        self.assertTrue(len(M.measures) > 0)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
 
     def test_propka(self):
         print('-> Test measuring PROPKA')

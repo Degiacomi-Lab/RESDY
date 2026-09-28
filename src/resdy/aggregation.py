@@ -256,10 +256,6 @@ class Aggregation:
         - 'vif': Variance Inflation Factor Correlation analysis to remove features which are
           correlated
         - 'null': Remove all the columns within the AEVs which are always zero
-
-        .. todo::
-
-           Implement the 'autoencoder' reduction method - Autoencoder dimension reduction method, try and capture any non-linearity (GW, 21.08.25).
         '''
         if 'aev' in self.features_to_include:
             df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.df_measurements['aev']]))
@@ -394,12 +390,12 @@ class Aggregation:
             data = dict(zip(self.lys_key, row_key))
             data['class'] = class_val
             features = [a for a in self.features_to_include if a not in self.non_feature_cols]
+            rand_row = random.randrange(0, len(df_query))
             for feature in features:
                 if feature == 'aev':
                     df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
                     min_row = df_query['sumaev'].idxmin()
                     max_row = df_query['sumaev'].idxmax()
-                    rand_row = random.randrange(0, len(df_query))
                     for feat in [a for a in df_query.columns if 'AEV_' in a]:
 
                         data[feat + '_min'] = round(float(df_query[feat].loc[min_row]), 2)  # min value at this position in min AEV
@@ -428,7 +424,7 @@ class Aggregation:
                     data[feature + '_avg'] = round(df_query[feature].mean(),2)
                     data[feature + '_sd'] = round(df_query[feature].std(ddof=0),2)
                     data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
-                    data[feature + '_rand'] = df_query[feature].iloc[random.randrange(0, len(df_query))]
+                    data[feature + '_rand'] = df_query[feature].iloc[rand_row]
 
             df_stats = pd.concat([df_stats, pd.DataFrame([data])], ignore_index=True)
 
@@ -460,7 +456,7 @@ class Aggregation:
                         case 'min' | '3':
                             if feat not in min_features: min_features.append(feat)
                         case 'med' | '4':
-                            if feat not in min_features: med_features.append(feat)
+                            if feat not in med_features: med_features.append(feat)
                         case 'avg' | '5':
                             if feat not in avg_features: avg_features.append(feat)
                         case 'sd' | '6':

@@ -39,9 +39,9 @@ class STRUCTURE():
             import melodia_py as mel
             self.mel = mel
         except ImportError as e:
-            print(f'>> Packages required for melodia calculations (melodia_py) are '
-                f'not available, melodia will be removed from features to calculate. '
-                f'Error: {str(e)}')
+            raise ImportError(f'>> Packages required for melodia calculations (melodia_py) are '
+                            f'not available, melodia will be removed from features to calculate. '
+                            f'Error: {str(e)}') from e
 
         self.melodia_features = melodia_features
         self.include_modified = include_modified
@@ -85,11 +85,13 @@ class STRUCTURE():
         except Exception as e:
             if self.record_errors: report_error_to_file('Melodia 1', path, str(e), self.error_filename)
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'curvature'])
 
         # Melodia 2 - Formatting and filtering
         try:
             melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
-            lys_results = melodia_results['name'].isin((self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']))
+            lys_results = melodia_results['name'].isin((self.aa_properties['non_modified_codes'] +
+                                                        self.aa_properties['modified_codes']))
             df_melodia = melodia_results[lys_results].copy()
             df_melodia.reset_index(inplace=True, drop=True)
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(df_melodia['name']))
@@ -97,11 +99,15 @@ class STRUCTURE():
                             'torsion', 'phi', 'psi', 'name', 'arc_length']
             cols_to_drop = [col for col in cols_to_drop if col not in self.melodia_features]
             df_melodia.drop(labels=cols_to_drop, axis = 'columns', inplace=True)
-            if self.include_modified: df_melodia['Modified'] = list_modified
+            if self.include_modified:
+                df_melodia['Modified'] = list_modified
 
         except Exception as e:
-            if self.record_errors: report_error_to_file('Melodia 2', path, str(e), self.error_filename)
-            print(f'Melodia 2: Unable to reformat melodia output correctly for input {path} with error: {e}')
+            if self.record_errors:
+                report_error_to_file('Melodia 2', path, str(e), self.error_filename)
+            print(f'Melodia 2: Unable to reformat melodia output correctly for '
+                  f'input {path} with error: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'curvature'])
 
         return df_melodia
 

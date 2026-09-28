@@ -170,6 +170,12 @@ class EVOLUTION():
                 tmp_data = subset_data[subset_data['chain'] == chain]
                 pdb_seqs[chain] = ''.join([_catch(lambda : protein_letters_dict[a.upper()]) for a in list(tmp_data['resname'])])
 
+            resid_to_index = {}
+            for chain in pdb_seqs:
+                tmp_data = subset_data[subset_data['chain'] == chain]
+                for pos, res in enumerate(tmp_data['resid']):
+                    resid_to_index[(chain, int(res))] = pos
+
         except Exception as e:
             if self.record_errors: report_error_to_file('Evolution - ESM 1', path, str(e), self.error_filename)
             print(f'Evolution ESM Calculation: 1 - could not extract the sequence from the protein file given: {e}')
@@ -182,8 +188,10 @@ class EVOLUTION():
         for idx, (lys_chain, lys_num) in enumerate(zip(list_chains, lys_res_nums)):
             try:
                 seq = pdb_seqs[lys_chain]
-                chain_shift_val = int(M.data[M.data['chain'] == lys_chain]['resid'].iloc[0]) - 1
-                seq_lys_index = lys_num - chain_shift_val - 1
+                seq_lys_index = resid_to_index.get((lys_chain, int(lys_num)))
+                if seq_lys_index is None:
+                    print(f'> Res {lys_num} on chain {lys_chain} has no CA in {path}, skipped')
+                    continue
 
                 start_idx = seq_lys_index - num_add_aa
                 end_idx = seq_lys_index + num_add_aa + 1

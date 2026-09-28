@@ -12,10 +12,15 @@ import shutil
 from copy import deepcopy
 import numpy as np
 import biobox as bb
-import pandas as pd
 
-from modeller import *
-from modeller.automodel import *
+try:
+    from modeller import *
+    from modeller.automodel import *
+    modeller_available = True
+    _modeller_error = ''
+except Exception as e:
+    modeller_available = False
+    _modeller_error = e
 
 from .helper import ShutUp
 
@@ -38,6 +43,11 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
     :returns: patched chain name path
     :rtype: str
     '''
+    if not modeller_available:
+        raise ImportError(f'>> To patch a structure which has gaps in requires Modeller which is '
+                          f'not currently installed. Install modeller with the instructions in '
+                          f'the RESDY Github Repo for more details. Error: {str(_modeller_error)}')
+
     print('>> modelling missing residues')
     pdb_out = ''
     seq_name = ''
@@ -368,8 +378,7 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     :type include_hetatm: bool
     '''
 
-    if not os.path.exists(outfolder):
-        os.mkdir(outfolder)
+    os.makedirs(outfolder, exist_ok=True)
 
     #split PDB file in chains using biobox
     M = bb.Molecule()
@@ -545,7 +554,6 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
                     except:
                         print(line, end='')
 
-        #If the protein fails, print error message with the error
         except Exception as e:
             raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. Error: {e}')
 
@@ -656,8 +664,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
         fouts.append(foutname)
 
     # reassemble complex in final directory
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
+    os.makedirs(outdir, exist_ok=True)
 
     fname = f"{os.path.basename(pdb).split('.')[0]}.pdb"
     outname = os.path.join(outdir, fname)

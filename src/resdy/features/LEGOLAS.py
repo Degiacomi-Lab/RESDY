@@ -75,7 +75,7 @@ class LEGOLAS():
         os.makedirs(self.legolas_output_path, exist_ok=True)
 
 
-    def calculate_legolas(self, path):
+    def calculate(self, path):
         '''
         Calculate 15N nmr data using legolas
 
@@ -179,4 +179,4 @@ class LEGOLAS():
 
 if __name__ == '__main__':
     nmr = LEGOLAS(outdir='demo', include_modified=False)
-    print(nmr.calculate_legolas(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))
+    print(nmr.calculate(path=f'demo{os.sep}curated{os.sep}1A6M-alt1A.pdb'))

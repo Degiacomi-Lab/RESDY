@@ -17,43 +17,6 @@ import biobox as bb
 from .features import *
 
 
-# AEV packages
-try:
-    from ase import Atoms
-    import torch
-    import torchani
-except Exception as e:
-    print(f'Packages required for AEV calculation are not available, '
-          f'will not be able to calculate AEVs. Error: {e}')
-
-try:
-    from Bio.PDB import PDBParser
-    from Bio.PDB.ResidueDepth import min_dist, get_surface, residue_depth
-except Exception as e:
-    print(f"biopython and msms unavailable. Unable be able to calculate residue depth. Error: {e}")
-
-# Frustration packages
-try:
-    import frustratometer
-except Exception as e:
-    print(f"frustratometer unavailable. Unable to calculate frustration. Error: {e}")
-
-# Melodia packages
-try:
-    import melodia_py as mel
-except Exception as e:
-    print(f"melodia unavailable. Unable to calculate melodia. Error: {e}")
-
-# ESM packages
-try:
-    import torch
-    import torch.nn as nn
-    import esm
-except Exception as e:
-    print(f'>> Failed to import packages required for esm calculations, '
-          f'will not be able to calculate sequence features based on esm. Error: {e}')
-
-
 class Measure(object):
     '''
     Class to handle functions used in calling feature functions; returns a dataframe
@@ -145,6 +108,7 @@ class Measure(object):
             self.logger.addHandler(handler)
 
         self.outdir = outdir
+        os.makedirs(outdir, exist_ok=True)
         self.df_input = df_input
         self.folder = os.path.join(outdir, "curated")
         self.only_relaxed = only_relaxed
@@ -155,8 +119,10 @@ class Measure(object):
         # document failed pdb files
         self.wrong_pdb_file = []
         self.report_errors = report_errors
-        if self.report_errors: self.error_filename = self._setup_report_errors_file()
-        else: self.error_filename = 'no_record'
+        if self.report_errors:
+            self.error_filename = self._setup_report_errors_file()
+        else:
+            self.error_filename = 'no_record'
 
         self.residue_of_interest = residue_of_interest
         self.features_dict = features_dict.copy()
@@ -199,7 +165,7 @@ class Measure(object):
         self.parallel_items = {}
 
         # Check that all files in DataFrame appear at least once in folder
-        files_af=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
+        files_af=[os.path.splitext(os.path.basename(c))[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
         files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
         for f in df_input['PDB_Code'].values:
             if f not in files_af and f not in files_pdb:
@@ -273,7 +239,15 @@ class Measure(object):
                 melodia_features += [m]
             else:
                 if m.upper() in globals().keys():
-                    if inspect.isclass(globals()[m.upper()]) and hasattr(globals()[m.upper()], 'calculate') and callable(getattr(globals()[m.upper()], 'calculate')):
+                    cls_dets = globals()[m.upper()]
+                    if not (inspect.isclass(cls_dets) and callable(getattr(cls_dets, 'calculate', None))):
+                        self.features.remove(m)
+                        print(f'>> Feauture class {m} has no callable attribute called calculate()'
+                              f', so {m} cannot be measured, please ensure the feature class has a'
+                              f'calculate() function. This feature has been removed from the list '
+                              f'to calculate.')
+                        continue
+                    if inspect.isclass(cls_dets) and hasattr(cls_dets, 'calculate') and callable(getattr(cls_dets, 'calculate')):
                         try:
                             tmp_name = m.lower()
                             kwargs = features_dict.get(m, {})
@@ -332,7 +306,7 @@ class Measure(object):
         '''
         propka_res = ['ASP', 'GLU', 'HIS', 'CYS', 'TYR', 'LYS', 'ARG']
         pkaani_res = ['ASP', 'GLU', 'HIS', 'TYR', 'LYS']
-        
+
         if isinstance(res_details, str):
             match res_details:
                 case 'LYS':
@@ -357,15 +331,22 @@ class Measure(object):
                                     f'dictionary of properties for your custom investigation into another '
                                     f'residue.')
 
-            if res_details not in propka_res and res_details in list(self.features_dict):
-                print(f'>> Residue entered for analysis ({res_details}) is not possible to run analysis '
-                      f'for in PROPKA3, removing from features to calculate.')
-                self.features_dict.pop('propka')
+            def _drop_unsupported_features(feature, supported, res_codes):
+                '''
+                Remove feature from list of features to calculate if the feature cannot be used
+                on the desired residue to calculate.
+                '''
+                if feature not in self.features_dict:
+                    return
+                if any(c.upper() in supported for c in res_codes):
+                    return
+                print(f'>> {feature} cannot compute a pKa value for {", ".join(res_codes)}; '
+                      f'removing {feature} from the features to calculate.')
+                self.features_dict.pop(feature)
 
-            if res_details not in pkaani_res and res_details in list(self.features_dict):
-                print(f'>> Residue entered for analysis ({res_details}) is not possible to run analysis '
-                        f'for in pKaANI, removing from features to calculate.')
-                self.features_dict.pop('pkaani')
+            res_codes = ([res_details] if isinstance(res_details, str) else list(res_details['non_modified_codes']))
+            _drop_unsupported_features('propka', propka_res, res_codes)
+            _drop_unsupported_features('pkaANI', pkaani_res, res_codes)
 
         elif isinstance(res_details, dict):
             dict_keys = ['non_modified_codes', 'modified_codes',
@@ -433,8 +414,16 @@ class Measure(object):
 
         plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
         if os.path.exists(plddt_record_path):
-            df_af_plddt = pd.read_csv(plddt_record_path).drop_duplicates(subset=['PDB_Code', 'Chain', 'Resid'], keep='last')
-            self.df = self.df.merge(df_af_plddt, how='left', on=['PDB_Code', 'Chain', 'Resid'])
+            df_af_plddt = pd.read_csv(plddt_record_path).drop_duplicates(
+                subset=['PDB_Code', 'Chain', 'Resid'], keep='last')
+            self.df['_plddt_key'] = self.df['PDB_Code'].str.replace('_relaxed', '', regex=False)
+            df_af_plddt = df_af_plddt.rename(columns={'PDB_Code': '_plddt_key'})
+            self.df = self.df.merge(df_af_plddt, how='left', on=['_plddt_key', 'Chain', 'Resid'])
+            self.df = self.df.drop(columns='_plddt_key')
+            n_af = int(self.df['PDB_Code'].str.contains('AF-').sum())
+            if n_af and not int(self.df['PLDDT'].notna().sum()):
+                print(f'>> {n_af} AlphaFold rows were measured but none matched a PLDDT record '
+                      f'in the PLDDT record path given {plddt_record_path}')
         else:
             print(f'>> No PLDDT record file available at {plddt_record_path}, '
                   f'no PLDDT column added to measurement dataframe')
@@ -798,7 +787,11 @@ class Measure(object):
                 data = dict(zip(base_columns, parts))
                 log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                 test_lines += 1
-                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
+                last_reported = 0
+                percent_prog = round((curr_line/num_lines)*100, 2)
+                if percent_prog != last_reported:
+                    last_reported = percent_prog
+                    print(f'Progress analysing log file: {percent_prog} %\r', end='', flush=True)
 
         self.df = log_to_df
         print('Data recovered from log file')
@@ -834,16 +827,21 @@ class Measure(object):
 
         # remove the last protein from list incase it wasn't completed fully
         measured_proteins = list(self.df['Uniprot_Entry'])
-        final_protein = measured_proteins[-1]
-        proteins_completed = list(set(measured_proteins))
-        proteins_completed = [c for c in proteins_completed if c != final_protein]
+        if measured_proteins:
+            final_protein = measured_proteins[-1]
+            proteins_completed = list(set(measured_proteins))
+            proteins_completed = [c for c in proteins_completed if c != final_protein]
 
-        # 2. Update df_input to only have the files which haven't been analysed yet
-        idx_to_remove = []
-        for i, r in self.df_input.iterrows():
-            if r['Uniprot_Entry'] in proteins_completed:
-                idx_to_remove.append(i)
-        self.df_input = self.df_input.drop(idx_to_remove)
+            # 2. Update df_input to only have the files which haven't been analysed yet
+            idx_to_remove = []
+            for i, r in self.df_input.iterrows():
+                if r['Uniprot_Entry'] in proteins_completed:
+                    idx_to_remove.append(i)
+            self.df_input = self.df_input.drop(idx_to_remove)
+
+        else:
+            print(f'>> No measurements of proteins were identified in the given log file: '
+                  f'{log_path}, starting again from scratch')
 
         # 3. Restart the measure_dataframe() with the new file list
         print(f'Continuing measurements. {len(self.df_input)} proteins to measure.')
@@ -1124,7 +1122,7 @@ class Measure(object):
 
         print('>> Preparing to restart measurements on PDB only')
         # 1. Analyse the measures log file to create a list of files that were analysed
-        tmp_log_path = os.path.join(self.outdir, f'{log_path.split('.')[0]}_tmp.txt')
+        tmp_log_path = os.path.join(self.outdir, f'{os.path.splitext(log_path)[0]}_tmp.txt')
         log_path = os.path.join(self.outdir, log_path)
         print(f'>> Finding measured proteins from log file: {log_path}')
         proteins_completed = []
@@ -1137,6 +1135,7 @@ class Measure(object):
 
         curr_line = 0
         final_prot_start_line = None
+        last_reported = 0
         with open(file=log_path, mode='r') as lpf:
             for line in lpf:
                 curr_line += 1
@@ -1145,18 +1144,23 @@ class Measure(object):
                 parts = line.split()
                 protein_code = parts[1].split('/')[-1]
                 proteins_completed.append(protein_code)
-                percent_prog = round((curr_line/num_lines)*100, 2)
                 final_prot_start_line = curr_line
-                print(f'Progress analysing log file: {percent_prog} %\r', end='', flush=True)
+                percent_prog = round((curr_line/num_lines)*100, 2)
+                if percent_prog != last_reported:
+                    last_reported = percent_prog
+                    print(f'Progress analysing log file: {percent_prog} %\r', end='', flush=True)
         print('>> Measured proteins recovered from log file')
 
-        curr_line = 0
-        with open(file=log_path, mode='r') as lpf, open(file=tmp_log_path, mode='w') as npf:
-            for line in lpf:
-                curr_line += 1
-                if line < final_prot_start_line:
-                    npf.write(line)
-        os.rename(src=tmp_log_path, dst=log_path)
+        if final_prot_start_line is None:
+            print(f'>> No complete measurement sets found in the log')
+        else:
+            curr_line = 0
+            with open(file=log_path, mode='r') as lpf, open(file=tmp_log_path, mode='w') as npf:
+                for line in lpf:
+                    curr_line += 1
+                    if curr_line < final_prot_start_line:
+                        npf.write(line)
+            os.replace(src=tmp_log_path, dst=log_path)
 
 
         # 2. remove the last protein from list incase it wasn't completed fully
@@ -1308,7 +1312,11 @@ class Measure(object):
 
                 log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
                 test_lines += 1
-                print(f'Progress analysing log file: {round((curr_line/num_lines)*100, 2)} %\r', end='', flush=True)
+                last_reported = 0
+                percent_prog = round((curr_line/num_lines)*100, 2)
+                if percent_prog != last_reported:
+                    last_reported = percent_prog
+                    print(f'Progress analysing log file: {percent_prog} %\r', end='', flush=True)
 
         self.df = log_to_df
         print('Data recovered from log file')
