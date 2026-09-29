@@ -1,6 +1,7 @@
 import unittest
 import sys
 import os
+from pathlib import Path
 import shutil
 import tempfile
 
@@ -9,9 +10,10 @@ from resdy import patcher
 
 class Test_Patcher(unittest.TestCase):
     def setUp(self):
-        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        self.outdir = 'resdy_test_patcher'
+        os.makedirs(self.outdir, exist_ok=True)
         os.makedirs(os.path.join(self.outdir, 'conformations'), exist_ok=True)
-        os.makedirs(os.path.join(self.outdir, 'curated'), exist_ok=True)
+
         shutil.copyfile(os.path.join('demo', 'conformations', '2MWS-alt-1.pdb'), os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb'))
         shutil.copyfile(os.path.join('demo', 'conformations', '2MWS.fasta'), os.path.join(self.outdir, 'conformations', '2MWS.fasta'))
 
@@ -22,7 +24,8 @@ class Test_Patcher(unittest.TestCase):
         pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
         fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
         gap = 10
-        fname = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=gap)
+        outdir = os.path.join(self.outdir, 'curated')
+        fname = patcher.curate(pdb=pdb, fasta=fasta, outdir=outdir, gap=gap)
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
 
 
