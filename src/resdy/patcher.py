@@ -358,6 +358,75 @@ def analyze_protein(M):
     return cnt
 
 
+def superpose_onto(mobile, reference, out=''):
+    '''
+    Rigidly move a patched chain back onto the coordinates it was built from.
+
+    Modeller returns a model in its own frame, so a chain comes back from
+    :func:`autopatch` translated and rotated with respect to the structure it was taken
+    from. For a single chain that is harmless, but the chains of a complex are patched
+    independently, so reassembling them without putting each one back destroys the
+    quaternary structure. This performs a least-squares fit (Kabsch) on the atoms the two
+    files share, keyed on residue number and atom name, and applies the resulting
+    transformation to every atom of ``mobile``.
+
+    Coordinates are rewritten in the text of the file rather than through biobox, so that
+    the occupancy and B-factor columns are left exactly as they were.
+
+    :param mobile: pdb file to move, normally the output of :func:`autopatch`.
+    :type mobile: str
+    :param reference: pdb file holding the original coordinates of the same chain.
+    :type reference: str
+    :param out: file to write. Defaults to overwriting ``mobile``.
+    :type out: str
+    :returns: (number of atoms fitted, RMSD over those atoms after the fit, in A). Both
+        are zero when the fit could not be made, in which case ``mobile`` is left alone.
+    :rtype: tuple
+    '''
+    out = out or mobile
+
+    def _atoms(path):
+        rows = []
+        for line in open(path):
+            if line.startswith(('ATOM', 'HETATM')):
+                rows.append((line, line[21], int(line[22:26]), line[12:16].strip(),
+                             (float(line[30:38]), float(line[38:46]), float(line[46:54]))))
+        return rows
+
+    mob, ref = _atoms(mobile), _atoms(reference)
+
+    # Key atoms on chain as well as residue and atom name, unless both files hold a
+    # single chain. The single-chain case is how curate() uses this, and there the chain
+    # name cannot be relied on: Modeller does not necessarily give its model the same
+    # chain name as the fragment it was built from.
+    one_chain = len({r[1] for r in mob}) <= 1 and len({r[1] for r in ref}) <= 1
+    key = (lambda r: (r[2], r[3])) if one_chain else (lambda r: (r[1], r[2], r[3]))
+
+    ref_xyz = {key(r): r[4] for r in ref}
+    P = [m[4] for m in mob if key(m) in ref_xyz]
+    Q = [ref_xyz[key(m)] for m in mob if key(m) in ref_xyz]
+    if len(P) < 3:
+        print(f'>> Only {len(P)} atoms shared between {os.path.basename(mobile)} and the '
+              f'chain it was built from; cannot superpose it back, leaving it as Modeller '
+              f'placed it')
+        return 0, 0.0
+
+    P, Q = np.array(P, dtype=float), np.array(Q, dtype=float)
+    Pc, Qc = P.mean(axis=0), Q.mean(axis=0)
+    U, _, Vt = np.linalg.svd((P - Pc).T @ (Q - Qc))
+    # guard against the fit producing a reflection rather than a rotation
+    D = np.diag([1.0, 1.0, np.sign(np.linalg.det(Vt.T @ U.T))])
+    rot = Vt.T @ D @ U.T
+    trans = Qc - rot @ Pc
+    rmsd = float(np.sqrt((((rot @ P.T).T + trans - Q) ** 2).sum(axis=1).mean()))
+
+    with open(out, 'w') as fh:
+        for line, _, _, _, xyz in mob:
+            v = rot @ np.array(xyz, dtype=float) + trans
+            fh.write(f'{line[:30]}{v[0]:8.3f}{v[1]:8.3f}{v[2]:8.3f}{line[54:]}')
+    return len(P), rmsd
+
+
 def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     '''
     Take pdb file, check if more than 62 chains (can't patch this due to legacy pdb format problems)
@@ -376,6 +445,10 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     :type outfolder: str
     :param include_hetatm: Toggleable option to allow hetatms to pass through biobox
     :type include_hetatm: bool
+    :returns: (gap report, chain names). The gap report has one row per chain, in the same
+        order as the chain names, holding [number of gaps, number of missing residues,
+        largest sequence gap].
+    :rtype: tuple
     '''
 
     os.makedirs(outfolder, exist_ok=True)
@@ -499,7 +572,7 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
         except Exception as e:
             raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. {e}')
 
-    return np.array(gap_count)
+    return np.array(gap_count), list(chains)
 
 
 def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
@@ -624,7 +697,8 @@ def curate(pdb, fasta, outdir="result", gap=10,
     os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    gap_count = fragment(pdb, fasta, tmp_folder, include_hetatm=include_hetatm)
+    gap_count, chain_order = fragment(pdb, fasta, tmp_folder, include_hetatm=include_hetatm)
+    gaps_by_chain = {c: int(g[0]) for c, g in zip(chain_order, gap_count)}
 
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
@@ -638,15 +712,23 @@ def curate(pdb, fasta, outdir="result", gap=10,
 
         # attempt modelling
         fbasename = os.path.splitext(f)[0]
+        chain_name = os.path.basename(fbasename)[len('chain'):]
 
-        if verbose:
-            foutname = autopatch(tmp_folder, fbasename, gap)
+        if gaps_by_chain.get(chain_name, 1) == 0:
+            # nothing is missing from this chain, so there is nothing for Modeller to
+            # build. Running it anyway would rebuild the chain and return it in its own
+            # frame, which for a complex means the chains no longer sit correctly with
+            # respect to one another.
+            foutname = f'{fbasename}.pdb'
         else:
-            with ShutUp():
+            if verbose:
                 foutname = autopatch(tmp_folder, fbasename, gap)
+            else:
+                with ShutUp():
+                    foutname = autopatch(tmp_folder, fbasename, gap)
 
-        if foutname == "":
-            raise Exception("Autopatching failed.")
+            if foutname == "":
+                raise Exception("Autopatching failed.")
 
         # ensure that sequences of AA starts from the correct resid
         M_raw = bb.Molecule()
@@ -660,7 +742,17 @@ def curate(pdb, fasta, outdir="result", gap=10,
             M_curated.data["resid"] = startval_clean
             M_curated.write_pdb(foutname)
 
-        chains.append(fbasename.split('chain')[-1])
+        if foutname != f'{fbasename}.pdb':
+            # put the model back in the frame of the chain it was built from, so that the
+            # chains can be reassembled into the complex they came from. This has to come
+            # after the renumbering above, because the fit pairs atoms on residue number
+            # and Modeller numbers its models from 1.
+            n_fit, rmsd = superpose_onto(foutname, f'{fbasename}.pdb')
+            if n_fit:
+                print(f'>> chain {chain_name}: patched model superposed back on {n_fit} '
+                      f'atoms, rmsd {rmsd:.2f} A')
+
+        chains.append(chain_name)
         fouts.append(foutname)
 
     # reassemble complex in final directory
