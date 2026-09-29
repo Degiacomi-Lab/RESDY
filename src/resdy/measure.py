@@ -17,6 +17,12 @@ import biobox as bb
 from .features import *
 
 
+#: Features requested by the 'all' shorthand in ``features_dict``.
+ALL_FEATURES = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
+                'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
+                'rmsf']
+
+
 class Measure(object):
     '''
     Class to handle functions used in calling feature functions; returns a dataframe
@@ -127,8 +133,14 @@ class Measure(object):
         self.residue_of_interest = residue_of_interest
         self.features_dict = features_dict.copy()
 
+        # expand the 'all' shorthand first, so that _setup_aa_properties sees the real
+        # feature names and can drop the ones that cannot handle the residue of interest
+        if 'all' in self.features_dict:
+            self.features_dict = {k: {} for k in ALL_FEATURES}
+
         self.aa_properties = self._setup_aa_properties(residue_of_interest)
-        self._setup_measures(features_dict.copy())
+        # build the registry from what survived _setup_aa_properties, not from the argument
+        self._setup_measures(self.features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
 
@@ -198,10 +210,7 @@ class Measure(object):
         :type features_dict: dict
         '''
         if 'all' in features_dict:
-            feature_all = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
-                        'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
-                        'rmsf']
-            features_dict = {k: {} for k in feature_all}
+            features_dict = {k: {} for k in ALL_FEATURES}
             self.features_dict = features_dict
             self.features = list(features_dict)
         self.measures = []
@@ -526,7 +535,7 @@ class Measure(object):
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append([file_details, lock])
 
-            base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Method']
+            base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             df_parallel = pd.DataFrame()
 
             gpu_feats = ['aev', 'evolution', 'legolas']

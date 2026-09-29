@@ -34,9 +34,12 @@ class Analysis(object):
         :type df: pandas.DataFrame
         :param outdir: Name of the directory to write to
         :type outdir: str
-        :param features_to_analyse: List of features which should be analysed over. If ['all'] is
-            passed, all features available in the table will be used.
+        :param features_to_analyse: List of features which should be analysed over. Naming them
+            explicitly also drops every row that has no value for one of them. If [] (default) or
+            ['all'] is passed, all feature columns present in the table are used and no row is
+            dropped.
         :type features_to_analyse: list
+        :raises KeyError: if a named feature is not a column of the dataframe.
         '''
         if isinstance(df, str):
             self.df = pd.read_csv(df)
@@ -47,15 +50,16 @@ class Analysis(object):
                          'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap']
 
         if features_to_analyse in ([], ['all']):
+            # no features named: analyse every feature column, and keep every row
             self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
         else:
             missing = [a for a in features_to_analyse if a not in self.df.columns]
             if missing:
                 raise KeyError(f'features_to_analyse gives columns that are not present within the'
                                f' dataframe, missing features: {", ".join(missing)}')
-
-        self.features_to_analyse = list(features_to_analyse)
-        self.df = self.df.dropna(subset=self.features_to_analyse)
+            self.features_to_analyse = list(features_to_analyse)
+            # features were named explicitly, so drop the rows that lack one of them
+            self.df = self.df.dropna(subset=self.features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
