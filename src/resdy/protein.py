@@ -43,7 +43,7 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
-                 resnames_of_interest = ['LYS'], minimise_strucs='',
+                 resnames_of_interest = ['LYS'], minimise_strucs='AF',
                  remove_all_modifications=False,
                  num_cores=0, max_nmr_conformers=''):
         '''
@@ -111,14 +111,12 @@ class PDB(object):
                 case 'ALL':
                     self.minimise_af = True
                     self.minimise_pdb = True
-                case '':
-                    print('>> Minimisation method left unchanged (\'\'), therefore default '
-                          'method of minimising only AF structures is applied')
-                    self.minimise_af = True
+                case '' | 'NONE':
+                    self.minimise_af = False
                     self.minimise_pdb = False
                 case _:
                     print(f'>> Minimisation method given as input (input: {minimise_strucs}) '
-                            f'not recognised: options are None, AF, PDB, ALL; Using default '
+                            f'not recognised: options are \'\', None, AF, PDB, ALL; Using default '
                             f'method of only minimising AF structures.')
                     self.minimise_af = True
                     self.minimise_pdb = False
@@ -127,8 +125,10 @@ class PDB(object):
             self.minimise_pdb = False
 
         if (self.minimise_af or self.minimise_pdb) and not openmm_available:
-            raise ImportError('Minimisation of structures requested but openmm not available, '
-                              'either install openmm or change minimise_strucs parameter to \'\'')
+            raise ImportError(f'Minimisation of structures requested (minimise_strucs='
+                              f'{minimise_strucs!r}) but openmm not available, either install '
+                              f'openmm or change minimise_strucs parameter to None to skip '
+                              f'the minimisation.')
 
         if isinstance(max_nmr_conformers, int):
             self.max_nmr_conformers = max_nmr_conformers
@@ -142,6 +142,7 @@ class PDB(object):
                     print(f'>> Could not infer the max number of nmr conformers desired with '
                           f'input value {max_nmr_conformers}, taking all conformers as '
                           f'default; Error: {e}')
+                    self.max_nmr_conformers = None
         else:
             if max_nmr_conformers != None:
                 print(f'>> Unknown option given as input for max_nmr_conformers '
@@ -301,9 +302,11 @@ class PDB(object):
                     broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
                     broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
 
-
-            with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                results = [t for t in pool.starmap(self._curate_row, items) if t is not None]
+            if self.parallel:
+                with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                    results = [t for t in pool.starmap(self._curate_row, items) if t is not None]
+            else:
+                results = [t for t in (self._curate_row(*i) for i in items) if t is not None]
 
             if not results:
                 print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
@@ -518,12 +521,6 @@ class PDB(object):
         :param chains: list of chains for the pdb interested in, not required but used if pdb file
             goes over more than 1 uniprot code. Default: []
         :type chains: list
-
-        .. todo::
-
-        Renumbering is only possible for structures that have a Uniprot code associated with them, so
-        that a sequence to align to is available. Find a way of making it work with PDB_only
-        (24.03.26).
         '''
         try:
             self.download_pdb(pdb)
@@ -567,7 +564,7 @@ class PDB(object):
 
             try:
                 if self.minimise_pdb:
-                    self.apply_minimisation(os.path.basename(f).split('.')[0])
+                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0])
             except Exception as e:
                 print(f'Failed to apply minimisation to file {f}')
 
@@ -959,7 +956,8 @@ class PDB(object):
                         f_write.close()
                         number = number + 1
 
-                        if number > self.max_nmr_conformers:
+                        if (self.max_nmr_conformers is not None and
+                            number > self.max_nmr_conformers):
                             f_write.close()
                             f.close()
                             os.remove(path)
@@ -1254,7 +1252,7 @@ class PDB(object):
 
             M.data['chain'] = M.data['chain'].replace(replacement_dict)
 
-            pdb = path.split(os.sep)[-1].split('.')[0]
+            pdb = os.path.splitext(os.path.basename(path))[0]
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
             M.write_pdb(path_temp, index=indices, split_struc=False)
 
@@ -1361,10 +1359,11 @@ class PDB(object):
             print(f'>> Minimising structure: {pdb}')
             pdb_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb'
             pdb_inst = PDBFile(pdb_path)
+            relaxed_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb'
 
             M = bb.Molecule()
             M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
-            df_beta = M.data[['chain', 'resid', 'beta']]
+            df_beta = M.data[['chain', 'resid', 'name', 'beta']]
 
             forcefield = ForceField("amber14-all.xml",
                                     "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
@@ -1395,14 +1394,23 @@ class PDB(object):
 
             PDBFile.writeFile(modeller.topology,
                             modeller.getPositions(),
-                            open(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb', "w"))
+                            open(relaxed_path, "w"),
+                            keepIds=True)
 
             N = bb.Molecule()
             N.import_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
-            N.data = N.data.drop(columns=['beta']).merge(df_beta, how='left', on=['chain', 'resid'])
-            N.write_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+            merged_beta = (N.data.drop(columns=['beta'])
+                           .merge(df_beta, how='left',
+                                  on=['chain', 'resid', 'name'],
+                                  validate='one_to_one'))
+            if len(merged_beta) != len(N.data):
+                raise Exception(f'B-factor restoration after minimisation failed for pdb: {pdb}, '
+                                f'Lengths before ({len(N.data)}) and length merged '
+                                f'({len(merged_beta)}) are different.')
+            N.data = merged_beta
+            N.write_pdb(relaxed_path)
 
-            print(f'>> Finished minimising structure: {pdb}')
+            print(f'>> Finished minimising structure: {pdb}_relaxed.pdb')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')

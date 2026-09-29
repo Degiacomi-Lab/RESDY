@@ -2,6 +2,7 @@ Uniprot_Entry,PDB_Code,Method,Resolution,Chains,Largest_Gap
 P40616,AF-P40616-F1-model_v6,Predicted,,A,
 P40616,1UPT,X-ray,1.70,A/C/E/G,0.0
 P40616,4DCN,X-ray,3.01,A/B,0.0
+P02185,1A6M,X-ray,1.00,A,0.0
 Q16825,AF-Q16825-F1-model_v6,Predicted,,A,
 Q16825,8GVL,X-ray,2.10,A/B,0.0
 Q16825,8GVV,X-ray,1.80,A,5.0
@@ -9,4 +10,3 @@ Q16825,8GWH,X-ray,2.00,A,1.0
 Q16825,8GXE,X-ray,3.00,A,5.0
 Q16825,8Y8Y,X-ray,2.10,A,0.0
 P0CG48,2MWS,NMR,-,A,0.0
-P02185,1A6M,X-ray,1.00,A,0.0

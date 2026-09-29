@@ -13,7 +13,6 @@ dependencies:
   - seaborn
   - Modeller
   - propka
-  # analysis.enrichment_analysis raises ImportError without statsmodels
   - statsmodels
   - frustratometer
   - ase
@@ -28,6 +27,11 @@ dependencies:
   - nglview
   - numba
   - python-dotenv
+  - scikit-learn
+  - scipy
+  - requests
+  - plotly
+  - dash
   - pip:
     - melodia-py==0.1.8
     - fair-esm

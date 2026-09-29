@@ -94,7 +94,9 @@ class DAS():
             list_modified = list(a in  self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
             if self.record_errors: report_error_to_file('DAS 1', path, str(e), self.error_filename)
-            print(f'DAS Calculation: 1 - could not load and identify the NZ atoms within the lysines of the structure: {e}')
+            print(f'DAS Calculation: 1 - could not load and identify the NZ '
+                  f'atoms within the lysines of the structure: {str(e)}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'das'])
 
         # 2: Setup the Xlink module and create the half spheres
         try:
@@ -103,6 +105,7 @@ class DAS():
         except Exception as e:
             if self.record_errors: report_error_to_file('DAS 2', path, str(e), self.error_filename)
             print(f'DAS Calculation: 2 - Failed to setup the Xlink biobox class: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'das'])
 
         for i, lys_nz_idx in enumerate(idx_nz):
             try:

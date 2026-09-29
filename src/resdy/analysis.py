@@ -43,17 +43,21 @@ class Analysis(object):
         else:
             self.df = df
 
-        if features_to_analyse == ['all']:
-            self.df = self.df
-        else:
-            self.df = self.df.dropna(subset=features_to_analyse)
+        standard_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Resolution', 'Method',
+                         'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap']
 
-        standard_cols = ['Uniprot_Entry', 'Chain', 'Resid', 'Resolution', 'Method', 'Class',
-                        'Modified', 'PLDDT']
-        self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
+        if features_to_analyse in ([], ['all']):
+            self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
+        else:
+            missing = [a for a in features_to_analyse if a not in self.df.columns]
+            if missing:
+                raise KeyError(f'features_to_analyse gives columns that are not present within the'
+                               f' dataframe, missing features: {", ".join(missing)}')
+
+        self.features_to_analyse = list(features_to_analyse)
+        self.df = self.df.dropna(subset=self.features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
-
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
 
         self.GO_dict = {} # code as the key
@@ -62,6 +66,7 @@ class Analysis(object):
         self.code_to_name = None
 
         self.outdir = outdir
+        os.makedirs(outdir, exist_ok=True)
         self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
 
 
@@ -480,7 +485,7 @@ class Analysis(object):
                 print(f'>> Plot type give ({plot_type}) not recognised, please choose either all, single, agg')
 
         if save_name != '':
-            plt.savefig(save_name)
+            plt.savefig(os.path.join(self.outdir, save_name))
 
         if show_graph:
             plt.show()
@@ -753,8 +758,6 @@ class Analysis(object):
             if new_nonoverlap_columns:
                 if column == 'aev':
                     new_df['aev'] = new_df['aev'].astype('object')
-                elif column == 'aev_legolas':
-                    new_df['aev_legolas'] = new_df['aev_legolas'].astype('object')
 
                 cols_to_use = ['PDB_Code', 'Chain', 'Resid'] + new_nonoverlap_columns
                 self.df = self.df.merge(new_df[cols_to_use], how='left',
@@ -905,7 +908,7 @@ class Analysis(object):
         min_feats = ['propka', 'pkaANI', 'legolas', 'depth']
         max_feats = ['sasa', 'das', 'seqcharge', 'frustration']
         for feat in features:
-            if feat in ['aev', 'aev_legolas', 'evolution']:
+            if feat in ['aev', 'evolution']:
                 print(f'>> Feature {feat} is not supported with this analysis. '
                       f'Dropping feature from list to analyse')
             if feat not in min_feats + max_feats:

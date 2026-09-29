@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import Mock, patch
 import sys
 import os
+import shutil
+import tempfile
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
@@ -9,12 +11,16 @@ import resdy as RD
 
 class Test_Analysis(unittest.TestCase):
     def setUp(self):
-        self.df_measures = f'demo{os.sep}measures.csv'
-        self.outdir = 'demo'
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        self.df_measures = f'{self.outdir}{os.sep}measures.csv'
         self.features_to_analyse = ['depth', 'sasa', 'propka', 'das', 'curvature']
         self.A = RD.Analysis(df=self.df_measures,
                               outdir=self.outdir,
                               features_to_analyse=self.features_to_analyse)
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
 
     def test_auxiliary(self):
         df_spec = self.A.get_data(uniprot_entry='P02185',

@@ -107,7 +107,6 @@ class SEQCHARGE():
             c_alpha_idxs = M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]
             subset_data = M.data.iloc[c_alpha_idxs]
 
-
             protein_letters_dict = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
                                     'CYS': 'C', 'GLU': 'E', 'GLN': 'Q', 'GLY': 'G',
                                     'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
@@ -118,10 +117,13 @@ class SEQCHARGE():
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
                                     'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
                                     'LYSN': 'K'}
-            # KCX, LYE and LYSN (neutral lysine from gromacs) down as X so that they are not treated as positive K when calculations aren't including modified lysines
-            # however when including modified, need to consider these K for checking purposes, gets tricky when considering near lysines that are all modified...
-            if self.include_modified: protein_letters_dict['KCX'] = 'K'; protein_letters_dict['LYE'] = 'K'
-            else: protein_letters_dict['KCX'] = 'X'; protein_letters_dict['LYE'] = 'X' 
+
+            if self.include_modified:
+                expected_letters = {protein_letters_dict.get(c.upper(), 'X') for c in 
+                                    (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes'])}
+            else:
+                expected_letters = {protein_letters_dict.get(c.upper(), 'X') for c in 
+                                    (self.aa_properties['non_modified_codes'])}
 
             def _catch(func, *args, handle=lambda e : e, **kwargs):
                 try:
@@ -172,9 +174,9 @@ class SEQCHARGE():
 
                 seq = ('-' * start_null) + seq[start_idx:end_idx] + ('-' * end_null)
                 seq_split = list(seq)
-                if seq_split[num_add_aa] != 'K':
-                    print(f'A lysine was not found at the desired position {lys_num} on chain {lys_chain} '
-                          f'read in for PDB file {path}; sequence -> {seq}')
+                if seq_split[num_add_aa] not in expected_letters:
+                    print(f'>> The residue of interest was not found at the expected position '
+                          f'{lys_num} on chain {lys_chain} of {path}; sequence -> {seq}')
                     continue
 
                 pos_aa = ['K', 'H', 'R']

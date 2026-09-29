@@ -2,16 +2,22 @@ import unittest
 from unittest.mock import Mock, patch
 import sys
 import os
+import shutil
+import tempfile
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
 
-class Test_Uniprot(unittest.TestCase):
+class Test_Aggregation(unittest.TestCase):
     def setUp(self):
-        self.outdir = 'demo'
-        self.demo_measure = pd.read_csv(f'demo{os.sep}measures.csv')
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        self.demo_measure = pd.read_csv(f'{self.outdir}{os.sep}measures.csv')
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
 
     # TEST SCALAR AGGREGATION
 
@@ -120,7 +126,7 @@ class Test_Uniprot(unittest.TestCase):
                             'torsion_range', 'phi_min', 'phi_max', 'phi_avg', 'phi_sd', 'phi_range',
                             'phi_rand', 'psi_min', 'psi_max', 'psi_med', 'psi_avg', 'psi_sd',
                             'psi_range', 'psi_rand', 'das_min', 'das_max', 'das_avg', 'das_sd',
-                            'das_range', 'das_rand', 'flexibility_max']
+                            'das_range', 'das_rand', 'flexibility_max', 'rmsf_med']
 
         with patch('builtins.input', fake_input):
             Agg = RD.Aggregation(df_measurements=self.demo_measure,

@@ -1,398 +1,287 @@
-from ipywidgets import widgets
 import numpy as np
 import pandas as pd
 import nglview as nv
-import plotly.graph_objects as go
+import plotly.express as px
 import os
 import webbrowser
+from dash import Dash, dcc, html, Input, Output, callback
+from .aggregation import Aggregation
+
 
 class Viewer(object):
-    
-    def __init__(self, analysis, outdir = 'result'):
-        self.analysis = analysis
-        self.df = analysis.df
-  
-        # some temp dataframes
-        self.temp_df = pd.DataFrame()
-        self.temp_df_2 = pd.DataFrame()
-        
-        # the path to store the regional data
+    '''
+    Class to investigate the measurements data produced from measures using the plotly
+    dash functionality
+    '''
+
+    def __init__(self, df_measures, outdir = 'result'):
+        if isinstance(df_measures, str):
+            self.df_measures = pd.read_csv(df_measures)
+        else:
+            self.df_measures = df_measures
         self.outdir = outdir
-        self.export_path = ''
-        
-        # store the uniprot code clicked for the pop-up uniprot page
-        self.uni_clicked = ''
-        
-        # plot
-        self.plot = 'You have not called advanced_plot method.'
-        
-        # pka slider
-        self.p = widgets.FloatRangeSlider(
-                    value=[1, 14],
-                    min=1,
-                    max=14.0,
-                    step=0.1,
-                    description='pKa:',
-                    disabled=False,
-                    continuous_update=False,
-                    orientation='horizontal',
-                    readout=True,
-                    readout_format='.1f',)
-        
-        # sasa slider
-        self.s = widgets.FloatRangeSlider(
-                    value=[0, 100],
-                    min=0,
-                    max=100.0,
-                    step=0.1,
-                    description='SASA:',
-                    disabled=False,
-                    continuous_update=False,
-                    orientation='horizontal',
-                    readout=True,
-                    readout_format='.1f',)
-        
-        # GO Terms dropdown
-        options = [f'{code}: {self.analysis.code_to_name[code]}' for code in list(self.analysis.GO_dict.keys())]
-        self.GO = widgets.Dropdown(
-                    options=(['Welcome'] + sorted(options, key = lambda x: int(x.split(':')[0]))),
-                    value='Welcome',
-                    description='GO Terms: ',
-                    disabled=False,)
 
-        # PDB file text box
-        self.PDB_box = widgets.Text(
-                            value='Welcome',
-                            placeholder='Type something',
-                            description='PDB file:',
-                            disabled=True)
+        self.non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid',
+                         'Method', 'Resolution', 'PLDDT', 'class']
+        self.features = [a for a in self.df_measures.columns if a not in self.non_feat_cols]
+
+        # create the aggregated table for investigations
+        self.A = Aggregation(df_measurements=df_measures,
+                             aggregation_method='all',
+                             features_to_include='all',
+                             aev_red_method='pca')
+        self.df_agg = self.A.aggregate_data()
+
+        self.df_meas_stack = self._stack_data(self.df_measures, ['sasa', 0, 100], ['das', 0, 100])
+        print(self.df_meas_stack)
+        self.df_agg_stack = self._stack_data(self.df_agg, ['sasa', 0, 100], ['das', 0, 100])
+
+        self.data_viewer_app = Dash(__name__)
+        self._setup_html()
 
 
-        # call back function for the export buttom
-        def call_back_buttom_export(b_export):
-            if self.temp_df.empty:
-                return
-            df = self.temp_df
-            columns = ['Uniprot_Entry', 'Resid', 'Num', 'pKa_mean', 'sasa_mean', 'GO_Terms']
-            df_out = pd.DataFrame(columns = columns)
-            for idx, row in df.iterrows():
-                my_uniprot = row['Uniprot_Entry']
-                my_resid = row['Resid']
-                df_query = self.df[(self.df['Uniprot_Entry'] == my_uniprot) & (self.df['Resid'] == my_resid)]
-                GO_Terms = self.analysis.GO_search_protein(my_uniprot)
-                data = ({'Uniprot_Entry':my_uniprot, 'Resid':my_resid, 'Num':len(df_query), 'pKa_mean': round(df_query['pKa'].mean(),2), 'sasa_mean':round(df_query['sasa'].mean(),2), 'GO_Terms': GO_Terms})
-                df_dictionary = pd.DataFrame([data])
-                df_out = pd.concat([df_out, df_dictionary], ignore_index=True)
-
-            df_out.to_csv(self.export_path, index = False)
-
-        # export buttom for exporting the data within a region including GO Terms
-        self.b_export = widgets.Button(
-                    description='EXPORT TO CSV',
-                    disabled=False,
-                    button_style='info', # 'success', 'info', 'warning', 'danger' or ''
-                    tooltip='Click me',
-                    icon='check')
-        self.b_export.on_click(call_back_buttom_export)
-
-        # clear buttom for clearing the region
-        def call_back_buttom(b):
-            self.p.value, self.s.value = [1, 14], [0, 100]
-            self.GO.options = (['Welcome'] + list(self.analysis.GO_dict.keys()))
-            self.GO.value = 'Welcome'
-            self.uni_clicked = ''
-
-        self.b = widgets.Button(
-                    description='RESET',
-                    disabled=False,
-                    button_style='info', # 'success', 'info', 'warning', 'danger' or ''
-                    tooltip='Click me',
-                    icon='check')
+    def _stack_data(self, df, feat_a=['propka', 7.0, 11.5], feat_b=['das', 2, 40]):
+        '''
+        Transform the data such that it allows for easy access into the viewer plotting sets
         
-        self.b.on_click(call_back_buttom)
+        Parameters
+        ----------
+        :param df: Dataframe containing all the measurements data for analysis
+        :type df: pandas Dataframe
+        :param feat_a: List containing 3 elements, first the feature column name, then the
+            floats of the lower and upper bounds for the feature from the sliders
+        :type feat_a: list
+        :param feat_b: List containing 3 elements, first the feature column name, then the
+            floats of the lower and upper bounds for the feature from the sliders
+        :type feat_b: list
+        '''
+        feat_cols_df = [a for a in df.columns if a not in self.non_feat_cols]
+        non_feat_cols_df = [a for a in df.columns if a in self.non_feat_cols]
 
-        # clear buttom for clearing the 3D visualisation
-        self.b_2 = widgets.Button(
-                        description='CLEAR',
-                        disabled=False,
-                        button_style='info', # 'success', 'info', 'warning', 'danger' or ''
-                        tooltip='Click me',
-                        icon='check')
+        feat_one, feat_one_low, feat_one_upper = str(feat_a[0]), float(feat_a[1]), float(feat_a[2])
+        feat_two, feat_two_low, feat_two_upper = str(feat_b[0]), float(feat_b[1]), float(feat_b[2])
 
-        # buttom that once clicked will pop up the uniprot webpage
-        def call_back_buttom_open_url(b_open_url):
-            if self.uni_clicked == '':
-                return
-            url = 'https://www.uniprot.org/uniprot/' + self.uni_clicked
-            try:
-                webbrowser.open(url)
-            except:
-                print(f'access failed for {url}.')
-   
-        self.b_open_url = widgets.Button(
-                        description='Go to Uniprot',
-                        disabled=False,
-                        button_style='info', # 'success', 'info', 'warning', 'danger' or ''
-                        tooltip='Click me',
-                        icon='check')
+        def _subset_data(df, feat, low, upper):
+            matching_feats = [a for a in df.columns if feat in a]
+            for feat in matching_feats:
+                df = df[(df[feat] >= low) & (df[feat] <= upper)]
+            return df
 
-        self.b_open_url.on_click(call_back_buttom_open_url)
+        selected_df = _subset_data(df, feat_one, feat_one_low, feat_one_upper)
+        selected_df = _subset_data(df, feat_two, feat_two_low, feat_two_upper)
 
-        # the very fundamental plot
-        labels = ["UNIPROT: %s<br>resid: %i"%(self.analysis.df_sub["Uniprot_Entry"].values[i], self.analysis.df_sub["Resid"].values[i]) for i in range(len(self.analysis.df_sub))]
-        self.f = go.FigureWidget([go.Scatter(x=self.analysis.df_sub["sasa"], y=self.analysis.df_sub["pKa"],
-                                mode='markers', name="aggregate", showlegend=False, opacity=0.75,
-                                text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}')])
+        selected_df = selected_df.set_index(non_feat_cols_df)
+        df_stack = selected_df.stack().reset_index()
 
-        self.f.update_layout(
-        xaxis_title="SASA (A2)",
-        yaxis_title="pKa")
-
-        self.f.update_xaxes(range=[0, 100])
-        self.f.update_yaxes(range=[(int(self.df['pKa'].min())-1), (int(self.df['pKa'].max())+1)])
-        self.f.update_xaxes(showspikes=True)
-        self.f.update_yaxes(showspikes=True)
-        
-        scatter = self.f.data[0]
-        colors = ['#7f7f7f'] * len(self.analysis.df_sub)
-        scatter.marker.color = colors
-        self.f.layout.hovermode = 'closest'
-        
-        # bar chart for displaying p values in enrichment analysis
-        self.bar = go.FigureWidget()
-        self.bar.update_layout(barmode='overlay',
-                              xaxis_title='-log10(p value)',
-                              yaxis_title='GO codes')
+        return df_stack
 
 
-    
-    def advanced_plot(self, export_path = 'Regional_Data.csv', cutoff=0):
-        
-        self.export_path = os.path.join(self.outdir, export_path)
-        
-        def interact_slides(p, s):
-            if len(self.f.data)>1:
-                self.f.data = [self.f.data[0]]
-    
-            pka_l, pka_u = p[0], p[1]
-            sasa_l, sasa_u = s[0], s[1]
-            
-            # dont do anything if we are at the initial state
-            if ((pka_l, pka_u) == (1, 14.0)) and ((sasa_l, sasa_u) == (0, 100.0)):
-                for i in range(len(self.bar.data)):
-                    self.bar.data[i].visible = False # clear the bar chart
-                return
-            
-            selected_df = self.analysis.df_sub[(self.analysis.df_sub['propka'] >= pka_l) & (self.analysis.df_sub['propka'] <= pka_u)]
-            selected_df = selected_df[(selected_df['sasa'] >= sasa_l) & (selected_df['sasa'] <= sasa_u)]
-            self.temp_df = selected_df
-            
-            # update GO Term dropdown options
-            selected_uni_codes = selected_df['Uniprot_Entry'].unique() # get unique uniprot codes
-            new_options = list()
-            for code, uni_list in self.analysis.GO_dict.items():
-                for uni in selected_uni_codes:
-                    if uni in uni_list:
-                        new_options.append(code)
-                        break
-            new_options = [f'{code}: {self.analysis.code_to_name[code]}' for code in new_options]
-            self.GO.options = ['Welcome'] + sorted(new_options, key = lambda x: int(x.split(':')[0]))
-            
-            ###################################################################################################
-            # enrichment analysis and update the barchart
-            for i in range(len(self.bar.data)):
-                self.bar.data[i].visible = False
-            
-            df_e = self.analysis.enrichment_analysis(['propka', pka_l, pka_u], ['sasa', sasa_l, sasa_u])
-            
-            # remove lines containing 0 examples in the region
-            test = [int(v.split("/")[0])>cutoff for v in df_e["num in the region"].values]
-            df_e = df_e[test]
-            
-            labels = ['%s'%(self.analysis.code_to_name[df_e['GO ID'].values[i]]) for i in range(len(df_e))]
-            
-            self.bar.add_trace(go.Bar(
-                        y=df_e['GO ID'],
-                        x=-np.log10(df_e['raw p value']),
-                        name='raw p-value',
-                        orientation='h',
-                        marker=dict(
-                                color='rgba(246, 78, 139, 0.6)',
-                        line=dict(color='rgba(246, 78, 139, 1.0)', width=3)),
-                        text = labels,
-                        hovertemplate = '%{x}<br>%{text}'))
-            
-            self.bar.add_trace(go.Bar(y=df_e['GO ID'],
-                        x=-np.log10(df_e['FDR']),
-                        name='FDR',
-                        orientation='h',
-                        marker=dict(
-                                    color='rgba(58, 71, 80, 0.6)',
-                                    line=dict(color='rgba(58, 71, 80, 1.0)', width=3)),
-                                     text = labels,
-                                     hovertemplate = '%{x}<br>%{text}'))
-            
-            self.bar.update_yaxes(autorange="reversed")
-            
-            ###################################################################################################
-            
-            label = 'propka: %.1f-%.1f | SASA: %.1f-%.1f'%(pka_l, pka_u, sasa_l, sasa_u)
-            labels = ["UNIPROT: %s<br>resid: %i"%(selected_df["Uniprot_Entry"].values[i], selected_df["Resid"].values[i]) for i in range(len(selected_df))]
-            self.f.add_scatter(x=selected_df["sasa"], y=selected_df["pKa"],
-                    mode='markers', showlegend=False, name=label,
-                    text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}')
-    
-            scatter_1 = self.f.data[-1]
-            scatter_1.marker.color = ['#1f77b4'] * len(selected_df)
-            scatter_1.marker.size = [10] * len(selected_df)
-        
-        def interact_dropdown(GO,p,s):
-            pka_l, pka_u = p[0], p[1]
-            sasa_l, sasa_u = s[0], s[1]
-    
-            if GO == 'Welcome':
-                # first case: having a region selected and have chosen a GO Term
-                if len(self.f.data) == 3 and (((pka_l, pka_u) != (1, 14.0)) or ((sasa_l, sasa_u) != (0, 100.0))):
-                    self.f.data = self.f.data[:-1]
-                    return
-        
-                # second case: no region selected and have chosen a GO Term code
-                elif ((len(self.f.data) == 2) or (len(self.f.data) == 3)) and ((pka_l, pka_u) == (1, 14.0)) and ((sasa_l, sasa_u) == (0, 100.0)):
-                    self.f.data = [self.f.data[0]]
-                    return
-        
-                # third case: a region and an option both selected and a point clicked
-                elif len(self.f.data) == 4:
-                    self.f.data = self.f.data[:2]
-                    return
-                
-                # everything else    
-                else:
-                    return
-            
-            # no regional selection, but want to search for a GO Term code
-            if (len(self.f.data) == 2) and ((pka_l, pka_u) == (1, 14.0)) and ((sasa_l, sasa_u) == (0, 100.0)):
-                self.f.data = self.f.data[:-1]
-    
-            # there is a region selected and want to search for a GO Term code inside the region
-            if len(self.f.data) == 3:
-                self.f.data = self.f.data[:-1]
-    
-            # a region, an option, and a point all selected and want to update using the call_back function
-            if len(self.f.data) == 4:
-                self.f.data = self.f.data[:2]
-    
-            GO_code = GO.split(': ')[0]
-            GO_name = self.analysis.code_to_name[GO_code]
-            
-            selected_df = self.analysis.GO_search_term(df = self.analysis.df_sub, code = GO_code)
-            
-            # only want the points inside the region
-            selected_df = selected_df[(selected_df['propka'] >= pka_l) & (selected_df['propka'] <= pka_u)]
-            selected_df = selected_df[(selected_df['sasa'] >= sasa_l) & (selected_df['sasa'] <= sasa_u)]
-            selected_df = selected_df.reset_index(drop=True) # this step is needed when attatching a call_back
-            
-            # store the dataframe for the call back function
-            self.temp_df_2 = selected_df
-            
-            label = '%s: %s | propka: %.1f-%.1f | SASA: %.1f-%.1f'%(GO_code, GO_name, pka_l, pka_u, sasa_l, sasa_u)
-            labels = ["Uniprot_Entry: %s"%(selected_df["Uniprot_Entry"].values[i]) for i in range(len(selected_df))]
-    
-            self.f.add_scatter(x=selected_df["sasa"], y=selected_df["pKa"],
-                    mode='markers', showlegend=False, name=label,
-                    text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}')
-    
-            scatter_2 = self.f.data[-1]
-            scatter_2.marker.color = ['#d62728'] * len(selected_df)
-            scatter_2.marker.size = [10] * len(selected_df)
-            scatter_2.on_click(update_point_2)
-        
-        def interact_3D(PDB_box):
-            
-            if PDB_box == 'Welcome':
-                return
-            elif PDB_box == 'Cleared':
-                return
-            else:
-                view = nv.show_file(PDB_box)
-                view.clear_representations()
-                view.add_representation('cartoon')
-                view.add_licorice('LYS')
-                
-                try:
-                    display(view)
-                except:
-                    pass
-        
-        
-        def update_point_2(trace, points, selector):
-            if len(points.point_inds) == 0:
-                return
-    
-            idx = points.point_inds[0]
-    
-            #0000122: negative regulation of transcription by RNA polymerase II | pKa: 1.0-8.6 | SASA: 37.6-100.0
-            pka_range = points.trace_name.split(' | ')[-2].split(': ')[-1].split('-')
-            sasa_range = points.trace_name.split(' | ')[-1].split(': ')[-1].split('-')
-    
-            pka_l, pka_u = float(pka_range[0]), float(pka_range[1])
-            sasa_l, sasa_u = float(sasa_range[0]), float(sasa_range[1])
+    def launch_viewer(self):
+        '''
+        Launch a plotly web browser window which can then be used 
+        '''
+        self.data_viewer_app.run(debug=True)
 
-            my_uniprot = self.temp_df_2.loc[idx, "Uniprot_Entry"] # use the temp df defined in the data structure
-            self.uni_clicked = my_uniprot
-            my_resid = self.temp_df_2.loc[idx, "Resid"]
-            my_label = "%s(%i)"%(my_uniprot, my_resid)
-            df_query = self.df[(self.df['Uniprot_Entry'] == my_uniprot) & (self.df['Resid'] == my_resid)]
-            labels = ["PDB: %s"%(df_query["PDB_Code"].values[i]) for i in range(len(df_query))]
-            
-            # a region, an option, and a point all selected
-            if (len(self.f.data) == 4):
-                self.f.data = self.f.data[:-1]
-            
-            # only an option and a point selected
-            if (len(self.f.data) == 3) and ((pka_l, pka_u) == (1, 14.0)) and ((sasa_l, sasa_u) == (0, 100.0)):
-                self.f.data = self.f.data[:-1]
-    
-            self.f.add_scatter(x=df_query["sasa"], y=df_query["pKa"],
-                                    mode='markers', showlegend=False, name=my_label,
-                                    text = labels, hovertemplate='%{text}<br>SASA: %{x:.2f}<br>pKa: %{y:.2f}')
-            
-            scatter_3 = self.f.data[-1]
-            scatter_3.marker.color = ['#2ca02c'] * len(df_query)
-            scatter_3.marker.size = [12] * len(df_query)
-            scatter_3.on_click(update_point_3)
-        
-        
-        def update_point_3(trace, points, selector):
-            if len(points.point_inds) == 0:
-                return
-    
-            idx = points.point_inds[0]
-            # e.g. P19338(398)
-            my_uniprot = points.trace_name.split('(')[0]
-            my_resid = int(points.trace_name.split('(')[1].strip(')'))
-            df_query = self.df[(self.df['Uniprot_Entry'] == my_uniprot) & (self.df['Resid'] == my_resid)].reset_index(drop=True)
-            pdb_file_path = df_query.loc[idx, 'PDB_Code'] + '.pdb'
-            self.PDB_box.value = pdb_file_path
-        
-        out_1 = widgets.interactive_output(interact_slides, {'p': self.p, 's':self.s})
-        out_2 = widgets.interactive_output(interact_dropdown, {'GO': self.GO, 'p':self.p, 's':self.s})
-        out_3 = widgets.interactive_output(interact_3D, {'PDB_box': self.PDB_box})
-        
-        
-        # we have to define the callback for the second buttom here
-        def call_back_buttom_2(b_2):
-            out_3.clear_output()
-            self.PDB_box.value = 'Cleared'
-        self.b_2.on_click(call_back_buttom_2)
-       
-        # output format
-        block0 = widgets.VBox([self.f, self.b_open_url, self.bar, out_3])
-        block1 = widgets.HBox([self.b_export, widgets.VBox([self.p,self.s,out_1,out_2])])
-        block2 = widgets.HBox([self.b,self.GO])
-        block3 = widgets.HBox([self.b_2,self.PDB_box])
-        
-        self.plot = widgets.VBox([block0,block1,block2,block3])
-        
-        return widgets.VBox([block0,block1,block2,block3])                      
-                       
+
+    def _setup_html(self):
+        '''
+        Currently house all the setup of the plotly work here, may split up if possible to do so too.
+        '''
+        self.data_viewer_app.layout = html.Div([
+            html.H1('RESDY Measurements Analysis', style={'text-align': 'center'}),
+            dcc.Tabs(id="tabs_scalar_analysis", value='tabs_scalar_analysis', children=[
+                dcc.Tab(label='Scalar Measurements Analysis', value='tab_scalar_analysis'),
+                dcc.Tab(label='Scalar Aggregation Analysis', value='tab_aggregation_analysis'),
+            ]),
+            html.Div(id='tabs_content_scalar_analysis')
+        ])
+
+        @callback(Output('tabs_content_scalar_analysis', 'children'),
+                  Output('x_axis_feat_select', 'value'),
+                  Output('scalar_feats_graph', 'figure'),
+                  Input('tabs_scalar_analysis', 'value'),
+                  Input('scalar_feats_graph', 'figure'),
+                  Input('scalar_feats_graph', 'relayoutData'))
+        def render_content(tab):
+            if tab == 'tab_scalar_analysis':
+                # investigate 2D and 3D plots of aggregated analysis
+                return html.Div([
+                    html.Div([
+                        html.H3('Scalar Measurements Analysis'),
+                        html.Div([
+                            dcc.Dropdown(
+                                self.features,
+                                'depth',
+                                id='crossfilter-xaxis-column',
+                            ),
+                            dcc.RadioItems(
+                                ['Linear', 'Log'],
+                                'Linear',
+                                id='crossfilter-xaxis-type',
+                                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+                            )
+                        ],
+                        style={'width': '32%', 'display': 'inline-block'}),
+
+                        html.Div([
+                            dcc.Dropdown(
+                                self.features,
+                                'propka',
+                                id='crossfilter-yaxis-column'
+                            ),
+                            dcc.RadioItems(
+                                ['Linear', 'Log'],
+                                'Linear',
+                                id='crossfilter-yaxis-type',
+                                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+                            )
+                        ],
+                        style={'width': '32%', 'float': 'right', 'display': 'inline-block'}),
+
+                        html.Div([
+                            dcc.Dropdown(
+                                self.features,
+                                'average',
+                                id='crossfilter-agg-col'
+                            ),
+                            dcc.RadioItems(
+                                ['On', 'Off'],
+                                'On',
+                                id='crossfilter-agg-type',
+                                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+                            )
+                        ],
+                        style={'width': '32%', 'float': 'right', 'display': 'inline-block'})
+                    ], style={
+                        'padding': '10px 5px'
+                    }),
+
+                    html.Div([
+                        dcc.Graph(
+                            id='crossfilter-indicator-scatter',
+                            hoverData={'points': [{'customdata': 'Japan'}]}
+                        )
+                    ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
+                    html.Div([
+                        dcc.Graph(id='x-feat-hist'),
+                        dcc.Graph(id='y-feat-hist'),
+                    ], style={'display': 'inline-block', 'width': '49%'}),
+
+                    html.Div(dcc.Slider(
+                        self.df_measures['sasa'].min(),
+                        self.df_measures['sasa'].max(),
+                        step=None,
+                        id='crossfilter-sasa--slider',
+                        value=self.df_measures['sasa'].max(),
+                        marks={str(sasa): str(sasa) for sasa in self.df_measures['sasa'].unique()}
+                    ), style={'width': '49%', 'padding': '0px 20px 20px 20px'})
+                ])
+            elif tab == 'tab_aggregation_analysis':
+                # investigate feature specific histogram and violins of different aggregation types
+                return html.Div([
+                    html.H3('Scalar Aggregation Analysis', style={'text-align': 'center'}),
+
+                    dcc.Dropdown(id='x_axis_feat_select',
+                                 options=self.features,
+                                 optionHeight=25,
+                                 multi=False,
+                                 placeholder='Enter feature for x-axis...',
+                                 clearable=True,
+                                 value=['all'],
+                                 style={'width': '100%'}
+                                 ),
+
+                    dcc.Graph(
+                        id='scalar_feats_graph',
+                        figure=self._scalar_feats_graph()
+                    ),
+                    dcc.Slider(
+                        id='param_a_graph2_slider'
+                    ),
+                    html.Div([
+                        dcc.Graph(id='tmp_graph')
+                    ])
+                ])
+
+        @callback(
+            Output('crossfilter-indicator-scatter', 'figure'),
+            Input('crossfilter-xaxis-column', 'value'),
+            Input('crossfilter-yaxis-column', 'value'),
+            Input('crossfilter-xaxis-type', 'value'),
+            Input('crossfilter-yaxis-type', 'value'),
+            Input('crossfilter-agg-col', 'value'),
+            Input('crossfilter-agg-type', 'value'),
+            Input('crossfilter-sasa--slider', 'value'))
+        def update_graph(xaxis_column_name, yaxis_column_name,
+                        xaxis_type, yaxis_type,
+                        sasa_value):
+            dff = self.df_agg[self.df_agg['sasa_avg'] == sasa_value]
+
+            fig = px.scatter(x=dff[dff['Feature'] == xaxis_column_name]['Value'],
+                    y=dff[dff['Feature'] == yaxis_column_name]['Value'],
+                    hover_name=dff[dff['Feature'] == yaxis_column_name][['Uniprot_Entry', 'Chain', 'Resid']]
+                    )
+
+            fig.update_traces(customdata=dff[dff['Feature'] == yaxis_column_name]['Uniprot_Entry'])
+
+            fig.update_xaxes(title=xaxis_column_name, type='linear' if xaxis_type == 'Linear' else 'log')
+
+            fig.update_yaxes(title=yaxis_column_name, type='linear' if yaxis_type == 'Linear' else 'log')
+
+            fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
+
+            return fig
+
+
+        def create_feature_hist(dff, feature, title):
+
+            fig = px.histogram(dff, x=feature)
+
+            fig.update_traces(mode='lines+markers')
+
+            fig.update_xaxes(showgrid=False)
+
+            fig.update_yaxes(type='linear' if axis_type == 'Linear' else 'log')
+
+            fig.add_annotation(x=0, y=0.85, xanchor='left', yanchor='bottom',
+                            xref='paper', yref='paper', showarrow=False, align='left',
+                            text=title)
+
+            fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10})
+
+            return fig
+
+
+        @callback(
+            Output('x-feat-hist', 'figure'),
+            Input('crossfilter-indicator-scatter', 'hoverData'),
+            Input('crossfilter-xaxis-column', 'value'),
+            Input('crossfilter-xaxis-type', 'value'))
+        def update_x_hist(hoverData, xaxis_column_name, axis_type):
+            country_name = hoverData['points'][0]['customdata']
+            dff = self.df_measures[self.df_measures['Country Name'] == country_name]
+            dff = dff[dff['Feature'] == xaxis_column_name]
+            title = '<b>{}</b><br>{}'.format(country_name, xaxis_column_name)
+            return create_feature_hist(dff, axis_type, title)
+
+
+        @callback(
+            Output('y-feat-hist', 'figure'),
+            Input('crossfilter-indicator-scatter', 'hoverData'),
+            Input('crossfilter-yaxis-column', 'value'),
+            Input('crossfilter-yaxis-type', 'value'))
+        def update_y_hist(hoverData, yaxis_column_name, axis_type):
+            dff = self.df_measures[self.df_measures['Country Name'] == hoverData['points'][0]['customdata']]
+            dff = dff[dff['Feature'] == yaxis_column_name]
+            return create_feature_hist(dff, axis_type, yaxis_column_name)
+
+
+if __name__ == '__main__':
+    outdir = 'demo'
+    df_measures = f'{outdir}{os.sep}measures.csv'
+    V = Viewer(df_measures=df_measures,
+                outdir=outdir)
+    V.launch_viewer()
+
+
+# https://dash.plotly.com/interactive-graphing

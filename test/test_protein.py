@@ -1,6 +1,8 @@
 import unittest
 import sys
 import os
+import shutil
+import tempfile
 import pandas as pd
 import biobox as bb
 
@@ -8,9 +10,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 from resdy import alphafold as af
 
-class Test_Uniprot(unittest.TestCase):
+class Test_Protein(unittest.TestCase):
     def setUp(self):
-        self.outdir = 'test'
+        self.tmpdir = tempfile.mkdtemp(prefix='resdy_test_')
+        self.outdir = self.tmpdir
+        shutil.copyfile(os.path.join('demo', 'demo_input.csv'), os.path.join(self.tmpdir, 'demo_input.csv'))
         self.gap = 10
         self.parallel = False
         self.PDB_only = False
@@ -23,6 +27,9 @@ class Test_Uniprot(unittest.TestCase):
                            include_hetatm=self.include_hetatm,
                            resnames_of_interest=self.resnames_of_interest,
                            max_nmr_conformers=3)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_downloads(self):
         self.PDB.download_pdb('1PAE')
@@ -92,30 +99,28 @@ class Test_Uniprot(unittest.TestCase):
         af.download_AF_struc(code, outfolder=self.outdir)
         self.PDB.apply_minimisation(code, max_iterations=10)
         self.assertTrue(os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}{code}_relaxed.pdb'))
-    '''
-    def test_gathering(self):
-        # runs on separate instance of PDB to work with demo
-        UP = RD.Uniprot()
-        UP.from_csv_file(f'demo{os.sep}demo_input.csv')
 
-        outdir = 'demo'
+    def test_gathering(self):
+        UP = RD.Uniprot()
+        UP.from_csv_file(f'{self.tmpdir}{os.sep}demo_input.csv')
+
         gap = 10
         parallel = False
         PDB_only = False
         include_hetatm = False
         resnames_of_interest = ['LYS']
         minimise_strucs='AF'
-        PDB = RD.PDB(outdir=outdir,
+        PDB = RD.PDB(outdir=self.outdir,
                     gap=gap,
                     parallel=parallel,
                     PDB_only=PDB_only,
                     include_hetatm=include_hetatm,
                     resnames_of_interest=resnames_of_interest,
-                    minimise_strucs=minimise_strucs)
+                    minimise_strucs=minimise_strucs,
+                    max_nmr_conformers=2)
         PDB.gather_proteins(UP.df.head(1), skip_if_found=False)
         self.assertEqual(1, len(PDB.df))
-    '''
+
 
 if __name__ == "__main__":
     unittest.main()
-    

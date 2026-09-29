@@ -41,7 +41,7 @@ class FRUSTRATION():
             import frustratometer
             self.frustratometer = frustratometer
         except ImportError as e:
-            raise ImportError(f'>> Packages required for calculating frustation or density '
+            raise ImportError(f'>> Packages required for calculating frustration or density '
                               f'(Frustratometer) are not available. Frustration or Density will '
                               f'be removed from feature list. Error: {e}') from e
 
@@ -118,7 +118,9 @@ class FRUSTRATION():
                 print(f'Failed to remove cleaned pdb for frustratometer calculation with error {ef}')
         except Exception as e:
             report_error_to_file('Frustratometer 2', path, str(e), self.error_filename)
-            print(f'Frustratometer calculation 2 - failed to extract frustratometer outputs or to append data to return dataframe: {e}')
+            print(f'Frustratometer calculation 2 - failed to extract frustratometer outputs '
+                  f'or to append data to return dataframe: {e}')
+            return pd.DataFrame(columns=['Chain', 'Resid', 'frustration', 'density'])
 
         return df_frustration_res_interest.rename(columns={'chain': 'Chain', 'resid': 'Resid'}).reset_index(drop=True)
 

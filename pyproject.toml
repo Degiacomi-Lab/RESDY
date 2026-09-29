@@ -32,6 +32,7 @@ dependencies = [
 analysis = ["statsmodels"]          # VIF decorrelation and GO term enrichment
 notebook = ["jupyter", "ipywidgets", "nglview", "plotly"]
 propka = ["propka"]                 # the 'propka' feature
+legolas = ["python-dotenv"]         # the 'legolas' feature
 docs = ["sphinx", "sphinx-autoapi"]
 
 [project.urls]

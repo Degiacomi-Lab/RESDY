@@ -66,6 +66,7 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     :rtype: dict
     '''
     cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
+    os.makedirs(os.path.join(outfolder, 'curated'), exist_ok=True)
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
         with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w', newline='') as plddt_out_file:
             plddt_writer = csv.writer(plddt_out_file)
