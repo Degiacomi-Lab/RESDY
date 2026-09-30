@@ -51,16 +51,31 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
     print('>> modelling missing residues')
     pdb_out = ''
     seq_name = ''
-    try:
 
-        _pdb_to_seq(fbasename)
-        _fasta_to_pir(fbasename)
-        seq_name = _full_align(tmp_folder, fbasename)
-        _trim_align(tmp_folder, "alignment.seg.ali")
-        patch_status = _gap_check(tmp_folder, "trimmed_align.ali", gap_cutoff)
+    # Modeller is given fbasename as a PDB *code*, which it resolves against
+    # env.io.atom_files_directory, and as the align_codes written into the PIR header.
+    # Neither tolerates an absolute path: the lookup cannot resolve one, and on Windows
+    # the drive letter adds a colon to a header whose fields are colon-separated. Work
+    # from the parent of the temporary folder so that every name handed to Modeller is
+    # relative and short.
+    abs_tmp = os.path.abspath(tmp_folder)
+    work_dir = os.path.dirname(abs_tmp)
+    rel_tmp = os.path.basename(abs_tmp)
+    rel_base = os.path.join(rel_tmp, os.path.basename(fbasename))
+    cwd = os.getcwd()
+
+    try:
+        os.chdir(work_dir)
+
+        _pdb_to_seq(rel_base)
+        _fasta_to_pir(rel_base)
+        seq_name = _full_align(rel_tmp, rel_base)
+        _trim_align(rel_tmp, "alignment.seg.ali")
+        patch_status = _gap_check(rel_tmp, "trimmed_align.ali", gap_cutoff)
 
         if patch_status:
-            pdb_out = _patch_model(tmp_folder, fbasename, seq_name)
+            pdb_out = _patch_model(rel_tmp, rel_base, seq_name)
+            pdb_out = os.path.join(abs_tmp, os.path.basename(pdb_out))
         else:
             pdb_out = ""
 
@@ -68,22 +83,24 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
         raise Exception(f">> ERROR on autopatching the structure: {e}") from e
 
     finally:
-
-        autopatch_files = [f'{fbasename}.seq', f'{fbasename}.pir', f'{tmp_folder}{os.sep}alignment.seg',
-                f'{tmp_folder}{os.sep}alignment.seg.ali', f'{tmp_folder}{os.sep}trimmed_align.ali', 'family.mat']
-        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.ini'))
-        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.rsr'))
-        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.sch'))
-        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.V*'))
-        autopatch_files.extend(glob.glob(f'{os.path.basename(tmp_folder)}.D*'))
+        # the intermediates were written relative to work_dir, which is still the
+        # working directory here
+        autopatch_files = [f'{rel_base}.seq', f'{rel_base}.pir',
+                           os.path.join(rel_tmp, 'alignment.seg'),
+                           os.path.join(rel_tmp, 'alignment.seg.ali'),
+                           os.path.join(rel_tmp, 'trimmed_align.ali'), 'family.mat']
+        for pattern in ('.ini', '.rsr', '.sch', '.V*', '.D*'):
+            autopatch_files.extend(glob.glob(f'{rel_tmp}{pattern}'))
 
         for patch_file in autopatch_files:
-            m = os.path.join(os.getcwd(), patch_file)
-            try:
-                os.remove(m)
-            except Exception as e:
-                print(f"cannot remove {m}, error: {e}; continuing...")
+            if not os.path.exists(patch_file):
                 continue
+            try:
+                os.remove(patch_file)
+            except Exception as e:
+                print(f"cannot remove {patch_file}, error: {e}; continuing...")
+
+        os.chdir(cwd)
 
     return pdb_out
 
