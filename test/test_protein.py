@@ -81,6 +81,80 @@ class Test_Protein(unittest.TestCase):
         M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
+    # ---- heteroatom retention policy -------------------------------------------
+
+    @staticmethod
+    def _hetatm_counts(path):
+        import collections
+        return collections.Counter(l[17:20].strip() for l in open(path)
+                                   if l.startswith('HETATM'))
+
+    def _curate_1a6m(self, **kwargs):
+        '''Curate 1A6M (HEM, waters, SO4, OXY; one chain, no gaps) under a policy.'''
+        out = tempfile.mkdtemp(prefix='resdy_het_')
+        P = RD.PDB(outdir=out, gap=10, parallel=False, minimise_strucs=None, **kwargs)
+        P.clean_and_split_pdb('1A6M', 'P02185', chains=[])
+        f = sorted(a for a in os.listdir(os.path.join(out, 'curated')) if '1A6M' in a)[0]
+        return P, out, os.path.join(out, 'curated', f)
+
+    def test_hetatm_default_keeps_nothing(self):
+        P, out, f = self._curate_1a6m()
+        try:
+            self.assertFalse(P.include_hetatm)
+            self.assertEqual(self._hetatm_counts(f), {})
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
+    def test_hetatm_keep_waters(self):
+        P, out, f = self._curate_1a6m(keep_waters=True)
+        try:
+            self.assertTrue(P.include_hetatm)
+            counts = self._hetatm_counts(f)
+            self.assertGreater(counts.get('HOH', 0), 100)
+            self.assertNotIn('HEM', counts)
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
+    def test_hetatm_keep_named_ligand(self):
+        P, out, f = self._curate_1a6m(keep_ligands=('HEM',))
+        try:
+            counts = self._hetatm_counts(f)
+            self.assertEqual(counts.get('HEM', 0), 43)
+            self.assertNotIn('HOH', counts)
+            self.assertNotIn('SO4', counts)
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
+    def test_hetatm_keep_all(self):
+        P, out, f = self._curate_1a6m(keep_ligands='all', keep_waters=True)
+        try:
+            counts = self._hetatm_counts(f)
+            for resname in ('HEM', 'HOH', 'SO4', 'OXY'):
+                self.assertIn(resname, counts, f'{resname} should have been kept')
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
+    def test_include_hetatm_is_backwards_compatible(self):
+        '''include_hetatm=True must mean what it always documented: keep metal ions.'''
+        from resdy.protein import DEFAULT_KEPT_IONS
+        P = RD.PDB(outdir=self.outdir, gap=10, include_hetatm=True, minimise_strucs=None)
+        self.assertEqual(P.keep_ions, DEFAULT_KEPT_IONS)
+        self.assertTrue(P.include_hetatm)
+        self.assertFalse(P.keep_waters)
+
+    def test_minimisation_skipped_when_waters_kept(self):
+        out = tempfile.mkdtemp(prefix='resdy_het_')
+        try:
+            P = RD.PDB(outdir=out, gap=10, parallel=False,
+                       keep_waters=True, minimise_strucs='ALL')
+            P.clean_and_split_pdb('1A6M', 'P02185', chains=[])
+            self.assertTrue(P.minimisation_skipped)
+            self.assertTrue(all('water' in r for r in P.minimisation_skipped.values()))
+            relaxed = [a for a in os.listdir(os.path.join(out, 'curated')) if '_relaxed' in a]
+            self.assertEqual(relaxed, [])
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
     def test_auxiliary(self):
         # test all other random functions from protein class
         if not os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'):

@@ -33,6 +33,18 @@ except Exception as e:
     openmm_available = False
 
 
+#: The twenty standard residue names.
+STANDARD_RESIDUES = ('ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE',
+                     'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL')
+
+#: Residue names treated as solvent.
+WATER_RESNAMES = ('HOH', 'WAT', 'DOD', 'H2O')
+
+#: Monoatomic ions retained when ``include_hetatm=True`` is used without a policy. This is
+#: the list clean_pdb used to carry, whose branch was unreachable.
+DEFAULT_KEPT_IONS = ('ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO')
+
+
 class PDB(object):
     '''
     Class for taking an input dataframe of the proteins required to investigate, downloading the
@@ -43,6 +55,7 @@ class PDB(object):
 
     def __init__(self, outdir="result", gap=10, parallel = False,
                  PDB_only=False, include_hetatm=False,
+                 keep_waters=False, keep_ions=(), keep_ligands=(),
                  resnames_of_interest = ['LYS'], minimise_strucs='AF',
                  remove_all_modifications=False,
                  num_cores=0, max_nmr_conformers=''):
@@ -61,8 +74,22 @@ class PDB(object):
         :param PDB_only: Toggle for if you want to download a system from a list of PDB files (True)
             or from a Uniprot dataframe (False) created from the Uniprot class.
         :type PDB_only: bool
-        :param include_hetatm: Toggleable option to allow hetatms to pass through biobox
+        :param include_hetatm: Deprecated, kept so that existing callers behave as before.
+            True is equivalent to ``keep_ions=DEFAULT_KEPT_IONS``.
         :type include_hetatm: bool
+        :param keep_waters: Retain crystallographic waters. They change pKa and solvent
+            accessibility and are only meaningful at high resolution, so this is off by
+            default. Keeping them also skips energy minimisation, because the implicit
+            solvent model would double-count their contribution.
+        :type keep_waters: bool
+        :param keep_ions: Residue names of monoatomic ions to retain, for example
+            ``('ZN', 'MG')``. Pass ``DEFAULT_KEPT_IONS`` for the common set.
+        :type keep_ions: tuple
+        :param keep_ligands: Residue names of other heteroatom groups to retain, for
+            example ``('HEM', 'NAD')``, or the string 'all' to keep every heteroatom
+            group present. A structure retaining a group the forcefield has no template
+            for is not minimised; see apply_minimisation.
+        :type keep_ligands: tuple, str
         :param resnames_of_interest: List of residues to investigate, only used for curating list of
             PLDDT values for the residues of interest here.
         :type resnames_of_interest: list
@@ -96,7 +123,22 @@ class PDB(object):
         self.PDB_only = PDB_only
         self.parallel = parallel
         self.num_cores = num_cores
-        self.include_hetatm = include_hetatm
+        # include_hetatm used to be the only control, and its documented intent was to keep
+        # metal ions. Honour that when no explicit policy is given, so existing callers are
+        # unaffected; self.include_hetatm then becomes the derived question of whether
+        # biobox needs to read heteroatoms at all.
+        if include_hetatm and not (keep_waters or keep_ions or keep_ligands):
+            keep_ions = DEFAULT_KEPT_IONS
+
+        #: structures that were not minimised, mapped to why. Reported at the end of a run.
+        self.minimisation_skipped = {}
+
+        self.keep_waters = keep_waters
+        self.keep_ions = tuple(a.upper() for a in keep_ions)
+        self.keep_ligands = (keep_ligands if keep_ligands == 'all'
+                             else tuple(a.upper() for a in keep_ligands))
+        self.include_hetatm = bool(self.keep_waters or self.keep_ions or self.keep_ligands)
+
         self.resnames_of_interest = resnames_of_interest
         self.remove_all_modifications = remove_all_modifications
 
@@ -506,6 +548,29 @@ class PDB(object):
             return pd.DataFrame.from_records(data, index=[0])
 
 
+    def _keep_hetatm(self, line, element=''):
+        '''
+        Decide whether a HETATM record survives cleaning.
+
+        :param line: the HETATM record.
+        :type line: str
+        :param element: element symbol, used to drop hydrogens as the ATOM branch does.
+        :type element: str
+        :returns: True if the record should be written to the cleaned structure.
+        :rtype: bool
+        '''
+        if element[:1] in ('H', 'D'):
+            return False
+        resname = line[17:20].strip().upper()
+        if resname in WATER_RESNAMES:
+            return self.keep_waters
+        if resname in self.keep_ions:
+            return True
+        if self.keep_ligands == 'all':
+            return True
+        return resname in self.keep_ligands
+
+
     def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[]):
         '''
         Download the pdb file from rcsb, clean the structure, split it based on alternative
@@ -664,7 +729,6 @@ class PDB(object):
             raise Exception(f'Error renaming chains. {str(e)}')
 
         #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
-        list_of_metals = ['ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO']
         standard_resids = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q',
                            'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
                            'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
@@ -703,13 +767,12 @@ class PDB(object):
                     res_num = line[18:22].strip()
                     modres_sites[chain + res_num] = line[24:27]
 
-            # check for resid insertion code in position 26
-            if not self.include_hetatm:
-                if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
-                    res_insertion_codes.append(line[26])
-            else:
-                if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and len(line) > 26 and line[26].isalpha():
-                    res_insertion_codes.append(line[26])
+            # check for resid insertion code in position 26. Only ATOM records matter: an
+            # insertion code breaks the residue key used throughout the pipeline, while on
+            # a ligand or a water it is harmless, and rejecting a structure for one would
+            # make retaining heteroatoms cost structures for no reason.
+            if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
+                res_insertion_codes.append(line[26])
 
             # replace selenomethionine with methionine
             if "MSE" in line and ('ATOM' in line or 'HETATM' in line):
@@ -741,6 +804,20 @@ class PDB(object):
             if not element_col:
                 # guess element based on atom type name
                 element_col = line[12:16].strip().lstrip('0123456789')[:2].upper()
+
+            # Heteroatom groups are decided here, ahead of the standard-residue check
+            # below. That check drops every residue whose name is not one of the twenty
+            # amino acids and not a MODRES site, which is every ion, water and ligand, and
+            # is why the metal branch further down was never reached. Residues that are
+            # MODRES sites are left alone: they are handled by the logic that follows.
+            if (line[:6] == 'HETATM' and len(line) > 26
+                    and line[17:20].strip().upper() not in standard_resids):
+                het_key = line[21] + line[22:26].strip()
+                # a MODRES site falls through to the logic below, which reverts it
+                if het_key not in modres_sites and het_key not in list_prev_mod_resids:
+                    if self._keep_hetatm(line, element_col):
+                        write_file.write(line)
+                    continue
 
             #check that amino acid is one of the 20 standard amino acids
             if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and (line[21] + line[22:26].strip()) in list(list_prev_mod_resids):
@@ -860,12 +937,6 @@ class PDB(object):
                 else:
                     raise Exception(f'Error in patching file: could not get residue type for '
                                     f'modified residue to convert to standard; file: {pdb}')
-
-            #neglect HETATM atoms, unless they are metal ions
-            if line[:6] == 'HETATM':
-                if element_col in list_of_metals:
-                    write_file.write(line)
-                    continue
 
             # write lines and ignore hydrogen atoms
             if line[:4] == 'ATOM':
@@ -1115,21 +1186,43 @@ class PDB(object):
 
                 mapped_res = M.data['resid'].map(res_mapper)
                 sel_chain = M.data['chain'] == chain
-                if mapped_res[sel_chain].isna().any():
+
+                # Only the polymer is renumbered. Retained waters, ions and ligands are
+                # numbered in their own range, have no place in the canonical sequence,
+                # and so never appear in res_mapper; requiring them to map would report
+                # every chain of a structure curated with keep_waters as a failure.
+                is_polymer = M.data['resname'].astype(str).str.upper().isin(STANDARD_RESIDUES)
+                sel_poly = sel_chain & is_polymer
+
+                unmapped = int(mapped_res[sel_poly].isna().sum())
+                if unmapped:
+                    print(f'>> Chain {chain} of {pdb_code}: {unmapped} of '
+                          f'{int(sel_poly.sum())} polymer atoms could not be placed in the '
+                          f'canonical sequence, so this chain keeps its original numbering')
                     failed.append(chain)
                     continue
-                M.data.loc[sel_chain, 'resid'] = mapped_res[sel_chain].astype(M.data['resid'].dtype)
+
+                M.data.loc[sel_poly, 'resid'] = mapped_res[sel_poly].astype(M.data['resid'].dtype)
 
             except Exception as e:
                 print(f'Failed alignment of pdb {pdb_code}, chain {chain}, with error: {str(e)}')
                 failed.append(chain)
 
-        if not failed:
+        # A chain that could not be placed keeps its own numbering, but that is no reason
+        # to throw away the chains that were placed: refusing to write left every chain
+        # with author numbering because of one, which for a complex spanning more than one
+        # Uniprot entry is the normal case rather than an error.
+        if len(failed) < len(chains):
             M.write_pdb(pdb_code)
-            print(f'>> Chains aligned to canonical uniprot sequence for pdb code: {pdb_code}')
-
+            placed = [c for c in chains if c not in failed]
+            print(f'>> Chains aligned to canonical uniprot sequence for pdb code: '
+                  f'{pdb_code} ({", ".join(map(str, placed))})')
+            if failed:
+                print(f'>> Chains left with their original numbering: '
+                      f'{", ".join(map(str, failed))}')
         else:
-            print(f'>> Alignment failed for pdb: {pdb_code}, not writing new file as not all chains matched properly')
+            print(f'>> Alignment failed for pdb: {pdb_code}, no chain could be placed in '
+                  f'the canonical sequence; the file keeps its original numbering')
 
 
     def get_chain_replacement(self, pdb_code):
@@ -1355,6 +1448,15 @@ class PDB(object):
             files should be written to.
         :type outfolder: str
         '''
+        if self.keep_waters:
+            # the implicit solvent model already accounts for solvation, so minimising
+            # explicit waters would count it twice
+            self.minimisation_skipped[pdb] = 'explicit waters are being kept'
+            print(f'>> Not minimising {pdb}: explicit waters are being kept, which the '
+                  f'implicit solvent model would double-count. The unminimised structure '
+                  f'will be measured instead.')
+            return
+
         try:
             print(f'>> Minimising structure: {pdb}')
             pdb_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb'
@@ -1368,9 +1470,30 @@ class PDB(object):
             forcefield = ForceField("amber14-all.xml",
                                     "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
             modeller = Modeller(pdb_inst.topology, pdb_inst.positions)
-            modeller.addHydrogens(forcefield)
-            system = forcefield.createSystem(modeller.topology,
-                                            nonbondedMethod=NoCutoff)
+
+            try:
+                modeller.addHydrogens(forcefield)
+                system = forcefield.createSystem(modeller.topology,
+                                                nonbondedMethod=NoCutoff)
+            except Exception as e:
+                # a retained cofactor the forcefield has no template for. Minimising the
+                # protein alone and putting the cofactor back unchanged would leave it
+                # clashing into a relaxed site, which is worse than not minimising, so
+                # the structure is measured as it is and the reason is recorded.
+                try:
+                    unmatched = sorted({r.name for r
+                                        in forcefield.getUnmatchedResidues(modeller.topology)})
+                except Exception:
+                    unmatched = []
+                # a failed addHydrogens leaves everything unmatched, standard residues
+                # included, so name only the residues that are actually unusual
+                culprits = [r for r in unmatched if r.upper() not in STANDARD_RESIDUES]
+                reason = (f'no forcefield template for {", ".join(culprits)}' if culprits
+                          else str(e))
+                self.minimisation_skipped[pdb] = reason
+                print(f'>> Not minimising {pdb}: {reason}. The unminimised structure will '
+                      f'be measured instead.')
+                return
 
             integrator = LangevinMiddleIntegrator(300*kelvin,
                                                 1/picosecond,
