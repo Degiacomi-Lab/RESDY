@@ -193,5 +193,49 @@ class Test_Minimisation(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.outdir, 'minimisation_log.csv')))
 
 
+@unittest.skipUnless(protein.openmm_available, 'openmm is not installed')
+class Test_Minimisation_Pipeline(unittest.TestCase):
+    '''
+    Minimisation reached through curation, on downloaded structures. Slower than
+    Test_Minimisation, since it minimises a full-length AlphaFold model with the default
+    settings.
+    '''
+
+    def setUp(self):
+        self.outdir = tempfile.mkdtemp(prefix='resdy_min_')
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
+
+    def test_gathering_minimises_af_models(self):
+        # the first demo entry (P40616) has no PDB code, so it is covered by its AF model.
+        # gather_proteins catches minimisation errors, so the record is checked explicitly.
+        shutil.copyfile(os.path.join('demo', 'demo_input.csv'),
+                        os.path.join(self.outdir, 'demo_input.csv'))
+        UP = RD.Uniprot()
+        UP.from_csv_file(os.path.join(self.outdir, 'demo_input.csv'))
+        P = RD.PDB(outdir=self.outdir, gap=10, parallel=False, PDB_only=False,
+                   minimise_strucs='AF', max_nmr_conformers=2)
+        P.gather_proteins(UP.df.head(1), skip_if_found=False)
+        self.assertEqual(1, len(P.df))
+
+        log = P.collect_minimisation_log()
+        af_rows = log[log['structure'].str.startswith('AF-P40616')]
+        self.assertEqual(len(af_rows), 1)
+        self.assertEqual(af_rows['status'].iloc[0], 'relaxed')
+        stem = af_rows['structure'].iloc[0]
+        self.assertTrue(os.path.exists(
+            os.path.join(self.outdir, 'curated', f'{stem}_relaxed.pdb')))
+
+    def test_minimisation_skipped_when_waters_kept(self):
+        P = RD.PDB(outdir=self.outdir, gap=10, parallel=False,
+                   keep_waters=True, minimise_strucs='ALL')
+        P.clean_and_split_pdb('1A6M', 'P02185', chains=[])
+        self.assertTrue(P.minimisation_skipped)
+        self.assertTrue(all('water' in r for r in P.minimisation_skipped.values()))
+        relaxed = [a for a in os.listdir(os.path.join(self.outdir, 'curated')) if '_relaxed' in a]
+        self.assertEqual(relaxed, [])
+
+
 if __name__ == '__main__':
     unittest.main()

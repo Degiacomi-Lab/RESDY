@@ -8,7 +8,6 @@ import biobox as bb
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
-from resdy import alphafold as af
 
 class Test_Protein(unittest.TestCase):
     def setUp(self):
@@ -26,6 +25,7 @@ class Test_Protein(unittest.TestCase):
                            PDB_only=self.PDB_only,
                            include_hetatm=self.include_hetatm,
                            resnames_of_interest=self.resnames_of_interest,
+                           minimise_strucs=None,
                            max_nmr_conformers=3)
 
     def tearDown(self):
@@ -142,19 +142,6 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(P.include_hetatm)
         self.assertFalse(P.keep_waters)
 
-    def test_minimisation_skipped_when_waters_kept(self):
-        out = tempfile.mkdtemp(prefix='resdy_het_')
-        try:
-            P = RD.PDB(outdir=out, gap=10, parallel=False,
-                       keep_waters=True, minimise_strucs='ALL')
-            P.clean_and_split_pdb('1A6M', 'P02185', chains=[])
-            self.assertTrue(P.minimisation_skipped)
-            self.assertTrue(all('water' in r for r in P.minimisation_skipped.values()))
-            relaxed = [a for a in os.listdir(os.path.join(out, 'curated')) if '_relaxed' in a]
-            self.assertEqual(relaxed, [])
-        finally:
-            shutil.rmtree(out, ignore_errors=True)
-
     def test_auxiliary(self):
         # test all other random functions from protein class
         if not os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}13LD-alt1A.pdb'):
@@ -167,13 +154,6 @@ class Test_Protein(unittest.TestCase):
                             PDB_only=self.PDB_only)
         self.PDB.df = pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains'])
 
-    def test_minimisation(self):
-        # test the minimisation of the protein structure with openmm
-        code = 'AF-P40616-F1-model_v6'
-        af.download_AF_struc(code, outfolder=self.outdir)
-        self.PDB.apply_minimisation(code, max_iterations=10)
-        self.assertTrue(os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}{code}_relaxed.pdb'))
-
     def test_gathering(self):
         UP = RD.Uniprot()
         UP.from_csv_file(f'{self.tmpdir}{os.sep}demo_input.csv')
@@ -183,7 +163,8 @@ class Test_Protein(unittest.TestCase):
         PDB_only = False
         include_hetatm = False
         resnames_of_interest = ['LYS']
-        minimise_strucs='AF'
+        # minimisation is tested separately, in test_minimisation.py
+        minimise_strucs=None
         PDB = RD.PDB(outdir=self.outdir,
                     gap=gap,
                     parallel=parallel,
