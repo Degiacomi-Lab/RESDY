@@ -20,6 +20,7 @@ import biobox as bb
 from . import alphafold as af
 from . import patcher
 from .helper import get_download_tool, ShutUp
+from .residues import AA_PRESETS
 
 try:
     import openmm
@@ -108,8 +109,12 @@ class PDB(object):
             for is not minimised; see apply_minimisation.
         :type keep_ligands: tuple, str
         :param resnames_of_interest: List of residues to investigate, only used for curating list of
-            PLDDT values for the residues of interest here.
-        :type resnames_of_interest: list
+            PLDDT values for the residues of interest here. The three-letter code of one of the
+            twenty standard amino acids can also be given as a string, and is expanded into the
+            unmodified codes of the matching preset in :data:`resdy.residues.AA_PRESETS`, so that
+            the same code can be passed here and to
+            :class:`Measure <resdy.measure.Measure>`.
+        :type resnames_of_interest: list, str
         :param minimise_strucs: Option to run a energy minimisastion on the structures curated
             through openmm, option is to minimise nothing, just alphafold, just RCSB PDB or all.
             Options:
@@ -183,7 +188,13 @@ class PDB(object):
                              else tuple(a.upper() for a in keep_ligands))
         self.include_hetatm = bool(self.keep_waters or self.keep_ions or self.keep_ligands)
 
-        self.resnames_of_interest = resnames_of_interest
+        # a preset name expands to its unmodified codes, so that PDB and Measure can be given
+        # the same three-letter code
+        if isinstance(resnames_of_interest, str):
+            preset = AA_PRESETS.get(resnames_of_interest.strip().upper())
+            resnames_of_interest = (list(preset['non_modified_codes']) if preset is not None
+                                    else [resnames_of_interest])
+        self.resnames_of_interest = list(resnames_of_interest)
         self.remove_all_modifications = remove_all_modifications
 
         if isinstance(minimise_strucs, str):

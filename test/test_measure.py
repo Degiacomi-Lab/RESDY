@@ -229,5 +229,127 @@ class Test_Measure(unittest.TestCase):
         M.recover_from_log('measure_log.txt')
     '''
 
+    def test_residue_preset(self):
+        # a three-letter code of any standard residue resolves to its preset
+        print('-> Testing a residue preset other than lysine')
+        M = RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict={'sasa': {}},
+                       residue_of_interest='tyr')
+        self.assertEqual(M.aa_properties['non_modified_codes'], ['TYR'])
+        self.assertEqual(M.aa_properties['atom_select_names_nonmod'], ['OH'])
+
+    def test_lysine_preset_unchanged(self):
+        # the shipped lysine behaviour has to survive the move into residues.py
+        print('-> Testing that the lysine default is unchanged')
+        M = RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict={'sasa': {}})
+        self.assertEqual(M.aa_properties['atom_select_names_nonmod'], ['NZ'])
+        self.assertEqual(M.aa_properties['atom_select_names_modified'], ['NZ', 'N07'])
+        self.assertIn('LYS', M.aa_properties['non_modified_codes'])
+        self.assertIn('KCX', M.aa_properties['modified_codes'])
+        self.assertIn('LYE', M.aa_properties['modified_codes'])
+
+    def test_unsupported_features_dropped(self):
+        # alanine has no pKa from either backend and no half-sphere shells
+        print('-> Testing that features that cannot act on the residue are dropped')
+        M = RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict={'propka': {}, 'pkaANI': {}, 'das': {}, 'sasa': {}},
+                       residue_of_interest='ALA')
+        self.assertEqual(set(M.features_dict), {'sasa'})
+        self.assertEqual({m[0] for m in M.measures}, {'sasa'})
+
+    def test_supported_features_kept(self):
+        print('-> Testing that the pKa backends survive for a residue they support')
+        M = RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict={'propka': {}, 'pkaANI': {}, 'das': {}},
+                       residue_of_interest='TYR')
+        self.assertEqual(set(M.features_dict), {'propka', 'pkaANI', 'das'})
+
+    def test_das_radii_injected(self):
+        # the residue's own shells reach the feature, and a user setting wins over them
+        print('-> Testing that the DAS shells of the residue are passed through')
+        features_dict = {'das': {}}
+        M = RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict=features_dict,
+                       residue_of_interest='TRP')
+        self.assertEqual(M.features_dict['das']['radii'], [4.7, 4.4, 4.0, 3.6])
+        # the caller's own dictionary must not have been written into
+        self.assertEqual(features_dict['das'], {})
+
+        M_user = RD.Measure(df_input=self.df_prot,
+                            outdir=self.outdir,
+                            features_dict={'das': {'radii': [5.0, 4.0, 3.0]}},
+                            residue_of_interest='TRP')
+        self.assertEqual(M_user.features_dict['das']['radii'], [5.0, 4.0, 3.0])
+
+    def test_custom_dict_any_key_order(self):
+        print('-> Testing a custom residue dictionary given in a different key order')
+        M = RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict={'sasa': {}},
+                       residue_of_interest={'atom_select_names_nonmod': ['SG'],
+                                            'modified_codes': '',
+                                            'non_modified_codes': ['CYS'],
+                                            'atom_select_names_modified': ['SG']})
+        self.assertEqual(M.aa_properties['modified_codes'], [])
+        self.assertEqual(M.aa_properties['atom_select_names_nonmod'], ['SG'])
+
+    def test_plugin_feature_declarations_are_honoured(self):
+        '''
+        A feature the core has never heard of should be able to declare which residues it can
+        act on, and its per-residue settings, without an edit to measure.py or residues.py.
+        '''
+        print('-> Testing that a new feature can declare its own residue support')
+        import pandas as pd
+        import resdy.measure as measure_module
+
+        class PLUGINPROBE():
+            SUPPORTED_RESIDUES = {'TYR', 'TRP'}
+            RESIDUE_KWARGS = {'TYR': {'window': 11}, 'TRP': {'window': 7}}
+            UNSUPPORTED_REASON = {'LYS': 'it was written for aromatics'}
+
+            def __init__(self, include_modified=False, aa_properties=None,
+                         error_filename='measure_errors.txt', window=0):
+                self.window = window
+
+            def calculate(self, path):
+                return pd.DataFrame(columns=['Chain', 'Resid', 'pluginprobe'])
+
+        measure_module.PLUGINPROBE = PLUGINPROBE
+        try:
+            # the residue it supports: kept, and given the settings of that residue
+            M = RD.Measure(df_input=self.df_prot, outdir=self.outdir,
+                           features_dict={'pluginprobe': {}}, residue_of_interest='TYR')
+            self.assertEqual(M.features_dict['pluginprobe'], {'window': 11})
+            self.assertIn('pluginprobe', {m[0] for m in M.measures})
+
+            # a residue it excludes: dropped, quoting its own reason
+            M_out = RD.Measure(df_input=self.df_prot, outdir=self.outdir,
+                               features_dict={'pluginprobe': {}, 'sasa': {}},
+                               residue_of_interest='LYS')
+            self.assertEqual(set(M_out.features_dict), {'sasa'})
+
+            # what the user asks for still wins over the settings of the residue
+            M_user = RD.Measure(df_input=self.df_prot, outdir=self.outdir,
+                                features_dict={'pluginprobe': {'window': 99}},
+                                residue_of_interest='TRP')
+            self.assertEqual(M_user.features_dict['pluginprobe'], {'window': 99})
+        finally:
+            del measure_module.PLUGINPROBE
+
+    def test_unknown_residue_raises(self):
+        print('-> Testing that an unknown residue of interest raises')
+        with self.assertRaises(KeyError):
+            RD.Measure(df_input=self.df_prot,
+                       outdir=self.outdir,
+                       features_dict={'sasa': {}},
+                       residue_of_interest='ZZZ')
+
+
 if __name__ == "__main__":
     unittest.main()

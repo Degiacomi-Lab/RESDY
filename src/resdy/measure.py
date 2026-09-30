@@ -1,6 +1,7 @@
 import re
 import os
 import io
+import copy
 import logging
 import datetime
 import glob
@@ -15,6 +16,7 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 from .features import *
+from .residues import residue_key, resolve_residue
 
 
 #: Features requested by the 'all' shorthand in ``features_dict``.
@@ -65,15 +67,21 @@ class Measure(object):
             house any optional arguments available for that specific feature class, if defaults are
             okay, leave as {}.
         :type features_dict: dict
-        :param residue_of_interest: The residue of interest to calculate measurements for, if
-            investigating LYS or CYS, can enter a string with either of these as code is setup
-            to handle them. If you are investigating other residues or would like more control
-            over LYS or CYS properties for calculation, please enter a dictionary of the following
-            format:
-            {'non_modified_codes': [residue codes of standard state],
-            'modified_codes': [codes of modfified state, can be left as '' if not investigating],
+        :param residue_of_interest: The residue of interest to calculate measurements for. The
+            three-letter code of any of the twenty standard amino acids can be given as a
+            string, and is matched against the presets in :data:`resdy.residues.AA_PRESETS`,
+            which name the codes of the modified forms and the atom the features are computed
+            at. If you are investigating a non-standard residue, or would like more control
+            over a preset, please enter a dictionary of the following format (the keys may be
+            given in any order):
+            {'non_modified_codes': [residue codes of standard state, canonical code first],
+            'modified_codes': [codes of modfified state, can be left as [] if not investigating],
             'atom_select_names_nonmod': [atom names of interest in standard state],
             'atom_select_names_modified': [atom names of interest in modified residues]}
+            A feature that cannot act on the residue given is dropped from features_dict with a
+            message quoting its own reason, and one that has per-residue settings is given
+            them. Both are declared by the feature class, not listed here; see
+            :mod:`resdy.residues`.
         :type residue_of_interest: str, dict
         :param parallel: Option to run the measurements in parallel.
         :type parallel: bool
@@ -329,89 +337,75 @@ class Measure(object):
 
     def _setup_aa_properties(self, res_details):
         '''
-        Adding in the function required for the codebase to have the potential to be used with
-        residues other than lysines. Matches up a 3 letter code given as input to measures to a list
-        of all the 3 letter codes associated for the non-modified amino acid (eg different charged
-        states) and modified codes for self.include_modified options. If a rogue 3 letter code is
-        given, it defaults to carbamylation data.
+        Resolve the residue of interest into the properties every feature works from, and drop
+        the features that cannot act on that residue.
 
-        :param res_details: 3 letter code of the residue to match up other 3 letter codes for
-        :type res_details: str
+        .. rubric:: Method
+
+        - :func:`resolve_residue <resdy.residues.resolve_residue>` accepts a three-letter code
+          of any of the twenty standard amino acids, matched case-insensitively against
+          :data:`AA_PRESETS <resdy.residues.AA_PRESETS>`, or a dictionary whose four keys may
+          be given in any order. Presets and dictionaries are validated by the same rule.
+        - Each requested feature is then asked, through the optional class attributes described
+          in :mod:`resdy.residues`, whether it can act on that residue. A feature declaring a
+          ``SUPPORTED_RESIDUES`` set that excludes the residue is dropped, quoting its own
+          ``UNSUPPORTED_REASON``; one declaring ``RESIDUE_KWARGS`` is given the arguments of
+          that residue. Nothing here names a particular feature, so a feature added by dropping
+          a file into ``features/`` participates without an edit to this method.
+
+        :param res_details: Three-letter code of the residue to measure, or a full properties
+            dictionary.
+        :type res_details: str, dict
+        :returns: The validated properties of the residue of interest.
+        :rtype: dict
         '''
-        propka_res = ['ASP', 'GLU', 'HIS', 'CYS', 'TYR', 'LYS', 'ARG']
-        pkaani_res = ['ASP', 'GLU', 'HIS', 'TYR', 'LYS']
+        aa_properties = resolve_residue(res_details)
+        res_code = residue_key(aa_properties)
 
-        if isinstance(res_details, str):
-            match res_details:
-                case 'LYS':
-                    aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                        'modified_codes': ['LYE', 'KCX'],
-                                        'atom_select_names_nonmod': ['NZ'],
-                                        'atom_select_names_modified': ['NZ', 'N07']}
-                case 'CYS':
-                    aa_properties = {'non_modified_codes': ['CYS'],
-                                    'modified_codes': [],
-                                    'atom_select_names_nonmod': ['SG'],
-                                    'atom_select_names_modified': []}
-                case _:
-                    print(f'>> Residue of interest given not known: {res_details}; Please modify the input '
-                            f'to give either LYS or CYS or a pass a custom parameters dictionary to the '
-                            f'class.')
-                    if self.report_errors:
-                        self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_details}) not known; using LYS as default')
-                    raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
-                                    f'match to any cases, stopping calculations. Please modify input '
-                                    f'parameter residue of interest with either LYS or CYS or give a full '
-                                    f'dictionary of properties for your custom investigation into another '
-                                    f'residue.')
+        for name in list(self.features_dict):
+            cls = self._feature_class(name)
+            if cls is None:
+                # an unknown feature, or one whose module failed to import; _setup_measures
+                # reports it and removes it
+                continue
 
-            def _drop_unsupported_features(feature, supported, res_codes):
-                '''
-                Remove feature from list of features to calculate if the feature cannot be used
-                on the desired residue to calculate.
-                '''
-                if feature not in self.features_dict:
-                    return
-                if any(c.upper() in supported for c in res_codes):
-                    return
-                print(f'>> {feature} cannot compute a pKa value for {", ".join(res_codes)}; '
-                      f'removing {feature} from the features to calculate.')
-                self.features_dict.pop(feature)
+            supported = getattr(cls, 'SUPPORTED_RESIDUES', None)
+            if supported is not None and res_code not in supported:
+                reason = getattr(cls, 'UNSUPPORTED_REASON', None)
+                if isinstance(reason, dict):
+                    reason = reason.get(res_code)
+                print(f'>> {name} cannot be calculated for {res_code}'
+                      + (f', because {reason}' if reason else '')
+                      + f'; removing {name} from the features to calculate.')
+                self.features_dict.pop(name)
+                continue
 
-            res_codes = ([res_details] if isinstance(res_details, str) else list(res_details['non_modified_codes']))
-            _drop_unsupported_features('propka', propka_res, res_codes)
-            _drop_unsupported_features('pkaANI', pkaani_res, res_codes)
-
-        elif isinstance(res_details, dict):
-            dict_keys = ['non_modified_codes', 'modified_codes',
-                            'atom_select_names_nonmod', 'atom_select_names_modified']
-            if list(res_details) != dict_keys:
-                raise KeyError(f'Not all keys required for aa_properties dict given; please '
-                                f'ensure that all keys required ({", ".join(dict_keys)}) are '
-                                f'included (can be set to \'\' if nothing required in the parameter)')
-            aa_properties = res_details
-
-            len_nonmod = len(aa_properties['non_modified_codes'])
-            if (any(aa_properties['non_modified_codes'] == propka_res[i:i + len_nonmod] for i in range(len(propka_res) - len_nonmod + 1))
-                        and res_details in list(self.features_dict)):
-                print(f'>> Residues entered for analysis in non modified codes of amino acid properties '
-                        f'({", ".join(aa_properties["non_modified_codes"])}) are not possible to run analysis '
-                        f'for in PROPKA3, removing from features to calculate.')
-                self.features_dict.pop('propka')
-
-            if (any(aa_properties['non_modified_codes'] == pkaani_res[i:i + len_nonmod] for i in range(len(pkaani_res) - len_nonmod + 1))
-                        and res_details in list(self.features_dict)):
-                print(f'>> Residues entered for analysis in non modified codes of amino acid properties '
-                      f'({", ".join(aa_properties["non_modified_codes"])}) are not possible to run analysis '
-                      f'for in pKaANI, removing from features to calculate.')
-                self.features_dict.pop('pkaani')
-
-        else:
-            raise ValueError(f'Unknown option give to residue_of_interest parameter: '
-                            f'{str(res_details)}; please enter either string or dict. '
-                            f'See class documentation.')
+            defaults = getattr(cls, 'RESIDUE_KWARGS', {}).get(res_code)
+            if defaults:
+                # the user's own settings win over the defaults of the residue, and
+                # features_dict was copied shallowly, so rebuild the entry rather than writing
+                # into the dictionary the caller still holds
+                self.features_dict[name] = {**copy.deepcopy(defaults),
+                                            **self.features_dict[name]}
 
         return aa_properties
+
+
+    def _feature_class(self, name):
+        '''
+        The class implementing a feature, looked up the same way :meth:`_setup_measures` does.
+
+        :param name: Name of the feature as it appears in features_dict.
+        :type name: str
+        :returns: The class, or None when no class of that name is available, which covers both
+            an unknown feature and one whose module failed to import for want of an optional
+            dependency.
+        :rtype: type
+        '''
+        cls = globals().get(name.upper())
+        if inspect.isclass(cls) and callable(getattr(cls, 'calculate', None)):
+            return cls
+        return None
 
 
     def _setup_report_errors_file(self):

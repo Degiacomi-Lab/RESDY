@@ -120,6 +120,9 @@ class AEV():
                         pairs_seen.add(pair)
                         keep_pos.append(pos)
                 idx_nz = idx_nz[keep_pos]
+                # the loop below walks coords_nz while indexing the deduplicated lists, so the
+                # coordinates have to be filtered alongside the indices
+                coords_nz = coords_nz[keep_pos]
 
             else:
                 coords_nz, idx_nz = M.atomselect('*',

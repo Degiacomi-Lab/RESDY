@@ -65,6 +65,10 @@ jobs:
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_helper.py
+      - name: Test Residues
+        if: ${{ matrix.group == 'rest' && !cancelled() }}
+        run: |
+          python test/test_residues.py
       - name: Test Aggregation
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |

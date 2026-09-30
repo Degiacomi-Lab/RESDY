@@ -14,6 +14,15 @@ class PROPKA():
     pKa values for structures, calculated with PROPKA3.
     '''
 
+    #: Residues PROPKA3 reports a pKa for. :class:`Measure <resdy.measure.Measure>` drops this
+    #: feature when the residue of interest is not one of them, since it would otherwise
+    #: contribute a column of NaN.
+    SUPPORTED_RESIDUES = {'ASP', 'GLU', 'HIS', 'CYS', 'TYR', 'LYS', 'ARG'}
+
+    #: Why the feature is unavailable, quoted back to the user when it is dropped.
+    UNSUPPORTED_REASON = ('PROPKA3 reports a pKa only for ASP, GLU, HIS, CYS, TYR, LYS '
+                          'and ARG')
+
     def __init__(self, outdir,
                  include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],

@@ -10,6 +10,14 @@ class PKAANI():
     pKa values for structures, calculated with pKaANI.
     '''
 
+    #: Residues pKa-ANI ships a trained model for, the contents of the ``pkaani/models``
+    #: directory of the isayevlab/pKa-ANI repository. :class:`Measure <resdy.measure.Measure>`
+    #: drops this feature when the residue of interest is not one of them.
+    SUPPORTED_RESIDUES = {'ASP', 'GLU', 'HIS', 'LYS', 'TYR'}
+
+    #: Why the feature is unavailable, quoted back to the user when it is dropped.
+    UNSUPPORTED_REASON = ('pKa-ANI ships trained models only for ASP, GLU, HIS, LYS and TYR')
+
     def __init__(self, include_modified=False,
                  aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
                                 'modified_codes': ['LYE', 'KCX'],
