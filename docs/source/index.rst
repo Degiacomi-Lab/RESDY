@@ -33,6 +33,7 @@ The pipeline is constituted by five steps, each documented in its own section be
    :maxdepth: 1
 
    measure
+   residues
    autoapi/index
 
 4\. **Analysis**, exploring the resulting measurements.
