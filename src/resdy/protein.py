@@ -777,7 +777,7 @@ class PDB(object):
                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                     aligner.open_gap_score = -11
                     aligner.extend_gap_score = -11
-                    aligner.end_insertion_score = 0.0
+                    aligner.end_gap_score = 0.0
                     alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
 
                     res_mapper = {}
@@ -840,7 +840,7 @@ class PDB(object):
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                                     aligner.open_gap_score = -11
                                     aligner.extend_gap_score = -11
-                                    aligner.end_insertion_score = 0.0
+                                    aligner.end_gap_score = 0.0
                                     alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
 
                                     for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
@@ -1103,7 +1103,7 @@ class PDB(object):
                 aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                 aligner.open_gap_score = -11
                 aligner.extend_gap_score = -11
-                aligner.end_insertion_score = 0.0
+                aligner.end_gap_score = 0.0
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
 
                 res_mapper = {}
