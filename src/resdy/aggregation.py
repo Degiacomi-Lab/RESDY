@@ -98,7 +98,7 @@ class Aggregation:
         self.df_agg = pd.DataFrame()
         self.max_feature_nan_fraction = max_feature_nan_fraction
 
-        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
+        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method', 'Source',
                                  'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
 
         if self.features_to_include == ['all']:

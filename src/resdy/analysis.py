@@ -47,7 +47,7 @@ class Analysis(object):
             self.df = df
 
         standard_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Resolution', 'Method',
-                         'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap']
+                         'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap', 'Source']
 
         if features_to_analyse in ([], ['all']):
             # no features named: analyse every feature column, and keep every row
@@ -360,7 +360,7 @@ class Analysis(object):
                 ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
 
             case 'all':
-                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
                                  'Resolution', 'Modified', 'class']
                 feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
                 if 'arc' in feat_cols:
@@ -445,7 +445,7 @@ class Analysis(object):
                                 features_to_include=[feature])
                 df_plot = agg.aggregate_data()
 
-                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
                                 'Resolution', 'Modified', 'class']
                 agg_types = [a.split('_')[-1] for a in df_plot.columns if a not in non_feat_cols]
 
@@ -575,7 +575,7 @@ class Analysis(object):
                       'sd': 'Standard Deviation',
                       'range': 'Range'}
 
-        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
                         'Resolution', 'Modified', 'class']
 
         if features == '' or features == []:
@@ -731,7 +731,7 @@ class Analysis(object):
             if isinstance(extra_measures_filename, str):
                 new_df = pd.read_csv(extra_measures_filename)
             if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
-            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
             new_measures_columns = [a for a in new_df.columns if a not in base_columns]
             overlap_columns = [a for a in new_measures_columns if a in orig_measures_columns]

@@ -90,6 +90,11 @@ class Measure(object):
         :param only_relaxed: Option to only calculate measurements for structures that are relaxed
             if there is a relaxed structure available for the structure. If set to False, measures
             will be calculated to both original and relaxed form. Default is True.
+
+            A structure with no minimised copy is measured unrelaxed either way, which happens
+            whenever minimisation was not requested, was skipped, or failed. The 'Source' column
+            of the output records which copy each row was taken from, 'relaxed' or 'unrelaxed',
+            so that the two are not silently mixed.
         :type only_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
@@ -190,12 +195,32 @@ class Measure(object):
         self.PDB_only = False
 
         if 'Uniprot_Entry' in self.df_input.columns:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB_Code', 'Chain', 'Resid']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source']
             self.df = pd.DataFrame(columns = columns)
+
+
+    @staticmethod
+    def _source_of(path):
+        '''
+        Record which copy of a structure a measurement was taken from.
+
+        Whether a structure is measured relaxed or unrelaxed is not a property of the
+        protein but of how curation went: minimisation is skipped when openmm has no
+        template for something the structure retains, and fails outright on some
+        structures, and ``only_relaxed`` then falls back to the unminimised file. Without
+        this column a measurements table silently mixes the two.
+
+        :param path: file the measurement was taken from.
+        :type path: str
+        :returns: 'relaxed' if the file is the energy-minimised copy, else 'unrelaxed'.
+        :rtype: str
+        '''
+        stem = os.path.splitext(os.path.basename(path))[0]
+        return 'relaxed' if stem.endswith('_relaxed') else 'unrelaxed'
 
 
     def _setup_measures(self, features_dict):
@@ -618,7 +643,7 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
             if self.include_mod:
                 columns.append('Modified')
             df_currentfile = pd.DataFrame(columns=columns)
@@ -647,7 +672,8 @@ class Measure(object):
                     'Method': method,
                     'Resolution': res,
                     'Chain': M.data['chain'].values[i],
-                    'Resid': M.data['resid'].values[i]})
+                    'Resid': M.data['resid'].values[i],
+                    'Source': self._source_of(f)})
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
@@ -703,7 +729,7 @@ class Measure(object):
                 frames_df_list.append(df_currentfile)
 
         if not frames_df_list:
-            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid'])
+            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -1021,7 +1047,7 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['PDB_Code', 'Chain', 'Resid']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source']
             if self.include_mod:
                 columns.append('Modified')
             df_currentfile = pd.DataFrame(columns=columns)
@@ -1046,7 +1072,8 @@ class Measure(object):
             for i in idxs:
                 data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
                     'Chain': M.data['chain'].values[i],
-                    'Resid': M.data['resid'].values[i]})
+                    'Resid': M.data['resid'].values[i],
+                    'Source': self._source_of(f)})
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]

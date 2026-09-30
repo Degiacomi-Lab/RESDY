@@ -21,7 +21,7 @@ class Viewer(object):
             self.df_measures = df_measures
         self.outdir = outdir
 
-        self.non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid',
+        self.non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Source',
                          'Method', 'Resolution', 'PLDDT', 'class']
         self.features = [a for a in self.df_measures.columns if a not in self.non_feat_cols]
 
