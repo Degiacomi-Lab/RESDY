@@ -347,17 +347,30 @@ def analyze_protein(M):
     Take a biobox molecule instance, look for gaps in the sequence and return 3 elements list:
     [number of gaps, number of missing residues, largest sequence gap]
 
+    Only polymer residues are considered, identified by carrying a CA atom. Waters,
+    ions and ligands are numbered in their own range, often continuing past the end of
+    the chain they sit in, so counting them would put the whole span between the last
+    residue and the first heteroatom down as missing. On 3DBJ, whose chains run to
+    residue 174 with waters numbered from 202, including them turns two real gaps of
+    two residues into a single phantom gap of 28 and the structure is rejected.
+
     :param M: bb.Molecule instance for the chain of interest to get gaps over
     :type M: Biobox molecule instance
-    :returns: List of 3 element lists for gaps within the chain of format: [number of gaps, number
-        of missing residues, largest sequence gap]
+    :returns: [number of gaps, number of missing residues, largest sequence gap]. All
+        zero if the chain holds no polymer residue at all.
     :rtype: list
     '''
+    # biobox reads columns 12 to 17, so an alternate-location indicator arrives stuck to
+    # the atom name ('CA A'); compare on the first whitespace-separated token
+    names = M.data['name'].astype(str).str.split().str[0]
+    res = np.unique(M.data.loc[names == 'CA', 'resid'].values)
 
-    res = np.unique(M.data["resid"].values)
     missing = []
     patch = []
     cnt = [0, 0, 0]
+    if len(res) == 0:
+        return cnt
+
     for r in range(int(np.min(res)), int(np.max(res)+1)):
         if r in res:
             if len(patch) > 0:

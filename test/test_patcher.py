@@ -6,6 +6,7 @@ import tempfile
 import itertools
 
 import numpy as np
+import biobox as bb
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 from resdy import patcher
@@ -62,6 +63,47 @@ class Test_Patcher(unittest.TestCase):
                 sep_before, sep_after, delta=1.0,
                 msg=f'chains {a} and {b} moved from {sep_before:.2f} A apart to '
                     f'{sep_after:.2f} A during curation')
+
+    def test_analyze_protein_ignores_heteroatoms(self):
+        '''
+        Gap detection must not count heteroatoms. Waters and ions are numbered in their
+        own range past the end of the chain, so counting them reports the whole span
+        between the last residue and the first water as missing, and the structure is
+        then rejected as having too large a gap.
+        '''
+        src = os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb')
+        M = bb.Molecule()
+        M.import_pdb(src, include_hetatm=True)
+        before = patcher.analyze_protein(M)
+
+        last = int(M.data['resid'].max())
+        with_water = os.path.join(self.outdir, 'with_water.pdb')
+        with open(src) as fin, open(with_water, 'w') as fout:
+            for line in fin:
+                if not line.startswith('END'):
+                    fout.write(line)
+            # waters numbered well past the chain, as a deposited entry numbers them
+            for n in range(1, 21):
+                fout.write(f'HETATM{9000 + n:5d}  O   HOH A{last + 30 + n:4d}    '
+                           f'{0.0:8.3f}{0.0:8.3f}{0.0:8.3f}  1.00  0.00           O\n')
+            fout.write('END\n')
+
+        N = bb.Molecule()
+        N.import_pdb(with_water, include_hetatm=True)
+        self.assertGreater(len(N.data), len(M.data))
+        self.assertEqual(patcher.analyze_protein(N), before)
+
+    def test_analyze_protein_with_no_polymer(self):
+        '''A chain holding only heteroatoms has no sequence, so it has no gaps.'''
+        only_water = os.path.join(self.outdir, 'only_water.pdb')
+        with open(only_water, 'w') as fout:
+            for n in range(1, 11):
+                fout.write(f'HETATM{n:5d}  O   HOH A{n:4d}    '
+                           f'{0.0:8.3f}{0.0:8.3f}{0.0:8.3f}  1.00  0.00           O\n')
+            fout.write('END\n')
+        M = bb.Molecule()
+        M.import_pdb(only_water, include_hetatm=True)
+        self.assertEqual(patcher.analyze_protein(M), [0, 0, 0])
 
     def test_superpose_onto_restores_a_displaced_chain(self):
         '''
