@@ -324,7 +324,7 @@ class PDB(object):
         return os.path.join(self.curated_dir, f'{pdb}{MINIMISATION_RECORD_SUFFIX}')
 
 
-    def _write_minimisation_record(self, pdb, status, reason='', **details):
+    def _write_minimisation_record(self, pdb, status, reason='', settings=None, **details):
         '''
         Record the outcome of minimising one structure, beside the structure itself.
 
@@ -339,11 +339,14 @@ class PDB(object):
         :type status: str
         :param reason: why the structure was not minimised, for 'skipped' and 'failed'.
         :type reason: str
+        :param settings: the settings this minimisation actually used, when a call
+            overrides the constructor's; None records self.minimisation_settings.
+        :type settings: dict
         '''
         if status != 'relaxed':
             self.minimisation_skipped[pdb] = reason
         record = {'structure': pdb, 'status': status, 'reason': reason,
-                  'settings': self.minimisation_settings,
+                  'settings': settings if settings is not None else self.minimisation_settings,
                   'openmm_version': openmm.__version__ if openmm_available else None,
                   'date': datetime.datetime.now().isoformat(timespec='seconds')}
         record.update(details)
@@ -1747,7 +1750,7 @@ class PDB(object):
             print(f'>> Not minimising {pdb}: explicit waters are being kept, which the '
                   f'implicit solvent model would double-count. The unminimised structure '
                   f'will be measured instead.')
-            self._write_minimisation_record(pdb, 'skipped', reason)
+            self._write_minimisation_record(pdb, 'skipped', reason, settings)
             return
 
         try:
@@ -1755,7 +1758,10 @@ class PDB(object):
             pdb_inst = PDBFile(pdb_path)
 
             M = bb.Molecule()
-            M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
+            # read heteroatoms on both sides of the B-factor round trip: biobox skips
+            # HETATM records by default, and writing N back would then delete every
+            # retained water, ion and ligand from the relaxed structure
+            M.import_pdb(pdb_path, include_hetatm=True)
             df_beta = M.data[['chain', 'resid', 'name', 'beta']]
 
             forcefield = ForceField(*settings['forcefield'])
@@ -1782,7 +1788,7 @@ class PDB(object):
                           else str(e))
                 print(f'>> Not minimising {pdb}: {reason}. The unminimised structure will '
                       f'be measured instead.')
-                self._write_minimisation_record(pdb, 'skipped', reason)
+                self._write_minimisation_record(pdb, 'skipped', reason, settings)
                 return
 
             heavy = [a.index for a in modeller.topology.atoms()
@@ -1831,7 +1837,7 @@ class PDB(object):
                 PDBFile.writeFile(modeller.topology, modeller.getPositions(), fh, keepIds=True)
 
             N = bb.Molecule()
-            N.import_pdb(relaxed_path)
+            N.import_pdb(relaxed_path, include_hetatm=True)
             merged_beta = (N.data.drop(columns=['beta'])
                            .merge(df_beta, how='left',
                                   on=['chain', 'resid', 'name'],
@@ -1848,9 +1854,7 @@ class PDB(object):
                        'energy_final_kj_mol':
                            sim_out.getPotentialEnergy().value_in_unit(kilojoule_per_mole),
                        'heavy_atom_rmsd_a': heavy_rmsd}
-            if max_iterations is not None:
-                details['max_iterations_override'] = int(max_iterations)
-            self._write_minimisation_record(pdb, 'relaxed', **details)
+            self._write_minimisation_record(pdb, 'relaxed', settings=settings, **details)
             print(f'>> Finished minimising structure: {pdb}_relaxed.pdb '
                   f'(heavy atoms moved {heavy_rmsd:.2f} A rmsd)')
 
@@ -1858,7 +1862,8 @@ class PDB(object):
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
             if os.path.exists(relaxed_path):
                 os.remove(relaxed_path)
-            self._write_minimisation_record(pdb, 'failed', f'{type(e).__name__}: {e}')
+            self._write_minimisation_record(pdb, 'failed', f'{type(e).__name__}: {e}',
+                                            settings)
 
 
 if __name__ == "__main__":
