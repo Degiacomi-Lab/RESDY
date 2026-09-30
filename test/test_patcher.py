@@ -10,6 +10,7 @@ import biobox as bb
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 from resdy import patcher
+from resdy.geometry import check_geometry
 
 class Test_Patcher(unittest.TestCase):
     def setUp(self):
@@ -38,7 +39,7 @@ class Test_Patcher(unittest.TestCase):
         pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
         fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
         gap = 10
-        outname, largest = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=gap)
+        outname, largest, geometry = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=gap)
         self.assertTrue(os.path.isfile(outname))
         self.assertEqual(largest, 0)
 
@@ -51,7 +52,7 @@ class Test_Patcher(unittest.TestCase):
         pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
         fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
         before = self._chain_centroids(pdb)
-        outname, _ = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=10)
+        outname, _, _ = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=10)
         after = self._chain_centroids(outname)
 
         self.assertEqual(sorted(before), sorted(after))
@@ -63,6 +64,51 @@ class Test_Patcher(unittest.TestCase):
                 sep_before, sep_after, delta=1.0,
                 msg=f'chains {a} and {b} moved from {sep_before:.2f} A apart to '
                     f'{sep_after:.2f} A during curation')
+
+    def test_curate_reports_geometry(self):
+        '''curate must hand back a geometry report for the assembled structure.'''
+        pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
+        fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
+        outname, largest, geometry = patcher.curate(pdb=pdb, fasta=fasta,
+                                                    outdir=self.outdir, gap=10)
+        for key in ('n_atoms', 'n_clashes', 'min_contact', 'n_modelled_residues',
+                    'involves_modelled', 'inter_chain'):
+            self.assertIn(key, geometry)
+        # 2MWS has no gaps, so nothing is rebuilt and nothing should clash
+        self.assertEqual(geometry['n_modelled_residues'], 0)
+        self.assertEqual(geometry['n_clashes'], 0)
+        self.assertGreater(geometry['min_contact'], 2.0)
+
+    def test_geometry_check_finds_a_planted_clash(self):
+        '''
+        The check has to notice an atom driven into a neighbouring chain, which is the
+        failure a rebuilt loop would produce: each chain is modelled on its own and knows
+        nothing about the chains packed against it.
+        '''
+        src = os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb')
+        clean, _ = check_geometry(src)
+        self.assertEqual(clean['n_clashes'], 0)
+
+        # move one atom of chain B onto an atom of chain A
+        target = None
+        for line in open(src):
+            if line.startswith('ATOM') and line[21] == 'A' and line[12:16].strip() == 'CA':
+                target = line[30:54]
+                break
+        planted = os.path.join(self.outdir, 'planted.pdb')
+        done = False
+        with open(src) as fin, open(planted, 'w') as fout:
+            for line in fin:
+                if (not done and line.startswith('ATOM') and line[21] == 'B'
+                        and line[12:16].strip() == 'CA'):
+                    line = line[:30] + target + line[54:]
+                    done = True
+                fout.write(line)
+
+        summary, offending = check_geometry(planted)
+        self.assertGreater(summary['n_clashes'], 0)
+        self.assertTrue(summary['inter_chain'])
+        self.assertLess(summary['min_contact'], 0.1)
 
     def test_analyze_protein_ignores_heteroatoms(self):
         '''

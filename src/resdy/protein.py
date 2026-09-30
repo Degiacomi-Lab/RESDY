@@ -1,9 +1,12 @@
 import os
+import csv
 import re
 import io
 import glob
+import json
 import shutil
 import time
+import datetime
 from contextlib import redirect_stdout
 from multiprocessing import cpu_count
 from multiprocessing import Manager
@@ -19,13 +22,15 @@ from . import patcher
 from .helper import get_download_tool, ShutUp
 
 try:
+    import openmm
     from openmm.app.modeller import Modeller
     from openmm.app.forcefield import ForceField
     from openmm.app.pdbfile import PDBFile
     from openmm.app import NoCutoff
-    from openmm.openmm import LangevinMiddleIntegrator
+    from openmm.openmm import LangevinMiddleIntegrator, CustomExternalForce, Platform
     from openmm.app.simulation import Simulation
-    from openmm.unit import nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin
+    from openmm.unit import (nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin,
+                             angstrom)
     openmm_available = True
 except Exception as e:
     print('Could not import openmm modules for running minimisations, please ensure '
@@ -44,6 +49,15 @@ WATER_RESNAMES = ('HOH', 'WAT', 'DOD', 'H2O')
 #: the list clean_pdb used to carry, whose branch was unreachable.
 DEFAULT_KEPT_IONS = ('ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO')
 
+#: Force field files used for minimisation unless the user gives others.
+DEFAULT_FORCEFIELD = ('amber14-all.xml', 'implicit/gbn2.xml')
+
+#: 1 kcal/mol/A^2 expressed in kJ/mol/nm^2, the unit OpenMM works in.
+KCAL_A2_TO_KJ_NM2 = 418.4
+
+#: Suffix of the per-structure record written beside every minimised (or not) structure.
+MINIMISATION_RECORD_SUFFIX = '.minimisation.json'
+
 
 class PDB(object):
     '''
@@ -57,6 +71,9 @@ class PDB(object):
                  PDB_only=False, include_hetatm=False,
                  keep_waters=False, keep_ions=(), keep_ligands=(),
                  resnames_of_interest = ['LYS'], minimise_strucs='AF',
+                 forcefield=DEFAULT_FORCEFIELD, minimise_tolerance=10.0,
+                 minimise_max_iterations=1000, restrain_heavy_atoms=False,
+                 restraint_k=10.0, minimisation_platform=None,
                  remove_all_modifications=False,
                  num_cores=0, max_nmr_conformers=''):
         '''
@@ -100,7 +117,34 @@ class PDB(object):
                 - 'AF': Just run on alphafold structures
                 - 'PDB': Just run on PDB
                 - 'ALL': Run on all structures
+
+            Each minimisation writes ``<structure>.minimisation.json`` beside the structure,
+            recording the settings, the outcome and how far the heavy atoms moved. A
+            structure found already curated is minimised again when its record is missing or
+            was made with different settings. gather_proteins collects the records into
+            ``minimisation_log.csv``.
         :type minimise_strucs: str
+        :param forcefield: OpenMM force field files used for minimisation. Extra files can
+            be added to give templates for retained cofactors. If one of them is an
+            implicit solvent model (a file under ``implicit/``), minimisation is skipped for
+            structures that keep explicit waters; with no implicit solvent it runs in vacuum.
+        :type forcefield: str, tuple
+        :param minimise_tolerance: Force tolerance at which minimisation stops, in kJ/mol/nm.
+        :type minimise_tolerance: float
+        :param minimise_max_iterations: Maximum number of minimisation iterations; 0 runs
+            until the tolerance is reached.
+        :type minimise_max_iterations: int
+        :param restrain_heavy_atoms: Restrain every heavy atom to its input position with a
+            harmonic potential, as AlphaFold's relaxation does, so that minimisation removes
+            clashes without drifting from the experimental coordinates.
+        :type restrain_heavy_atoms: bool
+        :param restraint_k: Spring constant of the restraint, in kcal/mol/A^2 (AlphaFold uses
+            10). Only used when ``restrain_heavy_atoms`` is True.
+        :type restraint_k: float
+        :param minimisation_platform: OpenMM platform to minimise on ('Reference', 'CPU',
+            'CUDA', 'OpenCL'). None lets OpenMM pick the fastest, which on a GPU platform does
+            not give identical coordinates from one run to the next.
+        :type minimisation_platform: str
         :param remove_all_modifications: Option to remove all other modifications from curated
             protein structures. By default, modifications on the residue of interest will be
             removed. Default for other removal of mutations is set to False, in this case only
@@ -172,6 +216,10 @@ class PDB(object):
                               f'openmm or change minimise_strucs parameter to None to skip '
                               f'the minimisation.')
 
+        self.minimisation_settings = self._setup_minimisation_settings(
+            forcefield, minimise_tolerance, minimise_max_iterations,
+            restrain_heavy_atoms, restraint_k, minimisation_platform)
+
         if isinstance(max_nmr_conformers, int):
             self.max_nmr_conformers = max_nmr_conformers
         elif isinstance(max_nmr_conformers, str):
@@ -207,6 +255,176 @@ class PDB(object):
             self.df = pd.DataFrame(columns=columns)
 
         self.gap = gap
+
+
+    def _setup_minimisation_settings(self, forcefield, tolerance, max_iterations,
+                                     restrain_heavy_atoms, restraint_k, platform):
+        '''
+        Validate the minimisation settings and return them as a plain dict.
+
+        The dict is what gets recorded beside every minimised structure and compared when a
+        curated structure is reused, so it holds only JSON-serialisable values. When
+        minimisation is requested, the force field files and the platform are also loaded
+        once here, so that a typo fails at construction rather than once per structure.
+
+        :returns: forcefield (list), tolerance_kj_mol_nm, max_iterations,
+            restrain_heavy_atoms, restraint_k_kcal_mol_a2, platform.
+        :rtype: dict
+        '''
+        if isinstance(forcefield, str):
+            forcefield = [forcefield]
+        forcefield = list(forcefield)
+        if not forcefield or not all(isinstance(f, str) and f for f in forcefield):
+            raise ValueError(f'forcefield must be a file name or a sequence of file names, '
+                             f'got {forcefield!r}')
+        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or tolerance <= 0:
+            raise ValueError(f'minimise_tolerance must be a positive number (kJ/mol/nm), '
+                             f'got {tolerance!r}')
+        if (isinstance(max_iterations, bool) or not isinstance(max_iterations, (int, np.integer))
+                or max_iterations < 0):
+            raise ValueError(f'minimise_max_iterations must be an integer >= 0 (0 means until '
+                             f'the tolerance is reached), got {max_iterations!r}')
+        if isinstance(restraint_k, bool) or not isinstance(restraint_k, (int, float)) or restraint_k < 0:
+            raise ValueError(f'restraint_k must be a number >= 0 (kcal/mol/A^2), '
+                             f'got {restraint_k!r}')
+        if platform is not None and not isinstance(platform, str):
+            raise ValueError(f'minimisation_platform must be None or a platform name, '
+                             f'got {platform!r}')
+
+        settings = {'forcefield': forcefield,
+                    'tolerance_kj_mol_nm': float(tolerance),
+                    'max_iterations': int(max_iterations),
+                    'restrain_heavy_atoms': bool(restrain_heavy_atoms),
+                    'restraint_k_kcal_mol_a2': float(restraint_k) if restrain_heavy_atoms else None,
+                    'platform': platform}
+
+        if (self.minimise_af or self.minimise_pdb) and openmm_available:
+            try:
+                ForceField(*forcefield)
+            except Exception as e:
+                raise ValueError(f'The minimisation force field {forcefield} could not be '
+                                 f'loaded: {e}') from e
+            if platform is not None:
+                available = [Platform.getPlatform(i).getName()
+                             for i in range(Platform.getNumPlatforms())]
+                if platform not in available:
+                    raise ValueError(f'minimisation_platform {platform!r} is not available; '
+                                     f'this OpenMM installation has {", ".join(available)}')
+        return settings
+
+
+    @staticmethod
+    def _uses_implicit_solvent(forcefield):
+        '''True if one of the force field files is an OpenMM implicit solvent model.'''
+        return any(f.replace('\\', '/').startswith('implicit/') for f in forcefield)
+
+
+    def _minimisation_record_path(self, pdb):
+        '''Path of the record kept beside curated structure ``pdb`` (a file stem).'''
+        return os.path.join(self.curated_dir, f'{pdb}{MINIMISATION_RECORD_SUFFIX}')
+
+
+    def _write_minimisation_record(self, pdb, status, reason='', **details):
+        '''
+        Record the outcome of minimising one structure, beside the structure itself.
+
+        One small file per structure rather than one shared table, because curation can run
+        in a worker pool: each worker writes only its own structures' records, and
+        gather_proteins collects them afterwards. Skips and failures are recorded in
+        self.minimisation_skipped as well, which is complete for a serial run.
+
+        :param pdb: file stem of the curated structure.
+        :type pdb: str
+        :param status: 'relaxed', 'skipped' or 'failed'.
+        :type status: str
+        :param reason: why the structure was not minimised, for 'skipped' and 'failed'.
+        :type reason: str
+        '''
+        if status != 'relaxed':
+            self.minimisation_skipped[pdb] = reason
+        record = {'structure': pdb, 'status': status, 'reason': reason,
+                  'settings': self.minimisation_settings,
+                  'openmm_version': openmm.__version__ if openmm_available else None,
+                  'date': datetime.datetime.now().isoformat(timespec='seconds')}
+        record.update(details)
+        try:
+            with open(self._minimisation_record_path(pdb), 'w') as fh:
+                json.dump(record, fh, indent=1)
+        except Exception as e:
+            print(f'>> Could not write the minimisation record for {pdb}: {e}')
+
+
+    def _read_minimisation_record(self, pdb):
+        '''The record written for ``pdb`` by a previous minimisation, or None.'''
+        try:
+            with open(self._minimisation_record_path(pdb)) as fh:
+                return json.load(fh)
+        except Exception:
+            return None
+
+
+    def _ensure_minimised(self, pdb):
+        '''
+        Minimise an already curated structure unless it was minimised with the current
+        settings.
+
+        Used when curation finds a structure already curated and reuses it. Without this,
+        changing the minimisation settings and re-running in the same outdir would silently
+        keep the relaxed files made with the old ones. A structure with no record at all
+        (made before records existed, or never minimised) is minimised now.
+
+        :param pdb: file stem of the curated structure.
+        :type pdb: str
+        '''
+        record = self._read_minimisation_record(pdb)
+        relaxed_present = os.path.exists(os.path.join(self.curated_dir, f'{pdb}_relaxed.pdb'))
+        if record is not None and record.get('settings') == self.minimisation_settings:
+            if record.get('status') != 'relaxed':
+                self.minimisation_skipped[pdb] = record.get('reason', '')
+                return
+            if relaxed_present:
+                return
+        if record is None:
+            why = 'it has no minimisation record'
+        elif record.get('settings') != self.minimisation_settings:
+            why = 'its minimisation settings differ from the current ones'
+        else:
+            why = 'its relaxed file is missing'
+        print(f'>> Minimising {pdb} again: {why}')
+        self.apply_minimisation(pdb)
+
+
+    def collect_minimisation_log(self, outname='minimisation_log.csv'):
+        '''
+        Gather the per-structure minimisation records into one table.
+
+        Called at the end of gather_proteins. Also refills self.minimisation_skipped, which
+        worker processes cannot update when curation runs in parallel.
+
+        :param outname: file written in the output directory; None to write nothing.
+        :type outname: str
+        :returns: one row per curated structure that has a record.
+        :rtype: pandas.DataFrame
+        '''
+        rows = []
+        for path in sorted(glob.glob(os.path.join(self.curated_dir,
+                                                  f'*{MINIMISATION_RECORD_SUFFIX}'))):
+            try:
+                with open(path) as fh:
+                    record = json.load(fh)
+            except Exception as e:
+                print(f'>> Could not read minimisation record {path}: {e}')
+                continue
+            settings = record.pop('settings', None) or {}
+            for k, v in settings.items():
+                record[f'setting_{k}'] = '+'.join(v) if isinstance(v, list) else v
+            rows.append(record)
+            if record.get('status') != 'relaxed':
+                self.minimisation_skipped[record['structure']] = record.get('reason', '')
+        df = pd.DataFrame(rows)
+        if outname and not df.empty:
+            df.to_csv(os.path.join(self.outdir, outname), index=False)
+        return df
 
 
     def save_state(self, outname='proteins.csv'):
@@ -350,6 +568,12 @@ class PDB(object):
             else:
                 results = [t for t in (self._curate_row(*i) for i in items) if t is not None]
 
+            if self.minimise_af or self.minimise_pdb:
+                self.collect_minimisation_log()
+                if self.minimisation_skipped:
+                    print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised '
+                          f'and will be measured unrelaxed; see minimisation_log.csv')
+
             if not results:
                 print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
                       f'for more details, see uncuratable_pdb_files.csv')
@@ -425,6 +649,12 @@ class PDB(object):
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
                     else:
                         data = {'PDB_Code': pdb_code}
+
+                    if self.minimise_af:
+                        reuse_print_trap = io.StringIO()
+                        with redirect_stdout(reuse_print_trap):
+                            self._ensure_minimised(pdb_code)
+                        print_statements.append(reuse_print_trap.getvalue())
 
                     finish_curate_jobs(failed=False)
                     return pd.DataFrame.from_records(data, index=[0])
@@ -517,6 +747,18 @@ class PDB(object):
                     else:
                         data = {'PDB_Code': pdb_code}
 
+                    if self.minimise_pdb:
+                        stems = sorted(
+                            os.path.splitext(os.path.basename(a))[0]
+                            for a in glob.glob(os.path.join(self.curated_dir, "*pdb"))
+                            if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]
+                            and not os.path.splitext(a)[0].endswith('_relaxed'))
+                        reuse_print_trap = io.StringIO()
+                        with redirect_stdout(reuse_print_trap):
+                            for stem in stems:
+                                self._ensure_minimised(stem)
+                        print_statements.append(reuse_print_trap.getvalue())
+
                     finish_curate_jobs(failed=False)
                     return pd.DataFrame.from_records(data, index=[0])
 
@@ -546,6 +788,34 @@ class PDB(object):
             print_statements.append(clean_split_print_trap.getvalue())
             finish_curate_jobs(failed=False)
             return pd.DataFrame.from_records(data, index=[0])
+
+
+    def _record_geometry(self, geometry):
+        '''
+        Append one curated structure's geometry report to ``curation_geometry.csv``.
+
+        Written beside proteins.csv so that a run can be audited afterwards: which
+        structures hold rebuilt residues, how close their closest non-bonded contact is,
+        and whether anything rebuilt ended up inside a neighbouring chain.
+
+        :param geometry: report as returned by resdy.geometry.check_geometry, with
+            n_modelled_residues added by patcher.curate.
+        :type geometry: dict
+        '''
+        if not geometry:
+            return
+        record = dict(geometry)
+        record['file'] = os.path.basename(str(record.get('file', '')))
+        path = os.path.join(self.outdir, 'curation_geometry.csv')
+        try:
+            with open(path, 'a', newline='') as fh:
+                writer = csv.DictWriter(fh, fieldnames=sorted(record))
+                if fh.tell() == 0:
+                    writer.writeheader()
+                writer.writerow(record)
+        except Exception as e:
+            print(f'>> Could not record the geometry report for '
+                  f'{record.get("file")}: {e}')
 
 
     def _keep_hetatm(self, line, element=''):
@@ -607,8 +877,10 @@ class PDB(object):
 
             try:
 
-                fname, largest_gap = patcher.curate(f, fasta_loc, outdir=self.curated_dir,
-                                       gap=self.gap, include_hetatm=self.include_hetatm)
+                fname, largest_gap, geometry = patcher.curate(
+                    f, fasta_loc, outdir=self.curated_dir,
+                    gap=self.gap, include_hetatm=self.include_hetatm)
+                self._record_geometry(geometry)
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
@@ -1167,6 +1439,11 @@ class PDB(object):
         if isinstance(chains, str):
             chains = [c for c in chains.split('/') if c]
 
+        if not chains:
+            # no chain was declared for this Uniprot entry, so there is nothing to place
+            # in the canonical sequence and nothing to report
+            return
+
         failed = []
         for chain in chains:
             try:
@@ -1434,41 +1711,54 @@ class PDB(object):
             print(f'Failed rewriting pdb file with error: {str(e)}')
 
 
-    def apply_minimisation(self, pdb, max_iterations=1000):
+    def apply_minimisation(self, pdb, max_iterations=None):
         '''
-        Utilise openmm to apply an energy minimisation in implicit solvent to relax the
-        structure in a more realistic state than in vacuum as AF structures are. 
+        Utilise openmm to apply an energy minimisation to relax the structure, by default
+        in implicit solvent. The force field, tolerance, iteration cap, heavy-atom restraints
+        and platform are those given to the constructor (self.minimisation_settings).
 
-        :param pdb: The AF code for the structure to extract the PLDDT values from
+        The outcome is recorded in ``<pdb>.minimisation.json`` beside the structure: the
+        settings used, 'relaxed', 'skipped' or 'failed' with the reason, and for a relaxed
+        structure the initial and final potential energy and the RMSD of the heavy atoms
+        from their input positions. A relaxed file left by an earlier minimisation is removed
+        first, so that a structure which is now skipped or fails is not measured from stale
+        coordinates.
+
+        :param pdb: file stem of the curated structure to minimise.
         :type pdb: str
-        :param max_iterations: Maximum number of minimisation iterations. Minimisation
-            stops earlier if the force tolerance is reached. Defaults to 1000.
+        :param max_iterations: Maximum number of minimisation iterations, overriding the
+            constructor's minimise_max_iterations for this call only (0 runs until the
+            tolerance is reached). None uses the constructor's value.
         :type max_iterations: int
-        :param outfolder: The output directory used to know where the minimised structure 
-            files should be written to.
-        :type outfolder: str
         '''
-        if self.keep_waters:
+        settings = dict(self.minimisation_settings)
+        if max_iterations is not None:
+            settings['max_iterations'] = int(max_iterations)
+
+        pdb_path = os.path.join(self.curated_dir, f'{pdb}.pdb')
+        relaxed_path = os.path.join(self.curated_dir, f'{pdb}_relaxed.pdb')
+        if os.path.exists(relaxed_path):
+            os.remove(relaxed_path)
+
+        if self.keep_waters and self._uses_implicit_solvent(settings['forcefield']):
             # the implicit solvent model already accounts for solvation, so minimising
             # explicit waters would count it twice
-            self.minimisation_skipped[pdb] = 'explicit waters are being kept'
+            reason = 'explicit waters are being kept'
             print(f'>> Not minimising {pdb}: explicit waters are being kept, which the '
                   f'implicit solvent model would double-count. The unminimised structure '
                   f'will be measured instead.')
+            self._write_minimisation_record(pdb, 'skipped', reason)
             return
 
         try:
             print(f'>> Minimising structure: {pdb}')
-            pdb_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}.pdb'
             pdb_inst = PDBFile(pdb_path)
-            relaxed_path = f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb'
 
             M = bb.Molecule()
             M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
             df_beta = M.data[['chain', 'resid', 'name', 'beta']]
 
-            forcefield = ForceField("amber14-all.xml",
-                                    "implicit/gbn2.xml")  # could use 'amber99sb.xml' here instead?
+            forcefield = ForceField(*settings['forcefield'])
             modeller = Modeller(pdb_inst.topology, pdb_inst.positions)
 
             try:
@@ -1490,38 +1780,58 @@ class PDB(object):
                 culprits = [r for r in unmatched if r.upper() not in STANDARD_RESIDUES]
                 reason = (f'no forcefield template for {", ".join(culprits)}' if culprits
                           else str(e))
-                self.minimisation_skipped[pdb] = reason
                 print(f'>> Not minimising {pdb}: {reason}. The unminimised structure will '
                       f'be measured instead.')
+                self._write_minimisation_record(pdb, 'skipped', reason)
                 return
 
+            heavy = [a.index for a in modeller.topology.atoms()
+                     if a.element is None or a.element.symbol != 'H']
+            if settings['restrain_heavy_atoms']:
+                # harmonic restraint to the input position, the form AlphaFold's
+                # relaxation uses (alphafold/relax/amber_minimize.py)
+                restraint = CustomExternalForce('0.5 * k * ((x-x0)^2 + (y-y0)^2 + (z-z0)^2)')
+                restraint.addGlobalParameter(
+                    'k', settings['restraint_k_kcal_mol_a2'] * KCAL_A2_TO_KJ_NM2)
+                for p in ('x0', 'y0', 'z0'):
+                    restraint.addPerParticleParameter(p)
+                for i in heavy:
+                    restraint.addParticle(i, modeller.positions[i].value_in_unit(nanometer))
+                system.addForce(restraint)
+
+            # the integrator is never stepped, a Simulation just requires one
             integrator = LangevinMiddleIntegrator(300*kelvin,
                                                 1/picosecond,
                                                 0.002*picoseconds)
-
-            simulation = Simulation(modeller.topology,
-                                    system,
-                                    integrator)
+            if settings['platform'] is not None:
+                simulation = Simulation(modeller.topology, system, integrator,
+                                        Platform.getPlatformByName(settings['platform']))
+            else:
+                simulation = Simulation(modeller.topology, system, integrator)
 
             simulation.context.setPositions(modeller.positions)
-            simulation.minimizeEnergy(tolerance=10*kilojoule_per_mole/nanometer,
-                                    maxIterations=max_iterations)
+            energy_initial = simulation.context.getState(getEnergy=True).getPotentialEnergy()
+            simulation.minimizeEnergy(
+                tolerance=settings['tolerance_kj_mol_nm']*kilojoule_per_mole/nanometer,
+                maxIterations=settings['max_iterations'])
 
-            sim_out = simulation.context.getState(getPositions=True)
+            sim_out = simulation.context.getState(getPositions=True, getEnergy=True)
             sim_out_positions = sim_out.getPositions()
-            sim_out_topology = simulation.topology
-            modeller = Modeller(sim_out_topology, sim_out_positions)
 
-            all_hydrogens = [a for a in modeller.topology.atoms() if a.element.symbol == 'H']
+            before = np.array(modeller.positions.value_in_unit(angstrom))[heavy]
+            after = np.array(sim_out_positions.value_in_unit(angstrom))[heavy]
+            heavy_rmsd = float(np.sqrt(((after - before) ** 2).sum(axis=1).mean()))
+
+            modeller = Modeller(simulation.topology, sim_out_positions)
+            all_hydrogens = [a for a in modeller.topology.atoms()
+                             if a.element is not None and a.element.symbol == 'H']
             modeller.delete(all_hydrogens)
 
-            PDBFile.writeFile(modeller.topology,
-                            modeller.getPositions(),
-                            open(relaxed_path, "w"),
-                            keepIds=True)
+            with open(relaxed_path, 'w') as fh:
+                PDBFile.writeFile(modeller.topology, modeller.getPositions(), fh, keepIds=True)
 
             N = bb.Molecule()
-            N.import_pdb(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+            N.import_pdb(relaxed_path)
             merged_beta = (N.data.drop(columns=['beta'])
                            .merge(df_beta, how='left',
                                   on=['chain', 'resid', 'name'],
@@ -1533,12 +1843,22 @@ class PDB(object):
             N.data = merged_beta
             N.write_pdb(relaxed_path)
 
-            print(f'>> Finished minimising structure: {pdb}_relaxed.pdb')
+            details = {'platform_used': simulation.context.getPlatform().getName(),
+                       'energy_initial_kj_mol': energy_initial.value_in_unit(kilojoule_per_mole),
+                       'energy_final_kj_mol':
+                           sim_out.getPotentialEnergy().value_in_unit(kilojoule_per_mole),
+                       'heavy_atom_rmsd_a': heavy_rmsd}
+            if max_iterations is not None:
+                details['max_iterations_override'] = int(max_iterations)
+            self._write_minimisation_record(pdb, 'relaxed', **details)
+            print(f'>> Finished minimising structure: {pdb}_relaxed.pdb '
+                  f'(heavy atoms moved {heavy_rmsd:.2f} A rmsd)')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
-            if os.path.exists(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb'):
-                os.remove(f'{self.outdir}{os.sep}curated{os.sep}{pdb}_relaxed.pdb')
+            if os.path.exists(relaxed_path):
+                os.remove(relaxed_path)
+            self._write_minimisation_record(pdb, 'failed', f'{type(e).__name__}: {e}')
 
 
 if __name__ == "__main__":
