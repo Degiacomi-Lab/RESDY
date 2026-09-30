@@ -315,12 +315,37 @@ def _patch_model(tmp_folder, fbasename, seq_name):
     :returns: patched chain name path
     :rtype: str
     '''
-    print(">> patching model...")
+    align_file = f'{tmp_folder}{os.sep}trimmed_align.ali'
+    gaps = alignment_gaps(align_file)
+
+    if not gaps:
+        # the template covers the whole target, so there is nothing to build. Running
+        # AutoModel anyway would rebuild and optimise coordinates that were measured
+        # experimentally, moving every atom by around an Angstrom for no gain.
+        print('>> nothing missing from this chain, leaving its coordinates untouched')
+        return f'{fbasename}.pdb'
+
+    print(f">> patching model, building {sum(e - s + 1 for s, e in gaps)} residue(s) "
+          f"in {len(gaps)} gap(s); the rest is held fixed")
     log.verbose()
     env = Environ()
     env.io.two_char_chain = True
     env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
-    a = AutoModel(env,
+
+    class _GapModel(AutoModel):
+        '''Optimise only the residues the template does not provide.'''
+
+        def select_atoms(self):
+            # select by position rather than by a 'number:chain' specification: the
+            # model's own numbering and chain naming are Modeller's to choose, while
+            # the positions come straight from the alignment
+            sel = Selection()
+            for first, last in gaps:
+                for i in range(first - 1, last):
+                    sel.add(self.residues[i])
+            return sel
+
+    a = _GapModel(env,
                   # file with template codes and target sequence
                   alnfile  = f'{tmp_folder}{os.sep}trimmed_align.ali',
                   # PDB codes of the templates
@@ -340,6 +365,90 @@ def _patch_model(tmp_folder, fbasename, seq_name):
     os.rename(f'{os.path.basename(tmp_folder)}.B99990001.pdb', pdb_out)
 
     return pdb_out
+
+
+def alignment_gaps(align_file):
+    '''
+    Residues of the model that the template does not provide coordinates for.
+
+    These are the only residues that need building. Everything else was determined
+    experimentally and should be left exactly as deposited.
+
+    :param align_file: trimmed PIR alignment, template block first.
+    :type align_file: str
+    :returns: list of (first, last) residue numbers in the model's own numbering, which
+        runs from 1 over the target sequence. Empty when nothing is missing.
+    :rtype: list
+    '''
+    seqs, cur = [], []
+    with open(align_file) as fh:
+        for line in fh:
+            line = line.strip()
+            if line.startswith('>P1;'):
+                if cur:
+                    seqs.append(''.join(cur))
+                    cur = []
+            elif line.startswith(('structureX:', 'structure:', 'sequence:')):
+                continue
+            elif line:
+                cur.append(line.replace('*', ''))
+    if cur:
+        seqs.append(''.join(cur))
+    if len(seqs) < 2:
+        return []
+
+    template, target = seqs[0], seqs[1]
+    ranges, idx, start = [], 0, None
+    for t_char, q_char in zip(template, target):
+        if q_char == '-':
+            continue                       # not part of the model at all
+        idx += 1                           # model residues are numbered from 1
+        if t_char == '-':
+            if start is None:
+                start = idx
+        elif start is not None:
+            ranges.append((start, idx - 1))
+            start = None
+    if start is not None:
+        ranges.append((start, idx))
+    return ranges
+
+
+def merge_heteroatoms(source, target):
+    '''
+    Carry the heteroatom records of ``source`` into ``target``.
+
+    Modeller returns only the polymer it modelled, and the complex is reassembled from
+    those models, so anything the user asked to keep is lost on any chain that was
+    patched. The coordinates are taken from ``source`` unchanged, which is correct only
+    because a patched chain is superposed back onto the frame it was built from; without
+    that, a ligand would end up several Angstrom from its site.
+
+    :param source: file holding the heteroatoms, normally the structure curate() was given.
+    :type source: str
+    :param target: reassembled file to write them into. Any heteroatom already present is
+        replaced, so calling this twice does not duplicate them.
+    :type target: str
+    :returns: number of heteroatom records carried over.
+    :rtype: int
+    '''
+    het = [l for l in open(source) if l.startswith('HETATM')]
+    if not het:
+        return 0
+
+    kept = [l for l in open(target) if not l.startswith('HETATM')]
+    out, inserted = [], False
+    for line in kept:
+        if not inserted and line.startswith('END') and not line.startswith('ENDMDL'):
+            out.extend(het)
+            inserted = True
+        out.append(line)
+    if not inserted:
+        out.extend(het)
+
+    with open(target, 'w') as fh:
+        fh.writelines(out)
+    return len(het)
 
 
 def analyze_protein(M):
@@ -425,16 +534,34 @@ def superpose_onto(mobile, reference, out=''):
 
     mob, ref = _atoms(mobile), _atoms(reference)
 
-    # Key atoms on chain as well as residue and atom name, unless both files hold a
-    # single chain. The single-chain case is how curate() uses this, and there the chain
-    # name cannot be relied on: Modeller does not necessarily give its model the same
-    # chain name as the fragment it was built from.
-    one_chain = len({r[1] for r in mob}) <= 1 and len({r[1] for r in ref}) <= 1
-    key = (lambda r: (r[2], r[3])) if one_chain else (lambda r: (r[1], r[2], r[3]))
+    # Atoms are paired on the position of their residue in the chain, not on its number.
+    # Modeller renumbers its model from 1 and contiguously, while the chain it was built
+    # from is numbered as deposited and skips wherever the structure does, so a residue
+    # number means different things in the two files and pairing on it silently matches
+    # atoms of different residues once past the first gap. Ordinal position is stable
+    # because the model holds the same residues in the same order.
+    def _keyed(rows):
+        keyed, ordinals = {}, {}
+        for line, chain, resid, name, xyz in rows:
+            res = (chain, resid)
+            if res not in ordinals:
+                ordinals[res] = len(ordinals)
+            keyed[(ordinals[res], name)] = xyz
+        return keyed
 
-    ref_xyz = {key(r): r[4] for r in ref}
-    P = [m[4] for m in mob if key(m) in ref_xyz]
-    Q = [ref_xyz[key(m)] for m in mob if key(m) in ref_xyz]
+    def _ordinal_of(rows):
+        ordinals, out = {}, []
+        for line, chain, resid, name, xyz in rows:
+            res = (chain, resid)
+            if res not in ordinals:
+                ordinals[res] = len(ordinals)
+            out.append(ordinals[res])
+        return out
+
+    ref_xyz = _keyed(ref)
+    mob_ord = _ordinal_of(mob)
+    P = [m[4] for m, o in zip(mob, mob_ord) if (o, m[3]) in ref_xyz]
+    Q = [ref_xyz[(o, m[3])] for m, o in zip(mob, mob_ord) if (o, m[3]) in ref_xyz]
     if len(P) < 3:
         print(f'>> Only {len(P)} atoms shared between {os.path.basename(mobile)} and the '
               f'chain it was built from; cannot superpose it back, leaving it as Modeller '
@@ -727,7 +854,10 @@ def curate(pdb, fasta, outdir="result", gap=10,
     os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    gap_count, chain_order = fragment(pdb, fasta, tmp_folder, include_hetatm=include_hetatm)
+    # heteroatoms are deliberately kept out of the per-chain files: Modeller has no use
+    # for them and drops them from its output anyway. They are merged back after the
+    # complex is reassembled, from the structure this was given.
+    gap_count, chain_order = fragment(pdb, fasta, tmp_folder, include_hetatm=False)
     gaps_by_chain = {c: int(g[0]) for c, g in zip(chain_order, gap_count)}
 
     # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
@@ -772,7 +902,10 @@ def curate(pdb, fasta, outdir="result", gap=10,
             M_curated.data["resid"] = startval_clean
             M_curated.write_pdb(foutname)
 
-        if foutname != f'{fbasename}.pdb':
+        # autopatch returns an absolute path, while fbasename is relative to the caller,
+        # so compare the resolved paths: when nothing was missing it hands back the very
+        # file it was given and there is nothing to superpose
+        if os.path.abspath(foutname) != os.path.abspath(f'{fbasename}.pdb'):
             # put the model back in the frame of the chain it was built from, so that the
             # chains can be reassembled into the complex they came from. This has to come
             # after the renumbering above, because the fit pairs atoms on residue number
@@ -794,7 +927,13 @@ def curate(pdb, fasta, outdir="result", gap=10,
     sorting_pairs = sorted(zip(chains, fouts), key=lambda cf: cf[0])
     chains, fouts = zip(*sorting_pairs)
 
-    reassemble(fouts, chains, outname, outdir, include_hetatm=include_hetatm)
+    reassemble(fouts, chains, outname, outdir, include_hetatm=False)
+
+    if include_hetatm:
+        n_het = merge_heteroatoms(pdb, outname)
+        if n_het:
+            print(f'>> {n_het} heteroatom records carried through to '
+                  f'{os.path.basename(outname)}')
 
     shutil.rmtree(tmp_folder)
 
