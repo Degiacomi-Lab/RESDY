@@ -11,17 +11,17 @@ This toolkit is subdivided in a set of classes that together operate as a pipeli
   - provided manually
   - contained in an input CSV file
   
-* download and curate each identified PDB file (see `PDB` class). Results are saved in the CSV file `result\proteins.csv`. Curation operations are:
-  - mutation of MSE to MET
-  - removal of all HETATM, ions excluded
-  - reversion to modified aminoacid to their wild type counterpart.
+* download and curate each identified PDB file (see `PDB` class). Results are saved in the CSV file `result\proteins.csv`. Curation operations offer optional operations including:
+  - removal of user-defined HETATM, ions, and water molecules
+  - reversion to modified aminoacid to their wild type counterpart
   - saving alternate conformations (e.g., NMR ensemble) in individual files
   - saving alternate side chain rotamers in individual files
-  - addition of missing regions, if their size falls within a user-defined length (if larger the protein is disregarded).
+  - addition of missing regions, if their size falls within a user-defined length
+  - energy minimization
   
-* calculate a set of features for every amino acid of interest in every curated structure (see `Measure` class). Results are saved in the CSV file `result\measures.csv`.
+* calculate a set of features for every amino acid of interest in every curated structure. A range of features comes pre-implemented (see `Measure` class), but the user can also include own-designed features. Results are saved in the CSV file `result\measures.csv`.
  
-* Plot aggregated data
+* Aggregate data, and produce informative plots on their distribution via an interactive interface.
 
 
 ## Installation
