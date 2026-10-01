@@ -8,15 +8,33 @@ import glob
 import time
 import inspect
 from datetime import date
+from functools import partial
+import multiprocessing as mp
 from multiprocessing import cpu_count
 from multiprocessing import Manager
-from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
 from .features import *
 from .residues import residue_key, resolve_residue
+
+
+def _call_with_args(func, args):
+    '''
+    Call ``func`` with the arguments packed in ``args``.
+
+    ``Pool.imap`` only accepts a single-argument callable, whereas the measuring methods take
+    a file and a lock. This module-level trampoline supplies the ``starmap`` behaviour while
+    keeping the results ordered and streamed, which is what lets a stalled worker be detected
+    (see :meth:`Measure._run_in_parallel`). It has to live at module level rather than be a
+    closure or a lambda, because the non-forking start methods pickle it to reach the worker.
+
+    :param func: The callable to run in the worker.
+    :param args: Positional arguments to unpack into ``func``.
+    :returns: Whatever ``func`` returns.
+    '''
+    return func(*args)
 
 
 #: Features requested by the 'all' shorthand in ``features_dict``.
@@ -35,7 +53,8 @@ class Measure(object):
                  features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
                                 'aev': {}, 'das': {}, 'seqcharge': {}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True, only_relaxed=True, num_cores=0):
+                 report_errors= True, only_relaxed=True, num_cores=0,
+                 parallel_timeout=600):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -109,6 +128,15 @@ class Measure(object):
             available will be used. Otherwise it will try and use the number of cores given
             if this is possible.
         :type num_cores: int
+        :param parallel_timeout: Seconds a single structure may take in a parallel worker
+            before the run is treated as stalled. The timeout is on the wait for the next
+            result rather than on the run as a whole, so a long measurement campaign is not
+            interrupted as long as it keeps producing results. A worker that stops making
+            progress raises a RuntimeError instead of blocking the run forever, which is what
+            a bare ``Pool`` does when a worker deadlocks or is killed. Raise it for features
+            that are slow per structure, or set it to None to wait indefinitely. Ignored when
+            not running in parallel.
+        :type parallel_timeout: int, float, None
         '''
 
         self.activate_log = False
@@ -165,6 +193,7 @@ class Measure(object):
         # for parallel measurements
         self.parallel = parallel
         self.num_cores = num_cores
+        self.parallel_timeout = parallel_timeout
         self.n_cores_to_use = 1
         if self.parallel:
             print('>> Measurements running in parallel')
@@ -514,6 +543,98 @@ class Measure(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
+    @staticmethod
+    def _parallel_context():
+        '''
+        Return the multiprocessing context the worker pool is built from.
+
+        A pool is deliberately not built on the 'fork' start method, which is the default on
+        Linux. Several features import torch (via the aev, evolution and legolas back ends),
+        and torch leaves its thread pools running in the parent for the rest of the session.
+        Forking a multi-threaded parent gives the child a copy of those pools with none of
+        their threads, so the first call that reaches the inherited OpenMP or BLAS runtime can
+        block forever. 'forkserver' is preferred, as its children are forked from a clean
+        single-threaded server process, and 'spawn' is the fallback on platforms without it.
+
+        :returns: A multiprocessing context whose start method is not 'fork', where one is
+            available.
+        '''
+        available = mp.get_all_start_methods()
+        for method in ('forkserver', 'spawn'):
+            if method in available:
+                return mp.get_context(method)
+        return mp.get_context()
+
+
+    def _ensure_logger(self):
+        '''
+        Reattach the log file handler if the current process does not have it.
+
+        A ``logging.Logger`` pickles as a lookup of its name, so a worker started by one of
+        the non-forking methods (see :meth:`_parallel_context`) receives the logger without
+        the handler that was added to it in the parent, and anything it logs would go nowhere.
+        The handler is therefore recreated on first use inside the worker. Records stay
+        serialised by the lock that is held around the logging calls, so the processes do not
+        interleave their writes to the file.
+        '''
+        if not self.activate_log:
+            return
+
+        self.logger = logging.getLogger('MeasureLog')
+        if not self.logger.handlers:
+            self.logger.setLevel(level=logging.DEBUG)
+            formatter = logging.Formatter('%(message)s')
+            handler = logging.FileHandler(self.log_path, encoding='UTF-8')
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+
+    def _run_in_parallel(self, worker, items):
+        '''
+        Run ``worker`` over ``items`` in a pool of processes, giving up on a stalled worker.
+
+        Results are collected through ``imap`` rather than ``starmap`` so that they arrive one
+        at a time and the wait for each one can be bounded by ``parallel_timeout``. The timeout
+        therefore applies to the gap between results, not to the run as a whole. We note that a
+        plain ``Pool.starmap`` never returns if one of its workers deadlocks or is killed, so a
+        single wedged structure otherwise consumes the whole run.
+
+        Items are handed out one at a time rather than in chunks, for two reasons. ``imap``
+        only returns an iterator whose ``next`` accepts a timeout when the chunk size is 1,
+        falling back to a plain generator otherwise, and measuring one structure is coarse
+        enough work that per-item dispatch costs nothing while balancing the load better.
+
+        :param worker: Bound method to call for each item, taking the unpacked item.
+        :type worker: callable
+        :param items: One sequence of positional arguments per structure to measure.
+        :type items: list
+        :returns: The return value of ``worker`` for each item, in the order of ``items``.
+        :rtype: list
+        :raises RuntimeError: if no further result arrives within ``parallel_timeout`` seconds.
+        '''
+        ctx = self._parallel_context()
+        results = []
+        with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+            iterator = pool.imap(partial(_call_with_args, worker),
+                                 [tuple(item) for item in items], chunksize=1)
+            while True:
+                try:
+                    results.append(iterator.next(timeout=self.parallel_timeout))
+                except StopIteration:
+                    break
+                except mp.TimeoutError:
+                    pool.terminate()
+                    raise RuntimeError(
+                        f'A parallel measuring worker produced no result for '
+                        f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
+                        f'structures, so it is treated as stalled and the run was stopped. '
+                        f'Either raise parallel_timeout if the features requested are simply '
+                        f'slow on these structures, or set parallel=False to measure in '
+                        f'series.') from None
+        return results
+
+
     def measure_dataframe(self):
         '''
         Function to measure specified features for all the structure files curated earlier in the
@@ -564,8 +685,8 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
-                        df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
+                    df_parallel = pd.concat(self._run_in_parallel(self._measure_file, items),
+                                            ignore_index=True)
                 else:
                     df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items], ignore_index=True)
 
@@ -699,6 +820,7 @@ class Measure(object):
                     print(statement)
 
                 if self.activate_log:
+                    self._ensure_logger()
                     if df_currentfile.empty is False:
                         pd.set_option('display.max_colwidth', None,
                                       'display.width', None,
@@ -981,8 +1103,8 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
-                        df_parallel = pd.concat(pool.starmap(self._measure_file_pdbonly, items, chunksize=4), ignore_index=True)
+                    df_parallel = pd.concat(self._run_in_parallel(self._measure_file_pdbonly, items),
+                                            ignore_index=True)
                 else:
                     df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lk) for file_dets, lk in items], ignore_index=True)
 
@@ -1100,6 +1222,7 @@ class Measure(object):
                     print(statement)
 
                 if self.activate_log:
+                    self._ensure_logger()
                     if df_currentfile.empty is False:
 
                         pd.set_option('display.max_colwidth', None,

@@ -83,6 +83,13 @@ class RMSF():
             file_loc = os.path.dirname(path)
             files = glob.glob(os.path.join(file_loc, "*pdb"))
             code = os.path.splitext(os.path.basename(path))[0]
+            # The minimised copy of a structure is "<stem>_relaxed.pdb", and only the stem is
+            # listed in the proteins dataframe. Splitting on '-' happens to drop the suffix of a
+            # PDB code ('1UPT-alt-1_relaxed' -> '1UPT'), but an AlphaFold code keeps its hyphens
+            # and so has to have the suffix removed explicitly, otherwise every relaxed AlphaFold
+            # structure fails the lookup below and the feature returns nothing for it.
+            if code.endswith('_relaxed'):
+                code = code[:-len('_relaxed')]
             if 'AF-' not in code:
                 code = code.split('-')[0]
 
@@ -135,18 +142,37 @@ class RMSF():
 
                 df_out = pd.DataFrame()
                 res_interest = self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']
+
+                # A 'backbone' alignment is on the whole structure, so neither the reference
+                # atoms nor the superposition they drive depend on the residue being measured.
+                # Both are therefore done once here rather than once per residue. Note that
+                # rmsd_one_vs_all(align=True) rewrites the coordinates in place, so repeating it
+                # was superposing an already superposed ensemble. A 'local' alignment is on the
+                # backbone of the residue itself and does stay inside the loop.
+                align_once = self.align_type != 'local'
+                alignment_failed = False
+                if align_once:
+                    try:
+                        _, idx_ref = P.atomselect('*', '*', ["C", "CA", "N", "O"], get_index=True)
+                        P.rmsd_one_vs_all(0, points_index=idx_ref, align=True)
+                    except Exception:
+                        # The superposition used to be attempted inside the residue loop, where a
+                        # failure left every residue with a NaN rather than discarding the whole
+                        # structure. That is preserved by flagging it here and letting each
+                        # residue take the same path it did before.
+                        alignment_failed = True
+
                 for i, r in P.data.drop_duplicates(subset=['chain', 'resid']).loc[P.data['resname'].isin(res_interest), ['chain', 'resid']].iterrows():
                     chain = r['chain']
                     resid = r['resid']
                     try:
-                        match self.align_type:
-                            case 'local':
-                                _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"], get_index=True)
-                            case 'backbone' | _:
-                                _, idx_ref = P.atomselect('*', '*', ["C", "CA", "N", "O"], get_index=True)
+                        if alignment_failed:
+                            raise RuntimeError('the whole-structure superposition failed')
+                        if not align_once:
+                            _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"], get_index=True)
+                            P.rmsd_one_vs_all(0, points_index=idx_ref, align=True)
                         _, idx_target = P.atomselect(chain, resid, self.aa_properties['atom_select_names_nonmod'], get_index=True)
 
-                        P.rmsd_one_vs_all(0, points_index=idx_ref, align=True)
                         rmsf = P.rmsf(indices=idx_target)[0]
 
                         df_out = pd.concat([df_out, pd.DataFrame([{'Chain': chain, 'Resid': resid, 'rmsf': rmsf}])])
