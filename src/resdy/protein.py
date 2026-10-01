@@ -118,6 +118,7 @@ class PDB(object):
         :param minimise_strucs: Option to run a energy minimisastion on the structures curated
             through openmm, option is to minimise nothing, just alphafold, just RCSB PDB or all.
             Options:
+
                 - '' or None: Don't run minimisation
                 - 'AF': Just run on alphafold structures
                 - 'PDB': Just run on PDB

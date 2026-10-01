@@ -70,10 +70,10 @@ class SEQCHARGE():
 
         .. todo::
 
-        Add the ability to use 3 letter codes and their charges rather than the 1 letter codes, which
-        may run into problems when modified residues are used. The change would be to stop converting
-        to the classic 1 letter code sequence, and instead take the list of residues and map the
-        charges onto it to sum (GW, 16.04.25).
+            Add the ability to use 3 letter codes and their charges rather than the 1 letter
+            codes, which may run into problems when modified residues are used. The change
+            would be to stop converting to the classic 1 letter code sequence, and instead
+            take the list of residues and map the charges onto it to sum (GW, 16.04.25).
         '''
         # 1: Extract the overall sequence for the protein given
         try:

@@ -1,3 +1,19 @@
+# Packages needed to build the documentation (installed by Read the Docs, see
+# .readthedocs.yaml). This is deliberately a subset of the runtime dependencies in
+# pyproject.toml: only the packages that the documented modules import when autodoc
+# loads them are listed here. The licensed, heavy or optional ones (biobox, Modeller,
+# openmm, torchani, esm, melodia_py, frustratometer, pkaani, nglview, plotly, dash)
+# are listed in autodoc_mock_imports in docs/source/conf.py instead.
+
+sphinx>=7,<9
+sphinx-autoapi>=3,<4
+
 numpy
 pandas
 scipy
+scikit-learn
+matplotlib
+seaborn
+requests
+biopython
+statsmodels

@@ -130,12 +130,20 @@ htmlhelp_basename = 'resdydoc'
 add_module_names = False
 autoclass_content = "both"
 
-# Third-party packages that are either licensed (Modeller), optional, or only
-# installed on the machines that run the corresponding feature. Mocking them lets
-# autodoc import every module of the package without having them present.
+# Third-party packages that are either licensed (Modeller), optional, only installed on
+# the machines that run the corresponding feature, or unavailable from PyPI (biobox is
+# distributed through conda). Mocking them lets autodoc import every module of the
+# package without having them present, which is what the Read the Docs build relies on:
+# none of them is used at import time or as a default argument, so no mock object
+# reaches a rendered signature. The packages that are imported at module load and
+# cannot be mocked are listed in docs/requirements.txt instead.
 autodoc_mock_imports = [
+    "biobox",
     "modeller",
+    "openmm",
     "nglview",
+    "plotly",
+    "dash",
     "torchani",
     "esm",
     "melodia_py",

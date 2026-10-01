@@ -37,6 +37,7 @@ docs = ["sphinx", "sphinx-autoapi"]
 
 [project.urls]
 Homepage = "https://github.com/Degiacomi-Lab/RESDY"
+Documentation = "https://resdy.readthedocs.io/en/latest/"
 
 [tool.setuptools.packages.find]
 where = ["src"]

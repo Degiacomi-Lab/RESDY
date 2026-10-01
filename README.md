@@ -1,6 +1,7 @@
 # RESDY
 
 [![Tests](https://github.com/Degiacomi-Lab/RESDY/actions/workflows/tests.yml/badge.svg)](https://github.com/Degiacomi-Lab/RESDY/actions/workflows/tests.yml)
+[![Documentation](https://readthedocs.org/projects/resdy/badge/?version=latest)](https://resdy.readthedocs.io/en/latest/)
 
 ## Introduction
 
@@ -219,7 +220,7 @@ UP = RD.Uniprot()
 
 
 * A tutorial demonstrating the pipeline main functionalities is provided in the notebook `resdy.ipynb`. 
-* The API is available on readthedocs (LINK SOON).
+* The API reference is hosted on Read the Docs: <a href="https://resdy.readthedocs.io/en/latest/">resdy.readthedocs.io</a>. It documents each of the five pipeline steps in turn, together with a page per pre-implemented feature and a FAQ.
 
 ## Technical Notes
 
