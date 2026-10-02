@@ -175,5 +175,97 @@ class Test_Patcher(unittest.TestCase):
             self.assertLess(float(np.linalg.norm(recovered[c] - original[c])), 1e-3)
 
 
+    def test_restore_template_columns(self):
+        """
+        Every atom the template provides takes the template's occupancy and B-factor, and
+        every atom Modeller built is marked with occupancy 0. Modeller itself puts the
+        template B-factor in the occupancy column and a value of its own in the B column.
+        """
+        def atom(serial, name, resname, resid, occ, b):
+            return (f'ATOM  {serial:5d}  {name:<3s} {resname} A{resid:4d}    '
+                    f'{1.0:8.3f}{2.0:8.3f}{3.0:8.3f}{occ:6.2f}{b:6.2f}           {name[0]}\n')
+
+        template = os.path.join(self.outdir, 'template.pdb')
+        with open(template, 'w') as fh:
+            fh.write(atom(1, 'N', 'GLY', 10, 1.00, 11.11) + atom(2, 'CA', 'GLY', 10, 1.00, 12.22)
+                     + atom(3, 'N', 'LYS', 11, 0.50, 21.11) + atom(4, 'CA', 'LYS', 11, 0.50, 22.22))
+        # Modeller layout: a residue inserted between the two, and an atom (CB of LYS)
+        # that the template residue lacks
+        model = os.path.join(self.outdir, 'model.pdb')
+        with open(model, 'w') as fh:
+            fh.write(atom(1, 'N', 'GLY', 1, 11.11, 37.0) + atom(2, 'CA', 'GLY', 1, 12.22, 37.0)
+                     + atom(3, 'N', 'ALA', 2, 0.0, 41.0) + atom(4, 'CA', 'ALA', 2, 0.0, 41.0)
+                     + atom(5, 'N', 'LYS', 3, 21.11, 52.0) + atom(6, 'CA', 'LYS', 3, 22.22, 52.0)
+                     + atom(7, 'CB', 'LYS', 3, 0.0, 52.0))
+
+        n_template, n_built = patcher.restore_template_columns(
+            model, template, pairs=[(0, 0), (2, 1)])
+        self.assertEqual((n_template, n_built), (4, 3))
+        columns = {(int(l[22:26]), l[12:16].strip()): (float(l[54:60]), float(l[60:66]))
+                   for l in open(model) if l.startswith('ATOM')}
+        self.assertEqual(columns[(1, 'N')], (1.00, 11.11))
+        self.assertEqual(columns[(1, 'CA')], (1.00, 12.22))
+        self.assertEqual(columns[(3, 'N')], (0.50, 21.11))
+        self.assertEqual(columns[(3, 'CA')], (0.50, 22.22))
+        for built in [(2, 'N'), (2, 'CA'), (3, 'CB')]:
+            self.assertEqual(columns[built], (0.0, 0.0))
+
+    def test_geometry_counts_built_atoms_as_modelled(self):
+        """
+        An atom with occupancy 0 was built by Modeller: a clash involving it is reported,
+        and reported as involving a modelled atom.
+        """
+        src = os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb')
+        target = next(line[30:54] for line in open(src)
+                      if line.startswith('ATOM') and line[21] == 'A' and line[12:16].strip() == 'CA')
+        planted = os.path.join(self.outdir, 'planted_built.pdb')
+        done = False
+        with open(src) as fin, open(planted, 'w') as fout:
+            for line in fin:
+                if (not done and line.startswith('ATOM') and line[21] == 'B'
+                        and line[12:16].strip() == 'CA'):
+                    line = line[:30] + target + f'{0.0:6.2f}{0.0:6.2f}' + line[66:]
+                    done = True
+                fout.write(line)
+        summary, _ = check_geometry(planted)
+        self.assertGreater(summary['n_clashes'], 0)
+        self.assertTrue(summary['involves_modelled'])
+
+    @unittest.skipUnless(patcher.modeller_available, 'Modeller is not installed')
+    def test_curated_gap_keeps_template_columns(self):
+        """
+        A residue cut out of a chain is rebuilt by Modeller. In the curated file the
+        rebuilt atoms carry occupancy 0, and every other atom keeps the occupancy and
+        B-factor it had in the structure that was curated.
+        """
+        src = os.path.join('demo', 'conformations', '1A6M-alt1A.pdb')
+        gapped = os.path.join(self.outdir, 'conformations', '1A6M-alt1A.pdb')
+        removed = 50
+        with open(src) as fin, open(gapped, 'w') as fout:
+            for line in fin:
+                if line.startswith(('ATOM', 'HETATM')) and int(line[22:26]) == removed:
+                    continue
+                fout.write(line)
+        fasta = os.path.join(self.outdir, 'conformations', '1A6M.fasta')
+        shutil.copyfile(os.path.join('demo', 'conformations', '1A6M.fasta'), fasta)
+
+        outname, largest, _ = patcher.curate(pdb=gapped, fasta=fasta, outdir=self.outdir, gap=10)
+        self.assertEqual(largest, 1)
+
+        def columns(path):
+            return {(int(l[22:26]), l[12:16].strip()): (l[54:60], l[60:66])
+                    for l in open(path) if l.startswith('ATOM')}
+        before, after = columns(src), columns(outname)
+        occupancies = [float(o) for o, _ in after.values()]
+        self.assertTrue(all(0.0 <= o <= 1.0 for o in occupancies))
+
+        built = {k for k, (o, _) in after.items() if float(o) == 0.0}
+        self.assertEqual({r for r, _ in built if r != removed}, set(),
+                         msg=f'atoms outside residue {removed} marked as built: {sorted(built)}')
+        self.assertEqual(built, {k for k in before if k[0] == removed})
+        kept = [k for k in before if k[0] != removed]
+        self.assertTrue(all(after[k] == before[k] for k in kept))
+
+
 if __name__ == "__main__":
     unittest.main()

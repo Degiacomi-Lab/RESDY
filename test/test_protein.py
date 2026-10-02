@@ -177,5 +177,47 @@ class Test_Protein(unittest.TestCase):
         self.assertEqual(1, len(PDB.df))
 
 
+class Test_Old_Curation(unittest.TestCase):
+    """
+    A curated file with an occupancy outside [0, 1] was written before RESDY required
+    biobox 1.1.5: it is deleted, with the rest of its structure, rather than reused.
+    """
+
+    def setUp(self):
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        self.curated = os.path.join(self.outdir, 'curated')
+        os.makedirs(self.curated)
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
+
+    def _write(self, stem, occupancy):
+        path = os.path.join(self.curated, f'{stem}.pdb')
+        with open(path, 'w') as fh:
+            fh.write(f'ATOM      1  CA  LYS A   1       1.000   2.000   3.000{occupancy:6.2f} 25.00           C\nEND\n')
+        return path
+
+    def test_old_layout_is_detected_and_discarded(self):
+        from resdy.protein import has_old_column_layout
+        new = self._write('1ABC-alt1A', 1.0)
+        built = self._write('1ABC-alt1B', 0.0)
+        self.assertFalse(has_old_column_layout(new))
+        self.assertFalse(has_old_column_layout(built))
+
+        old = self._write('9XYZ-alt1A', 25.0)
+        relaxed = self._write('9XYZ-alt1A_relaxed', 1.0)
+        record = os.path.join(self.curated, '9XYZ-alt1A.minimisation.json')
+        open(record, 'w').write('{}')
+        self.assertTrue(has_old_column_layout(old))
+
+        P = RD.PDB(outdir=self.outdir, minimise_strucs=None)
+        self.assertFalse(P._discard_old_curation([new, built]))
+        self.assertTrue(os.path.exists(new) and os.path.exists(built))
+        self.assertTrue(P._discard_old_curation([old, relaxed]))
+        for f in (old, relaxed, record):
+            self.assertFalse(os.path.exists(f))
+
+
+
 if __name__ == "__main__":
     unittest.main()

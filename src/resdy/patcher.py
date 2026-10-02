@@ -22,8 +22,10 @@ except Exception as e:
     modeller_available = False
     _modeller_error = e
 
-from .helper import ShutUp
+from .helper import ShutUp, require_biobox
 from .geometry import check_geometry
+
+require_biobox(bb)
 
 
 def autopatch(tmp_folder, fbasename, gap_cutoff=8):
@@ -369,11 +371,17 @@ def _patch_model(tmp_folder, fbasename, seq_name):
     # Put the model back in the frame of the chain it was built from. This is done here
     # rather than in curate() because the correspondence between the two comes from the
     # alignment, which is only available at this point.
-    n_fit, rmsd = superpose_onto(pdb_out, f'{fbasename}.pdb',
-                                 pairs=alignment_pairs(align_file))
+    pairs = alignment_pairs(align_file)
+    n_fit, rmsd = superpose_onto(pdb_out, f'{fbasename}.pdb', pairs=pairs)
     if n_fit:
         print(f'>> model put back on the experimental coordinates over {n_fit} atoms, '
               f'rmsd {rmsd:.2f} A')
+
+    # Modeller's own occupancy and B-factor columns hold neither, so take them from the
+    # template and mark the atoms that were built
+    n_template, n_built = restore_template_columns(pdb_out, f'{fbasename}.pdb', pairs=pairs)
+    print(f'>> occupancy and B-factor taken from the template for {n_template} atoms, '
+          f'{n_built} built atoms marked with occupancy 0')
 
     # the residues of the model that the template did not provide: these are the only
     # coordinates that are a prediction rather than a measurement
@@ -637,6 +645,74 @@ def superpose_onto(mobile, reference, out='', pairs=None):
             v = rot @ np.array(xyz, dtype=float) + trans
             fh.write(f'{line[:30]}{v[0]:8.3f}{v[1]:8.3f}{v[2]:8.3f}{line[54:]}')
     return len(P), rmsd
+
+
+#: Occupancy and B-factor columns (pdb columns 55-66) given to an atom that Modeller built.
+#: An occupancy of zero marks it in the file itself, so that any later reader can tell a
+#: predicted position from a measured one without a side file.
+BUILT_ATOM_COLUMNS = f'{0.0:6.2f}{0.0:6.2f}'
+
+
+def restore_template_columns(model, template, out='', pairs=None):
+    '''
+    Give every atom of a Modeller model the occupancy and B-factor of the template atom it
+    was copied from, and mark the atoms Modeller built.
+
+    Modeller does not keep these columns: its models carry the template B-factor in the
+    occupancy column and a per-residue value of its own in the B-factor column. An atom
+    the template provides takes the template's occupancy and B-factor, copied as text. An
+    atom the template does not provide, either because its residue was missing or because
+    the template residue lacked it, takes :data:`BUILT_ATOM_COLUMNS`.
+
+    :param model: pdb file written by Modeller.
+    :type model: str
+    :param template: pdb file of the chain the model was built from.
+    :type template: str
+    :param out: file to write. Defaults to overwriting ``model``.
+    :type out: str
+    :param pairs: (model residue index, template residue index) correspondences, as
+        :func:`alignment_pairs` returns them. Without it the two files are assumed to hold
+        the same residues in the same order.
+    :type pairs: list
+    :returns: (number of atoms given template values, number of atoms marked as built).
+    :rtype: tuple
+    '''
+    out = out or model
+
+    def _residues(path):
+        '''list of atom lines, and {residue index in file order: {atom name: columns 55-66}}'''
+        lines, by_res, ordinals = [], {}, {}
+        for line in open(path):
+            if line.startswith(('ATOM', 'HETATM')):
+                res = (line[21], line[22:27])
+                if res not in ordinals:
+                    ordinals[res] = len(ordinals)
+                by_res.setdefault(ordinals[res], {})[line[12:16].strip()] = line[54:66]
+                lines.append((line, ordinals[res]))
+            else:
+                lines.append((line, None))
+        return lines, by_res
+
+    model_lines, model_by = _residues(model)
+    _, template_by = _residues(template)
+    if pairs is None:
+        pairs = [(i, i) for i in sorted(set(model_by) & set(template_by))]
+    template_of = dict(pairs)
+
+    n_template, n_built = 0, 0
+    with open(out, 'w') as fh:
+        for line, res_idx in model_lines:
+            if res_idx is None:
+                fh.write(line)
+                continue
+            columns = template_by.get(template_of.get(res_idx), {}).get(line[12:16].strip())
+            if columns is None:
+                columns = BUILT_ATOM_COLUMNS
+                n_built += 1
+            else:
+                n_template += 1
+            fh.write(f'{line[:54]}{columns}{line[66:]}')
+    return n_template, n_built
 
 
 def fragment(pdb, fasta, outfolder=".", include_hetatm=False):

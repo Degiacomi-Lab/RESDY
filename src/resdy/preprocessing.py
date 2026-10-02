@@ -148,14 +148,17 @@ class Preprocessing:
 
 
 
-    def calculate_diff_features(self, data):
+    def calculate_diff_features(self, data, vif_threshold=5.0):
         '''
         Function to calculate the most decorrelated features from the measurements through VIF
         analysis. This will continuously call the VIF calculation until all the values returned are
-        less than 5 (the commonly used value for decorrelation)
+        less than vif_threshold.
 
         :param data: The overall dataframe of measurements to be analysed.
         :type data: pandas.DataFrame
+        :param vif_threshold: Variance inflation factor below which every remaining column has
+            to fall. Defaults to 5.
+        :type vif_threshold: float
         :returns: The list of the column names which are the most decorrelated
         :rtype: list
         '''
@@ -186,7 +189,7 @@ class Preprocessing:
             # check for correlation and then change the data
             if not self.vif.empty:
                 latest_vals = [a for a in list(self.vif[list(self.vif.columns)[-1]]) if str(a) != 'nan']
-                if all(x < 5 for x in latest_vals):
+                if all(x < vif_threshold for x in latest_vals):
                     all_decorrelated = True
                     break
                 if data.shape[1] <= min_feats:

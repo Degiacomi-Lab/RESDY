@@ -17,9 +17,10 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
+from .helper import get_download_tool, ShutUp, require_biobox
+require_biobox(bb)
 from . import alphafold as af
 from . import patcher
-from .helper import get_download_tool, ShutUp
 from .residues import AA_PRESETS
 
 try:
@@ -58,6 +59,32 @@ KCAL_A2_TO_KJ_NM2 = 418.4
 
 #: Suffix of the per-structure record written beside every minimised (or not) structure.
 MINIMISATION_RECORD_SUFFIX = '.minimisation.json'
+
+
+def has_old_column_layout(path):
+    '''
+    Whether a pdb file has an occupancy outside [0, 1], which no file written by the
+    present curation can have.
+
+    biobox before 1.1.5 wrote the occupancy and B-factor columns into each other's places,
+    and Modeller writes the template B-factor into the occupancy column, so a file curated
+    before RESDY required biobox 1.1.5 usually carries B-factors where the occupancy
+    belongs.
+
+    :param path: pdb file.
+    :type path: str
+    :rtype: bool
+    '''
+    with open(path) as fh:
+        for line in fh:
+            if line.startswith(('ATOM', 'HETATM')):
+                try:
+                    occupancy = float(line[54:60])
+                except ValueError:
+                    continue
+                if not 0.0 <= occupancy <= 1.0:
+                    return True
+    return False
 
 
 class PDB(object):
@@ -335,6 +362,28 @@ class PDB(object):
         '''Path of the record kept beside curated structure ``pdb`` (a file stem).'''
         return os.path.join(self.curated_dir, f'{pdb}{MINIMISATION_RECORD_SUFFIX}')
 
+
+    def _discard_old_curation(self, paths):
+        '''
+        Delete the curated files of one structure when any of them was written with the old
+        column layout, so that the structure is curated again rather than reused.
+
+        :param paths: curated pdb files of one structure, relaxed copies included.
+        :type paths: list
+        :returns: True if the files were deleted.
+        :rtype: bool
+        '''
+        old = [p for p in paths if has_old_column_layout(p)]
+        if not old:
+            return False
+        print(f'>> {", ".join(os.path.basename(p) for p in old)} has occupancies outside [0, 1], '
+              f'the layout of a file curated before RESDY required biobox 1.1.5; deleting '
+              f'{len(paths)} curated file(s) of this structure and curating it again')
+        for p in paths:
+            for f in (p, os.path.splitext(p)[0] + MINIMISATION_RECORD_SUFFIX):
+                if os.path.exists(f):
+                    os.remove(f)
+        return True
 
     def _write_minimisation_record(self, pdb, status, reason='', settings=None, **details):
         '''
@@ -657,6 +706,9 @@ class PDB(object):
         if pdb_code[:2] == "AF":
 
             if skip_if_found:
+                self._discard_old_curation(
+                    [c for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))
+                     if os.path.basename(c).split(".")[0] in (pdb_code, f'{pdb_code}_relaxed')])
                 files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
@@ -744,6 +796,9 @@ class PDB(object):
             if isinstance(chains, str):
                 chains = [c for c in chains.split('/') if c]
             if skip_if_found:
+                self._discard_old_curation(
+                    [c for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))
+                     if os.path.basename(c).split("-")[0] == pdb_code])
                 files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
@@ -1770,11 +1825,14 @@ class PDB(object):
             pdb_inst = PDBFile(pdb_path)
 
             M = bb.Molecule()
-            # read heteroatoms on both sides of the B-factor round trip: biobox skips
-            # HETATM records by default, and writing N back would then delete every
-            # retained water, ion and ligand from the relaxed structure
+            # read heteroatoms on both sides of the round trip: biobox skips HETATM
+            # records by default, and writing N back would then delete every retained
+            # water, ion and ligand from the relaxed structure
             M.import_pdb(pdb_path, include_hetatm=True)
-            df_beta = M.data[['chain', 'resid', 'name', 'beta']]
+            # OpenMM writes an occupancy of 1 and a B-factor of 0 for every atom. Both are
+            # put back from the structure that was minimised, the occupancy included, since
+            # an occupancy of zero is what marks an atom Modeller built
+            df_columns = M.data[['chain', 'resid', 'name', 'occupancy', 'beta']]
 
             forcefield = ForceField(*settings['forcefield'])
             modeller = Modeller(pdb_inst.topology, pdb_inst.positions)
@@ -1850,15 +1908,15 @@ class PDB(object):
 
             N = bb.Molecule()
             N.import_pdb(relaxed_path, include_hetatm=True)
-            merged_beta = (N.data.drop(columns=['beta'])
-                           .merge(df_beta, how='left',
+            merged = (N.data.drop(columns=['occupancy', 'beta'])
+                           .merge(df_columns, how='left',
                                   on=['chain', 'resid', 'name'],
                                   validate='one_to_one'))
-            if len(merged_beta) != len(N.data):
-                raise Exception(f'B-factor restoration after minimisation failed for pdb: {pdb}, '
+            if len(merged) != len(N.data):
+                raise Exception(f'Occupancy and B-factor restoration after minimisation failed for pdb: {pdb}, '
                                 f'Lengths before ({len(N.data)}) and length merged '
-                                f'({len(merged_beta)}) are different.')
-            N.data = merged_beta
+                                f'({len(merged)}) are different.')
+            N.data = merged
             N.write_pdb(relaxed_path)
 
             details = {'platform_used': simulation.context.getPlatform().getName(),

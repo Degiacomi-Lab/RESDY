@@ -1,4 +1,5 @@
 import os
+import inspect
 import pandas as pd
 import biobox as bb
 from .error_reporting import report_error_to_file
@@ -69,7 +70,8 @@ class DAS():
                                   'modified_codes': ['LYE', 'KCX'],
                                   'atom_select_names_nonmod': ['NZ'],
                                   'atom_select_names_modified': ['NZ', 'N07']},
-                 radii = None, error_filename = 'measure_errors.txt'):
+                 radii = None, error_filename = 'measure_errors.txt',
+                 half_sphere_kwargs=None):
         '''
         Initialise the DAS class, include any global variables that are required from measures in
         here.
@@ -94,7 +96,20 @@ class DAS():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param half_sphere_kwargs: Further arguments of biobox's ``Xlink._get_half_sphere``,
+            which builds the half sphere: ``pts_surf``, the spacing of the points on each
+            shell (biobox default 4.0 A), and ``thresh``, the distance below which a point
+            clashes with an atom and is discarded (biobox default 2.0 A). The residues in
+            :data:`UNSUPPORTED_REASON` were excluded at the default threshold, and changing it
+            does not make them available.
+        :type half_sphere_kwargs: dict
         '''
+        self.half_sphere_kwargs = dict(half_sphere_kwargs or {})
+        accepted = set(inspect.signature(bb.Xlink._get_half_sphere).parameters) - {'self', 'i', 'radii'}
+        unknown = set(self.half_sphere_kwargs) - accepted
+        if unknown:
+            raise ValueError(f'DAS half_sphere_kwargs accepts {sorted(accepted)}, got '
+                             f'{sorted(unknown)}. The shell radii are set with radii.')
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.radii = list(radii) if radii is not None else None
@@ -181,10 +196,10 @@ class DAS():
                 # i is the index of the anchor atom of the residue of interest. The shells the
                 # half sphere is built from are the ones of that residue, and biobox's own
                 # (lysine) list is used when none was given
-                if self.radii is None:
-                    half_sphere_coords = XL._get_half_sphere(i=lys_nz_idx)
-                else:
-                    half_sphere_coords = XL._get_half_sphere(i=lys_nz_idx, radii=self.radii)
+                kwargs = dict(self.half_sphere_kwargs)
+                if self.radii is not None:
+                    kwargs['radii'] = self.radii
+                half_sphere_coords = XL._get_half_sphere(i=lys_nz_idx, **kwargs)
                 # as the density of points created by the get half sphere is constant for any setup,
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))

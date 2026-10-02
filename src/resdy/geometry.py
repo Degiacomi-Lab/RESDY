@@ -11,6 +11,8 @@ runs into a neighbour still measures perfectly happily.
 import numpy as np
 import pandas as pd
 import biobox as bb
+from .helper import require_biobox
+require_biobox(bb)
 from scipy.spatial import cKDTree
 
 
@@ -34,11 +36,10 @@ def _read_altloc_occupancy(path, n_expected):
     '''
     Alternate-location indicator and occupancy of every atom record, in file order.
 
-    Both are read from the text rather than from biobox. biobox folds columns 12 to 17
-    into its ``name`` field, so the altloc ends up glued to the atom name ('OE2A') and
-    cannot be recovered from it unambiguously; and its ``occupancy`` column holds the
-    B-factor for any file biobox itself wrote, because its reader and writer disagree on
-    the order of the two. Only the first model is read, which is what biobox loads.
+    Both are read from the text rather than from biobox, because biobox folds columns 12
+    to 17 into its ``name`` field, so the altloc ends up glued to the atom name ('OE2A')
+    and cannot be recovered from it unambiguously. Only the first model is read, which is
+    what biobox loads.
 
     :returns: (altlocs, occupancies). If the record count does not match what biobox
         loaded, blanks and ones are returned so that no pair is excluded on this basis.
@@ -60,16 +61,7 @@ def _read_altloc_occupancy(path, n_expected):
               f'partial occupancies not excluded')
         return np.full(n_expected, ' '), np.ones(n_expected)
 
-    occ = np.array(occ)
-    # Occupancy is a fraction in (0, 1] by definition. Anything else means the column
-    # holds something other than occupancy, which happens for every file biobox wrote:
-    # its reader and writer disagree on the order of occupancy and B-factor, so this
-    # column carries the B-factor. A column of all zeros is the same story for a
-    # structure whose B-factors are zero, and filtering on it would discard every pair.
-    # Only trust the column when it looks like genuine occupancy.
-    if not (occ.size and 0.0 < occ.max() <= 1.0):
-        occ = np.ones(n_expected)
-    return np.array(alt), occ
+    return np.array(alt), np.array(occ)
 
 
 def _load(path):
@@ -112,7 +104,7 @@ def _residue_ordinals(d):
     return ordinal
 
 
-def _offending_pairs(d, xyz, elem, alt, occ, cutoff, min_occupancy=1.0):
+def _offending_pairs(d, xyz, elem, alt, occ, cutoff, min_occupancy=0.0):
     '''
     Atom pairs closer than ``cutoff`` that are not bonded, not in the same residue, and
     do not involve a monoatomic ion.
@@ -161,7 +153,7 @@ def _offending_pairs(d, xyz, elem, alt, occ, cutoff, min_occupancy=1.0):
 
 
 def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4.0,
-                   min_occupancy=1.0):
+                   min_occupancy=0.0):
     '''
     Find heavy-atom contacts closer than ``clash_cutoff`` between atoms that are not
     bonded neighbours.
@@ -181,15 +173,17 @@ def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4
     :param clash_cutoff: heavy-atom separation below which a contact is a clash, in A.
     :type clash_cutoff: float
     :param modelled_residues: (chain, resid) pairs built by Modeller, so that clashes
-        involving rebuilt atoms can be reported separately.
+        involving rebuilt atoms can be reported separately. Atoms with an occupancy of
+        zero, which is how curation marks the atoms Modeller built, count as modelled too.
     :type modelled_residues: iterable
     :param report_cutoff: when no clash is found, the radius searched to report the
         closest non-bonded contact anyway, in A.
     :type report_cutoff: float
-    :param min_occupancy: atoms modelled below this occupancy are not fully present, so
-        a contact involving one is ambiguous and is not reported. Set to 0 to report
-        them. Has no effect on a file biobox wrote, whose occupancy column holds the
-        B-factor.
+    :param min_occupancy: contacts involving an atom with an occupancy below this value
+        are not reported. Defaults to 0, reporting every contact: a curated file holds a
+        single conformer, so its partially occupied atoms are atoms of that conformer, and
+        the atoms Modeller built carry an occupancy of zero and are the ones most likely to
+        clash.
     :type min_occupancy: float
     :returns: (summary dict, DataFrame of offending pairs, worst first)
     :rtype: tuple
@@ -216,7 +210,7 @@ def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4
     is_protein = np.isin(resname, STANDARD_RESIDUES)
     is_water = np.isin(resname, WATER_RESNAMES)
     modelled = {(str(c), int(r)) for c, r in modelled_residues}
-    is_modelled = np.array([(c, r) in modelled for c, r in zip(chain, resid)])
+    is_modelled = np.array([(c, r) in modelled for c, r in zip(chain, resid)]) | (occ == 0.0)
 
     out = pd.DataFrame({
         'sep': np.round(sep, 3),
