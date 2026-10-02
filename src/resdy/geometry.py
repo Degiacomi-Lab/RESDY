@@ -66,7 +66,7 @@ def _read_altloc_occupancy(path, n_expected):
 
 def _load(path):
     '''
-    Read a structure and return its heavy atoms.
+    Read a structure and return details of its heavy atoms.
 
     :returns: (atom records, (n, 3) coordinates, element symbols, altlocs, occupancies)
     '''
@@ -198,7 +198,7 @@ def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4
 
     i, j, sep = _offending_pairs(d, xyz, elem, alt, occ, clash_cutoff, min_occupancy)
     if len(i) == 0:
-        # nothing clashes: still report how close the structure comes
+        # nothing clashes: report how close the structure comes
         _, _, wide = _offending_pairs(d, xyz, elem, alt, occ, report_cutoff, min_occupancy)
         summary['min_contact'] = float(wide[0]) if len(wide) else np.nan
         return summary, pd.DataFrame()

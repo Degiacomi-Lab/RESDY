@@ -1,5 +1,6 @@
 import shutil
-import sys, os
+import sys
+import os
 
 #: Oldest biobox RESDY works with. Earlier versions wrote the occupancy and B-factor columns
 #: of a pdb file into each other's places, and computed solvent accessible surface areas
@@ -17,7 +18,6 @@ def require_biobox(biobox):
     '''
     version = getattr(biobox, '__version__', None)
     if not isinstance(version, str):
-        # a mocked module, as in the documentation build
         return
     parts = tuple(int(''.join(c for c in p if c.isdigit()) or 0) for p in version.split('.')[:3])
     if parts < MIN_BIOBOX_VERSION:

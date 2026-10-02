@@ -269,7 +269,6 @@ class Viewer(object):
                     style={'width': '95%', 'display': 'inline-block'}),
                 ])
             elif tab == 'tab_histogram_analysis':
-                # investigate feature specific histogram and violins of different aggregation types
                 return html.Div([
                     html.Div([
                         html.Div([
@@ -338,14 +337,18 @@ class Viewer(object):
                     ], style={
                         'padding': '10px 5px'
                     }),
-                    html.Div([
-                        html.H4('Any potential warnings for plotting non aggregated feature data')
-                    ], style={'width': '100%', 'display': 'inline-block', 'padding': '0 20'}),
+
+                    html.Div(id='mainhist-warningtext',
+                             children=[
+                        html.H4('WARNING: Plotting data without an aggregation type may be biased due to the number of available structures for each protein.')
+                    ], style={'width': '100%', 'display': 'inline-block', 'float': 'center', 'text-align': 'center', 'padding': '0 20'}),
+
                     html.Div([
                         dcc.Graph(
                             id='histogram-main'
                         )
                     ], style={'width': '100%', 'display': 'inline-block', 'padding': '0 20'}),
+
                     html.Div([
                         html.H4('Number of Bins (Fits to Nearest Neat Splitting Bin Size)', style={'text-align': 'center'}),
                         dcc.Slider(
@@ -355,6 +358,7 @@ class Viewer(object):
                         id='main-hist-bins-slider',
                         marks=10),
                     ], style={'width': '95%', 'horizontal-align': 'center'}),
+
                     html.Div([
                         html.H4('pKa (PROPKA3) Range', style={'text-align': 'center'}, id='main-hist-feature-slider-header'),
                         dcc.RangeSlider(
@@ -365,6 +369,7 @@ class Viewer(object):
                         value=[round(self.df_scalar_measures['propka'].min(), 1), round(self.df_scalar_measures['propka'].max(), 1)],
                         marks=int(((self.df_scalar_measures['propka'].max() - self.df_scalar_measures['propka'].min())/ 5)) or 1),
                     ], style={'width': '95%', 'horizontal-align': 'center'}),
+
                     html.Div([
                         html.H3('GO Term Subset', style={'text-align': 'center'}),
                         dcc.Dropdown(
@@ -372,8 +377,16 @@ class Viewer(object):
                             'All',
                             id='mainhist-GOterm-dropdown',
                         ),
-                    ],
-                    style={'width': '95%', 'display': 'inline-block'}),
+                    ], style={'width': '95%', 'display': 'inline-block'}),
+
+                    html.Div([
+                        html.H4('Scatter Colour Section', style={'text-align': 'center'}),
+                        dcc.Dropdown(
+                            ['None'] + self.colour_cols,
+                            'None',
+                            id='mainhist-colour-col'
+                        ),
+                    ], style={'width': '95%', 'display': 'inline-block'})
                 ])
 
             elif tab == 'tab_GOterm_enrichment_analysis':
@@ -702,9 +715,16 @@ class Viewer(object):
 
 
         # tab 2 functions
-        def create_main_hist(dff, feature, title, nbins, chain_split, resid_split):
+        def create_main_hist(dff, feature, title, nbins, chain_split, resid_split, colour_col):
 
-            if chain_split == 'Together' and resid_split == 'Together':
+            if colour_col != 'None':
+                if colour_col in dff.columns:
+                    fig = px.histogram(dff, x=feature, marginal='rug',
+                                        nbins=nbins, color=colour_col)
+                else:
+                    fig = px.histogram(dff, x=feature, marginal='rug',
+                                        nbins=nbins, color_discrete_sequence=['#682860'])
+            elif chain_split == 'Together' and resid_split == 'Together':
                 fig = px.histogram(dff, x=feature, marginal='rug', color_discrete_sequence=['#682860'], nbins=nbins)
             elif chain_split == 'Together' and resid_split == 'Seperate':
                 fig = px.histogram(dff, x=feature, marginal='rug',
@@ -714,8 +734,8 @@ class Viewer(object):
                     fig = px.histogram(dff, x=feature, marginal='rug',
                                         nbins=nbins, color='Chain')
                 else:
-                    fig = px.histogram(dff, x=feature, marginal='rug', color_discrete_sequence=['#682860'],
-                                        nbins=nbins)
+                    fig = px.histogram(dff, x=feature, marginal='rug',
+                                       color_discrete_sequence=['#682860'], nbins=nbins)
             else:
                 dfff = dff.copy()
                 dfff['CombColour'] = dfff[['Chain', 'Resid']].apply(lambda row: '_'.join(row.values.astype(str)), axis=1)
@@ -744,6 +764,7 @@ class Viewer(object):
             Output('main-hist-feature-slider', 'value'),
             Output('main-hist-feature-slider', 'min'),
             Output('main-hist-feature-slider', 'max'),
+            Output('mainhist-warningtext', 'style'),
             Input('crossfilter-feature-hist', 'value'),
             Input('2d-agg-type-hist', 'value'),
             Input('crossfilter-uniprot-hist', 'value'),
@@ -753,9 +774,10 @@ class Viewer(object):
             Input('crossfilter-resid-split-type', 'value'),
             Input('main-hist-bins-slider', 'value'),
             Input('main-hist-feature-slider', 'value'),
-            Input('mainhist-GOterm-dropdown', 'value'))
+            Input('mainhist-GOterm-dropdown', 'value'),
+            Input('mainhist-colour-col', 'value'))
         def update_main_hist(feature, agg_type, uniprot, chain, chain_split,
-                             resid, resid_split, nbins, feat_range, go_term):
+                             resid, resid_split, nbins, feat_range, go_term, colour_col):
 
             trig_id = ctx.triggered_id
 
@@ -773,6 +795,8 @@ class Viewer(object):
                 resid = 'All'
             if go_term is None:
                 go_term = 'All'
+            if colour_col is None:
+                colour_col = 'None'
 
             pot_chains = ['All'] + list(self.df_measures['Chain'].unique())
             pot_resids = ['All'] + list(self.df_measures['Resid'].unique())
@@ -781,6 +805,8 @@ class Viewer(object):
             header = f'{feature} Range'
 
             if agg_type == 'None':
+                warning_label = {'width': '100%', 'display': 'inline-block', 'float': 'center', 'text-align': 'center', 'padding': '0 20'}
+                
                 feat = self.feature_labels[feature]
 
                 cols_remain = [a for a in self.non_feat_cols if a in self.df_scalar_measures.columns] + [feat]
@@ -807,9 +833,10 @@ class Viewer(object):
                 else:
                     feat_range = no_update
 
-                return create_main_hist(dff, feat, feature, nbins, chain_split, resid_split), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max
+                return create_main_hist(dff, feat, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
             else:
+                warning_label = {'display': 'None'}
                 feat = self.feature_labels[feature]
                 agg = self.aggregation_types[agg_type]
                 feat_col = f'{feat}_{agg}'
@@ -837,7 +864,7 @@ class Viewer(object):
                 else:
                     feat_range = no_update
                 
-                return create_main_hist(dff, feat_col, feature, nbins, chain_split, resid_split), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max
+                return create_main_hist(dff, feat_col, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
 
         @callback(
