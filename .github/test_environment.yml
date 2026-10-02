@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python=3.12
   - pip
-  - biobox
+  - biobox>=1.1.5
   - biopython
   - numpy
   - pandas

@@ -7,6 +7,7 @@ import datetime
 import glob
 import time
 import inspect
+import json
 from datetime import date
 from functools import partial
 import multiprocessing as mp
@@ -16,6 +17,8 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
+from .helper import require_biobox
+require_biobox(bb)
 from .features import *
 from .residues import residue_key, resolve_residue
 
@@ -35,6 +38,35 @@ def _call_with_args(func, args):
     :returns: Whatever ``func`` returns.
     '''
     return func(*args)
+
+
+#: File, in the output directory, that records the settings a measurement was made with.
+MEASURE_SETTINGS_FILE = 'measure_settings.json'
+
+#: Constructor arguments of a feature that are not settings of the measurement: they are
+#: filled in by Measure from its own arguments, or are data rather than parameters.
+_NOT_SETTINGS = ('self', 'include_modified', 'error_filename', 'aa_properties', 'outdir',
+                 'df_proteins')
+
+
+def _resolved_settings(cls, kwargs):
+    """
+    The settings a feature class is constructed with: its defaults, overridden by the
+    arguments given.
+
+    :param cls: feature class.
+    :type cls: type
+    :param kwargs: keyword arguments passed to the constructor.
+    :type kwargs: dict
+    :returns: {argument: value}, in a form json can write.
+    :rtype: dict
+    """
+    settings = {}
+    for name, par in inspect.signature(cls.__init__).parameters.items():
+        if name in _NOT_SETTINGS or par.kind in (par.VAR_POSITIONAL, par.VAR_KEYWORD):
+            continue
+        settings[name] = kwargs.get(name, None if par.default is par.empty else par.default)
+    return json.loads(json.dumps(settings, default=str))
 
 
 #: Features requested by the 'all' shorthand in ``features_dict``.
@@ -276,6 +308,8 @@ class Measure(object):
             self.features_dict = features_dict
             self.features = list(features_dict)
         self.measures = []
+        #: {feature: settings it was constructed with}, written to MEASURE_SETTINGS_FILE
+        self.feature_settings = {}
         melodia_features = []
         melodia_added = False
         frustration_added = False
@@ -289,6 +323,7 @@ class Measure(object):
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
                         self.measures.append(['frustration', frustration.calculate])
+                        self.feature_settings['frustration'] = _resolved_settings(FRUSTRATION, {})
                         frustration_added = True
                 except Exception as e:
                     self.features.remove(m)
@@ -300,6 +335,8 @@ class Measure(object):
                                           error_filename=self.error_filename,
                                           aa_properties=self.aa_properties)
                     self.measures.append([m, structure.calculate])
+                    self.feature_settings['melodia'] = _resolved_settings(
+                        STRUCTURE, {'melodia_features': ['all']})
                     melodia_added = True
                     self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                     self.features.remove('melodia')
@@ -336,6 +373,7 @@ class Measure(object):
                                 meas_dict[tmp_name].check_esm_model_available()
 
                             self.measures.append([m, meas_dict[tmp_name].calculate])
+                            self.feature_settings[tmp_name] = _resolved_settings(cls_dets, kwargs)
                         except Exception as e:
                             if self.report_errors:
                                 self._report_error_to_file('Setup measures: custom measure failed to be added', 'setup', f'Custom measure {m} failed to be added')
@@ -356,6 +394,8 @@ class Measure(object):
                                       error_filename=self.error_filename,
                                       aa_properties=self.aa_properties)
                 self.measures.append(['melodia', structure.calculate])
+                self.feature_settings['melodia'] = _resolved_settings(
+                    STRUCTURE, {'melodia_features': melodia_features})
                 melodia_added = True
             except Exception as e:
                 for feat in melodia_features:
@@ -455,12 +495,59 @@ class Measure(object):
         return new_file_name
 
 
+    def measurement_settings(self):
+        """
+        Everything that decides what a measurement means: the settings each feature was
+        constructed with, the residue measured, and the versions of RESDY and biobox.
+
+        :rtype: dict
+        """
+        from . import __version__ as resdy_version
+        return json.loads(json.dumps({
+            'resdy_version': resdy_version,
+            'biobox_version': getattr(bb, '__version__', None),
+            'residue_of_interest': self.aa_properties,
+            'include_modified': self.include_mod,
+            'only_relaxed': self.only_relaxed,
+            'features': self.feature_settings,
+        }, default=str))
+
+    def _write_settings(self):
+        """Write :meth:`measurement_settings` to MEASURE_SETTINGS_FILE in the output directory."""
+        with open(os.path.join(self.outdir, MEASURE_SETTINGS_FILE), 'w') as fh:
+            json.dump(self.measurement_settings(), fh, indent=2)
+
+    def _check_settings(self):
+        """
+        Refuse to continue a measurement with settings other than those it was started with,
+        which would leave rows measured two different ways in one table.
+
+        :raises ValueError: when MEASURE_SETTINGS_FILE exists and differs from the present
+            settings.
+        """
+        path = os.path.join(self.outdir, MEASURE_SETTINGS_FILE)
+        if not os.path.exists(path):
+            return
+        with open(path) as fh:
+            previous = json.load(fh)
+        current = self.measurement_settings()
+        if previous != current:
+            changed = sorted(k for k in set(previous) | set(current)
+                             if previous.get(k) != current.get(k))
+            raise ValueError(f'>> The measurement being restarted was made with different '
+                             f'settings ({", ".join(changed)} differ from {path}). Restart it '
+                             f'with the settings recorded there, or start a new measurement.')
+
     def measure_data(self):
         '''
         Determine the appropriate measures function to call based on the combination of running
         PDB_only and in parallel, reducing the number of individual functions that the user will
         have to call themselves.
+
+        The settings of the measurement are written to MEASURE_SETTINGS_FILE in the output
+        directory, see :meth:`measurement_settings`.
         '''
+        self._write_settings()
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
                 # not PDB only and parallel or series:
@@ -493,8 +580,11 @@ class Measure(object):
         Determine the appropriate measures function to call based on the combination of running
         PDB_only and in parallel, reducing the number of individual functions that the user will have
         to call themselves. Different to measure_data() as this will restart the measurements from
-        final previous point rather than starting again.
+        final previous point rather than starting again. Raises a ValueError if the settings
+        differ from those the measurement was started with.
         '''
+        self._check_settings()
+        self._write_settings()
         match (self.PDB_only, self.parallel):
             case (False, False) | (False, True):
                 # not PDB only and parallel or series

@@ -16,7 +16,8 @@ class SASA():
                                     'modified_codes': ['LYE', 'KCX'],
                                     'atom_select_names_nonmod': ['NZ'],
                                     'atom_select_names_modified': ['NZ', 'N07']},
-                  error_filename = 'measure_errors.txt'):
+                  error_filename = 'measure_errors.txt',
+                  probe=1.4, n_sphere_point=960, threshold=0):
         '''
         Initialise the SASA class, include any global variables that are required from measures in
         here.
@@ -33,7 +34,25 @@ class SASA():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param probe: Radius of the solvent probe, in Angstrom. 1.4 A is the usual value for
+            water.
+        :type probe: float
+        :param n_sphere_point: Number of points placed on the sphere around each atom. The area
+            is resolved in steps of 1/n_sphere_point of each atom's sphere.
+        :type n_sphere_point: int
+        :param threshold: Fraction of an atom's points that have to be exposed for its area to
+            be counted, between 0 and 1. 0 counts every exposed point.
+        :type threshold: float
         '''
+        if not probe > 0:
+            raise ValueError(f'SASA probe must be positive, got {probe}')
+        if int(n_sphere_point) < 1:
+            raise ValueError(f'SASA n_sphere_point must be at least 1, got {n_sphere_point}')
+        if not 0 <= threshold <= 1:
+            raise ValueError(f'SASA threshold must be between 0 and 1, got {threshold}')
+        self.probe = float(probe)
+        self.n_sphere_point = int(n_sphere_point)
+        self.threshold = float(threshold)
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
@@ -44,14 +63,18 @@ class SASA():
 
     def calculate(self, path):
         '''
-        Calculate the solvent accessible surface area of the NZ atom within the lysine structure
+        Calculate the solvent accessible surface area of the side chain of each residue of
+        interest, i.e. of all its atoms except N, CA, C and O.
 
         .. rubric:: Method
 
-        - Form small structures which include just the atoms surrounding the lysine of interest.
-        - Small structures are classified as any atoms within 15 angstroms of the NZ of the lysines.
-        - A new biobox molecule is created for the substructure and SASA is calculated from that.
-        - The SASA calculation uses the bb.sasa() function.
+        - Cut out the atoms around the anchor atom of the residue (NZ for lysine), within a
+          radius of 15 A or, if larger, of the side chain's extent from the anchor plus twice
+          the largest atomic radius and twice the probe radius. Every atom that can occlude a
+          point of the side chain lies inside that radius.
+        - Compute the area of the side chain atoms with the Shrake-Rupley algorithm of
+          ``bb.sasa()``, with the probe radius, number of sphere points and threshold given at
+          construction.
 
         :param path: The path of the pdb file that SASA is being calculated for.
         :type path: str
@@ -94,6 +117,7 @@ class SASA():
             list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'].values[lys_idx]))
 
             all_coords, all_idx = M.atomselect('*','*','*', get_index=True)
+            max_radius = float(M.data['radius'].max())
 
         except Exception as e:
             if self.record_errors: report_error_to_file('SASA 1', path, str(e), self.error_filename)
@@ -103,9 +127,17 @@ class SASA():
         for j, lys_coord in enumerate(lys_coords):
 
             coords_euc_dists = np.linalg.norm(all_coords - lys_coord, axis=1)
-            list_close_points = np.where(coords_euc_dists < 15)[0]
 
             try:
+                # the cut-out has to hold every atom that can occlude a point of the side
+                # chain: such an atom lies within r_i + r_j + 2*probe of a side chain atom
+                in_residue = ((M.data['chain'].values == list_of_chains[j]) &
+                              (M.data['resid'].values == list_of_resid[j]) &
+                              ~np.isin(M.data['name'].values, ['CA', 'C', 'N', 'O']))
+                extent = float(coords_euc_dists[in_residue].max()) if in_residue.any() else 0.0
+                radius = max(15.0, extent + 2 * max_radius + 2 * self.probe)
+                list_close_points = np.where(coords_euc_dists < radius)[0]
+
                 S = M.get_subset(idxs=list_close_points)
                 S.atomignore('*', '*', ['CX', 'OQ1', 'OQ2'])
                 chain = list_of_chains[j]
@@ -117,7 +149,8 @@ class SASA():
                 pts_2, indx_2 = S.atomselect(chain, [resid], non_backbone_res_atoms,
                                                             use_resname=False, get_index=True)
 
-                x = bb.sasa(S, targets=indx_2, probe=1.4, n_sphere_point=960, threshold=0)
+                x = bb.sasa(S, targets=indx_2, probe=self.probe,
+                            n_sphere_point=self.n_sphere_point, threshold=self.threshold)
                 list_of_sasa.append(x[0])
 
             except Exception as e:

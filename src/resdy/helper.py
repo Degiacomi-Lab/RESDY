@@ -1,6 +1,30 @@
 import shutil
 import sys, os
 
+#: Oldest biobox RESDY works with. Earlier versions wrote the occupancy and B-factor columns
+#: of a pdb file into each other's places, and computed solvent accessible surface areas
+#: that were too small.
+MIN_BIOBOX_VERSION = (1, 1, 5)
+
+
+def require_biobox(biobox):
+    '''
+    Raise if the biobox given is older than :data:`MIN_BIOBOX_VERSION`.
+
+    :param biobox: the imported biobox module.
+    :type biobox: module
+    :raises ImportError: when the version is older than required.
+    '''
+    version = getattr(biobox, '__version__', None)
+    if not isinstance(version, str):
+        # a mocked module, as in the documentation build
+        return
+    parts = tuple(int(''.join(c for c in p if c.isdigit()) or 0) for p in version.split('.')[:3])
+    if parts < MIN_BIOBOX_VERSION:
+        required = '.'.join(map(str, MIN_BIOBOX_VERSION))
+        raise ImportError(f'RESDY needs biobox {required} or later, found {version}. Install it '
+                          f'with: conda install -c conda-forge "biobox>={required}"')
+
 
 def get_download_tool():
     '''

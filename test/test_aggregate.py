@@ -128,12 +128,15 @@ class Test_Aggregation(unittest.TestCase):
                             'psi_range', 'psi_rand', 'das_min', 'das_max', 'das_avg', 'das_sd',
                             'das_range', 'das_rand', 'flexibility_max', 'rmsf_med']
 
+        # keep every feature whatever its NaN fraction (rmsf is NaN for every structure with a
+        # single model), so that each of the statistics asked for above is exercised
         with patch('builtins.input', fake_input):
             Agg = RD.Aggregation(df_measurements=self.demo_measure,
                                  outdir=self.outdir,
                                         aggregation_method='choose',
                                         features_to_include=['all'],
-                                        aev_red_method='pca')
+                                        aev_red_method='pca',
+                                        max_feature_nan_fraction=1.0)
             df_agg = Agg.aggregate_data()
             self.assertTrue(len(df_agg) > 0)
             self.assertListEqual(expected_columns, list(df_agg.columns))
@@ -176,6 +179,50 @@ class Test_Aggregation(unittest.TestCase):
                             aev_red_method='null')
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
+
+
+class Test_Aggregation_Settings(unittest.TestCase):
+    """aev_pca_variance and vif_threshold, which used to be fixed at 0.99 and 5."""
+
+    def setUp(self):
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        self.demo_measure = pd.read_csv(os.path.join('demo', 'measures.csv'))
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
+
+    def _agg(self, **kwargs):
+        return RD.Aggregation(df_measurements=self.demo_measure.copy(), outdir=self.outdir,
+                              aggregation_method='min', features_to_include=['all'],
+                              aev_red_method='pca', **kwargs)
+
+    def test_pca_variance_fraction_and_component_count(self):
+        import numpy as np
+        n_aev = lambda agg: len([c for c in agg.df_measurements.columns if c.startswith('AEV_')])
+        few = self._agg(aev_pca_variance=0.5)
+        few.aggregate_data()
+        many = self._agg(aev_pca_variance=0.999)
+        many.aggregate_data()
+        self.assertLess(n_aev(few), n_aev(many))
+        fixed = self._agg(aev_pca_variance=np.int64(3))
+        fixed.aggregate_data()
+        self.assertEqual(n_aev(fixed), 3)
+
+    def test_invalid_settings_fail_at_construction(self):
+        for bad in (0.0, 1.0, 1.5, 0, True, 'all'):
+            with self.assertRaises(ValueError):
+                self._agg(aev_pca_variance=bad)
+        with self.assertRaises(ValueError):
+            self._agg(vif_threshold=1.0)
+
+    def test_vif_threshold_reaches_preprocessing(self):
+        with patch('resdy.aggregation.Preprocessing') as P:
+            P.return_value.calculate_diff_features.return_value = []
+            agg = RD.Aggregation(df_measurements=self.demo_measure.copy(), outdir=self.outdir,
+                                 aggregation_method='min', features_to_include=['all'],
+                                 aev_red_method='vif', vif_threshold=7.5)
+            agg.aggregate_data()
+        self.assertEqual(P.return_value.calculate_diff_features.call_args.kwargs['vif_threshold'], 7.5)
 
 
 if __name__ == "__main__":

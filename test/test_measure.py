@@ -351,5 +351,184 @@ class Test_Measure(unittest.TestCase):
                        residue_of_interest='ZZZ')
 
 
+class Test_Flexibility_Built_Atoms(unittest.TestCase):
+    """
+    Atoms with occupancy 0 were built by Modeller and have no measured B-factor: they are
+    left out of the normalisation and of each residue's average.
+    """
+
+    def setUp(self):
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        self.path = os.path.join(self.outdir, 'built.pdb')
+        names = ['N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ']
+        lines, serial = [], 1
+        # LYS 1 measured; LYS 2 with a built side chain; LYS 3 built entirely; GLY 4-6 measured
+        for resid, resname in [(1, 'LYS'), (2, 'LYS'), (3, 'LYS'), (4, 'GLY'), (5, 'GLY'), (6, 'GLY')]:
+            for k, name in enumerate(names if resname == 'LYS' else names[:4]):
+                built = resid == 3 or (resid == 2 and k >= 4)
+                occ, b = (0.0, 0.0) if built else (1.0, 10.0 * resid + k)
+                lines.append(f'ATOM  {serial:5d}  {name:<3s} {resname} A{resid:4d}    '
+                             f'{float(serial):8.3f}{0.0:8.3f}{0.0:8.3f}{occ:6.2f}{b:6.2f}'
+                             f'           {name[0]}\n')
+                serial += 1
+        with open(self.path, 'w') as fh:
+            fh.write(''.join(lines) + 'END\n')
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
+
+    def test_built_atoms_are_ignored(self):
+        from resdy.features.FLEXIBILITY import FLEXIBILITY
+        import numpy as np
+        df = FLEXIBILITY(error_filename='no_record').calculate(self.path).set_index('Resid')
+
+        b = {}
+        for line in open(self.path):
+            if line.startswith('ATOM') and float(line[54:60]) > 0:
+                b.setdefault(int(line[22:26]), []).append(float(line[60:66]))
+        measured = np.concatenate([np.array(v) for v in b.values()])
+        z = lambda v: (np.array(v) - measured.mean()) / measured.std(ddof=1)
+
+        self.assertAlmostEqual(df.loc[1, 'flexibility'], z(b[1]).mean(), places=10)
+        self.assertAlmostEqual(df.loc[2, 'flexibility'], z(b[2]).mean(), places=10)
+        self.assertTrue(np.isnan(df.loc[3, 'flexibility']))
+
+
+class Test_Feature_Settings(unittest.TestCase):
+    """
+    The geometric constants of the features are settable, validated, and recorded with the
+    measurement in measure_settings.json.
+    """
+    SOURCE = os.path.join('demo', 'conformations', '1A6M-alt1A.pdb')
+
+    def setUp(self):
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+
+    def tearDown(self):
+        shutil.rmtree(self.outdir, ignore_errors=True)
+
+    def test_settings_are_recorded_and_checked_on_restart(self):
+        import json
+        from resdy.measure import MEASURE_SETTINGS_FILE
+        df = pd.DataFrame({'PDB_Code': ['1A6M']})
+        M = RD.Measure(df_input=df, outdir=self.outdir,
+                       features_dict={'sasa': {'probe': 1.2}, 'das': {}})
+        settings = M.measurement_settings()
+        self.assertEqual(settings['features']['sasa'],
+                         {'probe': 1.2, 'n_sphere_point': 960, 'threshold': 0})
+        # the radii DAS is given for the residue of interest are recorded, not its None default
+        self.assertEqual(settings['features']['das']['radii'], [6.3, 5.9, 5.4, 4.8])
+        self.assertEqual(settings['residue_of_interest']['non_modified_codes'][0], 'LYS')
+
+        M._write_settings()
+        with open(os.path.join(self.outdir, MEASURE_SETTINGS_FILE)) as fh:
+            self.assertEqual(json.load(fh), settings)
+        M._check_settings()
+        changed = RD.Measure(df_input=df, outdir=self.outdir,
+                             features_dict={'sasa': {'probe': 1.4}, 'das': {}})
+        with self.assertRaises(ValueError):
+            changed._check_settings()
+
+    def test_sasa_cut_out_matches_the_whole_structure(self):
+        """At the default probe, the cut-out gives the area computed on the whole structure."""
+        import biobox as bb
+        import numpy as np
+        from resdy.features.SASA import SASA
+        df = SASA(error_filename='no_record').calculate(self.SOURCE)
+        M = bb.Molecule()
+        M.import_pdb(self.SOURCE, include_hetatm=True)
+        for _, row in df.iterrows():
+            sel = ((M.data['chain'] == row['Chain']) & (M.data['resid'] == row['Resid'])
+                   & ~M.data['name'].isin(['CA', 'C', 'N', 'O'])).to_numpy()
+            whole = bb.sasa(M, targets=np.where(sel)[0], threshold=0)[0]
+            self.assertAlmostEqual(row['sasa'], whole, places=6)
+
+    def test_sasa_cut_out_grows_with_the_probe(self):
+        """
+        An atom 16 A from NZ, beyond a fixed 15 A cut-out, still occludes part of the side
+        chain when the probe is 7 A: the cut-out has to grow with the probe to include it.
+        """
+        import biobox as bb
+        import numpy as np
+        from resdy.features.SASA import SASA
+        names = ['N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ']
+        x = [-6.0, -4.5, -4.5, -4.5, -3.0, -1.5, 0.0, 1.5, 3.0]
+        y = [0.0, 0.0, 1.5, 2.7, 0.0, 0.0, 0.0, 0.0, 0.0]
+        lines = [f'ATOM  {k + 1:5d}  {n:<3s} LYS A   1    {xx:8.3f}{yy:8.3f}{0.0:8.3f}'
+                 f'{1.0:6.2f}{20.0:6.2f}           {n[0]}\n' for k, (n, xx, yy) in enumerate(zip(names, x, y))]
+        lines.append(f'ATOM     10  CA  GLY A   2    {3.0 + 16.0:8.3f}{0.0:8.3f}{0.0:8.3f}'
+                     f'{1.0:6.2f}{20.0:6.2f}           C\n')
+        path = os.path.join(self.outdir, 'far_occluder.pdb')
+        with open(path, 'w') as fh:
+            fh.write(''.join(lines) + 'END\n')
+
+        probe = 7.0
+        got = SASA(error_filename='no_record', probe=probe).calculate(path)['sasa'].iloc[0]
+        M = bb.Molecule()
+        M.import_pdb(path)
+        side_chain = np.arange(4, 9)
+        whole = bb.sasa(M, targets=side_chain, probe=probe, threshold=0)[0]
+        without = bb.sasa(M.get_subset(idxs=np.arange(9)), targets=side_chain,
+                          probe=probe, threshold=0)[0]
+        self.assertLess(whole, without)              # the far atom does occlude
+        self.assertAlmostEqual(got, whole, places=6)
+
+    def test_feature_settings_are_validated(self):
+        from resdy.features.SASA import SASA
+        from resdy.features.DAS import DAS
+        from resdy.features.FLEXIBILITY import FLEXIBILITY
+        for kwargs in ({'probe': 0}, {'n_sphere_point': 0}, {'threshold': 1.5}):
+            with self.assertRaises(ValueError):
+                SASA(**kwargs)
+        for bad in ({'radii': [5.0, 4.0]}, {'i': 3}, {'pts': 2.0}):
+            with self.assertRaises(ValueError):
+                DAS(half_sphere_kwargs=bad)
+        with self.assertRaises(ValueError):
+            FLEXIBILITY(outlier_z=0)
+
+    def test_das_half_sphere_kwargs_are_used(self):
+        from resdy.features.DAS import DAS
+        coarse = DAS(error_filename='no_record').calculate(self.SOURCE)['das']
+        fine = DAS(error_filename='no_record',
+                   half_sphere_kwargs={'pts_surf': 2.0}).calculate(self.SOURCE)['das']
+        self.assertGreater(fine.sum(), coarse.sum())
+
+    def test_flexibility_raw_b_factors_and_flat_column(self):
+        import numpy as np
+        from resdy.features.FLEXIBILITY import FLEXIBILITY
+        raw = FLEXIBILITY(error_filename='no_record', normalise=False).calculate(self.SOURCE)
+        b = {}
+        for line in open(self.SOURCE):
+            if line.startswith('ATOM') and float(line[54:60]) > 0:
+                b.setdefault((line[21], int(line[22:26])), []).append(float(line[60:66]))
+        for _, row in raw.head(5).iterrows():
+            self.assertAlmostEqual(row['flexibility'], np.mean(b[(row['Chain'], row['Resid'])]), places=6)
+
+        # more than half of the B-factors equal: the median absolute deviation is zero
+        flat = os.path.join(self.outdir, 'flat.pdb')
+        lines = [l for l in open(self.SOURCE) if l.startswith('ATOM')]
+        with open(flat, 'w') as fh:
+            for k, l in enumerate(lines):
+                fh.write(f'{l[:54]}{1.0:6.2f}{(20.0 if k % 3 else 20.0 + k):6.2f}{l[66:]}')
+        out = FLEXIBILITY(error_filename='no_record', remove_outliers=True).calculate(flat)
+        self.assertGreater(out['flexibility'].notna().sum(), 0)
+
+    def test_aev_cutoff_beyond_model_radius_changes_nothing(self):
+        try:
+            from resdy.features.AEV import AEV
+            default = AEV(error_filename='no_record')
+        except ImportError:
+            self.skipTest('torchani is not installed')
+        wider = AEV(error_filename='no_record', cutoff=8.0)
+        a = default.calculate(self.SOURCE)['aev']
+        b = wider.calculate(self.SOURCE)['aev']
+        import numpy as np
+        from ast import literal_eval
+        for x, y in zip(a, b):
+            np.testing.assert_allclose(literal_eval(x), literal_eval(y), atol=1e-5)
+        with self.assertRaises(ValueError):
+            AEV(cutoff=0)
+
+
 if __name__ == "__main__":
     unittest.main()

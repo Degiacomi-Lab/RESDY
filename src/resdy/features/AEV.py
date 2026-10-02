@@ -5,6 +5,11 @@ import biobox as bb
 from .error_reporting import report_error_to_file
 
 
+#: Radial cutoff of ANI-2x, in Angstrom, from the name of its parameter file
+#: (``rHCNOSFCl-5.1R_16-3.5A_a8-4.params``). Used only if the loaded model does not expose it.
+ANI2X_RADIAL_CUTOFF = 5.1
+
+
 class AEV():
     '''
     Representations of the local structure of lysines within the protein structure, termed atomic
@@ -16,7 +21,7 @@ class AEV():
                                   'modified_codes': ['LYE', 'KCX'],
                                   'atom_select_names_nonmod': ['NZ'],
                                   'atom_select_names_modified': ['NZ', 'N07']},
-                 error_filename = 'measure_errors.txt'):
+                 error_filename = 'measure_errors.txt', cutoff=None):
         '''
         Initialise the AEV class, provides general global variables and information taken forward
         from the overall measures class in here.
@@ -33,7 +38,16 @@ class AEV():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param cutoff: Radius, in Angstrom, of the substructure cut out around the anchor atom
+            before its AEV is computed. Defaults to None, meaning the radial cutoff of the
+            ANI-2x model itself (5.1 A). An atom further than that from the anchor contributes
+            nothing to its AEV, so a larger value gives the same result, while a smaller one
+            truncates the environment the AEV describes.
+        :type cutoff: float
         '''
+        if cutoff is not None and not cutoff > 0:
+            raise ValueError(f'AEV cutoff must be positive, got {cutoff}')
+        self.cutoff = cutoff
 
         try:
             from ase import Atoms
@@ -73,6 +87,24 @@ class AEV():
         self.ANI_model = self.ANI2x(periodic_table_index=True).to(device=self.device)
         self.species_converter = self.ChemicalSymbolsToInts(['H', 'C', 'N', 'O', 'S', 'F', 'Cl'])
 
+        # where the radial cutoff lives depends on the torchani version: aev_computer.radial
+        # .cutoff in 2.9, aev_computer.Rcr in earlier releases
+        aev_computer = self.ANI_model.aev_computer
+        model_cutoff = ANI2X_RADIAL_CUTOFF
+        for value in (getattr(getattr(aev_computer, 'radial', None), 'cutoff', None),
+                      getattr(aev_computer, 'Rcr', None)):
+            if value is not None:
+                model_cutoff = float(value)
+                break
+        if self.cutoff is None:
+            self.distance_cut_off = model_cutoff
+        else:
+            self.distance_cut_off = float(self.cutoff)
+            if self.distance_cut_off < model_cutoff:
+                print(f'>> AEV cutoff of {self.distance_cut_off} A is below the radial cutoff of '
+                      f'the ANI-2x model ({model_cutoff} A), so the AEVs describe a truncated '
+                      f'environment')
+
 
     def calculate(self, path):
         '''
@@ -84,8 +116,8 @@ class AEV():
         - Option available to use cuaev accelerated AEV calculation, can also just be run with a cpu
         - For each NZ atom within the lysines of the protein, a substructure is created including
           all atoms within a cutoff distance
-        - The cutoff distance is set at 6A currently as this was the minimum distance needed for all
-          information and agrees with pkaANI cutoff set
+        - The cutoff distance is the radial cutoff of ANI-2x (5.1 A) unless set otherwise at
+          construction: atoms further from the anchor contribute nothing to its AEV
         - The AEV is a vector with length 1008 representing the environment for the lysine
 
         :param path: The path of the pdb file that the AEVs are being calculated for.
@@ -141,9 +173,8 @@ class AEV():
         try:
             for lys_idx, lys_coord in enumerate(coords_nz):
                 # 2.1: for the NZ atom of the lysine, find all the atoms within the cutoff distance and create a substructure
-                distance_cut_off = 6  # current cutoff for substructure from analysis done on different cutoffs and matching pkaANI
                 coords_euc_dists = np.linalg.norm(all_coords - lys_coord, axis=1)
-                list_close_points = np.where(coords_euc_dists < distance_cut_off)[0]
+                list_close_points = np.where(coords_euc_dists < self.distance_cut_off)[0]
 
                 S = M.get_subset(idxs=list_close_points)
                 chain = list_chains[lys_idx]

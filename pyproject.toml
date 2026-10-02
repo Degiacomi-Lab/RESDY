@@ -22,7 +22,7 @@ dependencies = [
     "seaborn",
     "requests",
     "biopython",
-    "biobox",
+    "biobox>=1.1.5",
 ]
 
 # Modeller is required by the structure patching step (resdy.patcher) but is not

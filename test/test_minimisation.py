@@ -97,6 +97,30 @@ class Test_Minimisation(unittest.TestCase):
         self.assertLess(record['energy_final_kj_mol'], record['energy_initial_kj_mol'])
         self.assertGreater(record['heavy_atom_rmsd_a'], 0.0)
 
+    def test_relaxed_file_keeps_occupancy_and_b_factor(self):
+        # OpenMM writes occupancy 1 and B-factor 0 everywhere; both have to come back from
+        # the structure that was minimised, an occupancy of 0 (a built atom) included
+        path = self._path(STRUCTURE)
+        lines = open(path).read().splitlines(keepends=True)
+        expected, out, n = {}, [], 0
+        for line in lines:
+            if line.startswith('ATOM'):
+                resid = int(line[22:26])
+                occ = 0.0 if resid % 7 == 0 else (0.5 if resid % 5 == 0 else 1.0)
+                b = 10.0 + 0.25 * n
+                n += 1
+                line = f'{line[:54]}{occ:6.2f}{b:6.2f}{line[66:]}'
+                expected[(line[21], resid, line[12:16].strip())] = (occ, b)
+            out.append(line)
+        with open(path, 'w') as fh:
+            fh.write(''.join(out))
+
+        self._pdb().apply_minimisation(STRUCTURE)
+        self.assertEqual(self._record()['status'], 'relaxed')
+        relaxed = {(l[21], int(l[22:26]), l[12:16].strip()): (float(l[54:60]), float(l[60:66]))
+                   for l in open(self._relaxed()) if l.startswith('ATOM')}
+        self.assertEqual(relaxed, expected)
+
     def test_restraints_keep_heavy_atoms_closer_to_input(self):
         self._pdb().apply_minimisation(STRUCTURE)
         rmsd_free = self._record()['heavy_atom_rmsd_a']
