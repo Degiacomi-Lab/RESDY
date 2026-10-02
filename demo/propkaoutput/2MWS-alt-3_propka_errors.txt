@@ -1,0 +1,1 @@
+Unexpected number (4) of atoms in residue THR  12 A   in conformation 1A

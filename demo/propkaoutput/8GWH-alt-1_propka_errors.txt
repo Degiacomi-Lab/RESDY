@@ -1,20 +1,2 @@
-Missing atoms or failed protonation for GLN1152 A (AMD) -- please check the structure
-Group (AMD) for  2231-  CD  1152-GLN (A) [ -10.547  -21.284   22.592] C
-Expected 3 interaction atoms for acids, found:
-              2233- NE2  1152-GLN (A) [ -10.190  -19.973   22.525] N
-                 0- HE2  1152-GLN (A) [ -10.243  -19.154   21.937] H
-Expected 1 interaction atoms for bases, found:
-              2232- OE1  1152-GLN (A) [  -9.722  -22.195   22.607] O
-Missing atoms or failed protonation for GLN 531 E (BBN) -- please check the structure
-Group (BBN) for  2427-   N   531-GLN (E) [  -6.922  -20.114   28.443] N
-Expected 2 interaction atoms for acids, found:
-              2427-   N   531-GLN (E) [  -6.922  -20.114   28.443] N
-Expected 2 interaction atoms for bases, found:
-              2427-   N   531-GLN (E) [  -6.922  -20.114   28.443] N
-Missing atoms or failed protonation for GLN 531 E (AMD) -- please check the structure
-Group (AMD) for  2431-  CD   531-GLN (E) [  -6.454  -20.040   32.881] C
-Expected 3 interaction atoms for acids, found:
-              2433- NE2   531-GLN (E) [  -7.575  -20.669   33.322] N
-Expected 1 interaction atoms for bases, found:
-               212-   O   712-GLU (A) [  -4.756  -20.792   32.511] O
-              2432- OE1   531-GLN (E) [  -5.528  -19.712   33.622] O
+Unexpected number (5) of atoms in residue PHE 897 A   in conformation 1A
+Unexpected number (5) of atoms in residue GLN1098 A   in conformation 1A
