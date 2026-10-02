@@ -219,12 +219,24 @@ class Viewer(object):
                                 'Average',
                                 id='2d-agg-col'
                             ),
-                            dcc.RadioItems(
-                                ['On', 'Off'],
-                                'On',
-                                id='2d-agg-type',
-                                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
-                            ),
+                            html.Div(id='aggon-radio-container',
+                                children=[
+                                dcc.RadioItems(
+                                    ['On', 'Off'],
+                                    'On',
+                                    id='2d-agg-type',
+                                    labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+                                ),
+                            ], style={'width': '48%', 'float': 'left', 'display': 'inline-block'}),
+                            html.Div(id='sd-radio-container',
+                                children=[
+                                dcc.RadioItems(
+                                    ['+ st dev', '- st dev'],
+                                    '- st dev',
+                                    id='2d-stdev-toggle',
+                                    labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+                                ),
+                            ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
                             html.Div([
                                 html.H4('Scatter Colour Section', style={'text-align': 'center'}),
                                 dcc.Dropdown(
@@ -232,8 +244,7 @@ class Viewer(object):
                                     'None',
                                     id='2d-colour-col'
                                 ),])
-                        ],
-                        style={'width': '32%', 'float': 'right', 'display': 'inline-block'})
+                        ], style={'width': '32%', 'float': 'right', 'display': 'inline-block'})
                     ],),
 
                     html.Div([
@@ -512,6 +523,8 @@ class Viewer(object):
             Output('2d-yaxis-slider', 'max'),
             Output('2d-xaxis-slider', 'value'),
             Output('2d-yaxis-slider', 'value'),
+            Output('sd-radio-container', 'style'),
+            Output('aggon-radio-container', 'style'),
             Input('2d-axis-column', 'value'),
             Input('2d-yaxis-column', 'value'),
             Input('2d-xaxis-type', 'value'),
@@ -521,10 +534,11 @@ class Viewer(object):
             Input('2d-xaxis-slider', 'value'),
             Input('2d-yaxis-slider', 'value'),
             Input('2d-colour-col', 'value'),
-            Input('2d-GOterm-dropdown', 'value')
+            Input('2d-GOterm-dropdown', 'value'),
+            Input('2d-stdev-toggle', 'value')
             )
         def update_graph_2d(xaxis_column_name, yaxis_column_name, xaxis_type, yaxis_type,
-                         agg_type, agg_on, xaxis_range, yaxis_range, colour_col, go_term):
+                         agg_type, agg_on, xaxis_range, yaxis_range, colour_col, go_term, st_dev_tog):
             trig_id = ctx.triggered_id
 
             x_low, x_high = xaxis_range
@@ -554,7 +568,6 @@ class Viewer(object):
 
             if go_term != 'All':
                 associated_uniprots = self.GO_dict[self.GO_codes_reverse[go_term]]
-                print(associated_uniprots)
                 dff = dff[dff['Uniprot_Entry'].isin(associated_uniprots)]
 
             xaxis_min = round(dff[xaxis].min(), 1)
@@ -578,13 +591,38 @@ class Viewer(object):
             dff = dff[(dff[yaxis] >= y_low) & (dff[yaxis] <= y_high)]
 
             if colour_col != 'None' and (agg_on == 'Off' or agg_type == 'None'):
+                aggon_radio = {'width': '98%', 'float': 'left', 'display': 'inline-block'}
+                sd_radio = {'display': 'None'}
                 fig = px.scatter(dff,
                                 x=xaxis,
                                 y=yaxis,
                                 color=colour_col,
                                 hover_name='Uniprot_Entry',
                                 hover_data=self.res_key)
+            elif agg_type == 'Average':
+                aggon_radio = {'width': '48%', 'float': 'left', 'display': 'inline-block'}
+                sd_radio = {'width': '48%', 'float': 'right', 'display': 'inline-block'}
+                if st_dev_tog == '+ st dev':
+                    xaxis_error = f'{self.feature_labels[xaxis_column_name]}_sd'
+                    yaxis_error = f'{self.feature_labels[yaxis_column_name]}_sd'
+                    fig = px.scatter(dff,
+                        x=xaxis,
+                        y=yaxis,
+                        color_discrete_sequence=['#682860'],
+                        hover_name='Uniprot_Entry',
+                        hover_data=self.res_key,
+                        error_x=xaxis_error,
+                        error_y=yaxis_error)
+                else:
+                    fig = px.scatter(dff,
+                        x=xaxis,
+                        y=yaxis,
+                        color_discrete_sequence=['#682860'],
+                        hover_name='Uniprot_Entry',
+                        hover_data=self.res_key)
             else:
+                aggon_radio = {'width': '98%', 'float': 'left', 'display': 'inline-block'}
+                sd_radio = {'display': 'None'}
                 fig = px.scatter(dff,
                     x=xaxis,
                     y=yaxis,
@@ -608,7 +646,7 @@ class Viewer(object):
 
             fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
 
-            return fig, xaxis_column_name, yaxis_column_name, agg_type, xaxis_range_header, yaxis_range_header, xaxis_min, xaxis_max, yaxis_min, yaxis_max, xaxis_range, yaxis_range
+            return fig, xaxis_column_name, yaxis_column_name, agg_type, xaxis_range_header, yaxis_range_header, xaxis_min, xaxis_max, yaxis_min, yaxis_max, xaxis_range, yaxis_range, sd_radio, aggon_radio
 
 
         def create_feature_hist(dff, feature, title, axis_type):
@@ -669,8 +707,20 @@ class Viewer(object):
             if chain_split == 'Together' and resid_split == 'Together':
                 fig = px.histogram(dff, x=feature, marginal='rug', color_discrete_sequence=['#682860'], nbins=nbins)
             elif chain_split == 'Together' and resid_split == 'Seperate':
-                fig = px.histogram(dff, x=feature, marginal='rug', color_discrete_sequence=['#682860'],
-                                   nbins=nbins, )
+                fig = px.histogram(dff, x=feature, marginal='rug',
+                                   nbins=nbins, color='Resid')
+            elif chain_split == 'Seperate' and resid_split == 'Together':
+                if 'Chain' in dff.columns:
+                    fig = px.histogram(dff, x=feature, marginal='rug',
+                                        nbins=nbins, color='Chain')
+                else:
+                    fig = px.histogram(dff, x=feature, marginal='rug', color_discrete_sequence=['#682860'],
+                                        nbins=nbins)
+            else:
+                dfff = dff.copy()
+                dfff['CombColour'] = dfff[['Chain', 'Resid']].apply(lambda row: '_'.join(row.values.astype(str)), axis=1)
+                fig = px.histogram(dfff, x=feature, marginal='rug',
+                                    nbins=nbins, color='CombColour')
 
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(showgrid=False)
@@ -747,7 +797,6 @@ class Viewer(object):
 
                 if go_term != 'All':
                     associated_uniprots = self.GO_dict[self.GO_codes_reverse[go_term]]
-                    print(associated_uniprots)
                     dff = dff[dff['Uniprot_Entry'].isin(associated_uniprots)]
 
                 feat_min = round(self.df_scalar_measures[feat].min(), 1)
