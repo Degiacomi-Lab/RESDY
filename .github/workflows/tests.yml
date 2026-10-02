@@ -40,36 +40,49 @@ jobs:
           run-post: true
 
       - name: Test Measure
+        timeout-minutes: 15
         if: matrix.group == 'measure'
         run: |
           python test/test_measure.py
 
       - name: Test Protein
+        timeout-minutes: 15
         if: matrix.group == 'protein'
         run: |
           python test/test_protein.py
       - name: Test Patcher
+        timeout-minutes: 10
         if: ${{ matrix.group == 'protein' && !cancelled() }}
         run: |
           python test/test_patcher.py
 
       - name: Test Uniprot
+        timeout-minutes: 10
         if: matrix.group == 'rest'
         run: |
           python test/test_uniprot.py
       - name: Test Alphafold
+        timeout-minutes: 10
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_alphafold.py
       - name: Test Helper
+        timeout-minutes: 5
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_helper.py
+      - name: Test Residues
+        timeout-minutes: 5
+        if: ${{ matrix.group == 'rest' && !cancelled() }}
+        run: |
+          python test/test_residues.py
       - name: Test Aggregation
+        timeout-minutes: 10
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_aggregate.py
       - name: Test Analysis
+        timeout-minutes: 10
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_analysis.py

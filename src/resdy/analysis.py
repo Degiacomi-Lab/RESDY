@@ -34,9 +34,12 @@ class Analysis(object):
         :type df: pandas.DataFrame
         :param outdir: Name of the directory to write to
         :type outdir: str
-        :param features_to_analyse: List of features which should be analysed over. If ['all'] is
-            passed, all features available in the table will be used.
+        :param features_to_analyse: List of features which should be analysed over. Naming them
+            explicitly also drops every row that has no value for one of them. If [] (default) or
+            ['all'] is passed, all feature columns present in the table are used and no row is
+            dropped.
         :type features_to_analyse: list
+        :raises KeyError: if a named feature is not a column of the dataframe.
         '''
         if isinstance(df, str):
             self.df = pd.read_csv(df)
@@ -44,18 +47,19 @@ class Analysis(object):
             self.df = df
 
         standard_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Resolution', 'Method',
-                         'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap']
+                         'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap', 'Source']
 
         if features_to_analyse in ([], ['all']):
+            # no features named: analyse every feature column, and keep every row
             self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
         else:
             missing = [a for a in features_to_analyse if a not in self.df.columns]
             if missing:
                 raise KeyError(f'features_to_analyse gives columns that are not present within the'
                                f' dataframe, missing features: {", ".join(missing)}')
-
-        self.features_to_analyse = list(features_to_analyse)
-        self.df = self.df.dropna(subset=self.features_to_analyse)
+            self.features_to_analyse = list(features_to_analyse)
+            # features were named explicitly, so drop the rows that lack one of them
+            self.df = self.df.dropna(subset=self.features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
@@ -356,7 +360,7 @@ class Analysis(object):
                 ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
 
             case 'all':
-                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
                                  'Resolution', 'Modified', 'class']
                 feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
                 if 'arc' in feat_cols:
@@ -441,7 +445,7 @@ class Analysis(object):
                                 features_to_include=[feature])
                 df_plot = agg.aggregate_data()
 
-                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
                                 'Resolution', 'Modified', 'class']
                 agg_types = [a.split('_')[-1] for a in df_plot.columns if a not in non_feat_cols]
 
@@ -571,7 +575,7 @@ class Analysis(object):
                       'sd': 'Standard Deviation',
                       'range': 'Range'}
 
-        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method',
+        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
                         'Resolution', 'Modified', 'class']
 
         if features == '' or features == []:
@@ -727,7 +731,7 @@ class Analysis(object):
             if isinstance(extra_measures_filename, str):
                 new_df = pd.read_csv(extra_measures_filename)
             if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
-            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
             new_measures_columns = [a for a in new_df.columns if a not in base_columns]
             overlap_columns = [a for a in new_measures_columns if a in orig_measures_columns]

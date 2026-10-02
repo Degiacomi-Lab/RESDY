@@ -1,0 +1,58 @@
+name: Minimisation
+
+# Energy minimisation is slow, so it runs apart from tests.yml: on pushes touching the
+# code that produces or minimises curated structures, weekly to catch changes in OpenMM
+# and the force fields on conda-forge, and on demand.
+on:
+  push:
+    paths:
+      - 'src/resdy/protein.py'
+      - 'src/resdy/patcher.py'
+      - 'src/resdy/alphafold.py'
+      - 'test/test_minimisation.py'
+      - 'demo/demo_input.csv'
+      - 'demo/curated/1A6M-alt1A.pdb'
+      - '.github/test_environment.yml'
+      - '.github/workflows/minimisation.yml'
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up conda
+        env:
+          KEY_MODELLER : ${{ secrets.KEY_MODELLER }}
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          activate-environment: resdy_test
+          environment-file: .github/test_environment.yml
+          conda-solver: libmamba
+          channels: conda-forge,salilab
+          conda-remove-defaults: 'true'
+          channel-priority: strict
+          auto-update-conda: false
+          remove-profiles: true
+          run-post: true
+
+      # the tests skip themselves without openmm, which here would pass having tested nothing
+      - name: Check OpenMM
+        run: |
+          PYTHONPATH=src python -c "from resdy import protein; assert protein.openmm_available, 'openmm could not be imported'"
+
+      - name: Test Minimisation
+        run: |
+          python test/test_minimisation.py

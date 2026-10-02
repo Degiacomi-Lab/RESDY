@@ -126,13 +126,19 @@ ubq_pred/
 *Testing*
 glycation/
 connexin26/
+code_review/
 model_output_graphs/
-measure_errors_*
+# per-run artefacts, written under whatever outdir is in use. Named individually
+# rather than by folder: demo/ is reference data and is committed in full.
+measure_errors*
+measures_errors_*
+curation_geometry.csv
+minimisation_log.csv
+excessive_chains_files.txt
+double_letter_file_count.txt
+*_tmp.txt
 ubq_pred/
 *.pdb
-Demo/conformations/
-Demo/curated/
-Demo/propkaoutput/
 
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb
@@ -147,7 +153,6 @@ gw*
 
 # Temporary files to ignore
 model_output_graphs/
-Demo/
 *_test/
 .vscode/
 pred_tracking*

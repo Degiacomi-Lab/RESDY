@@ -156,7 +156,8 @@ class EVOLUTION():
                                     'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'P', 'PTHR': 'T',
                                     'PTYR': 'Y', 'MELYS': 'K', 'MEARG': 'R', 'ACLYS': 'K',
-                                    'KCX': 'K', 'LYE': 'K', 'LSYN': 'K'}
+                                    'KCX': 'K', 'LYE': 'K', 'LYSN': 'K',
+                                    'ASH': 'D', 'GLH': 'E', 'CYX': 'C'}
 
             def _catch(func, *args, handle=lambda e : e, **kwargs):
                 try:

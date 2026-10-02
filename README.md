@@ -1,6 +1,7 @@
 # RESDY
 
 [![Tests](https://github.com/Degiacomi-Lab/RESDY/actions/workflows/tests.yml/badge.svg)](https://github.com/Degiacomi-Lab/RESDY/actions/workflows/tests.yml)
+[![Documentation](https://readthedocs.org/projects/resdy/badge/?version=latest)](https://resdy.readthedocs.io/en/latest/)
 
 ## Introduction
 
@@ -11,24 +12,25 @@ This toolkit is subdivided in a set of classes that together operate as a pipeli
   - provided manually
   - contained in an input CSV file
   
-* download and curate each identified PDB file (see `PDB` class). Results are saved in the CSV file `result\proteins.csv`. Curation operations are:
-  - mutation of MSE to MET
-  - removal of all HETATM, ions excluded
-  - reversion to modified aminoacid to their wild type counterpart.
+* download and curate each identified PDB file (see `PDB` class). Results are saved in the CSV file `result\proteins.csv`. Curation operations offer optional operations including:
+  - removal of user-defined HETATM, ions, and water molecules
+  - reversion to modified aminoacid to their wild type counterpart
   - saving alternate conformations (e.g., NMR ensemble) in individual files
   - saving alternate side chain rotamers in individual files
-  - addition of missing regions, if their size falls within a user-defined length (if larger the protein is disregarded).
+  - addition of missing regions, if their size falls within a user-defined length
+  - energy minimization
   
-* calculate a set of features for every amino acid of interest in every curated structure (see `Measure` class). Results are saved in the CSV file `result\measures.csv`.
+* calculate a set of features for every amino acid of interest in every curated structure. A range of features comes pre-implemented (see `Measure` class), but the user can also include own-designed features. Results are saved in the CSV file `result\measures.csv`.
  
-* Plot aggregated data
+* Aggregate data, and produce informative plots on their distribution via an interactive interface.
 
 
 ## Installation
 
-Clone the repository and install it from its root:
+RESDY needs biobox 1.1.5 or later, which is distributed through conda-forge (the version on PyPI is older and is not compatible). Install it first, then clone the repository and install RESDY from its root:
 
 ```
+conda install -c conda-forge "biobox>=1.1.5"
 git clone https://github.com/Degiacomi-Lab/RESDY.git
 cd RESDY
 pip install -e .
@@ -51,7 +53,7 @@ python -c "import resdy; print(resdy.__version__)"
 The following required dependencies are installed by `pip install -e .`, and are needed to run the overall pipeline:
 * <a href="https://anaconda.org/conda-forge/numpy">numpy</a>
 * <a href="https://anaconda.org/conda-forge/pandas">pandas</a>
-* <a href="https://anaconda.org/conda-forge/biobox">biobox</a>
+* <a href="https://anaconda.org/conda-forge/biobox">biobox</a> (1.1.5 or later; `pip install -e .` checks for it but cannot install it, see Installation)
 * <a href="https://anaconda.org/conda-forge/matplotlib">matplotlib</a>
 * <a href="https://anaconda.org/conda-forge/seaborn">seaborn</a>
 
@@ -219,7 +221,7 @@ UP = RD.Uniprot()
 
 
 * A tutorial demonstrating the pipeline main functionalities is provided in the notebook `resdy.ipynb`. 
-* The API is available on readthedocs (LINK SOON).
+* The API reference is hosted on Read the Docs: <a href="https://resdy.readthedocs.io/en/latest/">resdy.readthedocs.io</a>. It documents each of the five pipeline steps in turn, together with a page per pre-implemented feature and a FAQ.
 
 ## Technical Notes
 

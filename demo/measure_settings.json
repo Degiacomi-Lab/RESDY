@@ -1,0 +1,66 @@
+{
+  "resdy_version": "1.0",
+  "biobox_version": "1.1.5",
+  "residue_of_interest": {
+    "non_modified_codes": [
+      "LYS",
+      "LYSN",
+      "LYN"
+    ],
+    "modified_codes": [
+      "LYE",
+      "KCX",
+      "MLY",
+      "MLZ",
+      "M3L",
+      "ALY",
+      "LYR"
+    ],
+    "atom_select_names_nonmod": [
+      "NZ"
+    ],
+    "atom_select_names_modified": [
+      "NZ",
+      "N07"
+    ]
+  },
+  "include_modified": false,
+  "only_relaxed": true,
+  "features": {
+    "propka": {},
+    "sasa": {
+      "probe": 1.4,
+      "n_sphere_point": 960,
+      "threshold": 0
+    },
+    "depth": {
+      "calculation_type": "ResidDepth"
+    },
+    "seqcharge": {},
+    "melodia": {
+      "melodia_features": [
+        "all"
+      ]
+    },
+    "das": {
+      "radii": [
+        6.3,
+        5.9,
+        5.4,
+        4.8
+      ],
+      "half_sphere_kwargs": null
+    },
+    "flexibility": {
+      "remove_outliers": false,
+      "outlier_z": 3.5,
+      "normalise": true
+    },
+    "rmsf": {
+      "align_type": "backbone"
+    },
+    "aev": {
+      "cutoff": null
+    }
+  }
+}

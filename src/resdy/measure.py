@@ -1,20 +1,78 @@
 import re
 import os
 import io
+import copy
 import logging
 import datetime
 import glob
 import time
 import inspect
+import json
 from datetime import date
+from functools import partial
+import multiprocessing as mp
 from multiprocessing import cpu_count
 from multiprocessing import Manager
-from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
+from .helper import require_biobox
+require_biobox(bb)
 from .features import *
+from .residues import residue_key, resolve_residue
+
+
+def _call_with_args(func, args):
+    '''
+    Call ``func`` with the arguments packed in ``args``.
+
+    ``Pool.imap`` only accepts a single-argument callable, whereas the measuring methods take
+    a file and a lock. This module-level trampoline supplies the ``starmap`` behaviour while
+    keeping the results ordered and streamed, which is what lets a stalled worker be detected
+    (see :meth:`Measure._run_in_parallel`). It has to live at module level rather than be a
+    closure or a lambda, because the non-forking start methods pickle it to reach the worker.
+
+    :param func: The callable to run in the worker.
+    :param args: Positional arguments to unpack into ``func``.
+    :returns: Whatever ``func`` returns.
+    '''
+    return func(*args)
+
+
+#: File, in the output directory, that records the settings a measurement was made with.
+MEASURE_SETTINGS_FILE = 'measure_settings.json'
+
+#: Constructor arguments of a feature that are not settings of the measurement: they are
+#: filled in by Measure from its own arguments, or are data rather than parameters.
+_NOT_SETTINGS = ('self', 'include_modified', 'error_filename', 'aa_properties', 'outdir',
+                 'df_proteins')
+
+
+def _resolved_settings(cls, kwargs):
+    """
+    The settings a feature class is constructed with: its defaults, overridden by the
+    arguments given.
+
+    :param cls: feature class.
+    :type cls: type
+    :param kwargs: keyword arguments passed to the constructor.
+    :type kwargs: dict
+    :returns: {argument: value}, in a form json can write.
+    :rtype: dict
+    """
+    settings = {}
+    for name, par in inspect.signature(cls.__init__).parameters.items():
+        if name in _NOT_SETTINGS or par.kind in (par.VAR_POSITIONAL, par.VAR_KEYWORD):
+            continue
+        settings[name] = kwargs.get(name, None if par.default is par.empty else par.default)
+    return json.loads(json.dumps(settings, default=str))
+
+
+#: Features requested by the 'all' shorthand in ``features_dict``.
+ALL_FEATURES = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
+                'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
+                'rmsf']
 
 
 class Measure(object):
@@ -27,7 +85,8 @@ class Measure(object):
                  features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
                                 'aev': {}, 'das': {}, 'seqcharge': {}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True, only_relaxed=True, num_cores=0):
+                 report_errors= True, only_relaxed=True, num_cores=0,
+                 parallel_timeout=600):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -59,15 +118,21 @@ class Measure(object):
             house any optional arguments available for that specific feature class, if defaults are
             okay, leave as {}.
         :type features_dict: dict
-        :param residue_of_interest: The residue of interest to calculate measurements for, if
-            investigating LYS or CYS, can enter a string with either of these as code is setup
-            to handle them. If you are investigating other residues or would like more control
-            over LYS or CYS properties for calculation, please enter a dictionary of the following
-            format:
-            {'non_modified_codes': [residue codes of standard state],
-            'modified_codes': [codes of modfified state, can be left as '' if not investigating],
+        :param residue_of_interest: The residue of interest to calculate measurements for. The
+            three-letter code of any of the twenty standard amino acids can be given as a
+            string, and is matched against the presets in :data:`resdy.residues.AA_PRESETS`,
+            which name the codes of the modified forms and the atom the features are computed
+            at. If you are investigating a non-standard residue, or would like more control
+            over a preset, please enter a dictionary of the following format (the keys may be
+            given in any order):
+            {'non_modified_codes': [residue codes of standard state, canonical code first],
+            'modified_codes': [codes of modfified state, can be left as [] if not investigating],
             'atom_select_names_nonmod': [atom names of interest in standard state],
             'atom_select_names_modified': [atom names of interest in modified residues]}
+            A feature that cannot act on the residue given is dropped from features_dict with a
+            message quoting its own reason, and one that has per-residue settings is given
+            them. Both are declared by the feature class, not listed here; see
+            :mod:`resdy.residues`.
         :type residue_of_interest: str, dict
         :param parallel: Option to run the measurements in parallel.
         :type parallel: bool
@@ -84,12 +149,26 @@ class Measure(object):
         :param only_relaxed: Option to only calculate measurements for structures that are relaxed
             if there is a relaxed structure available for the structure. If set to False, measures
             will be calculated to both original and relaxed form. Default is True.
+
+            A structure with no minimised copy is measured unrelaxed either way, which happens
+            whenever minimisation was not requested, was skipped, or failed. The 'Source' column
+            of the output records which copy each row was taken from, 'relaxed' or 'unrelaxed',
+            so that the two are not silently mixed.
         :type only_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
             available will be used. Otherwise it will try and use the number of cores given
             if this is possible.
         :type num_cores: int
+        :param parallel_timeout: Seconds a single structure may take in a parallel worker
+            before the run is treated as stalled. The timeout is on the wait for the next
+            result rather than on the run as a whole, so a long measurement campaign is not
+            interrupted as long as it keeps producing results. A worker that stops making
+            progress raises a RuntimeError instead of blocking the run forever, which is what
+            a bare ``Pool`` does when a worker deadlocks or is killed. Raise it for features
+            that are slow per structure, or set it to None to wait indefinitely. Ignored when
+            not running in parallel.
+        :type parallel_timeout: int, float, None
         '''
 
         self.activate_log = False
@@ -127,8 +206,14 @@ class Measure(object):
         self.residue_of_interest = residue_of_interest
         self.features_dict = features_dict.copy()
 
+        # expand the 'all' shorthand first, so that _setup_aa_properties sees the real
+        # feature names and can drop the ones that cannot handle the residue of interest
+        if 'all' in self.features_dict:
+            self.features_dict = {k: {} for k in ALL_FEATURES}
+
         self.aa_properties = self._setup_aa_properties(residue_of_interest)
-        self._setup_measures(features_dict.copy())
+        # build the registry from what survived _setup_aa_properties, not from the argument
+        self._setup_measures(self.features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
 
@@ -140,6 +225,7 @@ class Measure(object):
         # for parallel measurements
         self.parallel = parallel
         self.num_cores = num_cores
+        self.parallel_timeout = parallel_timeout
         self.n_cores_to_use = 1
         if self.parallel:
             print('>> Measurements running in parallel')
@@ -178,12 +264,32 @@ class Measure(object):
         self.PDB_only = False
 
         if 'Uniprot_Entry' in self.df_input.columns:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB_Code', 'Chain', 'Resid']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source']
             self.df = pd.DataFrame(columns = columns)
+
+
+    @staticmethod
+    def _source_of(path):
+        '''
+        Record which copy of a structure a measurement was taken from.
+
+        Whether a structure is measured relaxed or unrelaxed is not a property of the
+        protein but of how curation went: minimisation is skipped when openmm has no
+        template for something the structure retains, and fails outright on some
+        structures, and ``only_relaxed`` then falls back to the unminimised file. Without
+        this column a measurements table silently mixes the two.
+
+        :param path: file the measurement was taken from.
+        :type path: str
+        :returns: 'relaxed' if the file is the energy-minimised copy, else 'unrelaxed'.
+        :rtype: str
+        '''
+        stem = os.path.splitext(os.path.basename(path))[0]
+        return 'relaxed' if stem.endswith('_relaxed') else 'unrelaxed'
 
 
     def _setup_measures(self, features_dict):
@@ -198,13 +304,12 @@ class Measure(object):
         :type features_dict: dict
         '''
         if 'all' in features_dict:
-            feature_all = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
-                        'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
-                        'rmsf']
-            features_dict = {k: {} for k in feature_all}
+            features_dict = {k: {} for k in ALL_FEATURES}
             self.features_dict = features_dict
             self.features = list(features_dict)
         self.measures = []
+        #: {feature: settings it was constructed with}, written to MEASURE_SETTINGS_FILE
+        self.feature_settings = {}
         melodia_features = []
         melodia_added = False
         frustration_added = False
@@ -218,6 +323,7 @@ class Measure(object):
                                                   error_filename=self.error_filename,
                                                   aa_properties=self.aa_properties)
                         self.measures.append(['frustration', frustration.calculate])
+                        self.feature_settings['frustration'] = _resolved_settings(FRUSTRATION, {})
                         frustration_added = True
                 except Exception as e:
                     self.features.remove(m)
@@ -229,6 +335,8 @@ class Measure(object):
                                           error_filename=self.error_filename,
                                           aa_properties=self.aa_properties)
                     self.measures.append([m, structure.calculate])
+                    self.feature_settings['melodia'] = _resolved_settings(
+                        STRUCTURE, {'melodia_features': ['all']})
                     melodia_added = True
                     self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                     self.features.remove('melodia')
@@ -265,6 +373,7 @@ class Measure(object):
                                 meas_dict[tmp_name].check_esm_model_available()
 
                             self.measures.append([m, meas_dict[tmp_name].calculate])
+                            self.feature_settings[tmp_name] = _resolved_settings(cls_dets, kwargs)
                         except Exception as e:
                             if self.report_errors:
                                 self._report_error_to_file('Setup measures: custom measure failed to be added', 'setup', f'Custom measure {m} failed to be added')
@@ -285,6 +394,8 @@ class Measure(object):
                                       error_filename=self.error_filename,
                                       aa_properties=self.aa_properties)
                 self.measures.append(['melodia', structure.calculate])
+                self.feature_settings['melodia'] = _resolved_settings(
+                    STRUCTURE, {'melodia_features': melodia_features})
                 melodia_added = True
             except Exception as e:
                 for feat in melodia_features:
@@ -295,89 +406,75 @@ class Measure(object):
 
     def _setup_aa_properties(self, res_details):
         '''
-        Adding in the function required for the codebase to have the potential to be used with
-        residues other than lysines. Matches up a 3 letter code given as input to measures to a list
-        of all the 3 letter codes associated for the non-modified amino acid (eg different charged
-        states) and modified codes for self.include_modified options. If a rogue 3 letter code is
-        given, it defaults to carbamylation data.
+        Resolve the residue of interest into the properties every feature works from, and drop
+        the features that cannot act on that residue.
 
-        :param res_details: 3 letter code of the residue to match up other 3 letter codes for
-        :type res_details: str
+        .. rubric:: Method
+
+        - :func:`resolve_residue <resdy.residues.resolve_residue>` accepts a three-letter code
+          of any of the twenty standard amino acids, matched case-insensitively against
+          :data:`AA_PRESETS <resdy.residues.AA_PRESETS>`, or a dictionary whose four keys may
+          be given in any order. Presets and dictionaries are validated by the same rule.
+        - Each requested feature is then asked, through the optional class attributes described
+          in :mod:`resdy.residues`, whether it can act on that residue. A feature declaring a
+          ``SUPPORTED_RESIDUES`` set that excludes the residue is dropped, quoting its own
+          ``UNSUPPORTED_REASON``; one declaring ``RESIDUE_KWARGS`` is given the arguments of
+          that residue. Nothing here names a particular feature, so a feature added by dropping
+          a file into ``features/`` participates without an edit to this method.
+
+        :param res_details: Three-letter code of the residue to measure, or a full properties
+            dictionary.
+        :type res_details: str, dict
+        :returns: The validated properties of the residue of interest.
+        :rtype: dict
         '''
-        propka_res = ['ASP', 'GLU', 'HIS', 'CYS', 'TYR', 'LYS', 'ARG']
-        pkaani_res = ['ASP', 'GLU', 'HIS', 'TYR', 'LYS']
+        aa_properties = resolve_residue(res_details)
+        res_code = residue_key(aa_properties)
 
-        if isinstance(res_details, str):
-            match res_details:
-                case 'LYS':
-                    aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                        'modified_codes': ['LYE', 'KCX'],
-                                        'atom_select_names_nonmod': ['NZ'],
-                                        'atom_select_names_modified': ['NZ', 'N07']}
-                case 'CYS':
-                    aa_properties = {'non_modified_codes': ['CYS'],
-                                    'modified_codes': [],
-                                    'atom_select_names_nonmod': ['SG'],
-                                    'atom_select_names_modified': []}
-                case _:
-                    print(f'>> Residue of interest given not known: {res_details}; Please modify the input '
-                            f'to give either LYS or CYS or a pass a custom parameters dictionary to the '
-                            f'class.')
-                    if self.report_errors:
-                        self._report_error_to_file('Match resid codes for residue of interest', 'setup', f'Residue of interest given ({res_details}) not known; using LYS as default')
-                    raise Exception(f'>> Resid code given as input ({self.residue_of_interest}) does not '
-                                    f'match to any cases, stopping calculations. Please modify input '
-                                    f'parameter residue of interest with either LYS or CYS or give a full '
-                                    f'dictionary of properties for your custom investigation into another '
-                                    f'residue.')
+        for name in list(self.features_dict):
+            cls = self._feature_class(name)
+            if cls is None:
+                # an unknown feature, or one whose module failed to import; _setup_measures
+                # reports it and removes it
+                continue
 
-            def _drop_unsupported_features(feature, supported, res_codes):
-                '''
-                Remove feature from list of features to calculate if the feature cannot be used
-                on the desired residue to calculate.
-                '''
-                if feature not in self.features_dict:
-                    return
-                if any(c.upper() in supported for c in res_codes):
-                    return
-                print(f'>> {feature} cannot compute a pKa value for {", ".join(res_codes)}; '
-                      f'removing {feature} from the features to calculate.')
-                self.features_dict.pop(feature)
+            supported = getattr(cls, 'SUPPORTED_RESIDUES', None)
+            if supported is not None and res_code not in supported:
+                reason = getattr(cls, 'UNSUPPORTED_REASON', None)
+                if isinstance(reason, dict):
+                    reason = reason.get(res_code)
+                print(f'>> {name} cannot be calculated for {res_code}'
+                      + (f', because {reason}' if reason else '')
+                      + f'; removing {name} from the features to calculate.')
+                self.features_dict.pop(name)
+                continue
 
-            res_codes = ([res_details] if isinstance(res_details, str) else list(res_details['non_modified_codes']))
-            _drop_unsupported_features('propka', propka_res, res_codes)
-            _drop_unsupported_features('pkaANI', pkaani_res, res_codes)
-
-        elif isinstance(res_details, dict):
-            dict_keys = ['non_modified_codes', 'modified_codes',
-                            'atom_select_names_nonmod', 'atom_select_names_modified']
-            if list(res_details) != dict_keys:
-                raise KeyError(f'Not all keys required for aa_properties dict given; please '
-                                f'ensure that all keys required ({", ".join(dict_keys)}) are '
-                                f'included (can be set to \'\' if nothing required in the parameter)')
-            aa_properties = res_details
-
-            len_nonmod = len(aa_properties['non_modified_codes'])
-            if (any(aa_properties['non_modified_codes'] == propka_res[i:i + len_nonmod] for i in range(len(propka_res) - len_nonmod + 1))
-                        and res_details in list(self.features_dict)):
-                print(f'>> Residues entered for analysis in non modified codes of amino acid properties '
-                        f'({", ".join(aa_properties["non_modified_codes"])}) are not possible to run analysis '
-                        f'for in PROPKA3, removing from features to calculate.')
-                self.features_dict.pop('propka')
-
-            if (any(aa_properties['non_modified_codes'] == pkaani_res[i:i + len_nonmod] for i in range(len(pkaani_res) - len_nonmod + 1))
-                        and res_details in list(self.features_dict)):
-                print(f'>> Residues entered for analysis in non modified codes of amino acid properties '
-                      f'({", ".join(aa_properties["non_modified_codes"])}) are not possible to run analysis '
-                      f'for in pKaANI, removing from features to calculate.')
-                self.features_dict.pop('pkaani')
-
-        else:
-            raise ValueError(f'Unknown option give to residue_of_interest parameter: '
-                            f'{str(res_details)}; please enter either string or dict. '
-                            f'See class documentation.')
+            defaults = getattr(cls, 'RESIDUE_KWARGS', {}).get(res_code)
+            if defaults:
+                # the user's own settings win over the defaults of the residue, and
+                # features_dict was copied shallowly, so rebuild the entry rather than writing
+                # into the dictionary the caller still holds
+                self.features_dict[name] = {**copy.deepcopy(defaults),
+                                            **self.features_dict[name]}
 
         return aa_properties
+
+
+    def _feature_class(self, name):
+        '''
+        The class implementing a feature, looked up the same way :meth:`_setup_measures` does.
+
+        :param name: Name of the feature as it appears in features_dict.
+        :type name: str
+        :returns: The class, or None when no class of that name is available, which covers both
+            an unknown feature and one whose module failed to import for want of an optional
+            dependency.
+        :rtype: type
+        '''
+        cls = globals().get(name.upper())
+        if inspect.isclass(cls) and callable(getattr(cls, 'calculate', None)):
+            return cls
+        return None
 
 
     def _setup_report_errors_file(self):
@@ -398,12 +495,59 @@ class Measure(object):
         return new_file_name
 
 
+    def measurement_settings(self):
+        """
+        Everything that decides what a measurement means: the settings each feature was
+        constructed with, the residue measured, and the versions of RESDY and biobox.
+
+        :rtype: dict
+        """
+        from . import __version__ as resdy_version
+        return json.loads(json.dumps({
+            'resdy_version': resdy_version,
+            'biobox_version': getattr(bb, '__version__', None),
+            'residue_of_interest': self.aa_properties,
+            'include_modified': self.include_mod,
+            'only_relaxed': self.only_relaxed,
+            'features': self.feature_settings,
+        }, default=str))
+
+    def _write_settings(self):
+        """Write :meth:`measurement_settings` to MEASURE_SETTINGS_FILE in the output directory."""
+        with open(os.path.join(self.outdir, MEASURE_SETTINGS_FILE), 'w') as fh:
+            json.dump(self.measurement_settings(), fh, indent=2)
+
+    def _check_settings(self):
+        """
+        Refuse to continue a measurement with settings other than those it was started with,
+        which would leave rows measured two different ways in one table.
+
+        :raises ValueError: when MEASURE_SETTINGS_FILE exists and differs from the present
+            settings.
+        """
+        path = os.path.join(self.outdir, MEASURE_SETTINGS_FILE)
+        if not os.path.exists(path):
+            return
+        with open(path) as fh:
+            previous = json.load(fh)
+        current = self.measurement_settings()
+        if previous != current:
+            changed = sorted(k for k in set(previous) | set(current)
+                             if previous.get(k) != current.get(k))
+            raise ValueError(f'>> The measurement being restarted was made with different '
+                             f'settings ({", ".join(changed)} differ from {path}). Restart it '
+                             f'with the settings recorded there, or start a new measurement.')
+
     def measure_data(self):
         '''
         Determine the appropriate measures function to call based on the combination of running
         PDB_only and in parallel, reducing the number of individual functions that the user will
         have to call themselves.
+
+        The settings of the measurement are written to MEASURE_SETTINGS_FILE in the output
+        directory, see :meth:`measurement_settings`.
         '''
+        self._write_settings()
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
                 # not PDB only and parallel or series:
@@ -436,8 +580,11 @@ class Measure(object):
         Determine the appropriate measures function to call based on the combination of running
         PDB_only and in parallel, reducing the number of individual functions that the user will have
         to call themselves. Different to measure_data() as this will restart the measurements from
-        final previous point rather than starting again.
+        final previous point rather than starting again. Raises a ValueError if the settings
+        differ from those the measurement was started with.
         '''
+        self._check_settings()
+        self._write_settings()
         match (self.PDB_only, self.parallel):
             case (False, False) | (False, True):
                 # not PDB only and parallel or series
@@ -486,6 +633,98 @@ class Measure(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
+    @staticmethod
+    def _parallel_context():
+        '''
+        Return the multiprocessing context the worker pool is built from.
+
+        A pool is deliberately not built on the 'fork' start method, which is the default on
+        Linux. Several features import torch (via the aev, evolution and legolas back ends),
+        and torch leaves its thread pools running in the parent for the rest of the session.
+        Forking a multi-threaded parent gives the child a copy of those pools with none of
+        their threads, so the first call that reaches the inherited OpenMP or BLAS runtime can
+        block forever. 'forkserver' is preferred, as its children are forked from a clean
+        single-threaded server process, and 'spawn' is the fallback on platforms without it.
+
+        :returns: A multiprocessing context whose start method is not 'fork', where one is
+            available.
+        '''
+        available = mp.get_all_start_methods()
+        for method in ('forkserver', 'spawn'):
+            if method in available:
+                return mp.get_context(method)
+        return mp.get_context()
+
+
+    def _ensure_logger(self):
+        '''
+        Reattach the log file handler if the current process does not have it.
+
+        A ``logging.Logger`` pickles as a lookup of its name, so a worker started by one of
+        the non-forking methods (see :meth:`_parallel_context`) receives the logger without
+        the handler that was added to it in the parent, and anything it logs would go nowhere.
+        The handler is therefore recreated on first use inside the worker. Records stay
+        serialised by the lock that is held around the logging calls, so the processes do not
+        interleave their writes to the file.
+        '''
+        if not self.activate_log:
+            return
+
+        self.logger = logging.getLogger('MeasureLog')
+        if not self.logger.handlers:
+            self.logger.setLevel(level=logging.DEBUG)
+            formatter = logging.Formatter('%(message)s')
+            handler = logging.FileHandler(self.log_path, encoding='UTF-8')
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+
+    def _run_in_parallel(self, worker, items):
+        '''
+        Run ``worker`` over ``items`` in a pool of processes, giving up on a stalled worker.
+
+        Results are collected through ``imap`` rather than ``starmap`` so that they arrive one
+        at a time and the wait for each one can be bounded by ``parallel_timeout``. The timeout
+        therefore applies to the gap between results, not to the run as a whole. We note that a
+        plain ``Pool.starmap`` never returns if one of its workers deadlocks or is killed, so a
+        single wedged structure otherwise consumes the whole run.
+
+        Items are handed out one at a time rather than in chunks, for two reasons. ``imap``
+        only returns an iterator whose ``next`` accepts a timeout when the chunk size is 1,
+        falling back to a plain generator otherwise, and measuring one structure is coarse
+        enough work that per-item dispatch costs nothing while balancing the load better.
+
+        :param worker: Bound method to call for each item, taking the unpacked item.
+        :type worker: callable
+        :param items: One sequence of positional arguments per structure to measure.
+        :type items: list
+        :returns: The return value of ``worker`` for each item, in the order of ``items``.
+        :rtype: list
+        :raises RuntimeError: if no further result arrives within ``parallel_timeout`` seconds.
+        '''
+        ctx = self._parallel_context()
+        results = []
+        with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+            iterator = pool.imap(partial(_call_with_args, worker),
+                                 [tuple(item) for item in items], chunksize=1)
+            while True:
+                try:
+                    results.append(iterator.next(timeout=self.parallel_timeout))
+                except StopIteration:
+                    break
+                except mp.TimeoutError:
+                    pool.terminate()
+                    raise RuntimeError(
+                        f'A parallel measuring worker produced no result for '
+                        f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
+                        f'structures, so it is treated as stalled and the run was stopped. '
+                        f'Either raise parallel_timeout if the features requested are simply '
+                        f'slow on these structures, or set parallel=False to measure in '
+                        f'series.') from None
+        return results
+
+
     def measure_dataframe(self):
         '''
         Function to measure specified features for all the structure files curated earlier in the
@@ -526,7 +765,7 @@ class Measure(object):
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append([file_details, lock])
 
-            base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Method']
+            base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             df_parallel = pd.DataFrame()
 
             gpu_feats = ['aev', 'evolution', 'legolas']
@@ -536,8 +775,8 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
-                        df_parallel = pd.concat(pool.starmap(self._measure_file, items, chunksize=4), ignore_index=True)
+                    df_parallel = pd.concat(self._run_in_parallel(self._measure_file, items),
+                                            ignore_index=True)
                 else:
                     df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items], ignore_index=True)
 
@@ -609,7 +848,7 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
             if self.include_mod:
                 columns.append('Modified')
             df_currentfile = pd.DataFrame(columns=columns)
@@ -638,7 +877,8 @@ class Measure(object):
                     'Method': method,
                     'Resolution': res,
                     'Chain': M.data['chain'].values[i],
-                    'Resid': M.data['resid'].values[i]})
+                    'Resid': M.data['resid'].values[i],
+                    'Source': self._source_of(f)})
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
@@ -670,6 +910,7 @@ class Measure(object):
                     print(statement)
 
                 if self.activate_log:
+                    self._ensure_logger()
                     if df_currentfile.empty is False:
                         pd.set_option('display.max_colwidth', None,
                                       'display.width', None,
@@ -694,7 +935,7 @@ class Measure(object):
                 frames_df_list.append(df_currentfile)
 
         if not frames_df_list:
-            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid'])
+            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -952,8 +1193,8 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
-                        df_parallel = pd.concat(pool.starmap(self._measure_file_pdbonly, items, chunksize=4), ignore_index=True)
+                    df_parallel = pd.concat(self._run_in_parallel(self._measure_file_pdbonly, items),
+                                            ignore_index=True)
                 else:
                     df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lk) for file_dets, lk in items], ignore_index=True)
 
@@ -1012,7 +1253,7 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['PDB_Code', 'Chain', 'Resid']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source']
             if self.include_mod:
                 columns.append('Modified')
             df_currentfile = pd.DataFrame(columns=columns)
@@ -1037,7 +1278,8 @@ class Measure(object):
             for i in idxs:
                 data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
                     'Chain': M.data['chain'].values[i],
-                    'Resid': M.data['resid'].values[i]})
+                    'Resid': M.data['resid'].values[i],
+                    'Source': self._source_of(f)})
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]
@@ -1070,6 +1312,7 @@ class Measure(object):
                     print(statement)
 
                 if self.activate_log:
+                    self._ensure_logger()
                     if df_currentfile.empty is False:
 
                         pd.set_option('display.max_colwidth', None,

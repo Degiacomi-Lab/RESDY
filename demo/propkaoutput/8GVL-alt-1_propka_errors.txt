@@ -1,0 +1,10 @@
+Missing atoms or failed protonation for SER  21 B (BBN) -- please check the structure
+Group (BBN) for  2359-   N    21-SER (B) [   2.132   55.055  -42.190] N
+Expected 2 interaction atoms for acids, found:
+                 0-  H1    21-SER (B) [   1.661   54.169  -42.079] H
+                 0-  H2    21-SER (B) [   1.692   55.579  -42.933] H
+              2359-   N    21-SER (B) [   2.132   55.055  -42.190] N
+Expected 2 interaction atoms for bases, found:
+                 0-  H1    21-SER (B) [   1.661   54.169  -42.079] H
+                 0-  H2    21-SER (B) [   1.692   55.579  -42.933] H
+              2359-   N    21-SER (B) [   2.132   55.055  -42.190] N

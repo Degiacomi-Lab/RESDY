@@ -1,4 +1,5 @@
 import os
+import numbers
 import random
 from ast import literal_eval
 import numpy as np
@@ -17,7 +18,8 @@ class Aggregation:
     def __init__(self, df_measurements, outdir='result', aggregation_method='minmax',
                  features_to_include=['all'], aev_red_method='pca',
                  num_sd_aev_features=100, include_chain=False,
-                 max_feature_nan_fraction=0.5, get_nan_df=False):
+                 max_feature_nan_fraction=0.5, get_nan_df=False,
+                 aev_pca_variance=0.99, vif_threshold=5.0):
         '''
         Initialisation of the Aggregation class.
 
@@ -51,13 +53,14 @@ class Aggregation:
         :param aev_red_method: The dimensionality reduction method for reducing the size of the
             AEVs, reducing clouding. PCA is taken as default for this. Options:
 
-            - 'PCA': Create a PCA which represents 99% of the variance of the data and use these
-              new vectors to represent the AEVs instead.
+            - 'PCA': Create a PCA which represents a fraction aev_pca_variance of the variance
+              of the data (99% by default) and use these new vectors to represent the AEVs
+              instead.
             - 'sd': Take the standard deviation of all the AEV columns and work out which the
               top n are taken through for use
             - 'vif': Uses variance inflation factors to calculate the decorrelation between the
-              different columns of the AEV. Only takes through the features which are shown to
-              not be correlated.
+              different columns of the AEV. Only takes through the features whose variance
+              inflation factor falls below vif_threshold.
             - 'autoencoder': Uses an autoencoder to reduce the dimensions, better for non-linear
               data.
             - 'null': Removes all the null columns from the AEV
@@ -77,7 +80,26 @@ class Aggregation:
             that are being removed when aggregating, this allows curation of the data being removed
             for investigations into potential problems.
         :type get_nan_df: bool, optional
+        :param aev_pca_variance: Used when aev_red_method is 'pca'. A fraction between 0 and 1
+            keeps the fewest principal components that explain that fraction of the variance
+            of the AEVs; an integer keeps that number of components. Default 0.99.
+        :type aev_pca_variance: float or int, optional
+        :param vif_threshold: Used when aev_red_method is 'vif'. AEV columns are removed until
+            every remaining one has a variance inflation factor below this value. Default 5.
+        :type vif_threshold: float, optional
         '''
+        if isinstance(aev_pca_variance, bool) or not (
+                (isinstance(aev_pca_variance, numbers.Integral) and aev_pca_variance >= 1)
+                or (isinstance(aev_pca_variance, numbers.Real)
+                    and not isinstance(aev_pca_variance, numbers.Integral)
+                    and 0.0 < aev_pca_variance < 1.0)):
+            raise ValueError(f'aev_pca_variance must be a fraction between 0 and 1, or a '
+                             f'number of components of at least 1, got {aev_pca_variance}')
+        if not vif_threshold > 1:
+            raise ValueError(f'vif_threshold must be greater than 1, the smallest possible '
+                             f'variance inflation factor, got {vif_threshold}')
+        self.aev_pca_variance = aev_pca_variance
+        self.vif_threshold = vif_threshold
         if isinstance(df_measurements, str):
             self.df_measurements = pd.read_csv(df_measurements)
         else:
@@ -98,7 +120,7 @@ class Aggregation:
         self.df_agg = pd.DataFrame()
         self.max_feature_nan_fraction = max_feature_nan_fraction
 
-        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method',
+        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method', 'Source',
                                  'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
 
         if self.features_to_include == ['all']:
@@ -324,12 +346,13 @@ class Aggregation:
         Use the preprocessing module to calculate the variance inflation factor values for each of
         the columns within the AEVs and remove the columns which are highly correlated together such
         that it is the minimum number of columns without correlation. Non-correlation was taken to
-        be a VIF value of less than 5.
+        be a VIF value of less than vif_threshold (5 by default).
         '''
         print('>> Reducing AEV dimensions using VIF analysis...')
         aev_cols = [a for a in self.df_measurements.columns if 'AEV_' in a]
         P = Preprocessing(self.df_measurements, aev_cols)
-        columns_to_keep = P.calculate_diff_features(self.df_measurements)
+        columns_to_keep = P.calculate_diff_features(self.df_measurements,
+                                                    vif_threshold=self.vif_threshold)
 
         cols_to_remove = [a for a in self.df_measurements.columns if ('AEV_' in a) and (a not in columns_to_keep)]
         self.df_measurements.drop(cols_to_remove, axis=1, inplace=True)
@@ -342,7 +365,7 @@ class Aggregation:
         data in self.X_all ready for the aggregation to actually reduce the dataset for training on
         '''
         print('>> Calculating PCA on AEV data...')
-        n_components = 0.99
+        n_components = self.aev_pca_variance
         pca = PCA(n_components=n_components)
         aev_col_names = [a for a in self.df_measurements.columns if 'AEV_' in a]
         aev_data = self.df_measurements[aev_col_names].values.tolist()
@@ -354,8 +377,9 @@ class Aggregation:
         df_out = pd.DataFrame(pca_data)
         df_out = df_out.add_prefix('AEV_')
         self.df_measurements = pd.concat([self.df_measurements, df_out], axis=1)
-        print(f'>> PCA used {pca.n_components_} components to explain {n_components} '
-              f'variance. AEVs are now in reduced dimension format.')
+        print(f'>> PCA used {pca.n_components_} components to explain '
+              f'{variance_data.sum():.4f} of the variance. AEVs are now in reduced dimension '
+              f'format.')
 
 
     def _calculate_statistics(self):

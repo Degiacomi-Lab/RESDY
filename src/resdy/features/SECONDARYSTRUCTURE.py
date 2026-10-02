@@ -113,7 +113,7 @@ class SECONDARYSTRUCTURE():
                                     'ASX': 'B', 'GLX': 'Z', 'SEC': 'U', 'PYL': 'O',
                                     'XAA': 'X', 'XLE': 'J', 'PSER': 'p', 'PTHR': 't',
                                     'PTYR': 'y', 'MELYS': 'k', 'MEARG': 'r', 'ACLYS': 'k',
-                                    'LYSN': 'K'}
+                                    'LYSN': 'K', 'ASH': 'D', 'GLH': 'E', 'CYX': 'C'}
 
             if self.include_modified:
                 expected_letters = {protein_letters_dict.get(c.upper(), 'X') for c in 
