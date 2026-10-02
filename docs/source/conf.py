@@ -50,11 +50,11 @@ extensions = ['sphinx.ext.autodoc',
 autoapi_type = "python"
 autoapi_dirs = [os.path.join(SRC_DIR, 'resdy', 'features')]
 
-# "feature.py" is the template users copy when adding a feature of their own, not a feature
+# "FEATURE.py" is the template users copy when adding a feature of their own, not a feature
 # the user can request, so it is skipped outright. "error_reporting.py" is skipped further
 # down instead of here: every feature module imports from it, and dropping it at this stage
 # would leave those imports unresolvable.
-autoapi_ignore = ['*/feature.py']
+autoapi_ignore = ['*/FEATURE.py']
 
 # Use our own AutoAPI templates, so that the title and the introductory text of
 # the generated landing page can be edited (see _templates/autoapi/index.rst).
