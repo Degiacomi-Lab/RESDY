@@ -1,7 +1,7 @@
 {
  "structure": "1UPT-alt-1",
  "status": "skipped",
- "reason": "No template found for residue 1 (MET).  The set of atoms matches MET, but the residue is missing 2 C-S bonds.  For more information, see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#template",
+ "reason": "No template found for residue 168 (GLN).  The atoms and bonds in the residue match GLN, but the set of externally bonded atoms is missing 1 C atom.  Is the chain missing a terminal capping group?  For more information, see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#template",
  "settings": {
   "forcefield": [
    "amber14-all.xml",
@@ -14,5 +14,5 @@
   "platform": null
  },
  "openmm_version": "8.6.1",
- "date": "2026-10-01T23:23:03"
+ "date": "2026-10-03T21:01:05"
 }

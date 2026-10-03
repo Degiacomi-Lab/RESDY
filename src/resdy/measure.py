@@ -20,7 +20,8 @@ import biobox as bb
 from .helper import require_biobox
 require_biobox(bb)
 from .features import *
-from .residues import residue_key, resolve_residue
+from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
+from .geometry import distance_to_other_chains
 
 
 def _call_with_args(func, args):
@@ -90,6 +91,16 @@ class Measure(object):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
+
+        Every residue is featurised at its anchor atom (see residue_of_interest). A residue whose
+        anchor atom is absent from the structure cannot be featurised and is left out of the
+        output, and the number left out is reported per file. Beside the features, every row
+        carries the metadata column 'Min_Dist_Other_Chain': the distance, in A, from the anchor
+        atom to the closest heavy atom of a protein residue in any other chain of the measured
+        file, or NaN when the file holds a single protein chain. Ions, waters and ligands are not
+        counted as a chain. The chains are those of the curated file, i.e. the deposited
+        asymmetric unit. The column is computed whatever features_dict holds, and is listed in
+        ``METADATA_COLUMNS`` in resdy/helper.py.
 
         :param df_input: The input dataframe containing information on the structures over which the
             measurements will be done. This is usually the output given from the curation steps
@@ -264,11 +275,12 @@ class Measure(object):
         self.PDB_only = False
 
         if 'Uniprot_Entry' in self.df_input.columns:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source',
+                       'Min_Dist_Other_Chain']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB_Code', 'Chain', 'Resid', 'Source']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
             self.df = pd.DataFrame(columns = columns)
 
 
@@ -290,6 +302,45 @@ class Measure(object):
         '''
         stem = os.path.splitext(os.path.basename(path))[0]
         return 'relaxed' if stem.endswith('_relaxed') else 'unrelaxed'
+
+
+    def _other_chain_distances(self, M):
+        '''
+        Distance from each residue of interest to the closest other protein chain, and which
+        residues can be featurised at all.
+
+        A residue is featurised at its anchor atom, the ``atom_select_names_nonmod`` (or,
+        for a modified code, ``atom_select_names_modified``) entry of ``aa_properties``. A
+        residue whose anchor is absent cannot be featurised and is missing from the returned
+        dictionary, which is how the callers leave it out of the table. When a residue has
+        more than one anchor atom the shortest distance is kept.
+
+        :param M: the structure being measured.
+        :type M: biobox.Molecule
+        :returns: {(chain, resid): distance in A}, NaN when the structure holds no other
+            protein chain.
+        :rtype: dict
+        '''
+        d = M.data
+        resname = d['resname'].astype(str).str.strip().to_numpy()
+        name = d['name'].astype(str).str.strip().to_numpy()
+        anchor = (np.isin(resname, self.aa_properties['non_modified_codes'])
+                  & np.isin(name, self.aa_properties['atom_select_names_nonmod']))
+        if self.include_mod:
+            anchor |= (np.isin(resname, self.aa_properties['modified_codes'])
+                       & np.isin(name, self.aa_properties['atom_select_names_modified']))
+
+        protein = (PROTEIN_RESNAMES | set(self.aa_properties['non_modified_codes'])
+                   | set(self.aa_properties['modified_codes']))
+        dist = distance_to_other_chains(d['chain'].to_numpy(), resname,
+                                        d['atomtype'].to_numpy(), M.points, anchor, protein)
+
+        out = {}
+        idx = np.flatnonzero(anchor)
+        for c, r, v in zip(d['chain'].to_numpy()[idx], d['resid'].to_numpy()[idx], dist):
+            key = (c, int(r))
+            out[key] = np.fmin(out[key], v) if key in out else v
+        return out
 
 
     def _setup_measures(self, features_dict):
@@ -794,7 +845,10 @@ class Measure(object):
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
-            self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
+            # skip empty frames
+            frames = [f for f in (self.df, df_parallel) if not f.empty]
+            if frames:
+                self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
 
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
@@ -848,10 +902,11 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source',
+                       'Min_Dist_Other_Chain']
             if self.include_mod:
                 columns.append('Modified')
-            df_currentfile = pd.DataFrame(columns=columns)
+            records = []
 
             try:
                 M = bb.Molecule()
@@ -866,10 +921,17 @@ class Measure(object):
             resnames_to_explore = list(self.aa_properties['non_modified_codes'])
             if self.include_mod: resnames_to_explore += list(self.aa_properties['modified_codes'])
             _, idxs = M.atomselect('*', resnames_to_explore, ['CA'], get_index=True, use_resname=True)
+            other_chain = self._other_chain_distances(M)
+            no_anchor = 0
             for i in idxs:
 
                 #save only lysine entries from chain of interest
                 if M.data["chain"].values[i] not in chains:
+                    continue
+
+                key = (M.data['chain'].values[i], int(M.data['resid'].values[i]))
+                if key not in other_chain:
+                    no_anchor += 1
                     continue
 
                 data = ({'Uniprot_Entry': uniprot_code,
@@ -878,14 +940,19 @@ class Measure(object):
                     'Resolution': res,
                     'Chain': M.data['chain'].values[i],
                     'Resid': M.data['resid'].values[i],
-                    'Source': self._source_of(f)})
+                    'Source': self._source_of(f),
+                    'Min_Dist_Other_Chain': other_chain[key]})
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
 
-                df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                records.append(data)
 
+            df_currentfile = pd.DataFrame.from_records(records, columns=columns)
             terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
+            if no_anchor:
+                terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
+                                               f"anchor atom missing, cannot be featurised")
 
             for meas in self.measures:
                 terminal_out_statements.append(f">> evaluating {meas[0]}...")
@@ -935,7 +1002,8 @@ class Measure(object):
                 frames_df_list.append(df_currentfile)
 
         if not frames_df_list:
-            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source'])
+            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid',
+                                         'Source', 'Min_Dist_Other_Chain'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -1212,7 +1280,10 @@ class Measure(object):
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
-            self.df = pd.concat([self.df, df_parallel], ignore_index=True).reset_index(drop=True)
+            # skip empty frames
+            frames = [f for f in (self.df, df_parallel) if not f.empty]
+            if frames:
+                self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
 
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
@@ -1253,10 +1324,10 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['PDB_Code', 'Chain', 'Resid', 'Source']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
             if self.include_mod:
                 columns.append('Modified')
-            df_currentfile = pd.DataFrame(columns=columns)
+            records = []
 
             try:
                 M = bb.Molecule()
@@ -1275,19 +1346,31 @@ class Measure(object):
                 _, idxs = M.atomselect("*",  self.aa_properties['non_modified_codes'],
                                         ['CA'], get_index=True, use_resname=True)
 
+            other_chain = self._other_chain_distances(M)
+            no_anchor = 0
             for i in idxs:
+                key = (M.data['chain'].values[i], int(M.data['resid'].values[i]))
+                if key not in other_chain:
+                    no_anchor += 1
+                    continue
+
                 data = ({'PDB_Code': os.path.splitext(os.path.basename(f))[0],
                     'Chain': M.data['chain'].values[i],
                     'Resid': M.data['resid'].values[i],
-                    'Source': self._source_of(f)})
+                    'Source': self._source_of(f),
+                    'Min_Dist_Other_Chain': other_chain[key]})
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]
                                         in self.aa_properties['modified_codes'])
 
-                df_currentfile = pd.concat([df_currentfile, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                records.append(data)
 
+            df_currentfile = pd.DataFrame.from_records(records, columns=columns)
             terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
+            if no_anchor:
+                terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
+                                               f"anchor atom missing, cannot be featurised")
 
             for meas in self.measures:
                 terminal_out_statements.append(f">> evaluating {meas[0]}...")
@@ -1336,7 +1419,7 @@ class Measure(object):
                 file_df_list.append(df_currentfile)
 
         if not file_df_list:
-            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid'])
+            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
 
         return pd.concat(file_df_list, ignore_index=True)
 

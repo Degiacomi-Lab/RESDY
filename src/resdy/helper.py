@@ -6,6 +6,12 @@ import sys, os
 #: that were too small.
 MIN_BIOBOX_VERSION = (1, 1, 5)
 
+#: Columns of the measurements table that are not features: the row key, the structure it
+#: came from, and the metadata recorded beside the features.
+METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Resolution',
+                    'Source', 'Modified', 'class', 'Class', 'PLDDT', 'Largest_Gap',
+                    'Min_Dist_Other_Chain')
+
 
 def require_biobox(biobox):
     '''

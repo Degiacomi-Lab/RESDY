@@ -19,6 +19,16 @@ class Test_Aggregation(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
 
+    def test_metadata_columns_are_not_features(self):
+        # Min_Dist_Other_Chain sits in the demo table beside the features, as metadata
+        from resdy.helper import METADATA_COLUMNS
+        self.assertIn('Min_Dist_Other_Chain', self.demo_measure.columns)
+        Agg = RD.Aggregation(df_measurements=self.demo_measure, outdir=self.outdir,
+                             features_to_include=['all'])
+        self.assertFalse(set(Agg.features_to_include) & set(METADATA_COLUMNS))
+        A = RD.Analysis(self.demo_measure, outdir=self.outdir)
+        self.assertFalse(set(A.features_to_analyse) & set(METADATA_COLUMNS))
+
     # TEST SCALAR AGGREGATION
 
     def test_min(self):

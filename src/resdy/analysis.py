@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from .aggregation import Aggregation
+from .helper import METADATA_COLUMNS
 from scipy.stats import fisher_exact
 
 try:
@@ -46,8 +47,7 @@ class Analysis(object):
         else:
             self.df = df
 
-        standard_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Resolution', 'Method',
-                         'Class', 'class', 'Modified', 'PLDDT', 'Largest_Gap', 'Source']
+        standard_cols = METADATA_COLUMNS
 
         if features_to_analyse in ([], ['all']):
             # no features named: analyse every feature column, and keep every row
@@ -360,8 +360,7 @@ class Analysis(object):
                 ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
 
             case 'all':
-                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
-                                 'Resolution', 'Modified', 'class']
+                non_feat_cols = METADATA_COLUMNS
                 feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
                 if 'arc' in feat_cols:
                     feat_cols.remove('arc')
@@ -445,8 +444,7 @@ class Analysis(object):
                                 features_to_include=[feature])
                 df_plot = agg.aggregate_data()
 
-                non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
-                                'Resolution', 'Modified', 'class']
+                non_feat_cols = METADATA_COLUMNS
                 agg_types = [a.split('_')[-1] for a in df_plot.columns if a not in non_feat_cols]
 
                 if len(agg_types) <= 4: col_len = 2
@@ -575,8 +573,7 @@ class Analysis(object):
                       'sd': 'Standard Deviation',
                       'range': 'Range'}
 
-        non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'PLDDT', 'Method', 'Source',
-                        'Resolution', 'Modified', 'class']
+        non_feat_cols = METADATA_COLUMNS
 
         if features == '' or features == []:
             print('No features given as input, using all possible scalar features')
