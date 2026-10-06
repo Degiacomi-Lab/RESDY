@@ -6,6 +6,7 @@ import os
 import webbrowser
 from dash import Dash, dcc, html, Input, Output, callback
 from .aggregation import Aggregation
+from .helper import METADATA_COLUMNS
 
 
 class Viewer(object):
@@ -21,8 +22,7 @@ class Viewer(object):
             self.df_measures = df_measures
         self.outdir = outdir
 
-        self.non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Source',
-                         'Method', 'Resolution', 'PLDDT', 'class']
+        self.non_feat_cols = list(METADATA_COLUMNS)
         self.features = [a for a in self.df_measures.columns if a not in self.non_feat_cols]
 
         # create the aggregated table for investigations
