@@ -1152,7 +1152,7 @@ class PDB(object):
                         uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
 
                     M = bb.Molecule()
-                    M.import_pdb(pdb=read_file_path, include_hetatm=True)
+                    M.import_pdb(filename=read_file_path, include_hetatm=True)
                     M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
                     subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
                     pdb_seqs = {}
@@ -1215,7 +1215,7 @@ class PDB(object):
                                 if chain[0] == line[21]:
                                     
                                     F = bb.Molecule()
-                                    F.import_pdb(pdb=read_file_path, include_hetatm=True)
+                                    F.import_pdb(filename=read_file_path, include_hetatm=True)
                                     F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
                                     subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
                                     pdb_seqs = {}
@@ -1662,7 +1662,7 @@ class PDB(object):
 
             pdb = os.path.splitext(os.path.basename(path))[0]
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
-            M.write_pdb(path_temp, index=indices, split_struc=False)
+            M.write_pdb(path_temp, indices=indices, split_struc=False)
 
             # take the new written file and insert in place where it would sit in the overall pdb file
             lines = open(path, 'r').readlines()
@@ -1672,8 +1672,9 @@ class PDB(object):
                     break
                 first_lines.append(line)
 
+            # biobox ends the file it writes with an END record
             new_atom_lines = open(path_temp, 'r').readlines()
-            new_file_output = first_lines + new_atom_lines + ['END\n']
+            new_file_output = first_lines + new_atom_lines
 
             cleaned_file = open(path, 'w')
             cleaned_file.writelines(new_file_output)
@@ -1742,7 +1743,7 @@ class PDB(object):
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=self.include_hetatm)
             indices = M.atomselect('*', '*', '*', True, False)[1]
-            M.write_pdb(path, index=indices, split_struc=False)
+            M.write_pdb(path, indices=indices, split_struc=False)
 
         except Exception as e:
             os.remove(path)

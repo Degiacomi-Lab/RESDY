@@ -27,10 +27,10 @@ This toolkit is subdivided in a set of classes that together operate as a pipeli
 
 ## Installation
 
-RESDY needs biobox 1.1.5 or later, which is distributed through conda-forge (the version on PyPI is older and is not compatible). Install it first, then clone the repository and install RESDY from its root:
+RESDY needs biobox 2.0 or later (older versions, including the 1.x releases, are not compatible). Install it first, then clone the repository and install RESDY from its root:
 
 ```
-conda install -c conda-forge "biobox>=1.1.5"
+conda install -c conda-forge "biobox>=2.0"
 git clone https://github.com/Degiacomi-Lab/RESDY.git
 cd RESDY
 pip install -e .
@@ -53,7 +53,7 @@ python -c "import resdy; print(resdy.__version__)"
 The following required dependencies are installed by `pip install -e .`, and are needed to run the overall pipeline:
 * <a href="https://anaconda.org/conda-forge/numpy">numpy</a>
 * <a href="https://anaconda.org/conda-forge/pandas">pandas</a>
-* <a href="https://anaconda.org/conda-forge/biobox">biobox</a> (1.1.5 or later; `pip install -e .` checks for it but cannot install it, see Installation)
+* <a href="https://anaconda.org/conda-forge/biobox">biobox</a> (2.0 or later; `pip install -e .` checks for it but cannot install it, see Installation)
 * <a href="https://anaconda.org/conda-forge/matplotlib">matplotlib</a>
 * <a href="https://anaconda.org/conda-forge/seaborn">seaborn</a>
 

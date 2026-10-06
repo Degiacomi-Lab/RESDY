@@ -1033,8 +1033,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
         M_curated.import_pdb(foutname, include_hetatm=include_hetatm)
         startval_clean = M_curated.data["resid"].values
         if startval_raw[0] != startval_clean[0]:
-            startval_clean += startval_raw[0] - startval_clean[0]
-            M_curated.data["resid"] = startval_clean
+            M_curated.data["resid"] = startval_clean + (startval_raw[0] - startval_clean[0])
             M_curated.write_pdb(foutname)
 
         if built:

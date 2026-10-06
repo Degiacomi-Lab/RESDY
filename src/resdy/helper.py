@@ -1,10 +1,11 @@
 import shutil
 import sys, os
 
-#: Oldest biobox RESDY works with. Earlier versions wrote the occupancy and B-factor columns
-#: of a pdb file into each other's places, and computed solvent accessible surface areas
-#: that were too small.
-MIN_BIOBOX_VERSION = (1, 1, 5)
+#: Oldest biobox RESDY works with. Earlier versions lack ``Xlink.get_half_sphere``, which the
+#: DAS feature calls. Versions before 1.1.5 also wrote the occupancy and B-factor columns of a
+#: pdb file into each other's places, and computed solvent accessible surface areas that were
+#: too small.
+MIN_BIOBOX_VERSION = (2, 0, 0)
 
 #: Columns of the measurements table that are not features: the row key, the structure it
 #: came from, and the metadata recorded beside the features.
@@ -26,6 +27,8 @@ def require_biobox(biobox):
         # a mocked module, as in the documentation build
         return
     parts = tuple(int(''.join(c for c in p if c.isdigit()) or 0) for p in version.split('.')[:3])
+    # '2.0' counts as 2.0.0
+    parts = parts + (0,) * (3 - len(parts))
     if parts < MIN_BIOBOX_VERSION:
         required = '.'.join(map(str, MIN_BIOBOX_VERSION))
         raise ImportError(f'RESDY needs biobox {required} or later, found {version}. Install it '
