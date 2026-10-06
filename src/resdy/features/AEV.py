@@ -176,7 +176,7 @@ class AEV():
                 coords_euc_dists = np.linalg.norm(all_coords - lys_coord, axis=1)
                 list_close_points = np.where(coords_euc_dists < self.distance_cut_off)[0]
 
-                S = M.get_subset(idxs=list_close_points)
+                S = M.get_subset(indices=list_close_points)
                 chain = list_chains[lys_idx]
                 resid = list_resids[lys_idx]
                 temp_atom_species = S.data['atomtype']

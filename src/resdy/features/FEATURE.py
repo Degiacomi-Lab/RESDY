@@ -56,7 +56,7 @@ class FEATURE():
         try:
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
-            A = M.get_subset(idxs=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+            A = M.get_subset(indices=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
             df_feature = A.data[['resname', 'chain', 'resid']]
 
             if self.include_modified:

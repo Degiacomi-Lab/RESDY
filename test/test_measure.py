@@ -440,7 +440,7 @@ class Test_Feature_Settings(unittest.TestCase):
         for _, row in df.iterrows():
             sel = ((M.data['chain'] == row['Chain']) & (M.data['resid'] == row['Resid'])
                    & ~M.data['name'].isin(['CA', 'C', 'N', 'O'])).to_numpy()
-            whole = bb.sasa(M, targets=np.where(sel)[0], threshold=0)[0]
+            whole = bb.sasa(M, indices=np.where(sel)[0], threshold=0)[0]
             self.assertAlmostEqual(row['sasa'], whole, places=6)
 
     def test_sasa_cut_out_grows_with_the_probe(self):
@@ -467,8 +467,8 @@ class Test_Feature_Settings(unittest.TestCase):
         M = bb.Molecule()
         M.import_pdb(path)
         side_chain = np.arange(4, 9)
-        whole = bb.sasa(M, targets=side_chain, probe=probe, threshold=0)[0]
-        without = bb.sasa(M.get_subset(idxs=np.arange(9)), targets=side_chain,
+        whole = bb.sasa(M, indices=side_chain, probe=probe, threshold=0)[0]
+        without = bb.sasa(M.get_subset(indices=np.arange(9)), indices=side_chain,
                           probe=probe, threshold=0)[0]
         self.assertLess(whole, without)              # the far atom does occlude
         self.assertAlmostEqual(got, whole, places=6)

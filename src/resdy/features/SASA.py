@@ -138,7 +138,7 @@ class SASA():
                 radius = max(15.0, extent + 2 * max_radius + 2 * self.probe)
                 list_close_points = np.where(coords_euc_dists < radius)[0]
 
-                S = M.get_subset(idxs=list_close_points)
+                S = M.get_subset(indices=list_close_points)
                 S.atomignore('*', '*', ['CX', 'OQ1', 'OQ2'])
                 chain = list_of_chains[j]
                 resid = list_of_resid[j]
@@ -149,7 +149,7 @@ class SASA():
                 pts_2, indx_2 = S.atomselect(chain, [resid], non_backbone_res_atoms,
                                                             use_resname=False, get_index=True)
 
-                x = bb.sasa(S, targets=indx_2, probe=self.probe,
+                x = bb.sasa(S, indices=indx_2, probe=self.probe,
                             n_sphere_point=self.n_sphere_point, threshold=self.threshold)
                 list_of_sasa.append(x[0])
 
