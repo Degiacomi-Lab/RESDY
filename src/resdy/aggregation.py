@@ -260,9 +260,7 @@ class Aggregation:
         :type upper: float
         '''
         df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) | (self.df_measurements[feature] > upper)]
-        #self.df_measurements[feature] = self.df_measurements[feature].where(self.df_measurements[feature].between(lower, upper))  # sets out of bounds entries to NaN
         self.df_measurements = self.df_measurements[self.df_measurements[feature].between(lower, upper)]
-        #print(f'>> Changed {len(df_suspicious)} values for {feature} from the measurements data which did not fall inside the bounds, replaced with NaN')
         print(f'>> Removed {len(df_suspicious)} rows which contain out of bounds entries for {feature} from the measurements data.')
 
 
@@ -523,7 +521,10 @@ class Aggregation:
 if __name__ == "__main__":
     test_dataframe_name = 'data/measures_cut_Ecoli(hCit)_all_01.05.25_joined.csv'
     test_measures_dataframe = pd.read_csv(test_dataframe_name)
-    agg = Aggregation(test_measures_dataframe, aggregation_method='median', features_to_include=['all'], aev_red_method='pca')
+    agg = Aggregation(test_measures_dataframe,
+                      aggregation_method='median',
+                      features_to_include=['all'], 
+                      aev_red_method='pca')
     agg.aggregate_data()
     print(agg.df_agg)
     #agg.save_state()

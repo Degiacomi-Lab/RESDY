@@ -76,7 +76,6 @@ class STRUCTURE():
                 x           x           x          x          x            x    x   x
         :rtype: pandas.DataFrame
         '''
-        # Melodia 1 - Calculating geometry using melodia-py
         try:
             melodia_results = self.mel.geometry_from_structure_file(path)
             if isinstance(melodia_results, pd.Series):
@@ -87,7 +86,6 @@ class STRUCTURE():
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'curvature'])
 
-        # Melodia 2 - Formatting and filtering
         try:
             melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
             lys_results = melodia_results['name'].isin((self.aa_properties['non_modified_codes'] +

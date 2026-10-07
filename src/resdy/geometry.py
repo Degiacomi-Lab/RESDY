@@ -106,7 +106,7 @@ def _residue_ordinals(d):
 
 def _offending_pairs(d, xyz, elem, alt, occ, cutoff, min_occupancy=0.0):
     '''
-    Atom pairs closer than ``cutoff`` that are not bonded, not in the same residue, and
+    Atom pairs closer than "cutoff" that are not bonded, not in the same residue, and
     do not involve a monoatomic ion.
 
     Bonds are recognised from connectivity rather than from distance, because a peptide
@@ -198,7 +198,7 @@ def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4
 
     i, j, sep = _offending_pairs(d, xyz, elem, alt, occ, clash_cutoff, min_occupancy)
     if len(i) == 0:
-        # nothing clashes: report how close the structure comes
+        # nothing clashes -> report how close the structure comes
         _, _, wide = _offending_pairs(d, xyz, elem, alt, occ, report_cutoff, min_occupancy)
         summary['min_contact'] = float(wide[0]) if len(wide) else np.nan
         return summary, pd.DataFrame()

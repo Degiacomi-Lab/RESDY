@@ -305,7 +305,6 @@ class Test_Measure(unittest.TestCase):
         act on, and its per-residue settings, without an edit to measure.py or residues.py.
         '''
         print('-> Testing that a new feature can declare its own residue support')
-        import pandas as pd
         import resdy.measure as measure_module
 
         class PLUGINPROBE():

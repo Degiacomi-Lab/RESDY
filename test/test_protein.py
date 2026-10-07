@@ -11,7 +11,7 @@ import resdy as RD
 
 class Test_Protein(unittest.TestCase):
     def setUp(self):
-        self.outdir = 'resdy_test_protein'
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_protein_')
         os.makedirs(self.outdir, exist_ok=True)
         shutil.copyfile(os.path.join('demo', 'demo_input.csv'), os.path.join(self.outdir, 'demo_input.csv'))
         self.gap = 10

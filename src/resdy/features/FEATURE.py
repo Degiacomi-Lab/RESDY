@@ -9,12 +9,12 @@ class FEATURE():
     Example class for adding your own features into the codebase. To allow the measuring parent
     script to pick it up, please ensure that the class name is the same as the filename.
     '''
+    SUPPORTED_RESIDUES = {'LYS', 'ARG', 'HIS'}
+    RESIDUE_KWARGS = {'HIS': {'cutoff': 6.0}}
+    UNSUPPORTED_REASON = 'the shell was calibrated on basic side chains'
 
     def __init__(self, include_modified=False,
-                 aa_properties = {'non_modified_codes': ['LYS', 'LYSN'],
-                                  'modified_codes': ['LYE', 'KCX'],
-                                  'atom_select_names_nonmod': ['NZ'],
-                                  'atom_select_names_modified': ['NZ', 'N07']},
+                 aa_properties = None,
                  error_filename = 'measure_errors.txt'):
         '''
         Initialise the feature class here, note custom variables will not be taken through to the
@@ -56,8 +56,7 @@ class FEATURE():
         try:
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
-            A = M.get_subset(idxs=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-            df_feature = A.data[['resname', 'chain', 'resid']]
+            df_feature = M.data.loc[M.data['name'] == 'CA', ['resname', 'chain', 'resid']]
 
             if self.include_modified:
                 idx_atom_interest = M.atomselect('*',

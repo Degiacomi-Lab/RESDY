@@ -103,7 +103,8 @@ class PDB(object):
                  minimise_max_iterations=1000, restrain_heavy_atoms=False,
                  restraint_k=10.0, minimisation_platform=None,
                  remove_all_modifications=False,
-                 num_cores=0, max_nmr_conformers=''):
+                 num_cores=0, max_nmr_conformers='',
+                 keep_all_curated=True):
         '''
         Initialise the PDB class.
 
@@ -194,6 +195,11 @@ class PDB(object):
             structures. Default is no cap and will curate all. '' or None will also take all
             while an integer will limit.
         :type max_nmr_conformers: int
+        :param keep_all_curated: Toggleable option to allow the code to delete a curated structure
+            if a minimised version of the structure is produced. Default is to not delete curated
+            structures and to keep both the curated and relaxed structure whether one is produced
+            or not.
+        :type keep_all_curated: bool
         '''
 
         self.outdir = outdir
@@ -216,8 +222,7 @@ class PDB(object):
                              else tuple(a.upper() for a in keep_ligands))
         self.include_hetatm = bool(self.keep_waters or self.keep_ions or self.keep_ligands)
 
-        # a preset name expands to its unmodified codes, so that PDB and Measure can be given
-        # the same three-letter code
+        # preset name -> unmodified code -> PDB and Measures uses the same
         if isinstance(resnames_of_interest, str):
             preset = AA_PRESETS.get(resnames_of_interest.strip().upper())
             resnames_of_interest = (list(preset['non_modified_codes']) if preset is not None
@@ -258,6 +263,7 @@ class PDB(object):
         self.minimisation_settings = self._setup_minimisation_settings(
             forcefield, minimise_tolerance, minimise_max_iterations,
             restrain_heavy_atoms, restraint_k, minimisation_platform)
+        self.keep_all_curated = keep_all_curated
 
         if isinstance(max_nmr_conformers, int):
             self.max_nmr_conformers = max_nmr_conformers
@@ -499,12 +505,6 @@ class PDB(object):
         :param outname: the desired name for the pdb.df csv file to be written as; default:
             'proteins.csv'
         :type outname: str
-
-        .. rubric:: Example
-
-        ::
-
-            pdb.save_state()
         '''
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
@@ -1763,12 +1763,6 @@ class PDB(object):
 
         :param path: the path to the pdb file to rewrite
         :type path: str
-
-        .. rubric:: Example
-
-        ::
-
-            >>> self.rewrite_pdb(path)
         '''
         try:
             M = bb.Molecule()
@@ -1825,13 +1819,10 @@ class PDB(object):
             pdb_inst = PDBFile(pdb_path)
 
             M = bb.Molecule()
-            # read heteroatoms on both sides of the round trip: biobox skips HETATM
-            # records by default, and writing N back would then delete every retained
-            # water, ion and ligand from the relaxed structure
             M.import_pdb(pdb_path, include_hetatm=True)
-            # OpenMM writes an occupancy of 1 and a B-factor of 0 for every atom. Both are
-            # put back from the structure that was minimised, the occupancy included, since
-            # an occupancy of zero is what marks an atom Modeller built
+            # OpenMM writes an occupancy of 1 and a B-factor of 0 for every atom. Modeller
+            # writes occupancy of 0 for any atom it created to mark it. Occupancy and Beta
+            # columns are restored to pre-minimisation values
             df_columns = M.data[['chain', 'resid', 'name', 'occupancy', 'beta']]
 
             forcefield = ForceField(*settings['forcefield'])
@@ -1842,10 +1833,8 @@ class PDB(object):
                 system = forcefield.createSystem(modeller.topology,
                                                 nonbondedMethod=NoCutoff)
             except Exception as e:
-                # a retained cofactor the forcefield has no template for. Minimising the
-                # protein alone and putting the cofactor back unchanged would leave it
-                # clashing into a relaxed site, which is worse than not minimising, so
-                # the structure is measured as it is and the reason is recorded.
+                # If a structure has retained atoms the FF has no template for, the structure
+                # is left without minimisation as ignoring and replacing would induce clashes.
                 try:
                     unmatched = sorted({r.name for r
                                         in forcefield.getUnmatchedResidues(modeller.topology)})
@@ -1864,8 +1853,8 @@ class PDB(object):
             heavy = [a.index for a in modeller.topology.atoms()
                      if a.element is None or a.element.symbol != 'H']
             if settings['restrain_heavy_atoms']:
-                # harmonic restraint to the input position, the form AlphaFold's
-                # relaxation uses (alphafold/relax/amber_minimize.py)
+                # Restraints added to heavy atoms to give relaxation of amino acid side chains
+                # rather than allowing the full structure to move
                 restraint = CustomExternalForce('0.5 * k * ((x-x0)^2 + (y-y0)^2 + (z-z0)^2)')
                 restraint.addGlobalParameter(
                     'k', settings['restraint_k_kcal_mol_a2'] * KCAL_A2_TO_KJ_NM2)
@@ -1875,7 +1864,7 @@ class PDB(object):
                     restraint.addParticle(i, modeller.positions[i].value_in_unit(nanometer))
                 system.addForce(restraint)
 
-            # the integrator is never stepped, a Simulation just requires one
+            # integrator is never used, setup of the Simulation in openmm requires one
             integrator = LangevinMiddleIntegrator(300*kelvin,
                                                 1/picosecond,
                                                 0.002*picoseconds)

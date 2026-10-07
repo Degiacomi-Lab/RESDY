@@ -192,7 +192,6 @@ class Measure(object):
         self.folder = os.path.join(outdir, "curated")
         self.only_relaxed = only_relaxed
 
-        # modified lysine management
         self.include_mod = include_modified
 
         # document failed pdb files
@@ -206,13 +205,10 @@ class Measure(object):
         self.residue_of_interest = residue_of_interest
         self.features_dict = features_dict.copy()
 
-        # expand the 'all' shorthand first, so that _setup_aa_properties sees the real
-        # feature names and can drop the ones that cannot handle the residue of interest
         if 'all' in self.features_dict:
             self.features_dict = {k: {} for k in ALL_FEATURES}
 
         self.aa_properties = self._setup_aa_properties(residue_of_interest)
-        # build the registry from what survived _setup_aa_properties, not from the argument
         self._setup_measures(self.features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
@@ -451,9 +447,8 @@ class Measure(object):
 
             defaults = getattr(cls, 'RESIDUE_KWARGS', {}).get(res_code)
             if defaults:
-                # the user's own settings win over the defaults of the residue, and
-                # features_dict was copied shallowly, so rebuild the entry rather than writing
-                # into the dictionary the caller still holds
+                # take user's own settings over the default values for the residue,
+                # rebuild dictionary to ensure not writing to caller held one
                 self.features_dict[name] = {**copy.deepcopy(defaults),
                                             **self.features_dict[name]}
 

@@ -59,9 +59,6 @@ accepted, and the class that computes it.
    * - ``legolas``
      - :py:class:`~resdy.features.nmr.NMR`
      - 15N NMR chemical shift, calculated with LEGOLAS.
-   * - ``aev_legolas``
-     - :py:class:`~resdy.features.nmr.NMR`
-     - The ANI-2x atomic environment vectors dumped by LEGOLAS while it calculates the shifts.
    * - ``seqcharge``
      - :py:class:`~resdy.features.charge.Charge`
      - Summed charge of the amino acids on either side of the residue of interest.

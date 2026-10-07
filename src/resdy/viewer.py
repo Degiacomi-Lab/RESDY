@@ -15,7 +15,22 @@ class Viewer(object):
     dash functionality
     '''
 
-    def __init__(self, df_measures, outdir = 'result'):
+    def __init__(self, df_measures, outdir = 'result', render_mode='png'):
+        '''
+        Initialise the viewer module for the RESDY package.
+
+        :param df_measures: Dataframe of measurements created through measure.py to
+            view in the viewer window.
+        :type df_measures: Pandas Dataframe
+        :param outdir: Location in which the measurements are stored and the place you
+            would like any graphs saved to go to.
+        :type outdir: string
+        :param render_mode: Rendering mode of the graphs within the viewer window. Default
+            is auto which allows plotly to choose the best option between webgl and svg depending
+            on the size of the dataset in the plot. Can either be set to 'svg' or 'webgl' if user
+            wants more custom control.
+        :type str
+        '''
         if isinstance(df_measures, str):
             self.df_measures = pd.read_csv(df_measures)
         else:
@@ -23,6 +38,10 @@ class Viewer(object):
 
         self.df_measures.columns.name = 'Feature'
         self.outdir = outdir
+        self.render_mode = render_mode
+        if self.render_mode not in ['auto', 'svg', 'webgl']:
+            print(f'>> Given render mode is not one accepted, setting render_mode to auto')
+            self.render_mode = 'auto'
 
         self.non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Source',
                          'Method', 'Resolution', 'PLDDT', 'class']
@@ -30,6 +49,7 @@ class Viewer(object):
 
         self.vector_features = ['aev', 'evolution']
         self.df_scalar_measures = self.df_measures.copy()
+        self.df_scalar_measures['Chain'] = self.df_scalar_measures['Chain'].astype(str).str.strip()
         for feat in self.vector_features:
             if feat in self.df_scalar_measures.columns:
                 self.df_scalar_measures = self.df_scalar_measures.drop(columns=feat)
@@ -68,7 +88,6 @@ class Viewer(object):
 
         self.colour_cols = [a for a in ['PLDDT', 'Method', 'Source', 'class'] if a in self.df_scalar_measures.columns]
 
-        # create the aggregated table for investigations
         self.A = Aggregation(df_measurements=self.df_scalar_measures,
                              aggregation_method='all',
                              features_to_include='all',
@@ -87,49 +106,8 @@ class Viewer(object):
         self.GO_list = list(self.GO_codes.keys())
         self.GO_display_names = list(self.GO_codes.values())
 
-        self.df_meas_stack = self._stack_data(self.df_scalar_measures, ['depth', 0, 40], ['seqcharge', -5.0, 5.0])
-        self.df_agg_stack = self._stack_data(self.df_agg, ['depth', 0, 40], ['seqcharge', -5.0, 5.0])
-
         self.data_viewer_app = Dash(__name__, suppress_callback_exceptions=True)
         self._setup_html()
-
-
-    def _stack_data(self, df, feat_a=['depth', 0, 40], feat_b=['seqcharge', -5.0, 5.0]):
-        '''
-        Transform the data such that it allows for easy access into the viewer plotting sets
-        
-        Parameters
-        ----------
-        :param df: Dataframe containing all the measurements data for analysis
-        :type df: pandas Dataframe
-        :param feat_a: List containing 3 elements, first the feature column name, then the
-            floats of the lower and upper bounds for the feature from the sliders
-        :type feat_a: list
-        :param feat_b: List containing 3 elements, first the feature column name, then the
-            floats of the lower and upper bounds for the feature from the sliders
-        :type feat_b: list
-        '''
-        feat_cols_df = [a for a in df.columns if a not in self.non_feat_cols]
-        non_feat_cols_df = [a for a in df.columns if a in self.non_feat_cols]
-
-        feat_one, feat_one_low, feat_one_upper = str(feat_a[0]), float(feat_a[1]), float(feat_a[2])
-        feat_two, feat_two_low, feat_two_upper = str(feat_b[0]), float(feat_b[1]), float(feat_b[2])
-
-        def _subset_data(df, feat, low, upper):
-            matching_feats = [a for a in df.columns if feat in a]
-            for feat in matching_feats:
-                df = df[(df[feat] >= low) & (df[feat] <= upper)]
-            return df
-
-        selected_df = _subset_data(df, feat_one, feat_one_low, feat_one_upper)
-        selected_df = _subset_data(df, feat_two, feat_two_low, feat_two_upper)
-
-        selected_df = selected_df.set_index(non_feat_cols_df)
-        df_stack = selected_df.stack()
-        df_stack.name = 'Value'
-        df_stack = df_stack.reset_index()
-
-        return df_stack
 
 
     def launch_viewer(self):
@@ -148,8 +126,7 @@ class Viewer(object):
             dcc.Tabs(id="tabs_analysis", value='tab_2d_scalar_analysis', children=[
                 dcc.Tab(label='2D Scalar Measurements Analysis', value='tab_2d_scalar_analysis'),
                 dcc.Tab(label='3D Scalar Measurements Analysis', value='tab_3d_scalar_analysis'),
-                dcc.Tab(label='Feature Histogram Analysis', value='tab_histogram_analysis'),
-                #dcc.Tab(label='GO Ontology Analysis', value='tab_GOterm_enrichment_analysis'),
+                dcc.Tab(label='Feature Histogram Analysis', value='tab_histogram_analysis')
             ]),
             html.Div(id='tabs_content_analysis')
         ])
@@ -253,10 +230,29 @@ class Viewer(object):
                             hoverData={'points': [{'customdata': self.df_measures[self.res_key].iloc[0]}]}
                         )
                     ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
+
                     html.Div([
                         dcc.Graph(id='x-feat-hist'),
+
                         dcc.Graph(id='y-feat-hist'),
-                    ], style={'display': 'inline-block', 'width': '49%'}),
+
+                        html.Div([
+                            html.H5('Subset By:', style={'text-align': 'center'}),
+                            dcc.Dropdown(
+                                ['Uniprot Code', 'Uniprot Code + Resid', 'Uniprot Code + Chain + Resid'],
+                                'Uniprot Code',
+                                id='2d-little_hist_subset_dropdown'
+                            ),
+                        ], style={'display': 'inline-block', 'width': '48%'}),
+                        html.Div([
+                            html.H5('Colour By:', style={'text-align': 'center'}),
+                            dcc.Dropdown(
+                                ['Uniform', 'Chain', 'Resid', 'Chain + Resid'] + self.colour_cols,
+                                'Uniform',
+                                id='2d-little_hist_colour_dropdown'
+                            ),
+                        ], style={'display': 'inline-block', 'width': '48%'})
+                    ], style={'display': 'inline-block', 'width': '49%', 'float': 'right'}),
 
                     html.Div([
                         html.H3('GO Term Subset', style={'text-align': 'center'}),
@@ -389,11 +385,6 @@ class Viewer(object):
                     ], style={'width': '95%', 'display': 'inline-block'})
                 ])
 
-            elif tab == 'tab_GOterm_enrichment_analysis':
-                return html.Div([
-                    html.H2('GO Term Analysis'),
-                ])
-            
             elif tab == 'tab_3d_scalar_analysis':
                 return html.Div([
                     html.Div([
@@ -512,7 +503,24 @@ class Viewer(object):
                     ], style={'display': 'inline-block', 'width': '32%'}),
 
                     html.Div([
-                        html.H3('GO Term Subset', style={'text-align': 'center'}),
+                        html.H5('Individual Histograms Subset By:', style={'text-align': 'center'}),
+                        dcc.Dropdown(
+                            ['Uniprot Code', 'Uniprot Code + Resid', 'Uniprot Code + Chain + Resid'],
+                            'Uniprot Code',
+                            id='3d-little_hist_subset_dropdown'
+                        ),
+                    ], style={'display': 'inline-block', 'width': '48%'}),
+                    html.Div([
+                        html.H5('Individual Histograms Colour By:', style={'text-align': 'center'}),
+                        dcc.Dropdown(
+                            ['Uniform', 'Chain', 'Resid', 'Chain + Resid'] + self.colour_cols,
+                            'Uniform',
+                            id='3d-little_hist_colour_dropdown'
+                        ),
+                    ], style={'display': 'inline-block', 'width': '48%'}),
+
+                    html.Div([
+                        html.H3('GO Term Overall Subset', style={'text-align': 'center'}),
                         dcc.Dropdown(
                             ['All'] + self.GO_display_names,
                             'All',
@@ -603,6 +611,10 @@ class Viewer(object):
             dff = dff[(dff[xaxis] >= x_low) & (dff[xaxis] <= x_high)]
             dff = dff[(dff[yaxis] >= y_low) & (dff[yaxis] <= y_high)]
 
+            res_key = self.res_key.copy()
+            if 'Chain' in dff.columns:
+                res_key.append('Chain')
+
             if colour_col != 'None' and (agg_on == 'Off' or agg_type == 'None'):
                 aggon_radio = {'width': '98%', 'float': 'left', 'display': 'inline-block'}
                 sd_radio = {'display': 'None'}
@@ -611,28 +623,39 @@ class Viewer(object):
                                 y=yaxis,
                                 color=colour_col,
                                 hover_name='Uniprot_Entry',
-                                hover_data=self.res_key)
+                                hover_data=res_key)
             elif agg_type == 'Average':
-                aggon_radio = {'width': '48%', 'float': 'left', 'display': 'inline-block'}
-                sd_radio = {'width': '48%', 'float': 'right', 'display': 'inline-block'}
-                if st_dev_tog == '+ st dev':
-                    xaxis_error = f'{self.feature_labels[xaxis_column_name]}_sd'
-                    yaxis_error = f'{self.feature_labels[yaxis_column_name]}_sd'
-                    fig = px.scatter(dff,
-                        x=xaxis,
-                        y=yaxis,
-                        color_discrete_sequence=['#682860'],
-                        hover_name='Uniprot_Entry',
-                        hover_data=self.res_key,
-                        error_x=xaxis_error,
-                        error_y=yaxis_error)
+                if agg_on == 'On':
+                    aggon_radio = {'width': '48%', 'float': 'left', 'display': 'inline-block'}
+                    sd_radio = {'width': '48%', 'float': 'right', 'display': 'inline-block'}
+                    if st_dev_tog == '+ st dev':
+                        xaxis_error = f'{self.feature_labels[xaxis_column_name]}_sd'
+                        yaxis_error = f'{self.feature_labels[yaxis_column_name]}_sd'
+                        fig = px.scatter(dff,
+                            x=xaxis,
+                            y=yaxis,
+                            color_discrete_sequence=['#682860'],
+                            hover_name='Uniprot_Entry',
+                            hover_data=res_key,
+                            error_x=xaxis_error,
+                            error_y=yaxis_error)
+                    else:
+                        fig = px.scatter(dff,
+                            x=xaxis,
+                            y=yaxis,
+                            color_discrete_sequence=['#682860'],
+                            hover_name='Uniprot_Entry',
+                            hover_data=res_key)
                 else:
+                    aggon_radio = {'width': '98%', 'float': 'left', 'display': 'inline-block'}
+                    sd_radio = {'display': 'None'}
                     fig = px.scatter(dff,
                         x=xaxis,
                         y=yaxis,
                         color_discrete_sequence=['#682860'],
                         hover_name='Uniprot_Entry',
-                        hover_data=self.res_key)
+                        hover_data=res_key)
+
             else:
                 aggon_radio = {'width': '98%', 'float': 'left', 'display': 'inline-block'}
                 sd_radio = {'display': 'None'}
@@ -641,9 +664,9 @@ class Viewer(object):
                     y=yaxis,
                     color_discrete_sequence=['#682860'],
                     hover_name='Uniprot_Entry',
-                    hover_data=self.res_key)
+                    hover_data=res_key)
 
-            fig.update_traces(mode='markers', customdata=dff[self.res_key])
+            fig.update_traces(mode='markers', customdata=dff[res_key])
 
             fig.update_layout(
                 hoverlabel=dict(
@@ -662,9 +685,27 @@ class Viewer(object):
             return fig, xaxis_column_name, yaxis_column_name, agg_type, xaxis_range_header, yaxis_range_header, xaxis_min, xaxis_max, yaxis_min, yaxis_max, xaxis_range, yaxis_range, sd_radio, aggon_radio
 
 
-        def create_feature_hist(dff, feature, title, axis_type):
+        def create_feature_hist(dff, feature, title, axis_type, subset, colour):
 
-            fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
+            if colour == 'Uniform':
+                fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
+            elif colour == 'Chain + Resid':
+                if 'Chain' in dff.columns:
+                    dfff = dff.copy()
+                    dfff['CombColour'] = dfff[['Chain', 'Resid']].apply(lambda row: '_'.join(row.values.astype(str)), axis=1)
+                    fig = px.histogram(dfff, x=feature, color='CombColour')
+                else:
+                    fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
+            elif colour == 'Chain':
+                if 'Chain' in dff.columns:
+                    fig = px.histogram(dff, x=feature, color=colour)
+                else:
+                    fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
+            else:
+                if colour in dff.columns:
+                    fig = px.histogram(dff, x=feature, color=colour)
+                else:
+                    fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
 
             fig.update_xaxes(showgrid=False)
 
@@ -680,38 +721,71 @@ class Viewer(object):
             return fig
 
 
+        def update_little_hist(hoverData, col_name, subset, colour):
+            if col_name is None:
+                col_name = self.feature_labels_list[0]
+            if subset is None:
+                subset = 'Uniprot Code'
+            if colour is None:
+                colour = 'Uniform'
+
+            axis_name = self.feature_labels[col_name]
+            custom_hover_data = hoverData['points'][0]['customdata']
+            if len(custom_hover_data) == 3:
+                uniprot_entry = custom_hover_data[0]
+                chain = custom_hover_data['customdata'][1]
+                resid = custom_hover_data['customdata'][2]
+                if subset == 'Uniprot Code + Chain + Resid':
+                    dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
+                                                  (self.df_scalar_measures['Chain'] == chain) &
+                                                  (self.df_scalar_measures['Resid'] == resid)]
+                    title = '<b>{} {} {}</b><br>{}'.format(uniprot_entry, chain, resid, col_name)
+                elif subset == 'Uniprot Code + Resid':
+                    dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
+                                                    (self.df_scalar_measures['Resid'] == resid)]
+                    title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, col_name)
+                else:
+                    dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry)]
+                    title = '<b>{}</b><br>{}'.format(uniprot_entry, col_name)
+
+            else:
+                uniprot_entry = custom_hover_data[0]
+                resid = custom_hover_data[1]
+                if subset == 'Uniprot Code + Resid':
+                    dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
+                                                  (self.df_scalar_measures['Resid'] == resid)]
+                    title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, col_name)
+                else:
+                    dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry)]
+                    title = '<b>{}</b><br>{}'.format(uniprot_entry, col_name)
+                #dff = dff[['Uniprot_Entry', 'Resid'] + [axis_name]]
+
+            return dff, axis_name, title, subset, colour
+
         @callback(
             Output('x-feat-hist', 'figure'),
+            Output('2d-little_hist_subset_dropdown', 'value'),
+            Output('2d-little_hist_colour_dropdown', 'value'),
             Input('2d-indicator-scatter', 'hoverData'),
             Input('2d-axis-column', 'value'),
-            Input('2d-xaxis-type', 'value'))
-        def update_x_hist(hoverData, xaxis_column_name, axis_type):
-            if xaxis_column_name is None:
-                xaxis_column_name = self.feature_labels_list[0]
-            xaxis = self.feature_labels[xaxis_column_name]
-            uniprot_entry = hoverData['points'][0]['customdata'][0]
-            resid = hoverData['points'][0]['customdata'][1]
-            dff = self.df_scalar_measures[self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry]
-            dff = dff[['Uniprot_Entry', 'Resid'] + [xaxis]]
-            title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, xaxis_column_name)
-            return create_feature_hist(dff, xaxis, title, axis_type)
+            Input('2d-xaxis-type', 'value'),
+            Input('2d-little_hist_subset_dropdown', 'value'),
+            Input('2d-little_hist_colour_dropdown', 'value'))
+        def update_x_hist(hoverData, xaxis_column_name, axis_type, subset, colour):
+            dff, xaxis, title, subset, colour = update_little_hist(hoverData, xaxis_column_name, subset, colour)
+            return create_feature_hist(dff, xaxis, title, axis_type, subset, colour), subset, colour
 
 
         @callback(
             Output('y-feat-hist', 'figure'),
             Input('2d-indicator-scatter', 'hoverData'),
             Input('2d-yaxis-column', 'value'),
-            Input('2d-yaxis-type', 'value'))
-        def update_y_hist(hoverData, yaxis_column_name, axis_type):
-            if yaxis_column_name is None:
-                yaxis_column_name = self.feature_labels_list[1]
-            yaxis = self.feature_labels[yaxis_column_name]
-            uniprot_entry = hoverData['points'][0]['customdata'][0]
-            resid = hoverData['points'][0]['customdata'][1]
-            dff = self.df_scalar_measures[self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry]
-            dff = dff[['Uniprot_Entry', 'Resid'] + [yaxis]]
-            title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, yaxis_column_name)
-            return create_feature_hist(dff, yaxis, title, axis_type)
+            Input('2d-yaxis-type', 'value'),
+            Input('2d-little_hist_subset_dropdown', 'value'),
+            Input('2d-little_hist_colour_dropdown', 'value'))
+        def update_y_hist(hoverData, yaxis_column_name, axis_type, subset, colour):
+            dff, yaxis, title, subset, colour = update_little_hist(hoverData, yaxis_column_name, subset, colour)
+            return create_feature_hist(dff, yaxis, title, axis_type, subset, colour)
 
 
         # tab 2 functions
@@ -867,6 +941,7 @@ class Viewer(object):
                 return create_main_hist(dff, feat_col, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
 
+
         @callback(
             Output('3d-indicator-scatter', 'figure'),
             Output('3d-xaxis-column', 'value'),
@@ -966,22 +1041,28 @@ class Viewer(object):
             dff = dff[(dff[yaxis] >= y_low) & (dff[yaxis] <= y_high)]
             dff = dff[(dff[zaxis] >= z_low) & (dff[zaxis] <= z_high)]
 
+            res_key = self.res_key.copy()
+            if 'Chain' in dff.columns:
+                res_key.append('Chain')
+
             if colour_col != 'None' and agg_type == 'None':
                 fig = px.scatter_3d(dff,
                                 x=xaxis,
                                 y=yaxis,
+                                z=zaxis,
                                 color=colour_col,
                                 hover_name='Uniprot_Entry',
-                                hover_data=self.res_key)
+                                hover_data=res_key)
             else:
                 fig = px.scatter_3d(dff,
                     x=xaxis,
                     y=yaxis,
+                    z=zaxis,
                     color_discrete_sequence=['#682860'],
                     hover_name='Uniprot_Entry',
-                    hover_data=self.res_key)
+                    hover_data=res_key)
 
-            fig.update_traces(mode='markers', customdata=dff[self.res_key])
+            fig.update_traces(mode='markers', customdata=dff[res_key])
 
             fig.update_layout(
                 hoverlabel=dict(
@@ -1008,51 +1089,38 @@ class Viewer(object):
 
         @callback(
             Output('3d-x-feat-hist', 'figure'),
+            Output('3d-little_hist_subset_dropdown', 'value'),
+            Output('3d-little_hist_colour_dropdown', 'value'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-xaxis-column', 'value'),
-            Input('3d-xaxis-type', 'value'))
-        def update_3d_x_hist(hoverData, xaxis_column_name, axis_type):
-            if xaxis_column_name is None:
-                xaxis_column_name = self.feature_labels_list[0]
-            xaxis = self.feature_labels[xaxis_column_name]
-            uniprot_entry = hoverData['points'][0]['customdata'][0]
-            resid = hoverData['points'][0]['customdata'][1]
-            dff = self.df_scalar_measures[self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry]
-            dff = dff[['Uniprot_Entry', 'Resid'] + [xaxis]]
-            title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, xaxis_column_name)
-            return create_feature_hist(dff, xaxis, title, axis_type)
+            Input('3d-xaxis-type', 'value'),
+            Input('3d-little_hist_subset_dropdown', 'value'),
+            Input('3d-little_hist_colour_dropdown', 'value'))
+        def update_3d_x_hist(hoverData, xaxis_column_name, axis_type, subset, colour):
+            dff, xaxis, title, subset, colour = update_little_hist(hoverData, xaxis_column_name, subset, colour)
+            return create_feature_hist(dff, xaxis, title, axis_type, subset, colour), subset, colour
 
         @callback(
             Output('3d-y-feat-hist', 'figure'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-yaxis-column', 'value'),
-            Input('3d-yaxis-type', 'value'))
-        def update_3d_y_hist(hoverData, yaxis_column_name, axis_type):
-            if yaxis_column_name is None:
-                yaxis_column_name = self.feature_labels_list[1]
-            yaxis = self.feature_labels[yaxis_column_name]
-            uniprot_entry = hoverData['points'][0]['customdata'][0]
-            resid = hoverData['points'][0]['customdata'][1]
-            dff = self.df_scalar_measures[self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry]
-            dff = dff[['Uniprot_Entry', 'Resid'] + [yaxis]]
-            title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, yaxis_column_name)
-            return create_feature_hist(dff, yaxis, title, axis_type)
+            Input('3d-yaxis-type', 'value'),
+            Input('3d-little_hist_subset_dropdown', 'value'),
+            Input('3d-little_hist_colour_dropdown', 'value'))
+        def update_3d_y_hist(hoverData, yaxis_column_name, axis_type, subset, colour):
+            dff, yaxis, title, subset, colour = update_little_hist(hoverData, yaxis_column_name, subset, colour)
+            return create_feature_hist(dff, yaxis, title, axis_type, subset, colour)
 
         @callback(
             Output('3d-z-feat-hist', 'figure'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-zaxis-column', 'value'),
-            Input('3d-zaxis-type', 'value'))
-        def update_3d_z_hist(hoverData, zaxis_column_name, axis_type):
-            if zaxis_column_name is None:
-                zaxis_column_name = self.feature_labels_list[2]
-            zaxis = self.feature_labels[zaxis_column_name]
-            uniprot_entry = hoverData['points'][0]['customdata'][0]
-            resid = hoverData['points'][0]['customdata'][1]
-            dff = self.df_scalar_measures[self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry]
-            dff = dff[['Uniprot_Entry', 'Resid'] + [zaxis]]
-            title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, zaxis_column_name)
-            return create_feature_hist(dff, zaxis, title, axis_type)
+            Input('3d-zaxis-type', 'value'),
+            Input('3d-little_hist_subset_dropdown', 'value'),
+            Input('3d-little_hist_colour_dropdown', 'value'))
+        def update_3d_z_hist(hoverData, zaxis_column_name, axis_type, subset, colour):
+            dff, zaxis, title, subset, colour = update_little_hist(hoverData, zaxis_column_name, subset, colour)
+            return create_feature_hist(dff, zaxis, title, axis_type, subset, colour)
 
 
 

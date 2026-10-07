@@ -55,16 +55,16 @@ class SECONDARYSTRUCTURE():
         '''
         Calculate the secondary structure for the protein given in path. Option to either report
         the output as numbers of as letters corresponding to the secondary structure. Options:
-        - 0 or H
-        - 1 or G
-        - 2 or I
-        - 3 or P
-        - 4 or E
-        - 5 or B
-        - 6 or T
-        - 7 or S
-        - 8 or -
-        - 9 or C
+            - 0 or H
+            - 1 or G
+            - 2 or I
+            - 3 or P
+            - 4 or E
+            - 5 or B
+            - 6 or T
+            - 7 or S
+            - 8 or -
+            - 9 or C
 
         :param path: The path of the pdb file that the feature is being calculated for.
         :type path: str
