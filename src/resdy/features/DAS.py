@@ -96,7 +96,7 @@ class DAS():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
-        :param half_sphere_kwargs: Further arguments of biobox's ``Xlink._get_half_sphere``,
+        :param half_sphere_kwargs: Further arguments of biobox's ``Xlink.get_half_sphere``,
             which builds the half sphere: ``pts_surf``, the spacing of the points on each
             shell (biobox default 4.0 A), and ``thresh``, the distance below which a point
             clashes with an atom and is discarded (biobox default 2.0 A). The residues in
@@ -105,7 +105,7 @@ class DAS():
         :type half_sphere_kwargs: dict
         '''
         self.half_sphere_kwargs = dict(half_sphere_kwargs or {})
-        accepted = set(inspect.signature(bb.Xlink._get_half_sphere).parameters) - {'self', 'i', 'radii'}
+        accepted = set(inspect.signature(bb.Xlink.get_half_sphere).parameters) - {'self', 'i', 'radii'}
         unknown = set(self.half_sphere_kwargs) - accepted
         if unknown:
             raise ValueError(f'DAS half_sphere_kwargs accepts {sorted(accepted)}, got '
@@ -134,7 +134,7 @@ class DAS():
         - Uses biobox functionality to calculate the value
         - Create a molecule for the protein structure from the bb.Molecule class
         - Use the bb.Xlink class to setup the linking module
-        - Use the hidden method .__get_half_sphere() to work out the das value
+        - Use the method Xlink.get_half_sphere() to work out the das value
         - As the density of points in the sphere of the anchor atom is constant for a given set
           of radii, the das value is the number of points that are accessible
 
@@ -199,7 +199,7 @@ class DAS():
                 kwargs = dict(self.half_sphere_kwargs)
                 if self.radii is not None:
                     kwargs['radii'] = self.radii
-                half_sphere_coords = XL._get_half_sphere(i=lys_nz_idx, **kwargs)
+                half_sphere_coords = XL.get_half_sphere(i=lys_nz_idx, **kwargs)
                 # as the density of points created by the get half sphere is constant for any setup,
                 # therefore can just count the number of coordinates that are returned for a measure for SASA Path
                 das_output.append(len(half_sphere_coords))

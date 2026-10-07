@@ -51,6 +51,7 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
         M_1pae = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
+        self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
 
     def test_clean_split_MSEmut(self):
         # test MSE to MET mutation
@@ -58,6 +59,20 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
         M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
+        self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb', 'MET', 'SD')
+
+    def _assert_sulfur_named(self, path, resname, sulfur):
+        '''
+        every residue resname in path has its sulfur named sulfur, none is named S, and the
+        sulfur keeps the deposited coordinates (occupancy above 0)
+        '''
+        M = bb.Molecule(path)
+        d = M.data[M.data['resname'] == resname]
+        self.assertGreater(len(d), 0)
+        self.assertNotIn('S', set(d['name']))
+        for _, residue in d.groupby(['chain', 'resid']):
+            self.assertIn(sulfur, set(residue['name']))
+            self.assertTrue((residue.loc[residue['name'] == sulfur, 'occupancy'] > 0).all())
 
     def test_clean_split_modelsplit(self):
         # test splitting of models
@@ -177,46 +192,22 @@ class Test_Protein(unittest.TestCase):
         self.assertEqual(1, len(PDB.df))
 
 
-class Test_Old_Curation(unittest.TestCase):
-    """
-    A curated file with an occupancy outside [0, 1] was written before RESDY required
-    biobox 1.1.5: it is deleted, with the rest of its structure, rather than reused.
-    """
+class Test_SeleniumToSulfur(unittest.TestCase):
+    '''selenomethionine and selenocysteine take the sulfur names of their parents'''
 
-    def setUp(self):
-        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
-        self.curated = os.path.join(self.outdir, 'curated')
-        os.makedirs(self.curated)
+    MSE_SE = 'HETATM  465 SE   MSE A  62      19.231  25.744  31.405  1.00 20.00          SE  \n'
+    MSE_CA = 'HETATM  462  CA  MSE A  62      21.331  22.844  28.505  1.00 20.00           C  \n'
+    SEC_SE = 'HETATM 1027 SE   SEC A 135      10.100  11.200  12.300  1.00 15.00          SE  \n'
 
-    def tearDown(self):
-        shutil.rmtree(self.outdir, ignore_errors=True)
-
-    def _write(self, stem, occupancy):
-        path = os.path.join(self.curated, f'{stem}.pdb')
-        with open(path, 'w') as fh:
-            fh.write(f'ATOM      1  CA  LYS A   1       1.000   2.000   3.000{occupancy:6.2f} 25.00           C\nEND\n')
-        return path
-
-    def test_old_layout_is_detected_and_discarded(self):
-        from resdy.protein import has_old_column_layout
-        new = self._write('1ABC-alt1A', 1.0)
-        built = self._write('1ABC-alt1B', 0.0)
-        self.assertFalse(has_old_column_layout(new))
-        self.assertFalse(has_old_column_layout(built))
-
-        old = self._write('9XYZ-alt1A', 25.0)
-        relaxed = self._write('9XYZ-alt1A_relaxed', 1.0)
-        record = os.path.join(self.curated, '9XYZ-alt1A.minimisation.json')
-        open(record, 'w').write('{}')
-        self.assertTrue(has_old_column_layout(old))
-
-        P = RD.PDB(outdir=self.outdir, minimise_strucs=None)
-        self.assertFalse(P._discard_old_curation([new, built]))
-        self.assertTrue(os.path.exists(new) and os.path.exists(built))
-        self.assertTrue(P._discard_old_curation([old, relaxed]))
-        for f in (old, relaxed, record):
-            self.assertFalse(os.path.exists(f))
-
+    def test_selenium_to_sulfur(self):
+        from resdy.protein import selenium_to_sulfur
+        met = selenium_to_sulfur(self.MSE_SE, 'MET', 'SD')
+        self.assertEqual(met, self.MSE_SE.replace('SE   MSE', ' SD  MET').replace('SE  \n', ' S  \n'))
+        cys = selenium_to_sulfur(self.SEC_SE, 'CYS', 'SG')
+        self.assertEqual((cys[17:20], cys[12:16], cys[76:78]), ('CYS', ' SG ', ' S'))
+        # every other atom only changes residue name
+        self.assertEqual(selenium_to_sulfur(self.MSE_CA, 'MET', 'SD'),
+                         self.MSE_CA.replace('MSE', 'MET'))
 
 
 if __name__ == "__main__":

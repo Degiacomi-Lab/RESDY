@@ -140,6 +140,12 @@ AA_PRESETS = {
             'atom_select_names_modified': ['CB']},
 }
 
+#: Every residue code named by a preset, modified forms and protonation aliases included,
+#: used to tell a protein residue from an ion, a water or a ligand.
+PROTEIN_RESNAMES = frozenset(code for preset in AA_PRESETS.values()
+                             for code in preset['non_modified_codes'] + preset['modified_codes'])
+
+
 def _as_list(value, field):
     '''
     Normalise one field of an ``aa_properties`` dictionary to a list of strings.

@@ -154,7 +154,7 @@ class RMSF():
                 if align_once:
                     try:
                         _, idx_ref = P.atomselect('*', '*', ["C", "CA", "N", "O"], get_index=True)
-                        P.rmsd_one_vs_all(0, points_index=idx_ref, align=True)
+                        P.rmsd_one_vs_all(0, indices=idx_ref, align=True)
                     except Exception:
                         # The superposition used to be attempted inside the residue loop, where a
                         # failure left every residue with a NaN rather than discarding the whole
@@ -170,7 +170,7 @@ class RMSF():
                             raise RuntimeError('the whole-structure superposition failed')
                         if not align_once:
                             _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"], get_index=True)
-                            P.rmsd_one_vs_all(0, points_index=idx_ref, align=True)
+                            P.rmsd_one_vs_all(0, indices=idx_ref, align=True)
                         _, idx_target = P.atomselect(chain, resid, self.aa_properties['atom_select_names_nonmod'], get_index=True)
 
                         rmsf = P.rmsf(indices=idx_target)[0]

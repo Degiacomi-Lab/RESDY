@@ -6,6 +6,9 @@ residues, and every one of those steps has at some point moved atoms that should
 have moved. None of it is visible in the measurements themselves, which is what makes a
 geometric check worth having: a structure whose chains have drifted or whose rebuilt loop
 runs into a neighbour still measures perfectly happily.
+
+The module also holds :func:`distance_to_other_chains`, which records how close a residue
+sits to a neighbouring chain, the metadata column Min_Dist_Other_Chain.
 '''
 
 import numpy as np
@@ -14,6 +17,7 @@ import biobox as bb
 from .helper import require_biobox
 require_biobox(bb)
 from scipy.spatial import cKDTree
+from .residues import PROTEIN_RESNAMES
 
 
 #: Residue names treated as solvent.
@@ -150,6 +154,43 @@ def _offending_pairs(d, xyz, elem, alt, occ, cutoff, min_occupancy=0.0):
     sep = np.linalg.norm(xyz[i] - xyz[j], axis=1)
     order = np.argsort(sep)
     return i[order], j[order], sep[order]
+
+
+def distance_to_other_chains(chain, resname, element, xyz, anchor,
+                             protein_resnames=PROTEIN_RESNAMES):
+    '''
+    Distance from each anchor atom to the closest protein heavy atom of any other chain.
+
+    Only heavy atoms of protein residues count as a partner: an ion, a water or a ligand
+    that carries a chain identifier of its own is not a chain. Which chain is the closest is
+    not reported.
+
+    :param chain: (n,) chain identifier of every atom.
+    :param resname: (n,) residue name of every atom.
+    :param element: (n,) element symbol of every atom, used to leave out hydrogens.
+    :param xyz: (n, 3) coordinates.
+    :param anchor: (n,) boolean mask of the atoms to measure from.
+    :param protein_resnames: residue names counted as protein.
+    :returns: (number of anchors,) distances in A, in the order of ``np.flatnonzero(anchor)``,
+        NaN for an anchor whose structure holds no other protein chain.
+    :rtype: numpy.ndarray
+    '''
+    chain = np.asarray(chain).astype(str)
+    resname = np.char.upper(np.char.strip(np.asarray(resname).astype(str)))
+    element = np.char.upper(np.char.strip(np.asarray(element).astype(str)))
+    xyz = np.asarray(xyz, dtype=float)
+    anchor = np.asarray(anchor, dtype=bool)
+
+    partner = np.isin(resname, list(protein_resnames)) & ~np.isin(element, ['H', 'D'])
+    anchor_idx = np.flatnonzero(anchor)
+    out = np.full(len(anchor_idx), np.nan)
+    for c in np.unique(chain[anchor_idx]):
+        others = partner & (chain != c)
+        if not others.any():
+            continue
+        mine = chain[anchor_idx] == c
+        out[mine] = cKDTree(xyz[others]).query(xyz[anchor_idx[mine]])[0]
+    return out
 
 
 def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4.0,

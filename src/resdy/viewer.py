@@ -6,6 +6,7 @@ import os
 import webbrowser
 from dash import Dash, dcc, html, Input, Output, ctx, State, callback, no_update
 from .aggregation import Aggregation
+from .helper import METADATA_COLUMNS
 from .analysis import Analysis
 
 
@@ -43,8 +44,7 @@ class Viewer(object):
             print(f'>> Given render mode is not one accepted, setting render_mode to auto')
             self.render_mode = 'auto'
 
-        self.non_feat_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Source',
-                         'Method', 'Resolution', 'PLDDT', 'class']
+        self.non_feat_cols = list(METADATA_COLUMNS)
         self.features = [a for a in self.df_measures.columns if a not in self.non_feat_cols]
 
         self.vector_features = ['aev', 'evolution']

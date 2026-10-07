@@ -154,3 +154,31 @@ package.
 
 *Modified residues.* When ``include_modified=True``, the returned dataframe must also carry a
 ``Modified`` boolean column, or merging the result raises a :class:`KeyError`.
+
+
+Why was my structure not energy minimised?
+------------------------------------------
+
+:class:`PDB <resdy.protein.PDB>` minimises a structure with OpenMM only when all of the
+following hold:
+
+* ``minimise_strucs`` selects its source: ``'AF'`` (the default) for AlphaFold models,
+  ``'PDB'`` for RCSB structures, ``'ALL'`` for both. OpenMM must be installed, otherwise
+  asking for minimisation raises an :class:`ImportError`.
+* For an RCSB structure, curation by the patcher succeeded. A conformer whose gaps could not
+  be patched is not minimised.
+* Explicit waters are not kept together with an implicit solvent model. With the default
+  force field (``amber14-all.xml`` and ``implicit/gbn2.xml``), ``keep_waters=True`` skips
+  minimisation, since the solvent would be counted twice.
+* Every residue matches a force field template. This fails for a retained ligand or ion that
+  the force field does not describe (add its XML file to ``forcefield``), for a C-terminus
+  lacking its ``OXT`` atom, and for a residue with an incomplete side chain. The last two are
+  common in deposited chains that have no gaps, because the patcher only rebuilds chains with
+  missing residues.
+
+A structure that is not minimised is still measured, from its unrelaxed coordinates. The
+outcome for each structure (``relaxed``, ``skipped`` or ``failed``, with the reason) is
+written to ``<structure>.minimisation.json`` in the curated folder, and
+:meth:`gather_proteins <resdy.protein.PDB.gather_proteins>` collects these records into
+``minimisation_log.csv``. Checking that table is the quickest way to see which structures
+were relaxed.

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from .preprocessing import Preprocessing
+from .helper import METADATA_COLUMNS
 
 
 class Aggregation:
@@ -120,8 +121,7 @@ class Aggregation:
         self.df_agg = pd.DataFrame()
         self.max_feature_nan_fraction = max_feature_nan_fraction
 
-        self.non_feature_cols = ['Uniprot_Entry', 'PDB_Code', 'Chain', 'Modified', 'Method', 'Source',
-                                 'Resolution', 'Resid', 'class', 'PLDDT', 'Largest_Gap']
+        self.non_feature_cols = list(METADATA_COLUMNS)
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]

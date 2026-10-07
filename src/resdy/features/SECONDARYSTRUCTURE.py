@@ -96,7 +96,7 @@ class SECONDARYSTRUCTURE():
 
             if not orig_lines[0].startswith('HEADER'):
                 orig_lines.insert(0, f"HEADER    TEMPORARY                               "
-                                f"{datetime.today().strftime('%d-%m-%Y')}  {os.path.basename(path)[0]}")
+                                f"{datetime.today().strftime('%d-%m-%Y')}  {os.path.basename(path)[0]}\n")
 
                 tmp_file_name = f"{os.path.splitext(path)[0]}_tmpdssp.pdb"
                 with open(file=tmp_file_name, mode='w') as new_pdb:
@@ -125,7 +125,7 @@ class SECONDARYSTRUCTURE():
             #run analysis
             M = bb.Molecule()
             M.import_pdb(tmp_file_name, include_hetatm=True)
-            M = M.get_subset(idxs=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
+            M = M.get_subset(indices=M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
 
             p = PDBParser()
             struc = p.get_structure(id=os.path.basename(tmp_file_name), file=tmp_file_name)

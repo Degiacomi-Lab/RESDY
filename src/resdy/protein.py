@@ -61,30 +61,30 @@ KCAL_A2_TO_KJ_NM2 = 418.4
 MINIMISATION_RECORD_SUFFIX = '.minimisation.json'
 
 
-def has_old_column_layout(path):
+def selenium_to_sulfur(line, resname, sulfur_name):
     '''
-    Whether a pdb file has an occupancy outside [0, 1], which no file written by the
-    present curation can have.
+    Rewrite one atom record of a selenium-containing residue as its sulfur parent.
 
-    biobox before 1.1.5 wrote the occupancy and B-factor columns into each other's places,
-    and Modeller writes the template B-factor into the occupancy column, so a file curated
-    before RESDY required biobox 1.1.5 usually carries B-factors where the occupancy
-    belongs.
+    The residue name is replaced, and the selenium atom (named SE) is renamed to the sulfur
+    of the parent residue, SD in methionine and SG in cysteine, with its element set to S.
+    Only the fixed columns are touched: the residue name (18-20), the atom name (13-16) and
+    the element (77-78).
 
-    :param path: pdb file.
-    :type path: str
-    :rtype: bool
+    :param line: ATOM or HETATM record of an MSE or SEC residue.
+    :type line: str
+    :param resname: three-letter code of the parent residue, 'MET' or 'CYS'.
+    :type resname: str
+    :param sulfur_name: name the selenium atom takes in the parent residue, 'SD' or 'SG'.
+    :type sulfur_name: str
+    :returns: the rewritten record.
+    :rtype: str
     '''
-    with open(path) as fh:
-        for line in fh:
-            if line.startswith(('ATOM', 'HETATM')):
-                try:
-                    occupancy = float(line[54:60])
-                except ValueError:
-                    continue
-                if not 0.0 <= occupancy <= 1.0:
-                    return True
-    return False
+    line = line[:17] + resname + line[20:]
+    if line[12:16].strip() == 'SE':
+        line = line[:12] + f' {sulfur_name:<3}' + line[16:]
+        if len(line) > 77 and line[76:78].strip().upper() == 'SE':
+            line = line[:76] + ' S' + line[78:]
+    return line
 
 
 class PDB(object):
@@ -368,28 +368,6 @@ class PDB(object):
         '''Path of the record kept beside curated structure ``pdb`` (a file stem).'''
         return os.path.join(self.curated_dir, f'{pdb}{MINIMISATION_RECORD_SUFFIX}')
 
-
-    def _discard_old_curation(self, paths):
-        '''
-        Delete the curated files of one structure when any of them was written with the old
-        column layout, so that the structure is curated again rather than reused.
-
-        :param paths: curated pdb files of one structure, relaxed copies included.
-        :type paths: list
-        :returns: True if the files were deleted.
-        :rtype: bool
-        '''
-        old = [p for p in paths if has_old_column_layout(p)]
-        if not old:
-            return False
-        print(f'>> {", ".join(os.path.basename(p) for p in old)} has occupancies outside [0, 1], '
-              f'the layout of a file curated before RESDY required biobox 1.1.5; deleting '
-              f'{len(paths)} curated file(s) of this structure and curating it again')
-        for p in paths:
-            for f in (p, os.path.splitext(p)[0] + MINIMISATION_RECORD_SUFFIX):
-                if os.path.exists(f):
-                    os.remove(f)
-        return True
 
     def _write_minimisation_record(self, pdb, status, reason='', settings=None, **details):
         '''
@@ -706,9 +684,6 @@ class PDB(object):
         if pdb_code[:2] == "AF":
 
             if skip_if_found:
-                self._discard_old_curation(
-                    [c for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))
-                     if os.path.basename(c).split(".")[0] in (pdb_code, f'{pdb_code}_relaxed')])
                 files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
@@ -796,9 +771,6 @@ class PDB(object):
             if isinstance(chains, str):
                 chains = [c for c in chains.split('/') if c]
             if skip_if_found:
-                self._discard_old_curation(
-                    [c for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))
-                     if os.path.basename(c).split("-")[0] == pdb_code])
                 files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
@@ -1046,8 +1018,8 @@ class PDB(object):
 
         - insertion codes -> make note and not patch structure if present
         - modified lysines (KCX) -> remove CO2 and rename to LYS
-        - modified cysteines (SEC) -> replace SE with S and rename to CYS
-        - modified methionine (MSE) -> replace SE with S and rename to MET
+        - modified cysteines (SEC) -> rename the selenium SE to SG (element S) and the residue to CYS
+        - modified methionine (MSE) -> rename the selenium SE to SD (element S) and the residue to MET
         - element codes -> if not present in pdb file, add these in based on guess from atomtype col
         - neglect HETATMs unless metal ions and hydrogens
         - check for modified residues in structure, convert back to backbone for patching
@@ -1117,17 +1089,13 @@ class PDB(object):
                 res_insertion_codes.append(line[26])
 
             # replace selenomethionine with methionine
-            if "MSE" in line and ('ATOM' in line or 'HETATM' in line):
-                line = line.replace('HETATM', 'ATOM  ')
-                line = line.replace('MSE', 'MET')
-                line = line.replace('SE', ' S')
+            if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
+                line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
                 test_MSE = True
 
             # replace selenocysteine with cysteine
-            if "SEC" in line and ('ATOM' in line or 'HETATM' in line):
-                #line = line.replace("HETATM", "ATOM  ")
-                line = line.replace('SEC', 'CYS')
-                line = line.replace('SE', ' S')
+            if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
+                line = selenium_to_sulfur(line, 'CYS', 'SG')
                 test_SEC = True
 
             #transform carboxylated lysine into a normal lysine
@@ -1184,7 +1152,7 @@ class PDB(object):
                         uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
 
                     M = bb.Molecule()
-                    M.import_pdb(pdb=read_file_path, include_hetatm=True)
+                    M.import_pdb(filename=read_file_path, include_hetatm=True)
                     M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
                     subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
                     pdb_seqs = {}
@@ -1247,7 +1215,7 @@ class PDB(object):
                                 if chain[0] == line[21]:
                                     
                                     F = bb.Molecule()
-                                    F.import_pdb(pdb=read_file_path, include_hetatm=True)
+                                    F.import_pdb(filename=read_file_path, include_hetatm=True)
                                     F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
                                     subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
                                     pdb_seqs = {}
@@ -1694,7 +1662,7 @@ class PDB(object):
 
             pdb = os.path.splitext(os.path.basename(path))[0]
             path_temp = os.path.join(self.raw_dir, f"{pdb}_temp.pdb")
-            M.write_pdb(path_temp, index=indices, split_struc=False)
+            M.write_pdb(path_temp, indices=indices, split_struc=False)
 
             # take the new written file and insert in place where it would sit in the overall pdb file
             lines = open(path, 'r').readlines()
@@ -1704,8 +1672,9 @@ class PDB(object):
                     break
                 first_lines.append(line)
 
+            # biobox ends the file it writes with an END record
             new_atom_lines = open(path_temp, 'r').readlines()
-            new_file_output = first_lines + new_atom_lines + ['END\n']
+            new_file_output = first_lines + new_atom_lines
 
             cleaned_file = open(path, 'w')
             cleaned_file.writelines(new_file_output)
@@ -1768,7 +1737,7 @@ class PDB(object):
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=self.include_hetatm)
             indices = M.atomselect('*', '*', '*', True, False)[1]
-            M.write_pdb(path, index=indices, split_struc=False)
+            M.write_pdb(path, indices=indices, split_struc=False)
 
         except Exception as e:
             os.remove(path)

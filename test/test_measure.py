@@ -229,6 +229,40 @@ class Test_Measure(unittest.TestCase):
         M.recover_from_log('measure_log.txt')
     '''
 
+    def test_min_dist_other_chain(self):
+        # metadata column: NaN for one chain, a distance otherwise, no row without an anchor
+        print('-> Testing Min_Dist_Other_Chain')
+        import numpy as np
+        import biobox as bb
+        rows = self.df_prot[self.df_prot['PDB_Code'].isin(['AF-P40616-F1-model_v6', '1UPT', '8Y8Y'])]
+        M = RD.Measure(df_input=rows, outdir=self.outdir, features_dict={'sasa': {}},
+                       parallel=False)
+        M.measure_data()
+        df = M.df
+        self.assertIn('Min_Dist_Other_Chain', df.columns)
+        self.assertNotIn('Min_Dist_Other_Chain', M.features)
+
+        single = df[df['PDB_Code'].str.startswith(('AF-', '8Y8Y'))]
+        self.assertGreater(len(single), 0)
+        self.assertTrue(single['Min_Dist_Other_Chain'].isna().all())
+        multi = df[df['PDB_Code'].str.startswith('1UPT')]
+        self.assertGreater(len(multi), 0)
+        self.assertTrue((multi['Min_Dist_Other_Chain'] > 0).all())
+
+        # the five 8Y8Y lysines deposited without NZ cannot be featurised
+        y8 = df[df['PDB_Code'].str.startswith('8Y8Y')]
+        self.assertFalse(set(y8['Resid'].astype(int)) & {86, 166, 244, 246, 276})
+
+        # brute force on one 1UPT lysine
+        r = multi.iloc[0]
+        S = bb.Molecule(os.path.join(self.outdir, 'curated', f"{r['PDB_Code']}.pdb"))
+        d = S.data
+        nz = S.points[((d['chain'] == r['Chain']) & (d['resid'] == int(r['Resid']))
+                       & (d['name'] == 'NZ')).to_numpy()][0]
+        other = S.points[(d['chain'] != r['Chain']).to_numpy()]
+        self.assertAlmostEqual(r['Min_Dist_Other_Chain'],
+                               np.linalg.norm(other - nz, axis=1).min(), places=6)
+
     def test_residue_preset(self):
         # a three-letter code of any standard residue resolves to its preset
         print('-> Testing a residue preset other than lysine')
@@ -439,7 +473,7 @@ class Test_Feature_Settings(unittest.TestCase):
         for _, row in df.iterrows():
             sel = ((M.data['chain'] == row['Chain']) & (M.data['resid'] == row['Resid'])
                    & ~M.data['name'].isin(['CA', 'C', 'N', 'O'])).to_numpy()
-            whole = bb.sasa(M, targets=np.where(sel)[0], threshold=0)[0]
+            whole = bb.sasa(M, indices=np.where(sel)[0], threshold=0)[0]
             self.assertAlmostEqual(row['sasa'], whole, places=6)
 
     def test_sasa_cut_out_grows_with_the_probe(self):
@@ -466,8 +500,8 @@ class Test_Feature_Settings(unittest.TestCase):
         M = bb.Molecule()
         M.import_pdb(path)
         side_chain = np.arange(4, 9)
-        whole = bb.sasa(M, targets=side_chain, probe=probe, threshold=0)[0]
-        without = bb.sasa(M.get_subset(idxs=np.arange(9)), targets=side_chain,
+        whole = bb.sasa(M, indices=side_chain, probe=probe, threshold=0)[0]
+        without = bb.sasa(M.get_subset(indices=np.arange(9)), indices=side_chain,
                           probe=probe, threshold=0)[0]
         self.assertLess(whole, without)              # the far atom does occlude
         self.assertAlmostEqual(got, whole, places=6)
