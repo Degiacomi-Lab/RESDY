@@ -45,8 +45,7 @@ class DAS():
     }
 
     #: Residues the feature can act on. A residue is left out when the measurement showed the
-    #: feature has nothing to say about it: DAS was computed for all twenty residues over the 19
-    #: relaxed structures of ``demo/curated``, and a residue is excluded when the median count
+    #: feature has nothing to say about it: a residue is excluded when the median count
     #: came back as 1, the anchor atom alone.
     SUPPORTED_RESIDUES = set(RESIDUE_KWARGS)
 
@@ -147,8 +146,6 @@ class DAS():
                 x       x       x
         :rtype: pandas.DataFrame
         '''
-
-        # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
             M = bb.Molecule()
             M.import_pdb(path, include_hetatm=True)
@@ -159,7 +156,8 @@ class DAS():
                                       self.aa_properties['atom_select_names_modified'],
                                       use_resname=True, get_index=True)[1]
                 # due to wider selection criteria, possible to get more than 1 hit per residue of interest, remove duplicates
-                key_res_chain = zip(list(M.data['resid'].values[idx_nz]), list(M.data['chain'].values[idx_nz]))
+                key_res_chain = zip(list(M.data['resid'].values[idx_nz]),
+                                    list(M.data['chain'].values[idx_nz]))
                 pairs_seen, keep_pos = set(), []
                 for pair, pos in zip(key_res_chain, range(len(idx_nz))):
                     if pair not in pairs_seen:
@@ -175,14 +173,14 @@ class DAS():
 
             lys_res_nums = list(M.data['resid'][idx_nz])
             list_chains = list(M.data['chain'][idx_nz])
-            list_modified = list(a in  self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_nz]))
+            list_modified = list(a in  self.aa_properties['modified_codes']
+                                 for a in list(M.data['resname'][idx_nz]))
         except Exception as e:
             if self.record_errors: report_error_to_file('DAS 1', path, str(e), self.error_filename)
             print(f'DAS Calculation: 1 - could not load and identify the NZ '
                   f'atoms within the lysines of the structure: {str(e)}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'das'])
 
-        # 2: Setup the Xlink module and create the half spheres
         try:
             XL = bb.Xlink(M)
             das_output = []
@@ -201,14 +199,14 @@ class DAS():
                     kwargs['radii'] = self.radii
                 half_sphere_coords = XL.get_half_sphere(i=lys_nz_idx, **kwargs)
                 # as the density of points created by the get half sphere is constant for any setup,
-                # therefore can just count the number of coordinates that are returned for a measure for SASA Path
+                # can just count the number of coordinates that are returned for a measure for DAS
                 das_output.append(len(half_sphere_coords))
             except Exception as e:
                 if self.record_errors: report_error_to_file('DAS 2', path, str(e), self.error_filename)
-                print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the NZ atoms on lysine no {lys_res_nums[i]}: {e}')
+                print(f'DAS Calculation: 2 - Failed to calculate the half spheres for the '
+                      f'NZ atoms on lysine no {lys_res_nums[i]}: {e}')
                 das_output.append(None)
 
-        # 3: Create dataframe to return
         df_das = pd.DataFrame(columns=["Chain", "Resid", "das"])
         try:
             df_das['Chain'] = list_chains
@@ -217,7 +215,8 @@ class DAS():
             if self.include_modified: df_das['Modified'] = list_modified
         except Exception as e:
             if self.record_errors: report_error_to_file('DAS 3', path, str(e), self.error_filename)
-            print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall dataframe: {e}')
+            print(f'DAS Calculation: 3 - Failed to create datafame to append to the overall '
+                  f'dataframe: {e}')
 
         return df_das
 

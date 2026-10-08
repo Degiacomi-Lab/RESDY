@@ -20,12 +20,14 @@ class Test_Measure(unittest.TestCase):
         self.all_features = ['propka', 'sasa', 'depth', 'aev',
                              'das', 'seqcharge', 'melodia', 'frustration']
         self.features_dict = {k: {} for k in self.all_features}
+        self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb', '1A6M-alt1a_relaxed.pdb']})
 
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
 
     def test_full_setup(self):
         # test full setup of measures class, no run, test runs individually
+        # standard track
         print('-> Testing full setup')
         M = RD.Measure(df_input=self.df_prot,
                         outdir=self.outdir,
@@ -34,8 +36,16 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
 
-    def test_propka(self):
-        print('-> Test measuring PROPKA')
+        # pdb only
+        M = RD.Measure(df_input=self.df_pdb_only_test,
+                        outdir=self.outdir,
+                        features_dict=self.features_dict)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+
+    def test_propka_standardtrack(self):
+        print('-> Test measuring PROPKA - Standard Track')
         M_propka = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'propka': {}},
@@ -46,7 +56,19 @@ class Test_Measure(unittest.TestCase):
         print('len propka', len(M_propka.df))
         self.assertTrue(len(M_propka.df) > 0)
 
-    def test_sasa(self):
+    def test_propka_pdbonlytrack(self):
+        print('-> Test measuring PROPKA - PDB Only')
+        M_propka = RD.Measure(df_input=self.df_pdb_only_test,
+                        outdir=self.outdir,
+                        features_dict={'propka': {}},
+                        parallel=True,
+                        include_modified=False)
+        M_propka.measure_data()
+        print(M_propka.df)
+        print('len propka', len(M_propka.df))
+        self.assertTrue(len(M_propka.df) > 0)
+
+    def test_sasa_standardtrack(self):
         print('-> Test measuring SASA')
         M_sasa = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
@@ -58,7 +80,19 @@ class Test_Measure(unittest.TestCase):
         print('len sasa', len(M_sasa.df))
         self.assertTrue(len(M_sasa.df) > 0)
 
-    def test_depth(self):
+    def test_sasa_pdbonlytrack(self):
+        print('-> Test measuring SASA')
+        M_sasa = RD.Measure(df_input=self.df_pdb_only_test,
+                        outdir=self.outdir,
+                        features_dict={'sasa': {}},
+                        parallel=True,
+                        include_modified=False)
+        M_sasa.measure_data()
+        print(M_sasa.df)
+        print('len sasa', len(M_sasa.df))
+        self.assertTrue(len(M_sasa.df) > 0)
+
+    def test_depth_standardtrack(self):
         print('-> Test measuring DEPTH')
         M_depth = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
@@ -70,9 +104,33 @@ class Test_Measure(unittest.TestCase):
         print('len depth', len(M_depth.df))
         self.assertTrue(len(M_depth.df) > 0)
 
-    def test_aev(self):
+    def test_depth_pdbonlytrack(self):
+        print('-> Test measuring DEPTH')
+        M_depth = RD.Measure(df_input=self.df_pdb_only_test,
+                        outdir=self.outdir,
+                        features_dict={'depth': {}},
+                        parallel=True,
+                        include_modified=False)
+        M_depth.measure_data()
+        print(M_depth.df)
+        print('len depth', len(M_depth.df))
+        self.assertTrue(len(M_depth.df) > 0)
+
+    def test_aev_standardtrack(self):
         print('-> Test measuring AEV')
         M_aev = RD.Measure(df_input=self.df_prot[:2],
+                        outdir=self.outdir,
+                        features_dict={'aev': {}},
+                        parallel=True,
+                        include_modified=False)
+        M_aev.measure_data()
+        print(M_aev.df)
+        print('len aev', len(M_aev.df))
+        self.assertTrue(len(M_aev.df) > 0)
+
+    def test_aev_pdbonlytrack(self):
+        print('-> Test measuring AEV')
+        M_aev = RD.Measure(df_input=self.df_pdb_only_test,
                         outdir=self.outdir,
                         features_dict={'aev': {}},
                         parallel=True,

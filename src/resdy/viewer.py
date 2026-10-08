@@ -1,10 +1,10 @@
+import os
+import io
 import numpy as np
 import pandas as pd
-import nglview as nv
 import plotly.express as px
-import os
-import webbrowser
-from dash import Dash, dcc, html, Input, Output, ctx, State, callback, no_update
+from dash import Dash, dcc, html, Input, Output, ctx, callback, no_update
+from contextlib import redirect_stdout
 from .aggregation import Aggregation
 from .helper import METADATA_COLUMNS
 from .analysis import Analysis
@@ -16,7 +16,8 @@ class Viewer(object):
     dash functionality
     '''
 
-    def __init__(self, df_measures, outdir = 'result', render_mode='png'):
+    def __init__(self, df_measures, outdir = 'result', render_mode='auto',
+                 suppress_unimportant_output=True):
         '''
         Initialise the viewer module for the RESDY package.
 
@@ -31,6 +32,7 @@ class Viewer(object):
             on the size of the dataset in the plot. Can either be set to 'svg' or 'webgl' if user
             wants more custom control.
         :type str
+        :param suppress_unimportant_output: Toggleable option to 
         '''
         if isinstance(df_measures, str):
             self.df_measures = pd.read_csv(df_measures)
@@ -43,6 +45,7 @@ class Viewer(object):
         if self.render_mode not in ['auto', 'svg', 'webgl']:
             print(f'>> Given render mode is not one accepted, setting render_mode to auto')
             self.render_mode = 'auto'
+        self.suppress_unimportant_output = suppress_unimportant_output
 
         self.non_feat_cols = list(METADATA_COLUMNS)
         self.features = [a for a in self.df_measures.columns if a not in self.non_feat_cols]
@@ -83,28 +86,53 @@ class Viewer(object):
                                'Frustration': 'frustration',
                                'Density': 'density'}
 
+        self.axis_labels = {'depth': 'Depth (Å)',
+                        'sasa': 'Solvent Accessible Surface Area (Å\u00b2)',
+                        'propka': 'pKa (PROPKA3)',
+                        'pkaani': 'pKa (pKaANI)',
+                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                        'curvature': 'Curvature',
+                        'arc_length': 'Arc Length',
+                        'das': 'Dynamically Accessible Surface Area',
+                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                        'phi': 'Phi',
+                        'psi': 'Psi',
+                        'seqcharge': 'Sequence Charge',
+                        'torsion': 'Torsion Angle',
+                        'writhing': 'Writhing',
+                        'frustration': 'Frustration',
+                        'rmsf': 'Root Mean Square Fluctuation',
+                        'density': 'Density',
+                        'aev': 'Atomic Environment Vector'}
+
         self.feature_labels_reverse = {v: k for k, v in self.feature_labels.items()}
         self.feature_labels_list = [self.feature_labels_reverse[a] for a in self.features]
 
         self.colour_cols = [a for a in ['PLDDT', 'Method', 'Source', 'class'] if a in self.df_scalar_measures.columns]
 
-        self.A = Aggregation(df_measurements=self.df_scalar_measures,
-                             aggregation_method='all',
-                             features_to_include='all',
-                             aev_red_method='pca')
-        self.df_agg = self.A.aggregate_data()
-        self.df_agg.columns.name = 'Feature'
-        self.res_key = [a for a in ['Uniprot_Entry', 'Chain', 'Resid'] if a in self.df_agg.columns]
-        
-        self.Analysis = Analysis(df=self.df_scalar_measures,
-                                 outdir=self.outdir,
-                                 features_to_analyse=self.features)
-        self.Analysis.GO_get_data()
-        self.GO_codes = {k: f'{k}: {v}' for k,v in self.Analysis.code_to_name.items()}
-        self.GO_codes_reverse = {v:k for k,v in self.GO_codes.items()}
-        self.GO_dict = self.Analysis.GO_dict
-        self.GO_list = list(self.GO_codes.keys())
-        self.GO_display_names = list(self.GO_codes.values())
+        with redirect_stdout(io.StringIO()) as f:
+            self.A = Aggregation(df_measurements=self.df_scalar_measures,
+                                aggregation_method='all',
+                                features_to_include='all',
+                                aev_red_method='pca')
+            self.df_agg = self.A.aggregate_data()
+            self.df_agg.columns.name = 'Feature'
+            self.res_key = [a for a in ['Uniprot_Entry', 'Chain', 'Resid']
+                            if a in self.df_agg.columns]
+            
+            self.Analysis = Analysis(df=self.df_scalar_measures,
+                                    outdir=self.outdir,
+                                    features_to_analyse=self.features)
+            self.Analysis.GO_get_data()
+            self.GO_codes = {k: f'{k}: {v}' for k,v in self.Analysis.code_to_name.items()}
+            self.GO_codes_reverse = {v:k for k,v in self.GO_codes.items()}
+            self.GO_dict = self.Analysis.GO_dict
+            self.GO_list = list(self.GO_codes.keys())
+            self.GO_display_names = list(self.GO_codes.values())
+
+        if not self.suppress_unimportant_output:
+            for line in f:
+                print(line)
 
         self.data_viewer_app = Dash(__name__, suppress_callback_exceptions=True)
         self._setup_html()
@@ -165,8 +193,10 @@ class Viewer(object):
                                 max=round(self.df_scalar_measures['propka'].max(), 1),
                                 step=0.1,
                                 id='2d-xaxis-slider',
-                                value=[round(self.df_scalar_measures['propka'].min(), 1), round(self.df_scalar_measures['propka'].max(), 1)],
-                                marks=(int(((self.df_scalar_measures['propka'].max() - self.df_scalar_measures['propka'].min())/ 7)) or 1)),
+                                value=[round(self.df_scalar_measures['propka'].min(), 1),
+                                       round(self.df_scalar_measures['propka'].max(), 1)],
+                                marks=(int(((self.df_scalar_measures['propka'].max() -
+                                             self.df_scalar_measures['propka'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
                         style={'width': '32%', 'display': 'inline-block'}),
@@ -197,8 +227,10 @@ class Viewer(object):
                                 max=round(self.df_scalar_measures['sasa'].max(), 1),
                                 step=0.1,
                                 id='2d-yaxis-slider',
-                                value=[round(self.df_scalar_measures['sasa'].min(), 1), round(self.df_scalar_measures['sasa'].max(), 1)],
-                                marks=(int(((self.df_scalar_measures['sasa'].max() - self.df_scalar_measures['sasa'].min())/ 7)) or 1)),
+                                value=[round(self.df_scalar_measures['sasa'].min(), 1),
+                                       round(self.df_scalar_measures['sasa'].max(), 1)],
+                                marks=(int(((self.df_scalar_measures['sasa'].max() -
+                                             self.df_scalar_measures['sasa'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
                         style={'width': '32%', 'horizontal-align': 'center',
@@ -743,10 +775,11 @@ class Viewer(object):
                 )
             )
 
-            fig.update_xaxes(title=xaxis_column_name,
+            fig.update_xaxes(title=self.axis_labels[self.feature_labels[xaxis_column_name]],
                              type='linear' if xaxis_type == 'Linear' else 'log')
 
-            fig.update_yaxes(title=yaxis_column_name, type='linear' if yaxis_type == 'Linear' else 'log')
+            fig.update_yaxes(title=self.axis_labels[self.feature_labels[yaxis_column_name]],
+                             type='linear' if yaxis_type == 'Linear' else 'log')
 
             fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
 
@@ -771,7 +804,20 @@ class Viewer(object):
                     fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
             else:
                 if colour in dff.columns:
-                    fig = px.histogram(dff, x=feature, color=colour)
+                    if colour == 'PLDDT':
+                        dfff = dff.copy()
+                        plddt_bin_gap = 5
+                        bin_edges = [float(a) for a in list(range(0, 101, plddt_bin_gap))]
+                        bin_labels = [f'{int(a)}-{int(a)+5}' for a in bin_edges[:-1]]
+                        dfff['PLDDT'] = pd.cut(dff['PLDDT'],
+                                                    bins=bin_edges,
+                                                    labels=bin_labels,
+                                                    include_lowest=True,
+                                                    ordered=True).astype(str)
+                        fig = px.histogram(dfff, x=feature, color='PLDDT',
+                                            category_orders={'PLDDT': bin_labels})
+                    else:
+                        fig = px.histogram(dff, x=feature, color=colour)
                 else:
                     fig = px.histogram(dff, x=feature, color_discrete_sequence=['#682860'])
 
@@ -784,7 +830,7 @@ class Viewer(object):
                             text=title)
 
             fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10},
-                              xaxis_title_text=self.feature_labels_reverse[feature],
+                              xaxis_title_text=self.axis_labels[feature],
                               yaxis_title_text='Count')
 
             return fig
@@ -827,7 +873,6 @@ class Viewer(object):
                 else:
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry)]
                     title = '<b>{}</b><br>{}'.format(uniprot_entry, col_name)
-                #dff = dff[['Uniprot_Entry', 'Resid'] + [axis_name]]
 
             return dff, axis_name, title, subset, colour
 
@@ -863,8 +908,22 @@ class Viewer(object):
 
             if colour_col != 'None':
                 if colour_col in dff.columns:
-                    fig = px.histogram(dff, x=feature, marginal='rug',
-                                        nbins=nbins, color=colour_col)
+                    if colour_col == 'PLDDT':
+                        dfff = dff.copy()
+                        plddt_bin_gap = 5
+                        bin_edges = [float(a) for a in list(range(0, 101, plddt_bin_gap))]
+                        bin_labels = [f'{int(a)}-{int(a)+5}' for a in bin_edges[:-1]]
+                        dfff['PLDDT'] = pd.cut(dff['PLDDT'],
+                                                   bins=bin_edges,
+                                                   labels=bin_labels,
+                                                   include_lowest=True,
+                                                   ordered=True).astype(str)
+                        fig = px.histogram(dfff, x=feature, marginal='rug',
+                                            nbins=nbins, color='PLDDT',
+                                            category_orders={'PLDDT': bin_labels})
+                    else:
+                        fig = px.histogram(dff, x=feature, marginal='rug',
+                                            nbins=nbins, color=colour_col)
                 else:
                     fig = px.histogram(dff, x=feature, marginal='rug',
                                         nbins=nbins, color_discrete_sequence=['#682860'])
@@ -890,7 +949,7 @@ class Viewer(object):
             fig.update_yaxes(showgrid=False)
 
             fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10},
-                              xaxis_title_text=title, yaxis_title_text='Count')
+                              xaxis_title_text=self.axis_labels[self.feature_labels[title]], yaxis_title_text='Count')
 
             return fig
 
@@ -1145,11 +1204,11 @@ class Viewer(object):
                 height=700,
                 scene=dict(
                     aspectmode='cube',
-                    xaxis=dict(title=xaxis_column_name,
+                    xaxis=dict(title=self.axis_labels[self.feature_labels[xaxis_column_name]],
                                type='linear' if xaxis_type == 'Linear' else 'log'),
-                    yaxis=dict(title=yaxis_column_name,
+                    yaxis=dict(title=self.axis_labels[self.feature_labels[yaxis_column_name]],
                                type='linear' if yaxis_type == 'Linear' else 'log'),
-                    zaxis=dict(title=zaxis_column_name,
+                    zaxis=dict(title=self.axis_labels[self.feature_labels[zaxis_column_name]],
                                type='linear' if zaxis_type == 'Linear' else 'log'),
                 )
             )

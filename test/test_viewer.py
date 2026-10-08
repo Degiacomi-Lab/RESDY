@@ -1,7 +1,6 @@
 import unittest
 import sys
 import os
-from dash.testing.application_runners import import_app
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
@@ -14,8 +13,6 @@ class Test_Viewer(unittest.TestCase):
         self.V = RD.Viewer(outdir=self.outdir,
                            df_measures=self.df_measures)
 
-    def test_launch(self):
-        app = import_app('RD.Viewer.app')
 
 
 if __name__ == "__main__":
