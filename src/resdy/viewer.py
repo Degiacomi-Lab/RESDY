@@ -112,14 +112,16 @@ class Viewer(object):
 
     def launch_viewer(self):
         '''
-        Launch a plotly web browser window which can then be used 
+        Launch a plotly web browser window which can then be used for analysis of the
+        measurements data. Will launch on a local address which can be opened in a browser
+        or preview in many code editors.
         '''
         self.data_viewer_app.run(debug=True)
 
 
     def _setup_html(self):
         '''
-        Currently house all the setup of the plotly work here, may split up if possible to do so too.
+        Houses all the html layout for the viewer dash app. Operates on a tab based system.
         '''
         self.data_viewer_app.layout = html.Div([
             html.H1('RESDY Measurements Analysis', style={'text-align': 'center'}),
@@ -139,19 +141,25 @@ class Viewer(object):
                     html.Div([
                         html.Div([
                             html.H4('X-Axis Feature', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 self.feature_labels_list,
                                 self.feature_labels_list[0],
                                 id='2d-axis-column',
                             ),
+
                             dcc.RadioItems(
                                 ['Linear', 'Log'],
                                 'Linear',
                                 id='2d-xaxis-type',
                                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                             ),
+
                             html.Div([
-                                html.H4('pKa (PROPKA3) Range', style={'text-align': 'center'}, id='xaxis-feature-slider-header'),
+                                html.H4('pKa (PROPKA3) Range',
+                                        style={'text-align': 'center'},
+                                        id='xaxis-feature-slider-header'),
+
                                 dcc.RangeSlider(
                                 min=round(self.df_scalar_measures['propka'].min(), 1),
                                 max=round(self.df_scalar_measures['propka'].max(), 1),
@@ -165,19 +173,25 @@ class Viewer(object):
 
                         html.Div([
                             html.H4('Y-Axis Feature', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 self.feature_labels_list,
                                 self.feature_labels_list[1],
                                 id='2d-yaxis-column'
                             ),
+
                             dcc.RadioItems(
                                 ['Linear', 'Log'],
                                 'Linear',
                                 id='2d-yaxis-type',
                                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                             ),
+
                             html.Div([
-                                html.H4('Solvent Accessible Surface Area Range', style={'text-align': 'center'}, id='yaxis-feature-slider-header'),
+                                html.H4('Solvent Accessible Surface Area Range',
+                                        style={'text-align': 'center'},
+                                        id='yaxis-feature-slider-header'),
+
                                 dcc.RangeSlider(
                                 min=round(self.df_scalar_measures['sasa'].min(), 1),
                                 max=round(self.df_scalar_measures['sasa'].max(), 1),
@@ -187,15 +201,20 @@ class Viewer(object):
                                 marks=(int(((self.df_scalar_measures['sasa'].max() - self.df_scalar_measures['sasa'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
-                        style={'width': '32%', 'horizontal-align': 'center', 'display': 'inline-block', 'justify-content': 'center', 'align-items': 'center'}),
+                        style={'width': '32%', 'horizontal-align': 'center',
+                               'display': 'inline-block', 'justify-content': 'center',
+                               'align-items': 'center'}),
 
                         html.Div([
-                            html.H4('Measurements Aggregation Type', style={'text-align': 'center'}),
+                            html.H4('Measurements Aggregation Type',
+                                    style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 list(self.aggregation_types.keys()),
                                 'Average',
                                 id='2d-agg-col'
                             ),
+
                             html.Div(id='aggon-radio-container',
                                 children=[
                                 dcc.RadioItems(
@@ -205,6 +224,7 @@ class Viewer(object):
                                     labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                                 ),
                             ], style={'width': '48%', 'float': 'left', 'display': 'inline-block'}),
+
                             html.Div(id='sd-radio-container',
                                 children=[
                                 dcc.RadioItems(
@@ -214,8 +234,10 @@ class Viewer(object):
                                     labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                                 ),
                             ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
+
                             html.Div([
                                 html.H4('Scatter Colour Section', style={'text-align': 'center'}),
+
                                 dcc.Dropdown(
                                     ['None'] + self.colour_cols,
                                     'None',
@@ -238,14 +260,17 @@ class Viewer(object):
 
                         html.Div([
                             html.H5('Subset By:', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 ['Uniprot Code', 'Uniprot Code + Resid', 'Uniprot Code + Chain + Resid'],
                                 'Uniprot Code',
                                 id='2d-little_hist_subset_dropdown'
                             ),
                         ], style={'display': 'inline-block', 'width': '48%'}),
+
                         html.Div([
                             html.H5('Colour By:', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 ['Uniform', 'Chain', 'Resid', 'Chain + Resid'] + self.colour_cols,
                                 'Uniform',
@@ -256,6 +281,7 @@ class Viewer(object):
 
                     html.Div([
                         html.H3('GO Term Subset', style={'text-align': 'center'}),
+
                         dcc.Dropdown(
                             ['All'] + self.GO_display_names,
                             'All',
@@ -264,6 +290,8 @@ class Viewer(object):
                     ],
                     style={'width': '95%', 'display': 'inline-block'}),
                 ])
+
+
             elif tab == 'tab_histogram_analysis':
                 return html.Div([
                     html.Div([
@@ -279,18 +307,21 @@ class Viewer(object):
 
                         html.Div([
                             html.H3('Feature Aggregation Type', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 ['None'] + list(self.aggregation_types.keys()),
                                 'None',
                                 id='2d-agg-type-hist'
                             ),
                         ],
-                        style={'width': '49%', 'horizontal-align': 'right', 'display': 'inline-block'}),
+                        style={'width': '49%', 'horizontal-align': 'right',
+                               'display': 'inline-block'}),
                     ]),
 
                     html.Div([
                         html.Div([
                             html.H4('Uniprot Entry', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 ['All'] + list(self.df_measures['Uniprot_Entry'].unique()),
                                 'All',
@@ -301,11 +332,13 @@ class Viewer(object):
 
                         html.Div([
                             html.H4('Chain', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 ['All'] + list(self.df_measures['Chain'].unique()),
                                 'All',
                                 id='crossfilter-chain-hist'
                             ),
+
                             dcc.RadioItems(
                                 ['Together', 'Seperate'],
                                 'Together',
@@ -313,7 +346,8 @@ class Viewer(object):
                                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                             )
                         ],
-                        style={'width': '32%', 'horizontal-align': 'center', 'display': 'inline-block'}),
+                        style={'width': '32%', 'horizontal-align': 'center',
+                               'display': 'inline-block'}),
 
                         html.Div([
                             html.H4('Resid', style={'text-align': 'center'}),
@@ -322,6 +356,7 @@ class Viewer(object):
                                 'All',
                                 id='crossfilter-resid-hist'
                             ),
+
                             dcc.RadioItems(
                                 ['Together', 'Seperate'],
                                 'Together',
@@ -337,7 +372,8 @@ class Viewer(object):
                     html.Div(id='mainhist-warningtext',
                              children=[
                         html.H4('WARNING: Plotting data without an aggregation type may be biased due to the number of available structures for each protein.')
-                    ], style={'width': '100%', 'display': 'inline-block', 'float': 'center', 'text-align': 'center', 'padding': '0 20'}),
+                    ], style={'width': '100%', 'display': 'inline-block', 'float': 'center',
+                              'text-align': 'center', 'padding': '0 20'}),
 
                     html.Div([
                         dcc.Graph(
@@ -356,7 +392,8 @@ class Viewer(object):
                     ], style={'width': '95%', 'horizontal-align': 'center'}),
 
                     html.Div([
-                        html.H4('pKa (PROPKA3) Range', style={'text-align': 'center'}, id='main-hist-feature-slider-header'),
+                        html.H4('pKa (PROPKA3) Range', style={'text-align': 'center'},
+                                id='main-hist-feature-slider-header'),
                         dcc.RangeSlider(
                         min=round(self.df_scalar_measures['propka'].min(), 1),
                         max=round(self.df_scalar_measures['propka'].max(), 1),
@@ -390,19 +427,25 @@ class Viewer(object):
                     html.Div([
                         html.Div([
                             html.H4('X-Axis Feature', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 self.feature_labels_list,
                                 self.feature_labels_list[0],
                                 id='3d-xaxis-column',
                             ),
+
                             dcc.RadioItems(
                                 ['Linear', 'Log'],
                                 'Linear',
                                 id='3d-xaxis-type',
                                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                             ),
+
                             html.Div([
-                                html.H4('pKa (PROPKA3) Range', style={'text-align': 'center'}, id='3d-xaxis-feature-slider-header'),
+                                html.H4('pKa (PROPKA3) Range',
+                                        style={'text-align': 'center'},
+                                        id='3d-xaxis-feature-slider-header'),
+
                                 dcc.RangeSlider(
                                 min=round(self.df_scalar_measures['propka'].min(), 1),
                                 max=round(self.df_scalar_measures['propka'].max(), 1),
@@ -416,19 +459,25 @@ class Viewer(object):
 
                         html.Div([
                             html.H4('Y-Axis Feature', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 self.feature_labels_list,
                                 self.feature_labels_list[1],
                                 id='3d-yaxis-column'
                             ),
+
                             dcc.RadioItems(
                                 ['Linear', 'Log'],
                                 'Linear',
                                 id='3d-yaxis-type',
                                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                             ),
+
                             html.Div([
-                                html.H4('Solvent Accessible Surface Area Range', style={'text-align': 'center'}, id='3d-yaxis-feature-slider-header'),
+                                html.H4('Solvent Accessible Surface Area Range',
+                                        style={'text-align': 'center'},
+                                        id='3d-yaxis-feature-slider-header'),
+
                                 dcc.RangeSlider(
                                 min=round(self.df_scalar_measures['sasa'].min(), 1),
                                 max=round(self.df_scalar_measures['sasa'].max(), 1),
@@ -442,19 +491,24 @@ class Viewer(object):
 
                         html.Div([
                             html.H4('Z-Axis Feature', style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 self.feature_labels_list,
                                 self.feature_labels_list[2],
                                 id='3d-zaxis-column',
                             ),
+
                             dcc.RadioItems(
                                 ['Linear', 'Log'],
                                 'Linear',
                                 id='3d-zaxis-type',
                                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
                             ),
+
                             html.Div([
-                                html.H4('Depth', style={'text-align': 'center'}, id='3d-zaxis-feature-slider-header'),
+                                html.H4('Depth', style={'text-align': 'center'},
+                                        id='3d-zaxis-feature-slider-header'),
+
                                 dcc.RangeSlider(
                                 min=round(self.df_scalar_measures['depth'].min(), 1),
                                 max=round(self.df_scalar_measures['depth'].max(), 1),
@@ -469,6 +523,7 @@ class Viewer(object):
 
                     html.Div([
                         html.H4('Measurements Aggregation Type', style={'text-align': 'center'}),
+
                         dcc.Dropdown(
                             ['None'] + list(self.aggregation_types.keys()),
                             'Average',
@@ -478,7 +533,9 @@ class Viewer(object):
 
                     html.Div([
                         html.Div([
-                            html.H4('Scatter Colour Section', style={'text-align': 'center'}),
+                            html.H4('Scatter Colour Section',
+                                    style={'text-align': 'center'}),
+
                             dcc.Dropdown(
                                 ['None'] + self.colour_cols,
                                 'None',
@@ -492,26 +549,35 @@ class Viewer(object):
                             hoverData={'points': [{'customdata': self.df_measures[self.res_key].iloc[0]}]}
                         )
                     ], style={'width': '98%', 'display': 'inline-block', 'padding': '0 20'}),
+
                     html.Div([
                         dcc.Graph(id='3d-x-feat-hist'),
                     ], style={'display': 'inline-block', 'width': '32%'}),
+
                     html.Div([
                         dcc.Graph(id='3d-y-feat-hist'),
                     ], style={'display': 'inline-block', 'width': '32%'}),
+
                     html.Div([
                         dcc.Graph(id='3d-z-feat-hist'),
                     ], style={'display': 'inline-block', 'width': '32%'}),
 
+
                     html.Div([
-                        html.H5('Individual Histograms Subset By:', style={'text-align': 'center'}),
+                        html.H5('Individual Histograms Subset By:',
+                                style={'text-align': 'center'}),
+
                         dcc.Dropdown(
                             ['Uniprot Code', 'Uniprot Code + Resid', 'Uniprot Code + Chain + Resid'],
                             'Uniprot Code',
                             id='3d-little_hist_subset_dropdown'
                         ),
                     ], style={'display': 'inline-block', 'width': '48%'}),
+
                     html.Div([
-                        html.H5('Individual Histograms Colour By:', style={'text-align': 'center'}),
+                        html.H5('Individual Histograms Colour By:',
+                                style={'text-align': 'center'}),
+
                         dcc.Dropdown(
                             ['Uniform', 'Chain', 'Resid', 'Chain + Resid'] + self.colour_cols,
                             'Uniform',
@@ -520,7 +586,9 @@ class Viewer(object):
                     ], style={'display': 'inline-block', 'width': '48%'}),
 
                     html.Div([
-                        html.H3('GO Term Overall Subset', style={'text-align': 'center'}),
+                        html.H3('GO Term Overall Subset',
+                                style={'text-align': 'center'}),
+
                         dcc.Dropdown(
                             ['All'] + self.GO_display_names,
                             'All',
@@ -716,7 +784,8 @@ class Viewer(object):
                             text=title)
 
             fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10},
-                              xaxis_title_text=self.feature_labels_reverse[feature], yaxis_title_text='Count')
+                              xaxis_title_text=self.feature_labels_reverse[feature],
+                              yaxis_title_text='Count')
 
             return fig
 
@@ -761,6 +830,7 @@ class Viewer(object):
                 #dff = dff[['Uniprot_Entry', 'Resid'] + [axis_name]]
 
             return dff, axis_name, title, subset, colour
+
 
         @callback(
             Output('x-feat-hist', 'figure'),
@@ -879,7 +949,9 @@ class Viewer(object):
             header = f'{feature} Range'
 
             if agg_type == 'None':
-                warning_label = {'width': '100%', 'display': 'inline-block', 'float': 'center', 'text-align': 'center', 'padding': '0 20'}
+                warning_label = {'width': '100%', 'display': 'inline-block',
+                                 'float': 'center', 'text-align': 'center',
+                                 'padding': '0 20'}
                 
                 feat = self.feature_labels[feature]
 
@@ -937,7 +1009,7 @@ class Viewer(object):
                     feat_range = [feat_min, feat_max]
                 else:
                     feat_range = no_update
-                
+
                 return create_main_hist(dff, feat_col, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
 

@@ -798,56 +798,84 @@ class Analysis(object):
         :rtype: pandas.DataFrame
         '''
         print('>> Removing unrequired residues')
-        # Remove duplicated data from the measurements
+        
         if isinstance(req_resid_table, str):
             df_req_res = pd.read_csv(req_resid_table)
         else:
             df_req_res = req_resid_table
+
         initial_data_one = len(self.df)
-        self.df = self.df.drop_duplicates()
-        duplicate_rows_removed = initial_data_one - len(self.df)
+        df_working = self.df.drop_duplicates()
+        duplicate_rows_removed = initial_data_one - len(df_working)
         print(f'Removed {duplicate_rows_removed} rows of duplicates')
-        initial_full_data_rows = len(self.df)
+        initial_full_data_rows = len(df_working)
 
-        # remove rows which have a UNIPROT code which isnt required
-        uniprot_codes = df_req_res['Uniprot_Entry'].drop_duplicates().tolist()
-        entries_to_remove = []
-        for i, r in self.df.iterrows():
-            if r['Uniprot_Entry'] not in uniprot_codes:
-                entries_to_remove.append(i)
-        self.df = self.df.drop(index=entries_to_remove)
-        uniprot_rows_removed = initial_full_data_rows - len(self.df)
-        print(f'Removed {uniprot_rows_removed} rows of Uniprot codes which were not mentioned in the required residues file')
+        req_uniprot_codes = df_req_res['Uniprot_Entry'].drop_duplicates().tolist()
+        df_unreq_uni_codes = df_working[~df_working['Uniprot_Entry'].isin(req_uniprot_codes)]
+        df_working = df_working[df_working['Uniprot_Entry'].isin(req_uniprot_codes)]
+        print(f'Removed {len(df_unreq_uni_codes)} rows of Uniprot codes which were not mentioned in the required residues file')
 
-        while len(df_req_res) > 0:
-            print("Number of rows left: " + str(len(df_req_res)))
-            test_uniprot = df_req_res["Uniprot_Entry"][df_req_res.first_valid_index()]
-            print("test_uniprot: " + str(test_uniprot))
+        for i, uniprot in enumerate(req_uniprot_codes):
+            print(f"Number of rows left: {(len(df_req_res) - i)}")
+            print(f"Extracting data for: {uniprot}")
 
-            # find all the desired residues from the particular uniprot code and put into a list
-            # automatically removes duplicates from this (doesn't retain order)
-            desired_residues = list(set(df_req_res[df_req_res["Uniprot_Entry"] == test_uniprot]["Resid"].tolist()))
-
-            # search the measures spreadsheet for all rows containing the desired uniprot code
-            search_uniprot = self.df[self.df["Uniprot_Entry"] == test_uniprot.strip()][["Uniprot_Entry", "Resid"]]
+            desired_residues = list(df_req_res.loc[df_req_res["Uniprot_Entry"] == uniprot, "Resid"].drop_duplicates())
+            search_uniprot = df_working.loc[self.df["Uniprot_Entry"] == uniprot.strip(), ["Uniprot_Entry", "Resid"]]
             all_search_rows = search_uniprot.index.tolist()
-
-            # go over each row of search_uniprot, see if the residue matches one of the desired ones
             wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
             not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
-            print("Rows removed: " + str(len(not_wanted_rows)))
+            print(f"Rows removed: {len(not_wanted_rows)}")
+            df_working = df_working.drop(index = not_wanted_rows)
 
-            # remove the rows which aren't wanted from the main data set
-            self.df = self.df.drop(index = not_wanted_rows)
-            # remove rows which contain the uniprot code that has been searched from test_table
-            df_req_res = df_req_res.drop(index = df_req_res[df_req_res["Uniprot_Entry"] == test_uniprot].index.tolist())
-
-        final_full_data_rows = len(self.df)
+        final_full_data_rows = len(df_working)
         diff_rows = initial_full_data_rows - final_full_data_rows
         print(f'Original num of rows: {initial_full_data_rows}')
         print(f'Current num of rows: {final_full_data_rows}')
         print(f'Num of rows removed: {diff_rows}')
-        self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
+        df_working.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
+        self.df = df_working
+        return df_working
+
+
+    def add_class_labels(self, df_class_set, label='1'):
+        '''
+        Add class labels to a measurements dataframe given an input dataframe of the combinations
+        of Uniprot and Residue number you would like to mark. Note to save a new csv file post,
+        you will need to call ``save_state`` again.
+
+        :param df_class_set: Dataframe containing columns 'Uniprot_Entry' and 'Resid' for which
+            you would like measurements in the measurements dataframe to assign the class label to.
+            This will look for the dataframe in the output directory.
+        :type df_class_set: Pandas DataFrame
+        :param label: Label to apply to the specific sites given. Default is 1.
+        :type label: str
+
+        :returns: Measurements dataframe with a class column attached
+        :rtype: Pandas DataFrame
+        '''
+
+        if isinstance(df_class_set, str):
+            if os.path.isfile(df_class_set):
+                df_class_set = pd.read_csv(df_class_set)
+            else:
+                raise NameError(f'>> No file available for class labels at the location given '
+                                f'{df_class_set}, please check the file name is correct.')
+
+        df_class_set['class'] = label
+
+        if 'class' in self.df.columns:
+            print('Values for class are already present in the measurements dataframe, overwriting.')
+            df_class_set = df_class_set.rename(columns={'class': 'new_class'})
+            df_labelled = self.df.join(df_class_set, on=['Uniprot_Entry', 'Resid'])
+            df_labelled['class'] = [orig if new == np.nan else new for orig, new in zip(list(df_labelled['class']), list(df_labelled['new_class']))]
+            df_labelled = df_labelled.drop(columns='new_class')
+        else:
+            print('No previous class assignment found, class column will be created and the label '
+                  '0 will be given to anything that is not in the desired class')
+            df_labelled = self.df.join(df_class_set, on=['Uniprot_Entry', 'Resid'])
+            df_labelled['class'] = df_labelled['class'].fillna('0')
+
+        self.df = df_labelled
         return self.df
 
 
