@@ -21,6 +21,7 @@ from .helper import get_download_tool, ShutUp, require_biobox
 require_biobox(bb)
 from . import alphafold as af
 from . import patcher
+from . import assembly
 from .residues import AA_PRESETS
 
 try:
@@ -103,7 +104,8 @@ class PDB(object):
                  minimise_max_iterations=1000, restrain_heavy_atoms=False,
                  restraint_k=10.0, minimisation_platform=None,
                  remove_all_modifications=False,
-                 num_cores=0, max_nmr_conformers=''):
+                 num_cores=0, max_nmr_conformers='',
+                 biological_assembly=True, max_assembly_atoms=None):
         '''
         Initialise the PDB class.
 
@@ -194,6 +196,18 @@ class PDB(object):
             structures. Default is no cap and will curate all. '' or None will also take all
             while an integer will limit.
         :type max_nmr_conformers: int
+        :param biological_assembly: Build the biological assembly of each curated PDB
+            structure from the BIOMT operators of REMARK 350, choosing the first
+            author-determined BIOMOLECULE, else the first listed. The assembly is built
+            after the asymmetric unit has been curated and before minimisation. Its copies
+            take part in every measurement, but only the residues of the original chains
+            are reported. Each structure gets ``<structure>.assembly.json`` beside it, and
+            gather_proteins collects the records into ``assembly_log.csv``. See
+            :mod:`resdy.assembly`.
+        :type biological_assembly: bool
+        :param max_assembly_atoms: Largest assembly to build, in atoms; a larger one keeps
+            the asymmetric unit. None for no limit.
+        :type max_assembly_atoms: int
         '''
 
         self.outdir = outdir
@@ -294,6 +308,8 @@ class PDB(object):
             self.df = pd.DataFrame(columns=columns)
 
         self.gap = gap
+        self.biological_assembly = biological_assembly
+        self.max_assembly_atoms = max_assembly_atoms
 
 
     def _setup_minimisation_settings(self, forcefield, tolerance, max_iterations,
@@ -610,6 +626,9 @@ class PDB(object):
             else:
                 results = [t for t in (self._curate_row(*i) for i in items) if t is not None]
 
+            if self.biological_assembly:
+                self.collect_assembly_log()
+
             if self.minimise_af or self.minimise_pdb:
                 self.collect_minimisation_log()
                 if self.minimisation_skipped:
@@ -888,7 +907,9 @@ class PDB(object):
         Download the pdb file from rcsb, clean the structure, split it based on alternative
         conformations, find if there are gaps in the sequences, if more than the max gap set in
         class definition, remove files, if smaller, patch the curated files. The results are saved
-        into files: ``[outfolder]/conformations/[PDB code]-clean.pdb``.
+        into files: ``[outfolder]/conformations/[PDB code]-clean.pdb``. When
+        ``biological_assembly`` is set, each curated structure is then replaced with its
+        biological assembly, read from the REMARK 350 records of the downloaded file.
 
         :param pdb: code of the pdb file to curate
         :type pdb: str
@@ -901,6 +922,14 @@ class PDB(object):
         '''
         try:
             self.download_pdb(pdb)
+            biomatrix, determined = {}, {}
+            if self.biological_assembly:
+                try:
+                    biomatrix, determined = assembly.read_biomolecules(
+                        os.path.join(self.raw_dir, f'{pdb}.pdb'))
+                except Exception as e:
+                    print(f'>> Could not read the REMARK 350 records of {pdb}, the asymmetric '
+                          f'unit will be measured; error: {e}')
             replacement_dict = self.clean(pdb, uniprot_code=uniprot_code)
 
             self.split_struc_nmr(pdb)
@@ -933,6 +962,9 @@ class PDB(object):
                     except Exception as e:
                         print(f'>> Renumbering skipped for conformer {cnt} with error: {str(e)}')
 
+                if self.biological_assembly:
+                    self._build_assembly(fname, biomatrix, determined)
+
                 test_patch = True
 
             except Exception as e:
@@ -951,6 +983,67 @@ class PDB(object):
             raise Exception("Patching failed for all conformers")
 
         return largest_gap
+
+
+    def _build_assembly(self, path, biomatrix, determined):
+        '''
+        Replace a curated structure with its biological assembly and report the outcome. If
+        the assembly cannot be built the asymmetric unit is kept, and every chain is reported.
+
+        :param path: curated pdb file.
+        :type path: str
+        :param biomatrix: BIOMT operators, as returned by
+            :func:`resdy.assembly.read_biomolecules`.
+        :type biomatrix: dict
+        :param determined: how each biomolecule was determined, as returned by
+            :func:`resdy.assembly.read_biomolecules`.
+        :type determined: dict
+        '''
+        name = os.path.basename(path)
+        try:
+            record = assembly.build_assembly(path, biomatrix, determined,
+                                             max_atoms=self.max_assembly_atoms)
+        except Exception as e:
+            print(f'>> {name}: asymmetric unit kept, building the assembly failed with error: {e}')
+            return
+        if record['status'] == 'built':
+            print(f">> {name}: biological assembly {record['biomolecule']} "
+                  f"({record['determined']}) built with {record['n_operators']} operator(s), "
+                  f"chains {'/'.join(record['chains'])}; reporting "
+                  f"{'/'.join(record['measured_chains'])}")
+            if record['n_clashes']:
+                print(f">> {record['n_clashes']} non-bonded clash(es) in the assembly of {name}")
+        elif record['status'] == 'kept':
+            print(f">> {name}: asymmetric unit kept, {record['reason']}")
+
+
+    def collect_assembly_log(self, outname='assembly_log.csv'):
+        '''
+        Gather the per-structure assembly records into one table. Called at the end of
+        gather_proteins.
+
+        :param outname: file written in the output directory; None to write nothing.
+        :type outname: str
+        :returns: one row per curated structure that has a record.
+        :rtype: pandas.DataFrame
+        '''
+        rows = []
+        for path in sorted(glob.glob(os.path.join(self.curated_dir,
+                                                  f'*{assembly.RECORD_SUFFIX}'))):
+            try:
+                with open(path) as fh:
+                    record = json.load(fh)
+            except Exception as e:
+                print(f'>> Could not read assembly record {path}: {e}')
+                continue
+            record = {'structure': os.path.basename(path)[:-len(assembly.RECORD_SUFFIX)],
+                      **{k: '/'.join(v) if isinstance(v, list) else v
+                         for k, v in record.items()}}
+            rows.append(record)
+        df = pd.DataFrame(rows)
+        if outname and not df.empty:
+            df.to_csv(os.path.join(self.outdir, outname), index=False)
+        return df
 
 
     def download_pdb(self, pdb):

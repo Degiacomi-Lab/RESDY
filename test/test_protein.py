@@ -109,7 +109,7 @@ class Test_Protein(unittest.TestCase):
         out = tempfile.mkdtemp(prefix='resdy_het_')
         P = RD.PDB(outdir=out, gap=10, parallel=False, minimise_strucs=None, **kwargs)
         P.clean_and_split_pdb('1A6M', 'P02185', chains=[])
-        f = sorted(a for a in os.listdir(os.path.join(out, 'curated')) if '1A6M' in a)[0]
+        f = sorted(a for a in os.listdir(os.path.join(out, 'curated')) if '1A6M' in a and a.endswith('.pdb'))[0]
         return P, out, os.path.join(out, 'curated', f)
 
     def test_hetatm_default_keeps_nothing(self):

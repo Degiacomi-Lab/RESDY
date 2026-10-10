@@ -22,6 +22,7 @@ require_biobox(bb)
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains
+from .assembly import measured_chains
 
 
 def _call_with_args(func, args):
@@ -98,9 +99,11 @@ class Measure(object):
         carries the metadata column 'Min_Dist_Other_Chain': the distance, in A, from the anchor
         atom to the closest heavy atom of a protein residue in any other chain of the measured
         file, or NaN when the file holds a single protein chain. Ions, waters and ligands are not
-        counted as a chain. The chains are those of the curated file, i.e. the deposited
-        asymmetric unit. The column is computed whatever features_dict holds, and is listed in
-        ``METADATA_COLUMNS`` in resdy/helper.py.
+        counted as a chain. The chains are those of the curated file, which is the biological
+        assembly when :class:`PDB <resdy.protein.PDB>` built one. Copies made by the assembly
+        operators take part in every feature, but only residues of the original chains are
+        reported (see :func:`resdy.assembly.measured_chains`). The column is computed whatever
+        features_dict holds, and is listed in ``METADATA_COLUMNS`` in resdy/helper.py.
 
         :param df_input: The input dataframe containing information on the structures over which the
             measurements will be done. This is usually the output given from the curation steps
@@ -922,11 +925,15 @@ class Measure(object):
             if self.include_mod: resnames_to_explore += list(self.aa_properties['modified_codes'])
             _, idxs = M.atomselect('*', resnames_to_explore, ['CA'], get_index=True, use_resname=True)
             other_chain = self._other_chain_distances(M)
+            # copies made by the assembly operators are environment only
+            reported = measured_chains(f)
             no_anchor = 0
             for i in idxs:
 
                 #save only lysine entries from chain of interest
                 if M.data["chain"].values[i] not in chains:
+                    continue
+                if reported is not None and M.data["chain"].values[i] not in reported:
                     continue
 
                 key = (M.data['chain'].values[i], int(M.data['resid'].values[i]))
@@ -1347,8 +1354,12 @@ class Measure(object):
                                         ['CA'], get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
+            # copies made by the assembly operators are environment only
+            reported = measured_chains(f)
             no_anchor = 0
             for i in idxs:
+                if reported is not None and M.data["chain"].values[i] not in reported:
+                    continue
                 key = (M.data['chain'].values[i], int(M.data['resid'].values[i]))
                 if key not in other_chain:
                     no_anchor += 1

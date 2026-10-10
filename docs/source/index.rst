@@ -26,6 +26,7 @@ The pipeline is constituted by five steps, each documented in its own section be
 
    protein
    patcher
+   assembly
 
 3\. **Measure**, calculating one or more features for every residue of interest.
 
