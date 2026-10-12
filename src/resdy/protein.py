@@ -33,6 +33,7 @@ try:
     from openmm.app.simulation import Simulation
     from openmm.unit import (nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin,
                              angstrom)
+    from pdbfixer import PDBFixer
     openmm_available = True
 except Exception as e:
     print('Could not import openmm modules for running minimisations, please ensure '
@@ -931,6 +932,8 @@ class PDB(object):
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
 
+                self.add_missing_capping_atoms(pdb_path=f)
+
                 if not self.PDB_only:
                     try:
                         self._align_resnum_uniprot(uniprot_code, fname, chains)
@@ -1507,9 +1510,7 @@ class PDB(object):
                 sel_chain = M.data['chain'] == chain
 
                 # Only the polymer is renumbered. Retained waters, ions and ligands are
-                # numbered in their own range, have no place in the canonical sequence,
-                # and so never appear in res_mapper; requiring them to map would report
-                # every chain of a structure curated with keep_waters as a failure.
+                # numbered in their own range
                 is_polymer = M.data['resname'].astype(str).str.upper().isin(STANDARD_RESIDUES)
                 sel_poly = sel_chain & is_polymer
 
@@ -1746,6 +1747,33 @@ class PDB(object):
         except Exception as e:
             os.remove(path)
             print(f'Failed rewriting pdb file with error: {str(e)}')
+
+
+    def add_missing_capping_atoms(self, pdb_path):
+        '''
+        Some structures may miss capping heavy atoms at termini regions of proteins. Utilise openmm
+        pdbfixer to add these in.
+        
+        :param pdb_path: Path of pdb file to check
+        :type pdb_path: str
+        '''
+
+        # fix any potential problems with capping atoms on termainl residues
+        fixer = PDBFixer(filename=pdb_path)
+        fixer.missingResidues = {}
+        fixer.findMissingAtoms()
+        ter_res = set()
+        for c in fixer.topology.chains():
+            res = list(c.residues())
+            if res:
+                ter_res.add(res[0])
+                ter_res.add(res[-1])
+        fixer.missingAtoms = {r: a for r, a in fixer.missingAtoms.items()
+                                if r in ter_res}
+        fixer.missingTerminals = {r: a for r, a in fixer.missingTerminals.items()
+                                if r in ter_res}
+        fixer.addMissingAtoms()
+        PDBFile.writeFile(fixer.topology, fixer.positions, open(pdb_path, 'w'))
 
 
     def apply_minimisation(self, pdb, max_iterations=None):
