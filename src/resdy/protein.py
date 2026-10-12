@@ -516,13 +516,17 @@ class PDB(object):
         os.makedirs(self.raw_dir, exist_ok=True)
         self.gap = gap
 
-        try:
-            self.df = pd.read_csv(fname)
-            # remove duplicates from the dataframe to avoid extra unnecessary calculations
-            self.df = self.df.drop_duplicates()
+        if isinstance(fname, str):
+            try:
+                self.df = pd.read_csv(fname)
 
-        except Exception as e:
-            print(f"Could not load csv file, error: {str(e)}")
+            except Exception as e:
+                raise Exception(f"Could not read csv file, error: {str(e)}")
+
+        else:
+            self.df = fname
+
+        self.df = self.df.drop_duplicates()
 
         if isinstance(PDB_only, bool):
             self.PDB_only = PDB_only

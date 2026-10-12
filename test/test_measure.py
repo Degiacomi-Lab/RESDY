@@ -20,7 +20,7 @@ class Test_Measure(unittest.TestCase):
         self.all_features = ['propka', 'sasa', 'depth', 'aev',
                              'das', 'seqcharge', 'melodia', 'frustration']
         self.features_dict = {k: {} for k in self.all_features}
-        self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb', '1A6M-alt1a_relaxed.pdb']})
+        self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb', '1A6M-alt1A_relaxed.pdb']})
 
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)

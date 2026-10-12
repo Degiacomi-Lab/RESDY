@@ -1,12 +1,11 @@
-name: resdy
+name: resdy_test
 channels:
   - conda-forge
   - salilab
-  - defaults
 dependencies:
   - python=3.12
   - pip
-  - biobox
+  - biobox>=2.0
   - biopython
   - numpy
   - pandas
@@ -14,12 +13,23 @@ dependencies:
   - seaborn
   - Modeller
   - propka
+  - statsmodels
+  - frustratometer
   - ase
   - pytorch
   - torchani
   - openmm
   - pdbfixer
   - msms
+  - mdtraj
+  - nglview
+  - numba
+  - python-dotenv
+  - scikit-learn
+  - scipy
+  - requests
   - plotly
+  - dash
   - pip:
     - melodia-py==0.1.8
+    - fair-esm

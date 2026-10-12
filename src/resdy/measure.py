@@ -83,10 +83,10 @@ class Measure(object):
     '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
-                                'aev': {}, 'das': {}, 'seqcharge': {}},
+                 features_dict={'propka': {}, 'sasa': {}, 'aev': {}, 'das': {}, 
+                                'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True, only_relaxed=True, num_cores=0,
+                 report_errors= True, only_relaxed=False, num_cores=0,
                  parallel_timeout=600):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
@@ -159,12 +159,7 @@ class Measure(object):
         :type report_errors: bool
         :param only_relaxed: Option to only calculate measurements for structures that are relaxed
             if there is a relaxed structure available for the structure. If set to False, measures
-            will be calculated to both original and relaxed form. Default is True.
-
-            A structure with no minimised copy is measured unrelaxed either way, which happens
-            whenever minimisation was not requested, was skipped, or failed. The 'Source' column
-            of the output records which copy each row was taken from, 'relaxed' or 'unrelaxed',
-            so that the two are not silently mixed.
+            will be calculated to both original and relaxed form. Default is False.
         :type only_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
@@ -257,13 +252,6 @@ class Measure(object):
         self.files_to_analyse = []
         self.parallel_items = {}
 
-        # Check that all files in DataFrame appear at least once in folder
-        files_af=[os.path.splitext(os.path.basename(c))[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        for f in df_input['PDB_Code'].values:
-            if f not in files_af and f not in files_pdb:
-                print(f'WARNING: {f} not found in folder {self.folder}')
-
         self.pkaoutdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pkaoutdir):
             os.makedirs(self.pkaoutdir)
@@ -271,25 +259,49 @@ class Measure(object):
         self.PDB_only = False
 
         if 'Uniprot_Entry' in self.df_input.columns:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source',
-                       'Min_Dist_Other_Chain']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
+                       'Resid', 'Source', 'Min_Dist_Other_Chain']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
             columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
             self.df = pd.DataFrame(columns = columns)
 
+        files_af=[os.path.splitext(os.path.basename(c))[0] for c
+                  in glob.glob(os.path.join(self.folder, "*pdb"))]
+        files_pdb=[os.path.basename(c).split("-")[0] for c
+                   in glob.glob(os.path.join(self.folder, "*pdb"))]
+
+        f_not_found = []
+        pdb_code_list = list(df_input['PDB_Code'].drop_duplicates())
+        for f in pdb_code_list:
+            if f not in files_af and f not in files_pdb:
+                if self.PDB_only:
+                    try:
+                        if f.split('.')[0] not in files_af and f.split('.')[0] not in files_pdb:
+                            print(f'WARNING: {f} not found in folder {self.folder}')
+                            f_not_found.append(f)
+                    except Exception as e:
+                        print(f'WARNING: {f} not found in folder {self.folder}')
+                        f_not_found.append(f)
+                else:
+                    print(f'WARNING: {f} not found in folder {self.folder}')
+                    f_not_found.append(f)
+
+        self.run_ready = True
+        if len(f_not_found) == len(pdb_code_list):
+            print(f'No files given in the input dataframe matches to pdb files in {self.folder}, '
+                  f'please check files exist and were written correctly in the input dataframe.')
+            self.run_ready = False
+
 
     @staticmethod
     def _source_of(path):
         '''
-        Record which copy of a structure a measurement was taken from.
-
-        Whether a structure is measured relaxed or unrelaxed is not a property of the
-        protein but of how curation went: minimisation is skipped when openmm has no
-        template for something the structure retains, and fails outright on some
-        structures, and ``only_relaxed`` then falls back to the unminimised file. Without
-        this column a measurements table silently mixes the two.
+        Record which copy of a structure a measurement was taken from. Relaxation of structure
+        is a property of how the structures were curated and needs to be recorded for future
+        analysis of any differences in features seen, especially as minimisation doesn't always
+        run fully on structures.
 
         :param path: file the measurement was taken from.
         :type path: str
@@ -593,6 +605,10 @@ class Measure(object):
         The settings of the measurement are written to MEASURE_SETTINGS_FILE in the output
         directory, see :meth:`measurement_settings`.
         '''
+        if not self.run_ready:
+            print(f'No pdb files available for measurements, see earlier error.')
+            return
+
         self._write_settings()
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
@@ -786,6 +802,8 @@ class Measure(object):
         list of the files, check if structure file is
         '''
         if self.PDB_only:
+            print('measure_dataframe() called when input dataframe matches the format on PDB_only, '
+                  'call measure_PDB_only() directly instead.')
             return 'Call PDB_only method instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
@@ -824,11 +842,13 @@ class Measure(object):
                     df_parallel = pd.concat(self._run_in_parallel(self._measure_file, items),
                                             ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items], ignore_index=True)
+                    df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items],
+                                            ignore_index=True)
 
             self.measures = gpu_measurements
             if gpu_measurements:
-                df_gpu = pd.concat([self._measure_file(d, lock) for d, lock in items], ignore_index=True)
+                df_gpu = pd.concat([self._measure_file(d, lock) for d, lock in items],
+                                   ignore_index=True)
 
                 if df_parallel.empty:
                     df_parallel = df_gpu
@@ -875,7 +895,6 @@ class Measure(object):
         '''
         uniprot_code, pdb_code, method, res, chains = file_details
 
-        # calculate features values from all PDB files associated with specific DataFrame entry
         frames_df_list = []
         for f in self.files_to_analyse:
             if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
@@ -914,13 +933,16 @@ class Measure(object):
                 continue
 
             resnames_to_explore = list(self.aa_properties['non_modified_codes'])
-            if self.include_mod: resnames_to_explore += list(self.aa_properties['modified_codes'])
-            _, idxs = M.atomselect('*', resnames_to_explore, ['CA'], get_index=True, use_resname=True)
+            if self.include_mod:
+                resnames_to_explore += list(self.aa_properties['modified_codes'])
+            _, idxs = M.atomselect('*', resnames_to_explore, ['CA'],
+                                   get_index=True, use_resname=True)
+
             other_chain = self._other_chain_distances(M)
             no_anchor = 0
-            for i in idxs:
 
-                #save only lysine entries from chain of interest
+            for i in idxs:
+                #save only resid entries from chain of interest
                 if M.data["chain"].values[i] not in chains:
                     continue
 
@@ -939,7 +961,8 @@ class Measure(object):
                     'Min_Dist_Other_Chain': other_chain[key]})
 
                 if self.include_mod:
-                    data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
+                    data['Modified'] = (M.data['resname'].values[i]
+                                        in self.aa_properties['modified_codes'])
 
                 records.append(data)
 
@@ -956,7 +979,7 @@ class Measure(object):
                     with redirect_stdout(out_print_trap):
                         result = meas[1](f)
                     terminal_out_statements.append(out_print_trap.getvalue())
-                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
+                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                 except Exception as e:
                     if self.report_errors:
@@ -986,19 +1009,17 @@ class Measure(object):
                                 self._report_error_to_file('logging', 'measure file parallel', str(e))
                             print(f'Error in logging: {e}')
 
-                        # reset the pandas display options back to default for regular displaying
                         pd.reset_option('display.max_colwidth')
                         pd.reset_option('display.width')
                         pd.reset_option('max_seq_items')
                         pd.reset_option('display.max_rows')
 
-
             if not df_currentfile.empty:
                 frames_df_list.append(df_currentfile)
 
         if not frames_df_list:
-            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid',
-                                         'Source', 'Min_Dist_Other_Chain'])
+            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution',
+                                         'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -1238,12 +1259,12 @@ class Measure(object):
         with Manager() as manager:
             lock = manager.Lock()
             items = []
-            for pdb_idx, row in self.df_input.iterrows():
+            for i, r in self.df_input.iterrows():
 
-                if row['completed']:
+                if r['completed']:
                     continue
 
-                pdb_code = row['PDB_Code']
+                pdb_code = str(r['PDB_Code'])
                 items.append([pdb_code, lock])
 
             base_cols = ['PDB_Code', 'Chain', 'Resid']
@@ -1259,11 +1280,13 @@ class Measure(object):
                     df_parallel = pd.concat(self._run_in_parallel(self._measure_file_pdbonly, items),
                                             ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lk) for file_dets, lk in items], ignore_index=True)
+                    df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lk) for file_dets, lk in items],
+                                            ignore_index=True)
 
             self.measures = gpu_measurements
             if gpu_measurements:
-                df_gpu = pd.concat([self._measure_file_pdbonly(d, lock) for d, lock in items], ignore_index=True)
+                df_gpu = pd.concat([self._measure_file_pdbonly(d, lock) for d, lock in items],
+                                   ignore_index=True)
 
                 if df_parallel.empty:
                     df_parallel = df_gpu
@@ -1275,7 +1298,7 @@ class Measure(object):
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
-            # skip empty frames
+
             frames = [f for f in (self.df, df_parallel) if not f.empty]
             if frames:
                 self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
@@ -1302,14 +1325,17 @@ class Measure(object):
             time
         :type lock: multiprocessing manager lock
         '''
+        pdb_code = str(pdb_code)
         file_df_list = []
         for f in self.files_to_analyse:
-            if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
+            if ((pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()) and
+                (pdb_code.lower() != os.path.basename(f).lower())):
                 continue
 
             if self.only_relaxed:
                 f_stem = os.path.splitext(os.path.basename(f))[0]
-                if '_relaxed' not in f and os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
+                if ('_relaxed' not in f and
+                    os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb'))):
                     continue
 
             if f in self.pdb_only_files_to_ignore:
@@ -1328,18 +1354,19 @@ class Measure(object):
                 M = bb.Molecule()
                 M.import_pdb(f, include_hetatm=True)
             except Exception as e:
-                terminal_out_statements.append(f'Failed to create biobox molecule for file {f} with error: {e}')
+                terminal_out_statements.append(f'Failed to create biobox molecule for file '
+                                               f'{f} with error: {e}')
                 if self.report_errors:
-                    self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
+                    self._report_error_to_file(f'Failed to create bb molecule for file: {f}',
+                                               'measure pdb only', str(e))
                 self.wrong_pdb_file.append(f)
                 continue
 
+            resnames_to_explore = list(self.aa_properties['non_modified_codes'])
             if self.include_mod:
-                _, idxs = M.atomselect("*", (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
-                                        ['CA'], get_index=True, use_resname=True)
-            else:
-                _, idxs = M.atomselect("*",  self.aa_properties['non_modified_codes'],
-                                        ['CA'], get_index=True, use_resname=True)
+                resnames_to_explore += list(self.aa_properties['modified_codes'])
+            _, idxs = M.atomselect("*",  resnames_to_explore,
+                                   ['CA'], get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
             no_anchor = 0
@@ -1374,7 +1401,7 @@ class Measure(object):
                     with redirect_stdout(out_print_trap):
                         result = meas[1](f)
                     terminal_out_statements.append(out_print_trap.getvalue())
-                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
+                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                 except Exception as e:
                     if self.report_errors:

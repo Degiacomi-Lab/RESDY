@@ -12,14 +12,9 @@ from .aggregation import Aggregation
 from .helper import METADATA_COLUMNS
 from scipy.stats import fisher_exact
 
-try:
-    from statsmodels.stats.multitest import multipletests
-    statsmodel_available = True
-except Exception as e:
-    statsmodel_available = False
-    print(f'>> Packages available for calculating enrichment analysis '
-          f'(statsmodel.multipletests) are not available. Won\'t be '
-          f'able to calculate this. Error: {e}')
+
+NON_FEATURE_COLUMNS = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
+                       'Resid', 'Source', 'Min_Dist_Other_Chain']
 
 class Analysis(object):
     '''
@@ -42,6 +37,17 @@ class Analysis(object):
         :type features_to_analyse: list
         :raises KeyError: if a named feature is not a column of the dataframe.
         '''
+
+        try:
+            from statsmodels.stats.multitest import multipletests
+            self.multipletests = multipletests
+            self.statsmodel_available = True
+        except Exception as e:
+            self.statsmodel_available = False
+            print(f'>> Packages available for calculating enrichment analysis '
+                f'(statsmodel.multipletests) are not available. Won\'t be '
+                f'able to calculate this. Error: {e}')
+
         if isinstance(df, str):
             self.df = pd.read_csv(df)
         else:
@@ -50,7 +56,6 @@ class Analysis(object):
         standard_cols = METADATA_COLUMNS
 
         if features_to_analyse in ([], ['all']):
-            # no features named: analyse every feature column, and keep every row
             self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
         else:
             missing = [a for a in features_to_analyse if a not in self.df.columns]
@@ -58,7 +63,6 @@ class Analysis(object):
                 raise KeyError(f'features_to_analyse gives columns that are not present within the'
                                f' dataframe, missing features: {", ".join(missing)}')
             self.features_to_analyse = list(features_to_analyse)
-            # features were named explicitly, so drop the rows that lack one of them
             self.df = self.df.dropna(subset=self.features_to_analyse)
 
         self.df_aggregated = pd.DataFrame(columns = ['Uniprot_Entry','Resid','Num'])
@@ -1063,7 +1067,7 @@ class Analysis(object):
         :rtype: pandas.DataFrame
         '''
 
-        if not statsmodel_available:
+        if not self.statsmodel_available:
             raise ImportError(f'>> GO enrichment analysis requires statsmodel.multipletests which isn\' available')
 
         # get all the uniprot codes inside the range and the reference uniprot code list
@@ -1091,7 +1095,7 @@ class Analysis(object):
         p_val_list = [x[1] for x in p_val_dict.items()]
 
         # adjust p-values using the BH method
-        y=multipletests(pvals=p_val_list, alpha=0.05, method="fdr_bh")
+        y=self.multipletests(pvals=p_val_list, alpha=0.05, method="fdr_bh")
         out_dict = {}
 
         # no matter enrichment, output p values to the dictionary
@@ -1124,6 +1128,43 @@ class Analysis(object):
 
         return df
 
+
+    def df_to_numpy(self):
+        '''
+        Convert the dataframe into a numpy array ready for transfer into a ML model.
+        This checks that the dataframe given is aggregated before doing this. Training ML
+        models on un-aggregated data will give false results.
+
+        :returns (agg_df_np, y): Numpy array containing all the feature data for the set, y
+            numpy array containing the corresponding class labels for the set, if a 'class'
+            column was not provided it sets these all to -1.
+        :rtype: numpy arrays
+        '''
+        len_dropduplicates_df = len(self.df.drop_duplicates(subset=[['Uniprot_Entry', 'Resid']]))
+
+        if len(self.df) != len_dropduplicates_df:
+            print('>> Data to convert to numpy array is not aggregated. Training ML models on '
+                  'data that is not aggregated will produce inflated prediction metrics. '
+                  'Aggregating data on default methods.')
+            agg = Aggregation(df_measurements=self.df,
+                                outdir=self.outdir,
+                            aggregation_method='all')
+            agg_df = agg.aggregate_data()
+        else:
+            agg_df = self.df
+
+        cols_to_drop = [a for a in NON_FEATURE_COLUMNS if a in agg_df.columns and a != 'class']
+        agg_df = agg_df.drop(columns=cols_to_drop)
+
+        if 'class' in agg_df.columns:
+            y = agg_df['class'].values
+        else:
+            y = np.full(shape=len(agg_df), fill_value=-1, dtype=np.int)
+
+        agg_df = agg_df.drop('class')
+        agg_df_np = agg_df.to_numpy()
+
+        return agg_df_np, y
 
 
 if __name__ == '__main__':
