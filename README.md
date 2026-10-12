@@ -18,6 +18,7 @@ This toolkit is subdivided in a set of classes that together operate as a pipeli
   - saving alternate conformations (e.g., NMR ensemble) in individual files
   - saving alternate side chain rotamers in individual files
   - addition of missing regions, if their size falls within a user-defined length
+  - application of biomatrix operations
   - energy minimization
   
 * calculate a set of features for every amino acid of interest in every curated structure. A range of features comes pre-implemented (see `Measure` class), but the user can also include own-designed features. Results are saved in the CSV file `result\measures.csv`.
