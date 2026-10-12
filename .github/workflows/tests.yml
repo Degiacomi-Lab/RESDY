@@ -91,3 +91,8 @@ jobs:
         if: ${{ matrix.group == 'rest' && !cancelled() }}
         run: |
           python test/test_geometry.py
+      - name: Test Assembly
+        timeout-minutes: 5
+        if: ${{ matrix.group == 'rest' && !cancelled() }}
+        run: |
+          python test/test_assembly.py
