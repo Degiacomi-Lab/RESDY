@@ -182,3 +182,38 @@ written to ``<structure>.minimisation.json`` in the curated folder, and
 :meth:`gather_proteins <resdy.protein.PDB.gather_proteins>` collects these records into
 ``minimisation_log.csv``. Checking that table is the quickest way to see which structures
 were relaxed.
+
+
+How does RESDY handle biological assemblies?
+--------------------------------------------
+
+A crystal structure deposits the asymmetric unit, which may hold only part of the biological
+assembly, or several copies of it. By default, :class:`PDB <resdy.protein.PDB>` replaces each
+curated RCSB structure with its biological assembly, built from the BIOMT operators listed in
+REMARK 350 of the downloaded file. Crystal packing operators (REMARK 290) are never used.
+
+* *When.* The REMARK 350 records are read right after download. The assembly is built once the
+  asymmetric unit has been patched, its chains renamed and its residues renumbered, and before
+  energy minimisation. Every copy of a chain therefore carries the same rebuilt residues.
+* *Which assembly.* A file can list several BIOMOLECULE entries, which are alternative
+  assemblies or each cover part of the asymmetric unit. Only one is built: the first one
+  marked as author-determined or, when there is none, the first one listed. Chains the chosen
+  biomolecule does not list are left out, as in the assembly files distributed by the PDB.
+* *Copies.* The copies take part in every feature calculation, so that solvent accessibility,
+  pKa and Min_Dist_Other_Chain see the neighbouring chains. Rows are written only for the
+  original chains, so that a residue is measured once however many copies of it the assembly
+  holds. The first copy of a chain keeps its name, and later copies take names not used in the
+  structure.
+* *When the asymmetric unit is kept.* The structure is left as it is when the operators are
+  all identities covering every chain, when none of the listed chains is in the curated file,
+  when the assembly would need two-character chain names (i.e. more than about 62 chains,
+  since PROPKA and Biopython read a single character), or when it would hold more atoms than
+  ``max_assembly_atoms`` (no limit by default). Every chain is then reported.
+
+The outcome for each structure is written to ``<structure>.assembly.json`` in the curated
+folder. It records the biomolecule built, whether it was author-determined, the status
+(``built``, ``identity``, ``none`` or ``kept``, with the reason), the chains before and after,
+the chains reported, the number of atoms and the number of clashes found in the assembly.
+:meth:`gather_proteins <resdy.protein.PDB.gather_proteins>` collects these records into
+``assembly_log.csv``. Pass ``biological_assembly=False`` to measure the asymmetric unit
+instead. AlphaFold models do not go through this step.
