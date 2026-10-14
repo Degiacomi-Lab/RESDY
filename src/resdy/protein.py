@@ -106,8 +106,7 @@ class PDB(object):
                  restraint_k=10.0, minimisation_platform=None,
                  remove_all_modifications=False,
                  num_cores=0, max_nmr_conformers='',
-                 biological_assembly=True, max_assembly_atoms=None):
-                 num_cores=0, max_nmr_conformers='',
+                 biological_assembly=True, max_assembly_atoms=None,
                  keep_all_curated=True):
         '''
         Initialise the PDB class.

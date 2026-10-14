@@ -700,11 +700,13 @@ class Viewer(object):
 
             if trig_id == '2d-axis-column':
                 xaxis_range = [xaxis_min, xaxis_max]
+                x_low, x_high = xaxis_range
             else:
                 xaxis_range = no_update
 
             if trig_id == '2d-yaxis-column':
                 yaxis_range = [yaxis_min, yaxis_max]
+                y_low, y_high = yaxis_range
             else:
                 yaxis_range = no_update
 
@@ -945,7 +947,7 @@ class Viewer(object):
                 fig = px.histogram(dfff, x=feature, marginal='rug',
                                     nbins=nbins, color='CombColour')
 
-            fig.update_xaxes(showgrid=False)
+            fig.update_xaxes(showgrid=False, autorange=True)
             fig.update_yaxes(showgrid=False)
 
             fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10},
@@ -1011,11 +1013,21 @@ class Viewer(object):
                 warning_label = {'width': '100%', 'display': 'inline-block',
                                  'float': 'center', 'text-align': 'center',
                                  'padding': '0 20'}
-                
+
                 feat = self.feature_labels[feature]
 
                 cols_remain = [a for a in self.non_feat_cols if a in self.df_scalar_measures.columns] + [feat]
                 dff = self.df_scalar_measures[cols_remain]
+
+                feat_min = round(self.df_scalar_measures[feat].min(), 1)
+                feat_max = round(self.df_scalar_measures[feat].max(), 1)
+
+                if trig_id == 'crossfilter-feature-hist':
+                    feat_range = [feat_min, feat_max]
+                    feat_low, feat_high = feat_range
+                else:
+                    feat_range = no_update
+
                 dff = dff[(dff[feat] > feat_low) & (dff[feat] < feat_high)]
                 if uniprot != 'All':
                     dff = dff[dff['Uniprot_Entry'] == uniprot]
@@ -1030,13 +1042,7 @@ class Viewer(object):
                     associated_uniprots = self.GO_dict[self.GO_codes_reverse[go_term]]
                     dff = dff[dff['Uniprot_Entry'].isin(associated_uniprots)]
 
-                feat_min = round(self.df_scalar_measures[feat].min(), 1)
-                feat_max = round(self.df_scalar_measures[feat].max(), 1)
-
-                if trig_id == 'crossfilter-feature-hist':
-                    feat_range = [feat_min, feat_max]
-                else:
-                    feat_range = no_update
+                
 
                 return create_main_hist(dff, feat, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
@@ -1047,6 +1053,16 @@ class Viewer(object):
                 feat_col = f'{feat}_{agg}'
                 cols_remain = [a for a in self.non_feat_cols if a in self.df_agg.columns] + [feat_col]
                 dff = self.df_agg[cols_remain]
+
+                feat_min = round(self.df_agg[feat_col].min(), 1)
+                feat_max = round(self.df_agg[feat_col].max(), 1)
+
+                if trig_id == 'crossfilter-feature-hist':
+                    feat_range = [feat_min, feat_max]
+                    feat_low, feat_high = feat_range
+                else:
+                    feat_range = no_update
+
                 dff = dff[(dff[feat_col] > feat_low) & (dff[feat_col] < feat_high)]
                 if uniprot != 'All':
                     dff = dff[dff['Uniprot_Entry'] == uniprot]
@@ -1060,14 +1076,6 @@ class Viewer(object):
                 if go_term != 'All':
                     associated_uniprots = self.GO_dict[self.GO_codes_reverse[go_term]]
                     dff = dff[dff['Uniprot_Entry'].isin(associated_uniprots)]
-
-                feat_min = round(self.df_agg[feat_col].min(), 1)
-                feat_max = round(self.df_agg[feat_col].max(), 1)
-
-                if trig_id == 'crossfilter-feature-hist':
-                    feat_range = [feat_min, feat_max]
-                else:
-                    feat_range = no_update
 
                 return create_main_hist(dff, feat_col, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
@@ -1151,16 +1159,19 @@ class Viewer(object):
 
             if trig_id == '3d-xaxis-column':
                 xaxis_range = [xaxis_min, xaxis_max]
+                x_low, x_high = xaxis_range
             else:
                 xaxis_range = no_update
 
             if trig_id == '3d-yaxis-column':
                 yaxis_range = [yaxis_min, yaxis_max]
+                y_low, y_high = xaxis_range
             else:
                 yaxis_range = no_update
 
             if trig_id == '3d-zaxis-column':
                 zaxis_range = [zaxis_min, zaxis_max]
+                z_low, z_high = xaxis_range
             else:
                 zaxis_range = no_update
 

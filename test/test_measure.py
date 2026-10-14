@@ -25,24 +25,53 @@ class Test_Measure(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
 
-    def test_full_setup(self):
+    def test_full_standardtrack_series(self):
         # test full setup of measures class, no run, test runs individually
         # standard track
         print('-> Testing full setup')
-        M = RD.Measure(df_input=self.df_prot,
+        M = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
-                        features_dict=self.features_dict)
+                        features_dict=self.features_dict,
+                        parallel=False)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
 
+    def test_full_standardtrack_parallel(self):
+        # test full setup of measures class, no run, test runs individually
+        # standard track
+        print('-> Testing full setup')
+        M = RD.Measure(df_input=self.df_prot[:2],
+                        outdir=self.outdir,
+                        features_dict=self.features_dict,
+                        parallel=True)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
+
+    def test_full_pdbonly_series(self):
         # pdb only
         M = RD.Measure(df_input=self.df_pdb_only_test,
                         outdir=self.outdir,
-                        features_dict=self.features_dict)
+                        features_dict=self.features_dict,
+                        parallel=False)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
+
+    def test_full_pdbonly_parallel(self):
+        # pdb only
+        M = RD.Measure(df_input=self.df_pdb_only_test,
+                        outdir=self.outdir,
+                        features_dict=self.features_dict,
+                        parallel=True)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
 
     def test_propka_standardtrack(self):
         print('-> Test measuring PROPKA - Standard Track')
