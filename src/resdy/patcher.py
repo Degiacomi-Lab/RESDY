@@ -5,11 +5,13 @@ These interact with Modeller to perform patching on protein structures.
 import fileinput
 import glob
 import os
+import io
 import sys
 import re
 from textwrap import wrap
 import shutil
 from copy import deepcopy
+from contextlib import redirect_stdout
 import numpy as np
 import biobox as bb
 
@@ -28,7 +30,7 @@ from .geometry import check_geometry
 require_biobox(bb)
 
 
-def autopatch(tmp_folder, fbasename, gap_cutoff=8):
+def autopatch(tmp_folder, fbasename, gap_cutoff=8, block_bulk_modeller_output=True):
     '''
     Perform modelling on the given fbasename. Goes through the steps within individual functions:
     _pdb_to_seq(), _fasta_to_pir(), _full_align(), _trim_align(), _gap_check(), _patch_model(). Then
@@ -45,13 +47,18 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
     :type gap_cutoff: int
     :returns: patched chain name path
     :rtype: str
+    :param block_bulk_modeller_output: Switch to allow printing of the full modeller patching
+        output, allows printing of progress of the patching without bloating the terminal by
+        default setting of True. If set to False will give the entire output from Modeller
+        patching of missing residues and missing side chains.
+    :type block_bulk_modeller_output: bool
     '''
     if not modeller_available:
         raise ImportError(f'>> To patch a structure which has gaps in requires Modeller which is '
                           f'not currently installed. Install modeller with the instructions in '
                           f'the RESDY Github Repo for more details. Error: {str(_modeller_error)}')
 
-    print('>> modelling missing residues')
+    print('>> Investigating structure in case patching is required by Modeller')
     pdb_out = ''
     seq_name = ''
     built = []
@@ -71,14 +78,14 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
     try:
         os.chdir(work_dir)
 
-        _pdb_to_seq(rel_base)
-        _fasta_to_pir(rel_base)
-        seq_name = _full_align(rel_tmp, rel_base)
+        _pdb_to_seq(rel_base, block_bulk_modeller_output)
+        _fasta_to_pir(rel_base, block_bulk_modeller_output)
+        seq_name = _full_align(rel_tmp, rel_base, block_bulk_modeller_output)
         _trim_align(rel_tmp, "alignment.seg.ali")
         patch_status = _gap_check(rel_tmp, "trimmed_align.ali", gap_cutoff)
 
         if patch_status:
-            pdb_out, built = _patch_model(rel_tmp, rel_base, seq_name)
+            pdb_out, built = _patch_model(rel_tmp, rel_base, seq_name, block_bulk_modeller_output)
             pdb_out = os.path.join(abs_tmp, os.path.basename(pdb_out))
         else:
             pdb_out = ""
@@ -87,8 +94,6 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
         raise Exception(f">> ERROR on autopatching the structure: {e}") from e
 
     finally:
-        # the intermediates were written relative to work_dir, which is still the
-        # working directory here
         autopatch_files = [f'{rel_base}.seq', f'{rel_base}.pir',
                            os.path.join(rel_tmp, 'alignment.seg'),
                            os.path.join(rel_tmp, 'alignment.seg.ali'),
@@ -108,8 +113,9 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8):
 
     return pdb_out, built
 
+
 #autopatch step 1a. pir format of AA from pdb
-def _pdb_to_seq(fbasename):
+def _pdb_to_seq(fbasename, block_bulk_modeller_output=True):
     '''
     Autopatch step 1a: Use the modeller package to extract the sequence from the pdb file given and
     save this to a file with extension .seq. This file will be saved in the temporary directory
@@ -119,15 +125,21 @@ def _pdb_to_seq(fbasename):
         path to the temporary folder
     :type fbasename: str
     '''
-    env = Environ()
-    env.io.two_char_chain = True
-    mdl = Model(env, file=fbasename)
-    aln = Alignment(env)
-    aln.append_model(mdl, align_codes=fbasename)
-    aln.write(file=f'{fbasename}.seq')
+    modeller_print_trap = io.StringIO()
+    with redirect_stdout(modeller_print_trap):
+        env = Environ()
+        env.io.two_char_chain = True
+        mdl = Model(env, file=fbasename)
+        aln = Alignment(env)
+        aln.append_model(mdl, align_codes=fbasename)
+        aln.write(file=f'{fbasename}.seq')
+    
+    if not block_bulk_modeller_output:
+        print(modeller_print_trap.getvalue())
+
 
 #autopatch step 1b. pir from complete AA fasta
-def _fasta_to_pir(fbasename):
+def _fasta_to_pir(fbasename, block_bulk_modeller_output=True):
     '''
     Autopatch step 1b: Use the modeller package to transform the fasta file into a .pir file located
     in the temporary directory for the specific protein.
@@ -136,13 +148,19 @@ def _fasta_to_pir(fbasename):
         path to the temporary folder
     :type fbasename: str
     '''
-    env = Environ()
-    env.io.two_char_chain = True
-    a = Alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
-    a.write(file=f'{fbasename}.pir', alignment_format='PIR')
+    modeller_print_trap = io.StringIO()
+    with redirect_stdout(modeller_print_trap):
+        env = Environ()
+        env.io.two_char_chain = True
+        a = Alignment(env, file=fbasename+".fasta", alignment_format='FASTA')
+        a.write(file=f'{fbasename}.pir', alignment_format='PIR')
+
+    if not block_bulk_modeller_output:
+        print(modeller_print_trap.getvalue())
+
 
 #autopatch step 2. add sequence name to 2nd line; copy the pir contents and structure info into alignment.seg; align sequences and generate model
-def _full_align(tmp_folder, fbasename):
+def _full_align(tmp_folder, fbasename, block_bulk_modeller_output=True):
     '''
     Autopatch step 2: Take the curated .pir and .seq files and place them into an alignment.seg file
     located in the temporary directory
@@ -153,6 +171,11 @@ def _full_align(tmp_folder, fbasename):
     :param fbasename: basename to use for the file being used. In the overall code this includes the
         path to the temporary folder
     :type fbasename: str
+    :param block_bulk_modeller_output: Switch to allow printing of the full modeller patching
+        output, allows printing of progress of the patching without bloating the terminal by
+        default setting of True. If set to False will give the entire output from Modeller
+        patching of missing residues and missing side chains.
+    :type block_bulk_modeller_output: bool
     '''
     pir_fname = f'{fbasename}.pir'
     seq_fname = f'{fbasename}.seq'
@@ -182,20 +205,29 @@ def _full_align(tmp_folder, fbasename):
     else:
         my_cmd_a = f'cat {pir_fname} {seq_fname} > {alignment_filename}'
 
-    os.system(my_cmd_a)
+    modeller_print_trap = io.StringIO()
+    with redirect_stdout(modeller_print_trap):
+        os.system(my_cmd_a)
 
-    env = Environ()
-    env.io.two_char_chain = True
-    env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
-    a = AutoModel(env,
-                  # file with template codes and target sequence
-                  alnfile  = alignment_filename,
-                  # PDB codes of the templates
-                  knowns   = fbasename,
-                  # code of the target
-                  sequence = seq_name)
-    a.auto_align() # get an automatic alignment (alignment.seg.ali)
+        env = Environ()
+        env.io.two_char_chain = True
+        env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
+        a = AutoModel(env,
+                    # file with template codes and target sequence
+                    alnfile  = alignment_filename,
+                    # PDB codes of the templates
+                    knowns   = fbasename,
+                    # code of the target
+                    sequence = seq_name)
+
+        # get an automatic alignment (alignment.seg.ali)
+        a.auto_align()
+
+    if not block_bulk_modeller_output:
+        print(modeller_print_trap.getvalue())
+
     return seq_name
+
 
 # autopatch step 3. trim the alignment by removing gaps for missing residues at the termini of the structure
 def _trim_align(tmp_folder, align_file):
@@ -242,7 +274,7 @@ def _trim_align(tmp_folder, align_file):
 
     AA_struc_len = len(AA_struc)
     AA_struc_new = AA_struc[start_gaps_len : AA_struc_len - end_gaps_len]+"*"
-    AA_struc_new = wrap(AA_struc_new, 75) #split after 75 characters
+    AA_struc_new = wrap(AA_struc_new, 75)
 
     AA_seq = ''.join([str(elem.rstrip("\n").rstrip("*")) for elem in f1[sec_2+2:]])
     AA_seq_len = len(AA_seq)
@@ -259,6 +291,7 @@ def _trim_align(tmp_folder, align_file):
     f.writelines(struc_sec)
     f.writelines(seq_sec)
     f.close()
+
 
 #autopatch step 4. Check if any gap is more than cutoff length in the trimmed_align.ali and if so set patch_status = "no"
 def _gap_check(tmp_folder, align_file, gap_cutoff):
@@ -284,7 +317,8 @@ def _gap_check(tmp_folder, align_file, gap_cutoff):
     f1 = f.readlines()
     P1_pos = []
     for i, line in enumerate(f1):
-        if "P1;" in line: #identify positions of different sequences (P1) blocks
+        # identify positions of different sequences (P1) blocks
+        if "P1;" in line:
             P1_pos.append(i)
     f.close()
     sec_1 = P1_pos[0]
@@ -301,8 +335,66 @@ def _gap_check(tmp_folder, align_file, gap_cutoff):
 
     return patch_status
 
+
+def _ali_to_seq(ali_file):
+    '''
+    Take ali file to seq for use within mapping for eventually getting incomplete residues
+    
+    :param ali_file: Name of the alignnment file to get the sequences from
+    :type ali_file: str
+    
+    :returns seqs: Dictionary of sequences from the given file
+    :rtype seqs: dict
+    '''
+    with open(ali_file) as a_f:
+        lines = [l.strip() for l in a_f]
+    seqs, i = {}, 0
+    while i < len(lines):
+        if lines[i].startswith('>P1;'):
+            code = lines[i][4:]
+            i += 2
+            buf = []
+            while i < len(lines):
+                buf.append(lines[i])
+                if lines[i].endswith('*'):
+                    break
+                i += 1
+            seqs[code] = ''.join(buf).rstrip('*').replace('/', '').replace(' ', '')
+        i += 1
+    return seqs
+
+
+def _create_mapping(seqs, template_code, target_code):
+    '''
+    Create mapping to be used for identifying missing atoms of residue side chains
+    at the same time as finding gaps. Comes back with a mapping for sequences that
+    can be used to ensure that pointing at indexes does not come back to the
+    incorrect residue further down the line.
+    
+    :param seqs: Dictionary of sequences, can be created from function _ali_to_seq()
+    :type seqs: dict
+    :param template_code: Name of the template pdb file which is being edited
+    :type template_code: str
+    :param target_code: Name of the target sequence file to map to
+    :type target_code: str
+    
+    :returns mapping: Mapping of residues from template to target to ensure that identification of
+        incomplete residues does not break when gaps are present.
+    :rtype mapping: dict
+    '''
+    mapping, template_i, target_i = {}, 0, 0
+    for template_c, target_c in zip(seqs[template_code], seqs[target_code]):
+        if template_c != '-' and target_c != '-':
+            mapping[template_i] = target_i
+        if template_c != '-':
+            template_i += 1
+        if target_c != '-':
+            target_i += 1
+    return mapping
+
+
 #autopatch step 5. build missing residues
-def _patch_model(tmp_folder, fbasename, seq_name):
+def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=True):
     '''
     Autopatch step 5: Perform the patching on the structure, sets root name for temporary files
     created in normal directory (as all will be using same place on parallel), moves curated file
@@ -318,51 +410,143 @@ def _patch_model(tmp_folder, fbasename, seq_name):
     :type seq_name: str
     :returns: patched chain name path
     :rtype: str
+    :param block_bulk_modeller_output: Switch to allow printing of the full modeller patching
+        output, allows printing of progress of the patching without bloating the terminal by
+        default setting of True. If set to False will give the entire output from Modeller
+        patching of missing residues and missing side chains.
+    :type block_bulk_modeller_output: bool
     '''
     align_file = f'{tmp_folder}{os.sep}trimmed_align.ali'
     gaps = alignment_gaps(align_file)
 
-    if not gaps:
-        # the template covers the whole target, so there is nothing to build. Running
-        # AutoModel anyway would rebuild and optimise coordinates that were measured
-        # experimentally, moving every atom by around an Angstrom for no gain.
-        print('>> nothing missing from this chain, leaving its coordinates untouched')
-        return f'{fbasename}.pdb', []
-
-    print(f">> patching model, building {sum(e - s + 1 for s, e in gaps)} residue(s) "
-          f"in {len(gaps)} gap(s); the rest is held fixed")
     log.verbose()
-    env = Environ()
-    env.io.two_char_chain = True
-    env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
+
+    modeller_print_trap_a = io.StringIO()
+    with redirect_stdout(modeller_print_trap_a):
+        env = Environ()
+        env.io.two_char_chain = True
+        env.io.atom_files_directory = [tmp_folder, '.', f'..{os.sep}atom_files']
+
+    if not block_bulk_modeller_output:
+        print(modeller_print_trap_a.getvalue())
+
+    def _find_incomplete_residues(env, fbasename):
+        '''
+        Go over an environment and given pdb standard file for this, compare the model
+        with a fully rebuilt topology and compare to see which atoms need patching into
+        the structure.
+        
+        :param env: env instance of the given structure which is being passed for patching
+        :type env: Modeller env instance
+        :param fbasename: Name of the working pdb file to find incomplete residues for
+        :type fbasename: str
+        
+        :returns: Incomplete dictionary of format {residue_index (0-based): [missing heavy-atom names]}
+        :rtype: dict
+        '''
+        modeller_print_trap_b = io.StringIO()
+        with redirect_stdout(modeller_print_trap_b):
+            env.libs.topology.read(file='$(LIB)/top_heav.lib')
+            orig = Model(env, file=fbasename)
+
+            # Sequence-only model gives the *expected* atoms per residue
+            aln = Alignment(env)
+            aln.append_model(orig, align_codes='orig', atom_files=f'{fbasename}.pdb')
+            full = Model(env)
+            full.generate_topology(aln[0])
+
+        if not block_bulk_modeller_output:
+            print(modeller_print_trap_b.getvalue())
+
+        if len(orig.residues) != len(full.residues):
+            raise ValueError('Residue count mismatch between PDB and topology model')
+
+        incomplete = {}
+        for i, (r_orig, r_full) in enumerate(zip(orig.residues, full.residues)):
+            have = {a.name for a in r_orig.atoms}
+            want = {a.name for a in r_full.atoms}
+            missing = sorted(want - have)
+            if missing:
+                incomplete[i] = missing
+        return incomplete
+
+
+    incomplete_res = _find_incomplete_residues(env, fbasename)
+    sequences = _ali_to_seq(align_file)
+    t_map = _create_mapping(sequences, fbasename, seq_name)
+
+    if not gaps and not incomplete_res:
+        # if no gaps and all residues to complete -> nothing to rebuild
+        print('>> Nothing missing from this chain, leaving its coordinates untouched')
+        return f'{fbasename}.pdb', []
+    elif gaps and not incomplete_res:
+        print(f">> Gaps found in structure; building {sum(e - s + 1 for s, e in gaps)} residue(s) "
+                f"in {len(gaps)} gap(s); the rest is held fixed; starting patching...")
+    elif not gaps and incomplete_res:
+        print(f">> Incomplete residues found in the protein structure at residue(s): "
+              f"{', '.join([str(a) for a in list(incomplete_res.keys())])}; "
+              f"everything else remains fixed; starting patching...")
+    else:
+        print(f">> Gaps found over {sum(e - s + 1 for s, e in gaps)} residue(s) "
+              f"in {len(gaps)} gap(s) and incomplete residues found at residue(s): "
+              f"{', '.join([str(a) for a in list(incomplete_res.keys())])}; "
+              f"everything else remains fixed; structure, starting patching...")
 
     class _GapModel(AutoModel):
         '''Optimise only the residues the template does not provide.'''
 
         def select_atoms(self):
-            # select by position rather than by a 'number:chain' specification: the
-            # model's own numbering and chain naming are Modeller's to choose, while
-            # the positions come straight from the alignment
+            '''
+            Select the residues which have gaps from the gaps identified earlier and select
+            the atoms in residues which are missing as identified by _find_incomplete_residues()
+            '''
+            # First, select the residues which have been identified to be in gaps in the structure.
             sel = Selection()
             for first, last in gaps:
                 for i in range(first - 1, last):
                     sel.add(self.residues[i])
+
+            # Second, get the indices of atoms which are missing from side chains of residues.
+            new_atoms = []
+            for temp_idx, missing in incomplete_res.items():
+                targ_idx = t_map.get(temp_idx)
+                if targ_idx is None:
+                    continue
+                res = self.residues[targ_idx]
+                present = {a.name: a for a in res.atoms}
+                absent = [n for n in missing if n not in present]
+                if absent:
+                    print(f'>> Residue {targ_idx + 1} ({res.name}): {absent} not in the '
+                        f'target topology, skipped')
+                new_atoms.extend(present[n] for n in missing if n in present)
+
+            if new_atoms:
+                print('>> Missing atoms on residue side chains found: ', new_atoms)
+                for atom in new_atoms:
+                    sel.add(atom)
+
             return sel
 
     a = _GapModel(env,
-                  # file with template codes and target sequence
-                  alnfile  = f'{tmp_folder}{os.sep}trimmed_align.ali',
-                  # PDB codes of the templates
-                  knowns   = fbasename,
-                  # code of the target
-                  sequence = seq_name,
-                  assess_methods = (assess.DOPE, assess.GA341),
-                  root_name=os.path.basename(tmp_folder))
-    a.md_level = refine.fast #very_fast, fast, slow, very_slow, slow_large, refine
-    #repeat whole cycle twice and do not stop unless obj. func > 1e6
-    #a.repeat_optimization = 2
-    a.max_molpdf = 1e6
-    a.make()
+                # file with template codes and target sequence
+                alnfile  = f'{tmp_folder}{os.sep}trimmed_align.ali',
+                # PDB codes of the templates
+                knowns   = fbasename,
+                # code of the target
+                sequence = seq_name,
+                assess_methods = (assess.DOPE, assess.GA341),
+                root_name=os.path.basename(tmp_folder))
+
+    modeller_print_trap_d = io.StringIO()
+    with redirect_stdout(modeller_print_trap_d):
+        a.md_level = refine.fast #very_fast, fast, slow, very_slow, slow_large, refine
+        #repeat whole cycle twice and do not stop unless obj. func > 1e6
+        #a.repeat_optimization = 2
+        a.max_molpdf = 1e6
+        a.make()
+
+    if not block_bulk_modeller_output:
+        print(modeller_print_trap_d.getvalue())
 
     pdb_out = f'{fbasename}_PATCHED.pdb'
 
@@ -374,13 +558,13 @@ def _patch_model(tmp_folder, fbasename, seq_name):
     pairs = alignment_pairs(align_file)
     n_fit, rmsd = superpose_onto(pdb_out, f'{fbasename}.pdb', pairs=pairs)
     if n_fit:
-        print(f'>> model put back on the experimental coordinates over {n_fit} atoms, '
+        print(f'>> Model moved back towards the experimental coordinates over {n_fit} atoms, '
               f'rmsd {rmsd:.2f} A')
 
-    # Modeller's own occupancy and B-factor columns hold neither, so take them from the
-    # template and mark the atoms that were built
+    # Values Modeller puts onto occupancy and B-factor columns are not present,
+    # take them from the template structure used before patching.
     n_template, n_built = restore_template_columns(pdb_out, f'{fbasename}.pdb', pairs=pairs)
-    print(f'>> occupancy and B-factor taken from the template for {n_template} atoms, '
+    print(f'>> Occupancy and B-factor taken from the template for {n_template} atoms, '
           f'{n_built} built atoms marked with occupancy 0')
 
     # the residues of the model that the template did not provide: these are the only
@@ -398,6 +582,7 @@ def alignment_gaps(align_file):
 
     :param align_file: trimmed PIR alignment, template block first.
     :type align_file: str
+
     :returns: list of (first, last) residue numbers in the model's own numbering, which
         runs from 1 over the target sequence. Empty when nothing is missing.
     :rtype: list
@@ -423,7 +608,8 @@ def alignment_gaps(align_file):
     ranges, idx, start = [], 0, None
     for t_char, q_char in zip(template, target):
         if q_char == '-':
-            continue                       # not part of the model at all
+            # not part of the model at all
+            continue
         idx += 1                           # model residues are numbered from 1
         if t_char == '-':
             if start is None:
@@ -451,6 +637,7 @@ def merge_heteroatoms(source, target):
     :param target: reassembled file to write them into. Any heteroatom already present is
         replaced, so calling this twice does not duplicate them.
     :type target: str
+
     :returns: number of heteroatom records carried over.
     :rtype: int
     '''
@@ -487,6 +674,7 @@ def analyze_protein(M):
 
     :param M: bb.Molecule instance for the chain of interest to get gaps over
     :type M: Biobox molecule instance
+
     :returns: [number of gaps, number of missing residues, largest sequence gap]. All
         zero if the chain holds no polymer residue at all.
     :rtype: list
@@ -589,6 +777,7 @@ def superpose_onto(mobile, reference, out='', pairs=None):
         hold the same residues in the same order, which is only true when nothing was
         built.
     :type pairs: list
+
     :returns: (number of atoms fitted, RMSD over those atoms after the fit, in A). Both
         are zero when the fit could not be made, in which case ``mobile`` is left alone.
     :rtype: tuple
@@ -741,7 +930,6 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
 
     os.makedirs(outfolder, exist_ok=True)
 
-    #split PDB file in chains using biobox
     M = bb.Molecule()
     M.import_pdb(pdb, include_hetatm=include_hetatm)
     chains = np.unique(M.data["chain"].values)
@@ -750,13 +938,15 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     if len(chains) > 62:
         with open(os.path.join(os.path.split(outfolder)[0], 'excessive_chains_files.txt'), 'a') as f1:
             f1.write(f'PDB: {pdb}; Num Chains: {len(chains)}; Chains: {str(chains)}')
-        raise Exception(f'>> More than 62 individual chains present in the structure, not possible to curate a file for this number of chain names. File: {pdb}')
+        raise Exception(f'>> More than 62 individual chains present in the structure, not '
+                        f'possible to curate a file for this number of chain names. File: {pdb}')
 
     # Catch cases which have double letter chain names, used to work out if worth including more functionality for these, have left future double letter functionality in incase this is useful in future.
     if any(len(chain) > 1 for chain in chains):
         with open(os.path.join(os.path.split(outfolder)[0], 'double_letter_file_count.txt'), 'a') as f1:
             f1.write(f'PDB: {pdb}; Num Chains: {len(chains)}; Chains: {", ".join(chains)}\n')
-        raise Exception(f'>> Double letter chain names are present within the structure, currently ignoring these, tally updated in \'double_letter_file_count.txt\'. File: {pdb}')
+        raise Exception(f'>> Double letter chain names are present within the structure, currently ignoring '
+                        f'these, tally updated in \'double_letter_file_count.txt\'. File: {pdb}')
 
     gap_count = []
     for c in chains:
@@ -954,8 +1144,8 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
     '''
 
 
-def curate(pdb, fasta, outdir="result", gap=10,
-           verbose=False, include_hetatm=False):
+def curate(pdb, fasta, outdir="result", gap=10, include_hetatm=False,
+           block_bulk_modeller_output=True):
     '''
     Take pdb file, create specific temp folder for working in, call fragment to split into chains
     and get the gap counts, if gap counts are greater than max allowed, raise exception, otherwise
@@ -970,16 +1160,20 @@ def curate(pdb, fasta, outdir="result", gap=10,
     :type outdir: str
     :param gap: max gap allowed in the protein sequences to be patched
     :type gap: int
-    :param verbose: Toggleable option to allow for printing of full output from Modeller to the
-        terminal (default False)
-    :type verbose: bool
     :param include_hetatm: Toggleable option to allow hetatms to pass through biobox
     :type include_hetatm: bool
     :returns: (path of the curated file, largest gap patched, geometry report). The
         report is what :func:`resdy.geometry.check_geometry` returns for the assembled
         structure, with the number of rebuilt residues added.
     :rtype: tuple
+    :param block_bulk_modeller_output: Switch to allow printing of the full modeller patching
+        output, allows printing of progress of the patching without bloating the terminal by
+        default setting of True. If set to False will give the entire output from Modeller
+        patching of missing residues and missing side chains.
+    :type block_bulk_modeller_output: bool
     '''
+    print(f'>> Started structure curation for pdb: {pdb}')
+
     pdb_tmp_name = f'tmp_{os.path.splitext(os.path.basename(pdb))[0]}'
     tmp_folder = os.path.join(outdir, pdb_tmp_name)
     if os.path.exists(tmp_folder):
@@ -993,7 +1187,8 @@ def curate(pdb, fasta, outdir="result", gap=10,
     gap_count, chain_order = fragment(pdb, fasta, tmp_folder, include_hetatm=False)
     gaps_by_chain = {c: int(g[0]) for c, g in zip(chain_order, gap_count)}
 
-    # if there is a gap in the sequence greater than a specified amount, raise an exception and don't patch with Modeller
+    # if there is a gap in the sequence greater than a specified amount,
+    # raise an exception and don't patch with Modeller
     largest = np.max(gap_count[:, 2])
     if largest>gap:
         raise Exception(f"large gap detected ({largest} residues)")
@@ -1009,6 +1204,7 @@ def curate(pdb, fasta, outdir="result", gap=10,
         chain_name = os.path.basename(fbasename)[len('chain'):]
 
         built = []
+        '''
         if gaps_by_chain.get(chain_name, 1) == 0:
             # nothing is missing from this chain, so there is nothing for Modeller to
             # build. Running it anyway would rebuild the chain and return it in its own
@@ -1016,14 +1212,12 @@ def curate(pdb, fasta, outdir="result", gap=10,
             # respect to one another.
             foutname = f'{fbasename}.pdb'
         else:
-            if verbose:
-                foutname, built = autopatch(tmp_folder, fbasename, gap)
-            else:
-                with ShutUp():
-                    foutname, built = autopatch(tmp_folder, fbasename, gap)
+        '''
+        foutname, built = autopatch(tmp_folder, fbasename, gap,
+                                    block_bulk_modeller_output=block_bulk_modeller_output)
 
-            if foutname == "":
-                raise Exception("Autopatching failed.")
+        if foutname == '':
+            raise Exception("Autopatching failed.")
 
         # ensure that sequences of AA starts from the correct resid
         M_raw = bb.Molecule()

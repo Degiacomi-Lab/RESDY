@@ -830,7 +830,6 @@ class PDB(object):
 
             # load, clean, and split it in alternate conformations
             clean_split_print_trap = io.StringIO()
-            minimisation_print_trap = io.StringIO()
             data = None
             try:
                 with redirect_stdout(clean_split_print_trap):
@@ -907,7 +906,8 @@ class PDB(object):
         return resname in self.keep_ligands
 
 
-    def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[]):
+    def clean_and_split_pdb(self, pdb, uniprot_code = '', chains=[],
+                            block_bulk_modeller_output=True):
         '''
         Download the pdb file from rcsb, clean the structure, split it based on alternative
         conformations, find if there are gaps in the sequences, if more than the max gap set in
@@ -924,6 +924,11 @@ class PDB(object):
         :param chains: list of chains for the pdb interested in, not required but used if pdb file
             goes over more than 1 uniprot code. Default: []
         :type chains: list
+        :param block_bulk_modeller_output: Switch to allow printing of the full modeller patching
+            output, allows printing of progress of the patching without bloating the terminal by
+            default setting of True. If set to False will give the entire output from Modeller
+            patching of missing residues and missing side chains.
+        :type block_bulk_modeller_output: bool
         '''
         try:
             self.download_pdb(pdb)
@@ -955,7 +960,8 @@ class PDB(object):
 
                 fname, largest_gap, geometry = patcher.curate(
                     f, fasta_loc, outdir=self.curated_dir,
-                    gap=self.gap, include_hetatm=self.include_hetatm)
+                    gap=self.gap, include_hetatm=self.include_hetatm,
+                    block_bulk_modeller_output=block_bulk_modeller_output)
                 self._record_geometry(geometry)
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
