@@ -7,7 +7,9 @@ import json
 import shutil
 import time
 import datetime
+from functools import partial
 from contextlib import redirect_stdout
+import multiprocessing as mp
 from multiprocessing import cpu_count
 from multiprocessing import Manager
 from multiprocessing.pool import Pool
@@ -17,7 +19,7 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import get_download_tool, ShutUp, require_biobox
+from .helper import require_biobox
 require_biobox(bb)
 from . import alphafold as af
 from . import patcher
@@ -49,11 +51,10 @@ STANDARD_RESIDUES = ('ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HI
 #: Residue names treated as solvent.
 WATER_RESNAMES = ('HOH', 'WAT', 'DOD', 'H2O')
 
-#: Monoatomic ions retained when ``include_hetatm=True`` is used without a policy. This is
-#: the list clean_pdb used to carry, whose branch was unreachable.
+#: Monoatomic ions retained when ``include_hetatm=True``
 DEFAULT_KEPT_IONS = ('ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO')
 
-#: Force field files used for minimisation unless the user gives others.
+#: Force field files used for minimisation. Change if you want to use others.
 DEFAULT_FORCEFIELD = ('amber14-all.xml', 'implicit/gbn2.xml')
 
 #: 1 kcal/mol/A^2 expressed in kJ/mol/nm^2, the unit OpenMM works in.
@@ -107,7 +108,7 @@ class PDB(object):
                  remove_all_modifications=False,
                  num_cores=0, max_nmr_conformers='',
                  biological_assembly=True, max_assembly_atoms=None,
-                 keep_all_curated=True):
+                 keep_all_curated=True, parallel_timeout = 12000):
         '''
         Initialise the PDB class.
 
@@ -215,20 +216,23 @@ class PDB(object):
             structures and to keep both the curated and relaxed structure whether one is produced
             or not.
         :type keep_all_curated: bool
+        :param parallel_timeout: Number of seconds to allow processes of curation to run for
+            without given progress before the child is killed. This keeps the process moving
+            and stops curation getting stuck. Default is 12000 (2 hours) to allow for large
+            protein assemblies to pass curation.
+        :type parallel_timeout: int
         '''
 
         self.outdir = outdir
         self.PDB_only = PDB_only
         self.parallel = parallel
         self.num_cores = num_cores
-        # include_hetatm used to be the only control, and its documented intent was to keep
-        # metal ions. Honour that when no explicit policy is given, so existing callers are
-        # unaffected; self.include_hetatm then becomes the derived question of whether
-        # biobox needs to read heteroatoms at all.
+        self.parallel_timeout = parallel_timeout
+
         if include_hetatm and not (keep_waters or keep_ions or keep_ligands):
             keep_ions = DEFAULT_KEPT_IONS
 
-        #: structures that were not minimised, mapped to why. Reported at the end of a run.
+        # {failed minimisation structure name: reason why failed} - given at end of run.
         self.minimisation_skipped = {}
 
         self.keep_waters = keep_waters
@@ -322,12 +326,12 @@ class PDB(object):
     def _setup_minimisation_settings(self, forcefield, tolerance, max_iterations,
                                      restrain_heavy_atoms, restraint_k, platform):
         '''
-        Validate the minimisation settings and return them as a plain dict.
-
-        The dict is what gets recorded beside every minimised structure and compared when a
-        curated structure is reused, so it holds only JSON-serialisable values. When
-        minimisation is requested, the force field files and the platform are also loaded
-        once here, so that a typo fails at construction rather than once per structure.
+        Validate the minimisation settings and return them as a plain dict. The reported
+        dictionary is reported after every minimisation of a structure and when already
+        relaxed structures are found, they are compared to this to work out if settings
+        matched. JSON-serialisable values are used to make this process easy. If minimisation
+        is planned to run, checks are done here on given inputs to correct before minimisation
+        attempts to run.
 
         :returns: forcefield (list), tolerance_kj_mol_nm, max_iterations,
             restrain_heavy_atoms, restraint_k_kcal_mol_a2, platform.
@@ -377,23 +381,33 @@ class PDB(object):
 
     @staticmethod
     def _uses_implicit_solvent(forcefield):
-        '''True if one of the force field files is an OpenMM implicit solvent model.'''
+        '''
+        Determines if one of the force field files is an OpenMM implicit solvent model. Returns
+        True if so, otherwise returns False.
+        
+        :param forcefield: Name of the forcefield requested
+        :type forcefield: str
+        '''
         return any(f.replace('\\', '/').startswith('implicit/') for f in forcefield)
 
 
     def _minimisation_record_path(self, pdb):
-        '''Path of the record kept beside curated structure ``pdb`` (a file stem).'''
+        '''
+        Path of the record kept beside curated structure ``pdb`` (a file stem).
+
+        :param pdb: Name of the pdb file to create path to write minimisation to
+        :type pdb: str
+        '''
         return os.path.join(self.curated_dir, f'{pdb}{MINIMISATION_RECORD_SUFFIX}')
 
 
     def _write_minimisation_record(self, pdb, status, reason='', settings=None, **details):
         '''
-        Record the outcome of minimising one structure, beside the structure itself.
-
-        One small file per structure rather than one shared table, because curation can run
-        in a worker pool: each worker writes only its own structures' records, and
-        gather_proteins collects them afterwards. Skips and failures are recorded in
-        self.minimisation_skipped as well, which is complete for a serial run.
+        Complete a record of the minimisation procedure of each individual structure rather
+        than collating to a central csv at write time. This allows for easy parallel running
+        and also quick access when searching file directory to get information on what may have
+        gone wrong. Information from this is collated by collect_minimisation_log() after and 
+        skips and failures are recorded in self.minimisation_skipped as well.
 
         :param pdb: file stem of the curated structure.
         :type pdb: str
@@ -431,12 +445,8 @@ class PDB(object):
     def _ensure_minimised(self, pdb):
         '''
         Minimise an already curated structure unless it was minimised with the current
-        settings.
-
-        Used when curation finds a structure already curated and reuses it. Without this,
-        changing the minimisation settings and re-running in the same outdir would silently
-        keep the relaxed files made with the old ones. A structure with no record at all
-        (made before records existed, or never minimised) is minimised now.
+        settings. This ensures that relaxed structures that are found are not assumed
+        to be of the correct format. If the settings matched, it will be skipped.
 
         :param pdb: file stem of the curated structure.
         :type pdb: str
@@ -461,9 +471,9 @@ class PDB(object):
 
     def collect_minimisation_log(self, outname='minimisation_log.csv'):
         '''
-        Gather the per-structure minimisation records into one table.
-
-        Called at the end of gather_proteins. Also refills self.minimisation_skipped, which
+        Gather the per-structure minimisation records into one table. Allows for filtering
+        by specific conditions and completed minimisation states. Called at the end of
+        gather_proteins. Also refills self.minimisation_skipped, which
         worker processes cannot update when curation runs in parallel.
 
         :param outname: file written in the output directory; None to write nothing.
@@ -504,7 +514,7 @@ class PDB(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
-    def load_state(self, fname, outdir="", gap=10, PDB_only=False):
+    def load_state(self, fname, outdir='', gap=10, PDB_only=False):
         '''
         Allows part resuming of a partially run curation. Loads in the proteins.csv file curated in
         a previous run into the self.df dataframe. While it doesn't stop the programme trying to
@@ -613,9 +623,9 @@ class PDB(object):
                         method_obtained = r.get('Method', '')
                         resolution = r.get('Resolution', '')
                         chains = r.get('Chains', '')
-                        items.append([[r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains], skip_if_found, lock])
+                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains])
                     else:
-                        items.append([[r['PDB_Code']], skip_if_found, lock])
+                        items.append([r['PDB_Code']])
                 except Exception as e:
                     print(f'>> In adding rows to the parallel pool, failed to add row {i} '
                           f'and therefore will not be created; error: {e}')
@@ -626,8 +636,24 @@ class PDB(object):
                     broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
 
             if self.parallel:
+                results = []
                 with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                    results = [t for t in pool.starmap(self._curate_row, items) if t is not None]
+                    iterator = pool.imap(partial(self._curate_row, lock, skip_if_found),
+                                            [tuple(item) for item in items], chunksize=1)
+                    while True:
+                        try:
+                            results.append(iterator.next(timeout=self.parallel_timeout))
+                        except StopIteration:
+                            break
+                        except mp.TimeoutError:
+                            pool.terminate()
+                            raise RuntimeError(
+                                f'A parallel protein curation worker produced no result for '
+                                f'{self.parallel_timeout} s working on '
+                                f'structures, so it is treated as stalled and the run was stopped. '
+                                f'Either raise parallel_timeout if the features requested are simply '
+                                f'slow on these structures, or set parallel=False to measure in '
+                                f'series.') from None
             else:
                 results = [t for t in (self._curate_row(*i) for i in items) if t is not None]
 
@@ -649,7 +675,7 @@ class PDB(object):
             self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
 
 
-    def _curate_row(self, row_details, skip_if_found, lock):
+    def _curate_row(self, lock, skip_if_found, row_details):
         '''
         Function for use within the parallel gather proteins function for gathering pdb information
         for the given uniprot code within the row details. Checks if the pdb code contains 'AF-', if
@@ -857,11 +883,11 @@ class PDB(object):
 
     def _record_geometry(self, geometry):
         '''
-        Append one curated structure's geometry report to ``curation_geometry.csv``.
-
-        Written beside proteins.csv so that a run can be audited afterwards: which
-        structures hold rebuilt residues, how close their closest non-bonded contact is,
-        and whether anything rebuilt ended up inside a neighbouring chain.
+        Write a geometry report given from a specific structure to the ``curation_geometry.csv``
+        file. This appends on to any other geometry data already in this file. This is written
+        alongside the proteins.csv. If provides information on which structures hold rebuilt
+        residues, how close their closest non-bonded contact is, and whether anything rebuilt
+        ended up inside a neighbouring chain.
 
         :param geometry: report as returned by resdy.geometry.check_geometry, with
             n_modelled_residues added by patcher.curate.
@@ -885,7 +911,15 @@ class PDB(object):
 
     def _keep_hetatm(self, line, element=''):
         '''
-        Decide whether a HETATM record survives cleaning.
+        Decide whether a HETATM record survives cleaning based on series of conditions:
+            - If it is either hydrogen of deuterium, returns False
+            - If it is part of the denoted residue names for water (given at the top of
+                the script), it will return whatever self.keep_waters is set to.
+            - If it is part of the denoted ion names to keep (given at the top of the
+                script), it will return whatever self.keep_ions is set to.
+            - If keep_ligands is set to True, it will always return True.
+        If none of these conditiosn match, it will return a boolean based on if the residue
+        is in self.keep_ligands.
 
         :param line: the HETATM record.
         :type line: str
@@ -1033,7 +1067,8 @@ class PDB(object):
     def collect_assembly_log(self, outname='assembly_log.csv'):
         '''
         Gather the per-structure assembly records into one table. Called at the end of
-        gather_proteins.
+        gather_proteins. Allows for a collation of the assembly records for individual
+        structures to allow for easier filtering.
 
         :param outname: file written in the output directory; None to write nothing.
         :type outname: str
@@ -1164,8 +1199,7 @@ class PDB(object):
         write_file_path = os.path.join(self.raw_dir, f"{pdb}-clean.pdb")
         write_file = open(write_file_path, 'w')
 
-        # Write the clean file, including HETATMs (if they are metal ions),
-        # all atoms and lines starting with TER and END.
+        # Write the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
         test_MSE = False
         test_SEC = False
         test_KCX = False
@@ -1187,10 +1221,7 @@ class PDB(object):
                     res_num = line[18:22].strip()
                     modres_sites[chain + res_num] = line[24:27]
 
-            # check for resid insertion code in position 26. Only ATOM records matter: an
-            # insertion code breaks the residue key used throughout the pipeline, while on
-            # a ligand or a water it is harmless, and rejecting a structure for one would
-            # make retaining heteroatoms cost structures for no reason.
+            # check for resid insertion code in position 26 on ATOM records
             if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
                 res_insertion_codes.append(line[26])
 
@@ -1221,15 +1252,11 @@ class PDB(object):
                 # guess element based on atom type name
                 element_col = line[12:16].strip().lstrip('0123456789')[:2].upper()
 
-            # Heteroatom groups are decided here, ahead of the standard-residue check
-            # below. That check drops every residue whose name is not one of the twenty
-            # amino acids and not a MODRES site, which is every ion, water and ligand, and
-            # is why the metal branch further down was never reached. Residues that are
-            # MODRES sites are left alone: they are handled by the logic that follows.
+            # Identify HETATM records and go to _keep_hetatm() to work out whether to keep or not.
             if (line[:6] == 'HETATM' and len(line) > 26
                     and line[17:20].strip().upper() not in standard_resids):
                 het_key = line[21] + line[22:26].strip()
-                # a MODRES site falls through to the logic below, which reverts it
+
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
                     if self._keep_hetatm(line, element_col):
                         write_file.write(line)
@@ -1608,8 +1635,7 @@ class PDB(object):
                 mapped_res = M.data['resid'].map(res_mapper)
                 sel_chain = M.data['chain'] == chain
 
-                # Only the polymer is renumbered. Retained waters, ions and ligands are
-                # numbered in their own range
+                # Only the polymer is renumbered. Retained waters, ions and ligands are numbered in their own range
                 is_polymer = M.data['resname'].astype(str).str.upper().isin(STANDARD_RESIDUES)
                 sel_poly = sel_chain & is_polymer
 
@@ -1627,10 +1653,7 @@ class PDB(object):
                 print(f'Failed alignment of pdb {pdb_code}, chain {chain}, with error: {str(e)}')
                 failed.append(chain)
 
-        # A chain that could not be placed keeps its own numbering, but that is no reason
-        # to throw away the chains that were placed: refusing to write left every chain
-        # with author numbering because of one, which for a complex spanning more than one
-        # Uniprot entry is the normal case rather than an error.
+        # Write as many chains with correct numbering to new file as possible.
         if len(failed) < len(chains):
             M.write_pdb(pdb_code)
             placed = [c for c in chains if c not in failed]
@@ -1856,8 +1879,6 @@ class PDB(object):
         :param pdb_path: Path of pdb file to check
         :type pdb_path: str
         '''
-
-        # fix any potential problems with capping atoms on termainl residues
         fixer = PDBFixer(filename=pdb_path)
         fixer.missingResidues = {}
         fixer.findMissingAtoms()
@@ -1884,9 +1905,10 @@ class PDB(object):
         The outcome is recorded in ``<pdb>.minimisation.json`` beside the structure: the
         settings used, 'relaxed', 'skipped' or 'failed' with the reason, and for a relaxed
         structure the initial and final potential energy and the RMSD of the heavy atoms
-        from their input positions. A relaxed file left by an earlier minimisation is removed
-        first, so that a structure which is now skipped or fails is not measured from stale
-        coordinates.
+        from their input positions. If another relaxed file for the given pdb is found, checks
+        are made incase parameters matched. A relaxed file left by an earlier minimisation
+        is removed first, so that a structure which is now skipped or fails is not measured
+        from stale coordinates.
 
         :param pdb: file stem of the curated structure to minimise.
         :type pdb: str
@@ -1905,8 +1927,7 @@ class PDB(object):
             os.remove(relaxed_path)
 
         if self.keep_waters and self._uses_implicit_solvent(settings['forcefield']):
-            # the implicit solvent model already accounts for solvation, so minimising
-            # explicit waters would count it twice
+            # the implicit solvent model already accounts for solvation, so minimising explicit waters would count it twice
             reason = 'explicit waters are being kept'
             print(f'>> Not minimising {pdb}: explicit waters are being kept, which the '
                   f'implicit solvent model would double-count. The unminimised structure '
@@ -1940,8 +1961,8 @@ class PDB(object):
                                         in forcefield.getUnmatchedResidues(modeller.topology)})
                 except Exception:
                     unmatched = []
-                # a failed addHydrogens leaves everything unmatched, standard residues
-                # included, so name only the residues that are actually unusual
+                # find residues that are unusual in the structure that will have been
+                # likely to cause the problem in adding hydrogens
                 culprits = [r for r in unmatched if r.upper() not in STANDARD_RESIDUES]
                 reason = (f'no forcefield template for {", ".join(culprits)}' if culprits
                           else str(e))

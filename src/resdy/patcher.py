@@ -65,8 +65,7 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8, block_bulk_modeller_output=Tr
 
     # Modeller is given fbasename as a PDB *code*, which it resolves against
     # env.io.atom_files_directory, and as the align_codes written into the PIR header.
-    # Neither tolerates an absolute path: the lookup cannot resolve one, and on Windows
-    # the drive letter adds a colon to a header whose fields are colon-separated. Work
+    # None of these settings can handle an absolute path thereforew work is done
     # from the parent of the temporary folder so that every name handed to Modeller is
     # relative and short.
     abs_tmp = os.path.abspath(tmp_folder)
@@ -114,7 +113,7 @@ def autopatch(tmp_folder, fbasename, gap_cutoff=8, block_bulk_modeller_output=Tr
     return pdb_out, built
 
 
-#autopatch step 1a. pir format of AA from pdb
+# autopatch step 1a. pir format of AA from pdb
 def _pdb_to_seq(fbasename, block_bulk_modeller_output=True):
     '''
     Autopatch step 1a: Use the modeller package to extract the sequence from the pdb file given and
@@ -133,12 +132,12 @@ def _pdb_to_seq(fbasename, block_bulk_modeller_output=True):
         aln = Alignment(env)
         aln.append_model(mdl, align_codes=fbasename)
         aln.write(file=f'{fbasename}.seq')
-    
+
     if not block_bulk_modeller_output:
         print(modeller_print_trap.getvalue())
 
 
-#autopatch step 1b. pir from complete AA fasta
+# autopatch step 1b. pir from complete AA fasta
 def _fasta_to_pir(fbasename, block_bulk_modeller_output=True):
     '''
     Autopatch step 1b: Use the modeller package to transform the fasta file into a .pir file located
@@ -159,7 +158,8 @@ def _fasta_to_pir(fbasename, block_bulk_modeller_output=True):
         print(modeller_print_trap.getvalue())
 
 
-#autopatch step 2. add sequence name to 2nd line; copy the pir contents and structure info into alignment.seg; align sequences and generate model
+# autopatch step 2. add sequence name to 2nd line; copy the pir contents and structure info into
+# alignment.seg; align sequences and generate model
 def _full_align(tmp_folder, fbasename, block_bulk_modeller_output=True):
     '''
     Autopatch step 2: Take the curated .pir and .seq files and place them into an alignment.seg file
@@ -393,7 +393,7 @@ def _create_mapping(seqs, template_code, target_code):
     return mapping
 
 
-#autopatch step 5. build missing residues
+# autopatch step 5. build missing residues
 def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=True):
     '''
     Autopatch step 5: Perform the patching on the structure, sets root name for temporary files
@@ -449,7 +449,6 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
             env.libs.topology.read(file='$(LIB)/top_heav.lib')
             orig = Model(env, file=fbasename)
 
-            # Sequence-only model gives the *expected* atoms per residue
             aln = Alignment(env)
             aln.append_model(orig, align_codes='orig', atom_files=f'{fbasename}.pdb')
             full = Model(env)
@@ -476,7 +475,6 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
     t_map = _create_mapping(sequences, fbasename, seq_name)
 
     if not gaps and not incomplete_res:
-        # if no gaps and all residues to complete -> nothing to rebuild
         print('>> Nothing missing from this chain, leaving its coordinates untouched')
         return f'{fbasename}.pdb', []
     elif gaps and not incomplete_res:
@@ -490,10 +488,15 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
         print(f">> Gaps found over {sum(e - s + 1 for s, e in gaps)} residue(s) "
               f"in {len(gaps)} gap(s) and incomplete residues found at residue(s): "
               f"{', '.join([str(a) for a in list(incomplete_res.keys())])}; "
-              f"everything else remains fixed; structure, starting patching...")
+              f"everything else remains fixed; starting patching...")
 
     class _GapModel(AutoModel):
         '''Optimise only the residues the template does not provide.'''
+        '''
+        Custom AutoModel created with select_atoms which allows the programme to find only the
+        residues which the template does not provide and also side chains and capping atoms of
+        terminal residues that are missing from the template.
+        '''
 
         def select_atoms(self):
             '''
@@ -540,8 +543,7 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
     modeller_print_trap_d = io.StringIO()
     with redirect_stdout(modeller_print_trap_d):
         a.md_level = refine.fast #very_fast, fast, slow, very_slow, slow_large, refine
-        #repeat whole cycle twice and do not stop unless obj. func > 1e6
-        #a.repeat_optimization = 2
+        # do not stop unless obj. func > 1e6
         a.max_molpdf = 1e6
         a.make()
 
@@ -552,9 +554,7 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
 
     os.rename(f'{os.path.basename(tmp_folder)}.B99990001.pdb', pdb_out)
 
-    # Put the model back in the frame of the chain it was built from. This is done here
-    # rather than in curate() because the correspondence between the two comes from the
-    # alignment, which is only available at this point.
+    # Put the model back in the frame of the chain it was built from.
     pairs = alignment_pairs(align_file)
     n_fit, rmsd = superpose_onto(pdb_out, f'{fbasename}.pdb', pairs=pairs)
     if n_fit:
@@ -575,10 +575,8 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
 
 def alignment_gaps(align_file):
     '''
-    Residues of the model that the template does not provide coordinates for.
-
-    These are the only residues that need building. Everything else was determined
-    experimentally and should be left exactly as deposited.
+    Residues of the model that the template does not provide coordinates for. Only residues found
+    here should be rebuilt, such that all possible experimental data provided is preserved.
 
     :param align_file: trimmed PIR alignment, template block first.
     :type align_file: str
@@ -610,7 +608,8 @@ def alignment_gaps(align_file):
         if q_char == '-':
             # not part of the model at all
             continue
-        idx += 1                           # model residues are numbered from 1
+        # model residues are numbered from 1
+        idx += 1
         if t_char == '-':
             if start is None:
                 start = idx
@@ -624,13 +623,12 @@ def alignment_gaps(align_file):
 
 def merge_heteroatoms(source, target):
     '''
-    Carry the heteroatom records of ``source`` into ``target``.
-
-    Modeller returns only the polymer it modelled, and the complex is reassembled from
-    those models, so anything the user asked to keep is lost on any chain that was
-    patched. The coordinates are taken from ``source`` unchanged, which is correct only
-    because a patched chain is superposed back onto the frame it was built from; without
-    that, a ligand would end up several Angstrom from its site.
+    Carry the heteroatom records of ``source`` into ``target``. Modeller will simply return only
+    the chain that it modelled before the full complex is reassembled. Anything previously done
+    in protein to hold certain bits of the structure within a curated complex would be lost
+    without this function. Coordinates are taken from the ``source`` file, as the new complex has
+    been mapped onto the originial coordinates this will line up well. This allows user defined
+    HETATM control to preserve through curation.
 
     :param source: file holding the heteroatoms, normally the structure curate() was given.
     :type source: str
@@ -663,14 +661,8 @@ def merge_heteroatoms(source, target):
 def analyze_protein(M):
     '''
     Take a biobox molecule instance, look for gaps in the sequence and return 3 elements list:
-    [number of gaps, number of missing residues, largest sequence gap]
-
-    Only polymer residues are considered, identified by carrying a CA atom. Waters,
-    ions and ligands are numbered in their own range, often continuing past the end of
-    the chain they sit in, so counting them would put the whole span between the last
-    residue and the first heteroatom down as missing. On 3DBJ, whose chains run to
-    residue 174 with waters numbered from 202, including them turns two real gaps of
-    two residues into a single phantom gap of 28 and the structure is rejected.
+    [number of gaps, number of missing residues, largest sequence gap]. Only polymer residues
+    are considered, identified by carrying a CA atom.
 
     :param M: bb.Molecule instance for the chain of interest to get gaps over
     :type M: Biobox molecule instance
@@ -679,8 +671,7 @@ def analyze_protein(M):
         zero if the chain holds no polymer residue at all.
     :rtype: list
     '''
-    # biobox reads columns 12 to 17, so an alternate-location indicator arrives stuck to
-    # the atom name ('CA A'); compare on the first whitespace-separated token
+    # as biobox may include an alternate location indicator with the residue, compare on first whitespace-separated token.
     names = M.data['name'].astype(str).str.split().str[0]
     res = np.unique(M.data.loc[names == 'CA', 'resid'].values)
 
@@ -709,12 +700,10 @@ def analyze_protein(M):
 
 def alignment_pairs(align_file):
     '''
-    Which residue of the model corresponds to which residue of the template.
-
-    Taken from the alignment itself rather than inferred. Neither residue numbers nor
-    ordinal positions can be trusted: Modeller renumbers its model from 1, and once it
-    inserts a residue every ordinal after the insertion shifts, so both proxies silently
-    pair atoms of different residues.
+    Which residue of the model corresponds to which residue of the template. Take the alignment
+    file, and create a mapping between these to ensure that the indexing of Modeller renumbering
+    starting from 1 and adding other residues in does not cause atoms to be added in the wrong
+    spot.
 
     :param align_file: trimmed PIR alignment, template block first.
     :type align_file: str
@@ -757,9 +746,8 @@ def superpose_onto(mobile, reference, out='', pairs=None):
 
     Modeller returns a model in its own frame, so a chain comes back from
     :func:`autopatch` translated and rotated with respect to the structure it was taken
-    from. For a single chain that is harmless, but the chains of a complex are patched
-    independently, so reassembling them without putting each one back destroys the
-    quaternary structure. This performs a least-squares fit (Kabsch) on the atoms the two
+    from. Doing this ensures that when the chains are placed back together, there are no
+    induced clashes. This performs a least-squares fit (Kabsch) on the atoms the two
     files share, keyed on residue number and atom name, and applies the resulting
     transformation to every atom of ``mobile``.
 
@@ -1074,7 +1062,6 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
     for pdb_file in pdbs:
         # take pdb_file and extract the chain name - need to find the exact format it needs to go back into that the code is expecting to reconvert it from
         dbletter = False
-        thousand_chain = False
         chainname = os.path.splitext(os.path.basename(pdb_file))[0].split('_')[0][5:]
         if len(chainname) > 1:
             dbletter = True
@@ -1181,9 +1168,7 @@ def curate(pdb, fasta, outdir="result", gap=10, include_hetatm=False,
     os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    # heteroatoms are deliberately kept out of the per-chain files: Modeller has no use
-    # for them and drops them from its output anyway. They are merged back after the
-    # complex is reassembled, from the structure this was given.
+    # heteroatoms ignored, if required are added back after the curation has been completed and reassembled.
     gap_count, chain_order = fragment(pdb, fasta, tmp_folder, include_hetatm=False)
     gaps_by_chain = {c: int(g[0]) for c, g in zip(chain_order, gap_count)}
 
@@ -1204,15 +1189,6 @@ def curate(pdb, fasta, outdir="result", gap=10, include_hetatm=False,
         chain_name = os.path.basename(fbasename)[len('chain'):]
 
         built = []
-        '''
-        if gaps_by_chain.get(chain_name, 1) == 0:
-            # nothing is missing from this chain, so there is nothing for Modeller to
-            # build. Running it anyway would rebuild the chain and return it in its own
-            # frame, which for a complex means the chains no longer sit correctly with
-            # respect to one another.
-            foutname = f'{fbasename}.pdb'
-        else:
-        '''
         foutname, built = autopatch(tmp_folder, fbasename, gap,
                                     block_bulk_modeller_output=block_bulk_modeller_output)
 
@@ -1263,9 +1239,7 @@ def curate(pdb, fasta, outdir="result", gap=10, include_hetatm=False,
 
     shutil.rmtree(tmp_folder)
 
-    # Check the assembled result. Each chain was modelled on its own, so a rebuilt loop
-    # knows nothing about the chains packed against it, and a clash there is invisible to
-    # everything downstream: the measurements are taken happily either way.
+    # Check the assembled result to ensure that clashes have not been induced through curation.
     geometry, offending = check_geometry(outname, modelled_residues=modelled)
     geometry['n_modelled_residues'] = len(modelled)
     if geometry['n_clashes']:

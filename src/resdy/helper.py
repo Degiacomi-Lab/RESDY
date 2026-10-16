@@ -17,7 +17,9 @@ METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Re
 
 def require_biobox(biobox):
     '''
-    Raise if the biobox given is older than :data:`MIN_BIOBOX_VERSION`.
+    Raise if the biobox given is older than :data:`MIN_BIOBOX_VERSION`. This ensures
+    that use of the RESDY package will get correct output and won't see known bugs from
+    previous biobox versions pass through.
 
     :param biobox: the imported biobox module.
     :type biobox: module

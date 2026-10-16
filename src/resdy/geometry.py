@@ -2,10 +2,11 @@
 Geometry check applied to a structure once curation has finished.
 
 Curation rebuilds missing residues, splits and reassembles chains and renumbers
-residues, and every one of those steps has at some point moved atoms that should not
-have moved. None of it is visible in the measurements themselves, which is what makes a
-geometric check worth having: a structure whose chains have drifted or whose rebuilt loop
-runs into a neighbour still measures perfectly happily.
+residues. These steps will at some point move atoms that should not have and were placed
+back. This file contains scripts to ensure unwanted movement is minimised and performs
+checks to work out how much things have moved. These functions ensure that the structure
+remains as close to the true nature of experimental form as possible after corrections
+have been made.
 
 The module also holds :func:`distance_to_other_chains`, which records how close a residue
 sits to a neighbouring chain, the metadata column Min_Dist_Other_Chain.
@@ -27,7 +28,7 @@ WATER_RESNAMES = ('HOH', 'WAT', 'DOD', 'H2O')
 ION_RESNAMES = ('ZN', 'NI', 'CU', 'FE', 'MG', 'MN', 'NA', 'K', 'CA', 'CO', 'CL', 'MO',
                 'CD', 'HG', 'PT', 'AU', 'AG', 'SR', 'BA', 'CS', 'RB', 'LI', 'BR', 'IOD', 'F')
 
-#: The 20 standard residue names, used to tell protein from everything else.
+#: The 20 standard residue names
 STANDARD_RESIDUES = ('ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE',
                      'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL')
 
@@ -203,11 +204,7 @@ def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4
     sequence-adjacent residues, which covers the peptide bond and the 1-3 pairs it
     creates; disulfide SG-SG; and any pair involving a metal, since coordination is a
     bond. The metal test is on the element, so it covers a cofactor's metal centre as
-    well as a free ion.
-
-    Bonds are recognised from connectivity rather than from distance. A peptide bond at
-    1.3 A and a severe clash at 1.3 A are not distinguishable geometrically, so any rule
-    based on covalent radii either reports real bonds or excuses real overlaps.
+    well as a free ion. Bonds are recognised from connectivity rather than from distance.
 
     :param path: curated pdb file to check.
     :type path: str

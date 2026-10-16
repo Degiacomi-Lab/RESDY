@@ -1,12 +1,12 @@
 '''
 Residue presets: which residue codes and which atom the pipeline works on.
 
-Every feature computes its value at one *anchor atom* per residue of interest. The anchor
-is not merely a label: SASA is summed over it, DAS grows its half sphere from it, AEV
-centres its substructure on it, and depth is measured to it. It is therefore the reactive
-atom of the side chain where there is one (NZ for lysine, SG for cysteine), the outermost
-well defined side-chain atom otherwise, and CB where the side chain has no reactive group
-at all (CA for glycine, which has nothing else).
+Features creating information on the side chains of the residues of interest base their values
+on a specific atom. The choice of this atom is important to get the best information out:
+SASA is summed over it, DAS grows its half sphere from it, AEV centres its substructure on it,
+and depth is measured to it. It is therefore the reactive atom of the side chain where there
+is one (NZ for lysine, SG for cysteine), the outermost well defined side-chain atom otherwise,
+and CB where the side chain has no reactive group at all (CA for glycine, which has nothing else).
 
 This module holds the presets for the twenty standard amino acids and a single resolver that
 validates presets and user dictionaries by the same rule::
@@ -140,8 +140,7 @@ AA_PRESETS = {
             'atom_select_names_modified': ['CB']},
 }
 
-#: Every residue code named by a preset, modified forms and protonation aliases included,
-#: used to tell a protein residue from an ion, a water or a ligand.
+#: Every residue code named by a preset, modified forms and protonation aliases included
 PROTEIN_RESNAMES = frozenset(code for preset in AA_PRESETS.values()
                              for code in preset['non_modified_codes'] + preset['modified_codes'])
 
@@ -233,8 +232,8 @@ def residue_key(aa_properties):
 
     This is the key a feature class is asked about when it declares ``SUPPORTED_RESIDUES``,
     ``RESIDUE_KWARGS`` or ``UNSUPPORTED_REASON``. The canonical code is taken as the first
-    entry of ``non_modified_codes``, which is the same entry the pKa parsers build their
-    regular expression from.
+    entry of ``non_modified_codes``. This is important for certain features (pKa parsers) where
+    using the canonical code is important to match up results from an output file.
 
     :param aa_properties: A dictionary as returned by :func:`resolve_residue`.
     :type aa_properties: dict
