@@ -1,7 +1,7 @@
 {
  "structure": "2MWS-alt-3",
- "status": "skipped",
- "reason": "No template found for residue 11 (THR).  The set of heavy atoms matches GLY, but the residue is missing 1 H atom.  You may be able to add it with Modeller.addHydrogens().  For more information, see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#template",
+ "status": "relaxed",
+ "reason": "",
  "settings": {
   "forcefield": [
    "amber14-all.xml",
@@ -14,5 +14,9 @@
   "platform": null
  },
  "openmm_version": "8.6.1",
- "date": "2026-10-01T23:30:19"
+ "date": "2026-10-16T10:49:52",
+ "platform_used": "CPU",
+ "energy_initial_kj_mol": -21833.791883302387,
+ "energy_final_kj_mol": -25257.0216234405,
+ "heavy_atom_rmsd_a": 0.5436536352978849
 }

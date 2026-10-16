@@ -1,7 +1,7 @@
 {
  "structure": "4DCN-alt-1",
- "status": "skipped",
- "reason": "No template found for residue 164 (SER).  The atoms and bonds in the residue match SER, but the set of externally bonded atoms is missing 1 C atom.  Is the chain missing a terminal capping group?  For more information, see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#template",
+ "status": "relaxed",
+ "reason": "",
  "settings": {
   "forcefield": [
    "amber14-all.xml",
@@ -14,5 +14,9 @@
   "platform": null
  },
  "openmm_version": "8.6.1",
- "date": "2026-10-01T23:23:10"
+ "date": "2026-10-16T11:00:14",
+ "platform_used": "CPU",
+ "energy_initial_kj_mol": -100259.13730374267,
+ "energy_final_kj_mol": -118821.7024675567,
+ "heavy_atom_rmsd_a": 0.6150178458011646
 }

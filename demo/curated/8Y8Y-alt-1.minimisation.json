@@ -1,7 +1,7 @@
 {
  "structure": "8Y8Y-alt-1",
- "status": "skipped",
- "reason": "No template found for residue 18 (GLU).  The set of atoms is similar to VAL, but is missing 3 H atoms and 1 C atom.  For more information, see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#template",
+ "status": "relaxed",
+ "reason": "",
  "settings": {
   "forcefield": [
    "amber14-all.xml",
@@ -14,5 +14,9 @@
   "platform": null
  },
  "openmm_version": "8.6.1",
- "date": "2026-10-01T23:30:11"
+ "date": "2026-10-16T10:34:02",
+ "platform_used": "CPU",
+ "energy_initial_kj_mol": -38656.96263175148,
+ "energy_final_kj_mol": -44092.71649078386,
+ "heavy_atom_rmsd_a": 0.44005055301315077
 }

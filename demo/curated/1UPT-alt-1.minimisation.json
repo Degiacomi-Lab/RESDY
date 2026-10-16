@@ -1,7 +1,7 @@
 {
  "structure": "1UPT-alt-1",
- "status": "skipped",
- "reason": "No template found for residue 168 (GLN).  The atoms and bonds in the residue match GLN, but the set of externally bonded atoms is missing 1 C atom.  Is the chain missing a terminal capping group?  For more information, see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#template",
+ "status": "relaxed",
+ "reason": "",
  "settings": {
   "forcefield": [
    "amber14-all.xml",
@@ -14,5 +14,9 @@
   "platform": null
  },
  "openmm_version": "8.6.1",
- "date": "2026-10-03T21:01:05"
+ "date": "2026-10-16T10:42:59",
+ "platform_used": "CPU",
+ "energy_initial_kj_mol": -61305.17663784814,
+ "energy_final_kj_mol": -73820.31939379586,
+ "heavy_atom_rmsd_a": 0.42166284975610635
 }
