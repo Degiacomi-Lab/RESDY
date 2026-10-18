@@ -1,5 +1,6 @@
 import os
 import io
+import importlib
 from contextlib import redirect_stdout
 import pandas as pd
 import biobox as bb
@@ -39,7 +40,6 @@ class FRUSTRATION():
 
         try:
             import frustratometer
-            self.frustratometer = frustratometer
         except ImportError as e:
             raise ImportError(f'>> Packages required for calculating frustration or density '
                               f'(Frustratometer) are not available. Frustration or Density will '
@@ -48,6 +48,16 @@ class FRUSTRATION():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        self.frustratometer = None
+
+
+    def _setup(self):
+        '''
+        Setup frustration import to allow for parallel running.
+        Sets self.frustation to be the import. Import is checked at class initialisation
+        but the functional version for calculating is not set until calculate is required.
+        '''
+        self.frustratometer = importlib.import_module('frustratometer')
 
 
     def calculate(self, path):
@@ -70,6 +80,9 @@ class FRUSTRATION():
                 x           x             x         x
         :rtype: pandas.DataFrame
         '''
+        if self.frustratometer is None:
+            self._setup()
+
         df_frustration = pd.DataFrame()
         try:
             M = bb.Molecule()

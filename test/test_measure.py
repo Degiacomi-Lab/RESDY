@@ -37,6 +37,7 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
+        self.assertTrue(len(M.data > 0))
 
     def test_full_standardtrack_parallel(self):
         # test full setup of measures class, no run, test runs individually
@@ -44,12 +45,13 @@ class Test_Measure(unittest.TestCase):
         print('-> Testing full setup')
         M = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
-                        features_dict=self.features_dict,
+                        features_dict=tmp_meas,
                         parallel=True)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
+        self.assertTrue(len(M.data > 0))
 
     def test_full_pdbonly_series(self):
         # pdb only
@@ -61,6 +63,7 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
+        self.assertTrue(len(M.data > 0))
 
     def test_full_pdbonly_parallel(self):
         # pdb only
@@ -72,6 +75,7 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
+        self.assertTrue(len(M.data > 0))
 
     def test_propka_standardtrack(self):
         print('-> Test measuring PROPKA - Standard Track')

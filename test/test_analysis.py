@@ -25,7 +25,7 @@ class Test_Analysis(unittest.TestCase):
     def test_auxiliary(self):
         df_spec = self.A.get_data(uniprot_entry='P02185',
                                   resid=17)
-        self.assertEqual(len(df_spec), 2)
+        self.assertEqual(len(df_spec), 4)
 
         df_af = self.A.get_data_alphafold()
         self.assertEqual(list(set(list(df_af['Method']))), ['Predicted'])
