@@ -655,7 +655,7 @@ class PDB(object):
                                 f'slow on these structures, or set parallel=False to measure in '
                                 f'series.') from None
             else:
-                results = [t for t in (self._curate_row(lock, skip_if_found, *i) for i in items) if t is not None]
+                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items) if t is not None]
 
             if self.biological_assembly:
                 self.collect_assembly_log()

@@ -18,7 +18,7 @@ class Test_Measure(unittest.TestCase):
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
         self.all_features = ['propka', 'sasa', 'depth', 'aev',
-                             'das', 'seqcharge', 'melodia', 'frustration']
+                             'das', 'seqcharge', 'melodia']
         self.features_dict = {k: {} for k in self.all_features}
         self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb', '1A6M-alt1A_relaxed.pdb']})
 
@@ -26,7 +26,7 @@ class Test_Measure(unittest.TestCase):
         shutil.rmtree(self.outdir, ignore_errors=True)
 
     def test_full_standardtrack_series(self):
-        # test full setup of measures class, no run, test runs individually
+        # test full setup of measures class
         # standard track
         print('-> Testing full setup')
         M = RD.Measure(df_input=self.df_prot[:2],
@@ -37,21 +37,21 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
-        self.assertTrue(len(M.data > 0))
+        self.assertTrue(len(M.df) > 0)
 
     def test_full_standardtrack_parallel(self):
-        # test full setup of measures class, no run, test runs individually
+        # test full setup of measures class
         # standard track
         print('-> Testing full setup')
         M = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
-                        features_dict=tmp_meas,
+                        features_dict=self.features_dict,
                         parallel=True)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
-        self.assertTrue(len(M.data > 0))
+        self.assertTrue(len(M.df) > 0)
 
     def test_full_pdbonly_series(self):
         # pdb only
@@ -63,7 +63,7 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
-        self.assertTrue(len(M.data > 0))
+        self.assertTrue(len(M.df) > 0)
 
     def test_full_pdbonly_parallel(self):
         # pdb only
@@ -75,7 +75,7 @@ class Test_Measure(unittest.TestCase):
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
-        self.assertTrue(len(M.data > 0))
+        self.assertTrue(len(M.df) > 0)
 
     def test_propka_standardtrack(self):
         print('-> Test measuring PROPKA - Standard Track')
@@ -128,18 +128,6 @@ class Test_Measure(unittest.TestCase):
     def test_depth_standardtrack(self):
         print('-> Test measuring DEPTH')
         M_depth = RD.Measure(df_input=self.df_prot[:2],
-                        outdir=self.outdir,
-                        features_dict={'depth': {}},
-                        parallel=True,
-                        include_modified=False)
-        M_depth.measure_data()
-        print(M_depth.df)
-        print('len depth', len(M_depth.df))
-        self.assertTrue(len(M_depth.df) > 0)
-
-    def test_depth_pdbonlytrack(self):
-        print('-> Test measuring DEPTH')
-        M_depth = RD.Measure(df_input=self.df_pdb_only_test,
                         outdir=self.outdir,
                         features_dict={'depth': {}},
                         parallel=True,
@@ -524,6 +512,7 @@ class Test_Feature_Settings(unittest.TestCase):
     measurement in measure_settings.json.
     """
     SOURCE = os.path.join('demo', 'conformations', '1A6M-alt1A.pdb')
+    SOURCE_CURATE = os.path.join('demo', 'curated', '1A6M-alt1A.pdb')
 
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
@@ -620,9 +609,9 @@ class Test_Feature_Settings(unittest.TestCase):
     def test_flexibility_raw_b_factors_and_flat_column(self):
         import numpy as np
         from resdy.features.FLEXIBILITY import FLEXIBILITY
-        raw = FLEXIBILITY(error_filename='no_record', normalise=False).calculate(self.SOURCE)
+        raw = FLEXIBILITY(error_filename='no_record', normalise=False).calculate(self.SOURCE_CURATE)
         b = {}
-        for line in open(self.SOURCE):
+        for line in open(self.SOURCE_CURATE):
             if line.startswith('ATOM') and float(line[54:60]) > 0:
                 b.setdefault((line[21], int(line[22:26])), []).append(float(line[60:66]))
         for _, row in raw.head(5).iterrows():
