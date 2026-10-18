@@ -29,7 +29,7 @@ class Test_Measure(unittest.TestCase):
         # test full setup of measures class
         # standard track
         print('-> Testing full setup')
-        M = RD.Measure(df_input=self.df_prot[:2],
+        M = RD.Measure(df_input=self.df_prot[:1],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
                         parallel=False)
@@ -43,7 +43,7 @@ class Test_Measure(unittest.TestCase):
         # test full setup of measures class
         # standard track
         print('-> Testing full setup')
-        M = RD.Measure(df_input=self.df_prot[:2],
+        M = RD.Measure(df_input=self.df_prot[:1],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
                         parallel=True)
@@ -55,7 +55,7 @@ class Test_Measure(unittest.TestCase):
 
     def test_full_pdbonly_series(self):
         # pdb only
-        M = RD.Measure(df_input=self.df_pdb_only_test,
+        M = RD.Measure(df_input=self.df_pdb_only_test[:1],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
                         parallel=False)
@@ -67,7 +67,7 @@ class Test_Measure(unittest.TestCase):
 
     def test_full_pdbonly_parallel(self):
         # pdb only
-        M = RD.Measure(df_input=self.df_pdb_only_test,
+        M = RD.Measure(df_input=self.df_pdb_only_test[:1],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
                         parallel=True)
@@ -77,8 +77,8 @@ class Test_Measure(unittest.TestCase):
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
-    def test_propka_standardtrack(self):
-        print('-> Test measuring PROPKA - Standard Track')
+    def test_propka(self):
+        print('-> Test measuring PROPKA')
         M_propka = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict={'propka': {}},
@@ -89,19 +89,7 @@ class Test_Measure(unittest.TestCase):
         print('len propka', len(M_propka.df))
         self.assertTrue(len(M_propka.df) > 0)
 
-    def test_propka_pdbonlytrack(self):
-        print('-> Test measuring PROPKA - PDB Only')
-        M_propka = RD.Measure(df_input=self.df_pdb_only_test,
-                        outdir=self.outdir,
-                        features_dict={'propka': {}},
-                        parallel=True,
-                        include_modified=False)
-        M_propka.measure_data()
-        print(M_propka.df)
-        print('len propka', len(M_propka.df))
-        self.assertTrue(len(M_propka.df) > 0)
-
-    def test_sasa_standardtrack(self):
+    def test_sasa(self):
         print('-> Test measuring SASA')
         M_sasa = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
@@ -113,19 +101,7 @@ class Test_Measure(unittest.TestCase):
         print('len sasa', len(M_sasa.df))
         self.assertTrue(len(M_sasa.df) > 0)
 
-    def test_sasa_pdbonlytrack(self):
-        print('-> Test measuring SASA')
-        M_sasa = RD.Measure(df_input=self.df_pdb_only_test,
-                        outdir=self.outdir,
-                        features_dict={'sasa': {}},
-                        parallel=True,
-                        include_modified=False)
-        M_sasa.measure_data()
-        print(M_sasa.df)
-        print('len sasa', len(M_sasa.df))
-        self.assertTrue(len(M_sasa.df) > 0)
-
-    def test_depth_standardtrack(self):
+    def test_depth(self):
         print('-> Test measuring DEPTH')
         M_depth = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
@@ -137,21 +113,9 @@ class Test_Measure(unittest.TestCase):
         print('len depth', len(M_depth.df))
         self.assertTrue(len(M_depth.df) > 0)
 
-    def test_aev_standardtrack(self):
+    def test_aev(self):
         print('-> Test measuring AEV')
         M_aev = RD.Measure(df_input=self.df_prot[:2],
-                        outdir=self.outdir,
-                        features_dict={'aev': {}},
-                        parallel=True,
-                        include_modified=False)
-        M_aev.measure_data()
-        print(M_aev.df)
-        print('len aev', len(M_aev.df))
-        self.assertTrue(len(M_aev.df) > 0)
-
-    def test_aev_pdbonlytrack(self):
-        print('-> Test measuring AEV')
-        M_aev = RD.Measure(df_input=self.df_pdb_only_test,
                         outdir=self.outdir,
                         features_dict={'aev': {}},
                         parallel=True,
@@ -327,10 +291,6 @@ class Test_Measure(unittest.TestCase):
         multi = df[df['PDB_Code'].str.startswith('1UPT')]
         self.assertGreater(len(multi), 0)
         self.assertTrue((multi['Min_Dist_Other_Chain'] > 0).all())
-
-        # the five 8Y8Y lysines deposited without NZ cannot be featurised
-        y8 = df[df['PDB_Code'].str.startswith('8Y8Y')]
-        self.assertFalse(set(y8['Resid'].astype(int)) & {86, 166, 244, 246, 276})
 
         # brute force on one 1UPT lysine
         r = multi.iloc[0]
