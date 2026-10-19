@@ -1,6 +1,7 @@
 import unittest
 import sys
 import os
+from pathlib import Path
 import shutil
 import tempfile
 import itertools
@@ -14,9 +15,10 @@ from resdy.geometry import check_geometry
 
 class Test_Patcher(unittest.TestCase):
     def setUp(self):
-        self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
+        self.outdir = 'resdy_test_patcher'
+        os.makedirs(self.outdir, exist_ok=True)
         os.makedirs(os.path.join(self.outdir, 'conformations'), exist_ok=True)
-        os.makedirs(os.path.join(self.outdir, 'curated'), exist_ok=True)
+
         shutil.copyfile(os.path.join('demo', 'conformations', '2MWS-alt-1.pdb'), os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb'))
         shutil.copyfile(os.path.join('demo', 'conformations', '2MWS.fasta'), os.path.join(self.outdir, 'conformations', '2MWS.fasta'))
 

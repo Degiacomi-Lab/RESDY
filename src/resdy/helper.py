@@ -1,5 +1,6 @@
 import shutil
-import sys, os
+import sys
+import os
 
 #: Oldest biobox RESDY works with. Earlier versions lack ``Xlink.get_half_sphere``, which the
 #: DAS feature calls. Versions before 1.1.5 also wrote the occupancy and B-factor columns of a
@@ -16,7 +17,9 @@ METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Re
 
 def require_biobox(biobox):
     '''
-    Raise if the biobox given is older than :data:`MIN_BIOBOX_VERSION`.
+    Raise if the biobox given is older than :data:`MIN_BIOBOX_VERSION`. This ensures
+    that use of the RESDY package will get correct output and won't see known bugs from
+    previous biobox versions pass through.
 
     :param biobox: the imported biobox module.
     :type biobox: module
@@ -24,7 +27,6 @@ def require_biobox(biobox):
     '''
     version = getattr(biobox, '__version__', None)
     if not isinstance(version, str):
-        # a mocked module, as in the documentation build
         return
     parts = tuple(int(''.join(c for c in p if c.isdigit()) or 0) for p in version.split('.')[:3])
     # '2.0' counts as 2.0.0

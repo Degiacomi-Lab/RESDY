@@ -1,10 +1,18 @@
-Missing atoms or failed protonation for SER  21 B (BBN) -- please check the structure
-Group (BBN) for  2359-   N    21-SER (B) [   2.132   55.055  -42.190] N
+Missing atoms or failed protonation for C-  308 A (COO) -- please check the structure
+Group (COO) for  2359- OXT   308-GLN (A) [  -5.780   -8.390  -20.275] O
 Expected 2 interaction atoms for acids, found:
-                 0-  H1    21-SER (B) [   1.661   54.169  -42.079] H
-                 0-  H2    21-SER (B) [   1.692   55.579  -42.933] H
-              2359-   N    21-SER (B) [   2.132   55.055  -42.190] N
+              2359- OXT   308-GLN (A) [  -5.780   -8.390  -20.275] O
 Expected 2 interaction atoms for bases, found:
-                 0-  H1    21-SER (B) [   1.661   54.169  -42.079] H
-                 0-  H2    21-SER (B) [   1.692   55.579  -42.933] H
-              2359-   N    21-SER (B) [   2.132   55.055  -42.190] N
+              2359- OXT   308-GLN (A) [  -5.780   -8.390  -20.275] O
+Missing atoms or failed protonation for SER  19 B (BBN) -- please check the structure
+Group (BBN) for  2367-   N    19-SER (B) [   3.888   53.928  -42.514] N
+Expected 2 interaction atoms for acids, found:
+              2367-   N    19-SER (B) [   3.888   53.928  -42.514] N
+Expected 2 interaction atoms for bases, found:
+              2367-   N    19-SER (B) [   3.888   53.928  -42.514] N
+Missing atoms or failed protonation for CYS  22 B (BBN) -- please check the structure
+Group (BBN) for  2388-   N    22-CYS (B) [   3.889   55.115  -40.111] N
+Expected 2 interaction atoms for acids, found:
+              2388-   N    22-CYS (B) [   3.889   55.115  -40.111] N
+Expected 2 interaction atoms for bases, found:
+              2388-   N    22-CYS (B) [   3.889   55.115  -40.111] N

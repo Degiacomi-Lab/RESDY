@@ -125,7 +125,6 @@ ubq_pred/
 *testing*
 *Testing*
 glycation/
-connexin26/
 code_review/
 model_output_graphs/
 # per-run artefacts, written under whatever outdir is in use. Named individually
@@ -163,3 +162,4 @@ measures_*
 *.png
 test/curated/
 test/conformations/
+test_*

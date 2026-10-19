@@ -1,0 +1,6 @@
+Missing atoms or failed protonation for GLN1098 A (BBN) -- please check the structure
+Group (BBN) for  1802-   N  1098-GLN (A) [ -25.027  -58.317   -6.200] N
+Expected 2 interaction atoms for acids, found:
+              1802-   N  1098-GLN (A) [ -25.027  -58.317   -6.200] N
+Expected 2 interaction atoms for bases, found:
+              1802-   N  1098-GLN (A) [ -25.027  -58.317   -6.200] N

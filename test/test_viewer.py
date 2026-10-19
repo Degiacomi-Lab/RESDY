@@ -10,10 +10,9 @@ class Test_Viewer(unittest.TestCase):
         self.outdir = 'demo'
         self.df_input = f'{self.outdir}{os.sep}demo_input.csv'
         self.df_measures = f'{self.outdir}{os.sep}measures.csv'
-        self.A = RD.Analysis(df=self.df_measures,
-                             outdir=self.outdir)
         self.V = RD.Viewer(outdir=self.outdir,
-                           analysis=self.A)
+                           df_measures=self.df_measures)
+
 
 
 if __name__ == "__main__":

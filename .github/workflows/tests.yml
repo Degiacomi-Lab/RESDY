@@ -1,6 +1,11 @@
 name: Tests
 
-on: [push]
+# weekly test included to ensure code is kept up to date with other package improvements
+on:
+  push:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

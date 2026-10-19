@@ -1,8 +1,9 @@
 import os
 import pandas as pd
+import importlib
 from .error_reporting import report_error_to_file
 
-
+import melodia_py as mel
 class STRUCTURE():
     '''
     Structural measurement values for structures.
@@ -37,7 +38,6 @@ class STRUCTURE():
 
         try:
             import melodia_py as mel
-            self.mel = mel
         except ImportError as e:
             raise ImportError(f'>> Packages required for melodia calculations (melodia_py) are '
                             f'not available, melodia will be removed from features to calculate. '
@@ -47,12 +47,22 @@ class STRUCTURE():
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        self.mel = None
         if self.error_filename != 'no_record':
             self.record_errors = True
         else:
             self.record_errors = False
         if self.melodia_features == ['all']:
             self.melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
+
+
+    def _setup(self):
+        '''
+        Setup melodia_py import to allow for parallel running.
+        Sets self.mod to be the import. Import is checked at class initialisation
+        but the functional version for calculating is not set until calculate is required.
+        '''
+        self.mel = importlib.import_module('melodia_py')
 
 
     def calculate(self, path):
@@ -76,9 +86,11 @@ class STRUCTURE():
                 x           x           x          x          x            x    x   x
         :rtype: pandas.DataFrame
         '''
-        # Melodia 1 - Calculating geometry using melodia-py
+        if self.mel is None:
+            self._setup()
+        
         try:
-            melodia_results = self.mel.geometry_from_structure_file(path)
+            melodia_results = mel.geometry_from_structure_file(path)
             if isinstance(melodia_results, pd.Series):
                 melodia_results = melodia_results.to_frame().T
 
@@ -87,7 +99,6 @@ class STRUCTURE():
             print(f'Melodia 1: Error processing input file - {path} with error: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'curvature'])
 
-        # Melodia 2 - Formatting and filtering
         try:
             melodia_results.rename({"chain": "Chain", "order": "Resid"}, axis="columns", inplace = True)
             lys_results = melodia_results['name'].isin((self.aa_properties['non_modified_codes'] +

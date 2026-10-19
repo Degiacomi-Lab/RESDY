@@ -1,2 +1,0 @@
-Unexpected number (5) of atoms in residue PHE 897 A   in conformation 1A
-Unexpected number (5) of atoms in residue GLN1098 A   in conformation 1A

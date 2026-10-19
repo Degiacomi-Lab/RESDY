@@ -13,6 +13,7 @@ from functools import partial
 import multiprocessing as mp
 from multiprocessing import cpu_count
 from multiprocessing import Manager
+from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
@@ -24,22 +25,6 @@ from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains
 from .assembly import measured_chains
 
-
-def _call_with_args(func, args):
-    '''
-    Call ``func`` with the arguments packed in ``args``.
-
-    ``Pool.imap`` only accepts a single-argument callable, whereas the measuring methods take
-    a file and a lock. This module-level trampoline supplies the ``starmap`` behaviour while
-    keeping the results ordered and streamed, which is what lets a stalled worker be detected
-    (see :meth:`Measure._run_in_parallel`). It has to live at module level rather than be a
-    closure or a lambda, because the non-forking start methods pickle it to reach the worker.
-
-    :param func: The callable to run in the worker.
-    :param args: Positional arguments to unpack into ``func``.
-    :returns: Whatever ``func`` returns.
-    '''
-    return func(*args)
 
 
 #: File, in the output directory, that records the settings a measurement was made with.
@@ -84,10 +69,10 @@ class Measure(object):
     '''
 
     def __init__(self, df_input, outdir="result", activate_log=False, log_path='measure_log.txt',
-                 features_dict={'propka': {}, 'sasa': {}, 'depth': {'calculation_type': 'ResidDepth'},
-                                'aev': {}, 'das': {}, 'seqcharge': {}},
+                 features_dict={'propka': {}, 'sasa': {}, 'aev': {}, 'das': {},
+                                'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True, only_relaxed=True, num_cores=0,
+                 report_errors= True, only_relaxed=False, num_cores=0,
                  parallel_timeout=600):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
@@ -162,12 +147,7 @@ class Measure(object):
         :type report_errors: bool
         :param only_relaxed: Option to only calculate measurements for structures that are relaxed
             if there is a relaxed structure available for the structure. If set to False, measures
-            will be calculated to both original and relaxed form. Default is True.
-
-            A structure with no minimised copy is measured unrelaxed either way, which happens
-            whenever minimisation was not requested, was skipped, or failed. The 'Source' column
-            of the output records which copy each row was taken from, 'relaxed' or 'unrelaxed',
-            so that the two are not silently mixed.
+            will be calculated to both original and relaxed form. Default is False.
         :type only_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
@@ -206,7 +186,6 @@ class Measure(object):
         self.folder = os.path.join(outdir, "curated")
         self.only_relaxed = only_relaxed
 
-        # modified lysine management
         self.include_mod = include_modified
 
         # document failed pdb files
@@ -220,13 +199,10 @@ class Measure(object):
         self.residue_of_interest = residue_of_interest
         self.features_dict = features_dict.copy()
 
-        # expand the 'all' shorthand first, so that _setup_aa_properties sees the real
-        # feature names and can drop the ones that cannot handle the residue of interest
         if 'all' in self.features_dict:
             self.features_dict = {k: {} for k in ALL_FEATURES}
 
         self.aa_properties = self._setup_aa_properties(residue_of_interest)
-        # build the registry from what survived _setup_aa_properties, not from the argument
         self._setup_measures(self.features_dict.copy())
         pd.set_option("display.max_columns", None)
         pd.reset_option('display.max_rows')
@@ -264,13 +240,6 @@ class Measure(object):
         self.files_to_analyse = []
         self.parallel_items = {}
 
-        # Check that all files in DataFrame appear at least once in folder
-        files_af=[os.path.splitext(os.path.basename(c))[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        files_pdb=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.folder, "*pdb"))]
-        for f in df_input['PDB_Code'].values:
-            if f not in files_af and f not in files_pdb:
-                print(f'WARNING: {f} not found in folder {self.folder}')
-
         self.pkaoutdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pkaoutdir):
             os.makedirs(self.pkaoutdir)
@@ -278,25 +247,49 @@ class Measure(object):
         self.PDB_only = False
 
         if 'Uniprot_Entry' in self.df_input.columns:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source',
-                       'Min_Dist_Other_Chain']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
+                       'Resid', 'Source', 'Min_Dist_Other_Chain']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
             columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
             self.df = pd.DataFrame(columns = columns)
 
+        files_af=[os.path.splitext(os.path.basename(c))[0] for c
+                  in glob.glob(os.path.join(self.folder, "*pdb"))]
+        files_pdb=[os.path.basename(c).split("-")[0] for c
+                   in glob.glob(os.path.join(self.folder, "*pdb"))]
+
+        f_not_found = []
+        pdb_code_list = list(df_input['PDB_Code'].drop_duplicates())
+        for f in pdb_code_list:
+            if f not in files_af and f not in files_pdb:
+                if self.PDB_only:
+                    try:
+                        if f.split('.')[0] not in files_af and f.split('.')[0] not in files_pdb:
+                            print(f'WARNING: {f} not found in folder {self.folder}')
+                            f_not_found.append(f)
+                    except Exception as e:
+                        print(f'WARNING: {f} not found in folder {self.folder}')
+                        f_not_found.append(f)
+                else:
+                    print(f'WARNING: {f} not found in folder {self.folder}')
+                    f_not_found.append(f)
+
+        self.run_ready = True
+        if len(f_not_found) == len(pdb_code_list):
+            print(f'No files given in the input dataframe matches to pdb files in {self.folder}, '
+                  f'please check files exist and were written correctly in the input dataframe.')
+            self.run_ready = False
+
 
     @staticmethod
     def _source_of(path):
         '''
-        Record which copy of a structure a measurement was taken from.
-
-        Whether a structure is measured relaxed or unrelaxed is not a property of the
-        protein but of how curation went: minimisation is skipped when openmm has no
-        template for something the structure retains, and fails outright on some
-        structures, and ``only_relaxed`` then falls back to the unminimised file. Without
-        this column a measurements table silently mixes the two.
+        Record which copy of a structure a measurement was taken from. Relaxation of structure
+        is a property of how the structures were curated and needs to be recorded for future
+        analysis of any differences in features seen, especially as minimisation doesn't always
+        run fully on structures.
 
         :param path: file the measurement was taken from.
         :type path: str
@@ -362,7 +355,7 @@ class Measure(object):
             self.features_dict = features_dict
             self.features = list(features_dict)
         self.measures = []
-        #: {feature: settings it was constructed with}, written to MEASURE_SETTINGS_FILE
+
         self.feature_settings = {}
         melodia_features = []
         melodia_added = False
@@ -505,9 +498,8 @@ class Measure(object):
 
             defaults = getattr(cls, 'RESIDUE_KWARGS', {}).get(res_code)
             if defaults:
-                # the user's own settings win over the defaults of the residue, and
-                # features_dict was copied shallowly, so rebuild the entry rather than writing
-                # into the dictionary the caller still holds
+                # take user's own settings over the default values for the residue,
+                # rebuild dictionary to ensure not writing to caller held one
                 self.features_dict[name] = {**copy.deepcopy(defaults),
                                             **self.features_dict[name]}
 
@@ -601,6 +593,10 @@ class Measure(object):
         The settings of the measurement are written to MEASURE_SETTINGS_FILE in the output
         directory, see :meth:`measurement_settings`.
         '''
+        if not self.run_ready:
+            print(f'No pdb files available for measurements, see earlier error.')
+            return
+
         self._write_settings()
         match (self.PDB_only, self.parallel):
             case (False, True) | (False, False):
@@ -690,15 +686,15 @@ class Measure(object):
     @staticmethod
     def _parallel_context():
         '''
-        Return the multiprocessing context the worker pool is built from.
+        Return the multiprocessing context the worker pool is built from. This function is used
+        to get the available context and if possible prefer 'forkserver' method first and then
+        'spawn' if this is not available. If neither preferred option is available, it will fall
+        back onto whatever multiprocessing context is available. 
 
-        A pool is deliberately not built on the 'fork' start method, which is the default on
-        Linux. Several features import torch (via the aev, evolution and legolas back ends),
-        and torch leaves its thread pools running in the parent for the rest of the session.
-        Forking a multi-threaded parent gives the child a copy of those pools with none of
-        their threads, so the first call that reaches the inherited OpenMP or BLAS runtime can
-        block forever. 'forkserver' is preferred, as its children are forked from a clean
-        single-threaded server process, and 'spawn' is the fallback on platforms without it.
+        With several features importing torch, and torch leaving its thread pools running in the
+        parent for the rest of the session. Forking a multi-threaded parent gives the child a copy
+        of those pools with none of their threads, so the first call that reaches the inherited
+        OpenMP or BLAS runtime can block forever.
 
         :returns: A multiprocessing context whose start method is not 'fork', where one is
             available.
@@ -707,6 +703,8 @@ class Measure(object):
         for method in ('forkserver', 'spawn'):
             if method in available:
                 return mp.get_context(method)
+        print(">> Could not get 'forkserver' or 'spawn' multiprocessing context," \
+            "defaulting to 'fork'")
         return mp.get_context()
 
 
@@ -734,51 +732,6 @@ class Measure(object):
             self.logger.addHandler(handler)
 
 
-    def _run_in_parallel(self, worker, items):
-        '''
-        Run ``worker`` over ``items`` in a pool of processes, giving up on a stalled worker.
-
-        Results are collected through ``imap`` rather than ``starmap`` so that they arrive one
-        at a time and the wait for each one can be bounded by ``parallel_timeout``. The timeout
-        therefore applies to the gap between results, not to the run as a whole. We note that a
-        plain ``Pool.starmap`` never returns if one of its workers deadlocks or is killed, so a
-        single wedged structure otherwise consumes the whole run.
-
-        Items are handed out one at a time rather than in chunks, for two reasons. ``imap``
-        only returns an iterator whose ``next`` accepts a timeout when the chunk size is 1,
-        falling back to a plain generator otherwise, and measuring one structure is coarse
-        enough work that per-item dispatch costs nothing while balancing the load better.
-
-        :param worker: Bound method to call for each item, taking the unpacked item.
-        :type worker: callable
-        :param items: One sequence of positional arguments per structure to measure.
-        :type items: list
-        :returns: The return value of ``worker`` for each item, in the order of ``items``.
-        :rtype: list
-        :raises RuntimeError: if no further result arrives within ``parallel_timeout`` seconds.
-        '''
-        ctx = self._parallel_context()
-        results = []
-        with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
-            iterator = pool.imap(partial(_call_with_args, worker),
-                                 [tuple(item) for item in items], chunksize=1)
-            while True:
-                try:
-                    results.append(iterator.next(timeout=self.parallel_timeout))
-                except StopIteration:
-                    break
-                except mp.TimeoutError:
-                    pool.terminate()
-                    raise RuntimeError(
-                        f'A parallel measuring worker produced no result for '
-                        f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
-                        f'structures, so it is treated as stalled and the run was stopped. '
-                        f'Either raise parallel_timeout if the features requested are simply '
-                        f'slow on these structures, or set parallel=False to measure in '
-                        f'series.') from None
-        return results
-
-
     def measure_dataframe(self):
         '''
         Function to measure specified features for all the structure files curated earlier in the
@@ -794,6 +747,8 @@ class Measure(object):
         list of the files, check if structure file is
         '''
         if self.PDB_only:
+            print('measure_dataframe() called when input dataframe matches the format on PDB_only, '
+                  'call measure_PDB_only() directly instead.')
             return 'Call PDB_only method instead'
 
         files = glob.glob(os.path.join(self.folder, "*pdb"))
@@ -817,7 +772,7 @@ class Measure(object):
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
-                items.append([file_details, lock])
+                items.append(file_details)
 
             base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             df_parallel = pd.DataFrame()
@@ -829,14 +784,34 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    df_parallel = pd.concat(self._run_in_parallel(self._measure_file, items),
-                                            ignore_index=True)
+                    ctx = self._parallel_context()
+                    results = []
+                    with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+                        iterator = pool.imap(partial(self._measure_file, lock),
+                                                [tuple(item) for item in items], chunksize=1)
+                        while True:
+                            try:
+                                results.append(iterator.next(timeout=self.parallel_timeout))
+                            except StopIteration:
+                                break
+                            except mp.TimeoutError:
+                                pool.terminate()
+                                raise RuntimeError(
+                                    f'A parallel measuring worker produced no result for '
+                                    f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
+                                    f'structures, so it is treated as stalled and the run was stopped. '
+                                    f'Either raise parallel_timeout if the features requested are simply '
+                                    f'slow on these structures, or set parallel=False to measure in '
+                                    f'series.') from None
+                    df_parallel = pd.concat(results, ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file(file_dets, lk) for file_dets, lk in items], ignore_index=True)
+                    df_parallel = pd.concat([self._measure_file(lock, file_dets) for file_dets in items],
+                                            ignore_index=True)
 
             self.measures = gpu_measurements
             if gpu_measurements:
-                df_gpu = pd.concat([self._measure_file(d, lock) for d, lock in items], ignore_index=True)
+                df_gpu = pd.concat([self._measure_file(lock, d) for d in items],
+                                   ignore_index=True)
 
                 if df_parallel.empty:
                     df_parallel = df_gpu
@@ -862,7 +837,7 @@ class Measure(object):
                 self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
 
 
-    def _measure_file(self, file_details, lock):
+    def _measure_file(self, lock, file_details):
         '''
         Take a file and calculate the required measurements for this. Return the dataframe of the
         calculations to the overall self.df
@@ -883,7 +858,6 @@ class Measure(object):
         '''
         uniprot_code, pdb_code, method, res, chains = file_details
 
-        # calculate features values from all PDB files associated with specific DataFrame entry
         frames_df_list = []
         for f in self.files_to_analyse:
             if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
@@ -905,8 +879,8 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source',
-                       'Min_Dist_Other_Chain']
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
+                       'Resid', 'Source', 'Min_Dist_Other_Chain']
             if self.include_mod:
                 columns.append('Modified')
             records = []
@@ -922,15 +896,18 @@ class Measure(object):
                 continue
 
             resnames_to_explore = list(self.aa_properties['non_modified_codes'])
-            if self.include_mod: resnames_to_explore += list(self.aa_properties['modified_codes'])
-            _, idxs = M.atomselect('*', resnames_to_explore, ['CA'], get_index=True, use_resname=True)
+            if self.include_mod:
+                resnames_to_explore += list(self.aa_properties['modified_codes'])
+            _, idxs = M.atomselect('*', resnames_to_explore, ['CA'],
+                                   get_index=True, use_resname=True)
+
             other_chain = self._other_chain_distances(M)
             # copies made by the assembly operators are environment only
             reported = measured_chains(f)
             no_anchor = 0
-            for i in idxs:
 
-                #save only lysine entries from chain of interest
+            for i in idxs:
+                #save only resid entries from chain of interest
                 if M.data["chain"].values[i] not in chains:
                     continue
                 if reported is not None and M.data["chain"].values[i] not in reported:
@@ -951,7 +928,8 @@ class Measure(object):
                     'Min_Dist_Other_Chain': other_chain[key]})
 
                 if self.include_mod:
-                    data['Modified'] = (M.data['resname'].values[i] in self.aa_properties['modified_codes'])
+                    data['Modified'] = (M.data['resname'].values[i]
+                                        in self.aa_properties['modified_codes'])
 
                 records.append(data)
 
@@ -968,7 +946,7 @@ class Measure(object):
                     with redirect_stdout(out_print_trap):
                         result = meas[1](f)
                     terminal_out_statements.append(out_print_trap.getvalue())
-                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
+                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                 except Exception as e:
                     if self.report_errors:
@@ -998,19 +976,17 @@ class Measure(object):
                                 self._report_error_to_file('logging', 'measure file parallel', str(e))
                             print(f'Error in logging: {e}')
 
-                        # reset the pandas display options back to default for regular displaying
                         pd.reset_option('display.max_colwidth')
                         pd.reset_option('display.width')
                         pd.reset_option('max_seq_items')
                         pd.reset_option('display.max_rows')
 
-
             if not df_currentfile.empty:
                 frames_df_list.append(df_currentfile)
 
         if not frames_df_list:
-            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid',
-                                         'Source', 'Min_Dist_Other_Chain'])
+            return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution',
+                                         'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -1250,13 +1226,13 @@ class Measure(object):
         with Manager() as manager:
             lock = manager.Lock()
             items = []
-            for pdb_idx, row in self.df_input.iterrows():
+            for i, r in self.df_input.iterrows():
 
-                if row['completed']:
+                if r['completed']:
                     continue
 
-                pdb_code = row['PDB_Code']
-                items.append([pdb_code, lock])
+                pdb_code = str(r['PDB_Code'])
+                items.append(pdb_code)
 
             base_cols = ['PDB_Code', 'Chain', 'Resid']
             df_parallel = pd.DataFrame()
@@ -1268,14 +1244,34 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    df_parallel = pd.concat(self._run_in_parallel(self._measure_file_pdbonly, items),
-                                            ignore_index=True)
+                    ctx = self._parallel_context()
+                    results = []
+                    with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+                        iterator = pool.imap(partial(self._measure_file_pdbonly, lock),
+                                                items, chunksize=1)
+                        while True:
+                            try:
+                                results.append(iterator.next(timeout=self.parallel_timeout))
+                            except StopIteration:
+                                break
+                            except mp.TimeoutError:
+                                pool.terminate()
+                                raise RuntimeError(
+                                    f'A parallel measuring worker produced no result for '
+                                    f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
+                                    f'structures, so it is treated as stalled and the run was stopped. '
+                                    f'Either raise parallel_timeout if the features requested are simply '
+                                    f'slow on these structures, or set parallel=False to measure in '
+                                    f'series.') from None
+                    df_parallel = pd.concat(results, ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lk) for file_dets, lk in items], ignore_index=True)
+                    df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lock) for file_dets in items],
+                                            ignore_index=True)
 
             self.measures = gpu_measurements
             if gpu_measurements:
-                df_gpu = pd.concat([self._measure_file_pdbonly(d, lock) for d, lock in items], ignore_index=True)
+                df_gpu = pd.concat([self._measure_file_pdbonly(lock, d) for d in items],
+                                   ignore_index=True)
 
                 if df_parallel.empty:
                     df_parallel = df_gpu
@@ -1287,7 +1283,7 @@ class Measure(object):
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
-            # skip empty frames
+
             frames = [f for f in (self.df, df_parallel) if not f.empty]
             if frames:
                 self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
@@ -1301,8 +1297,7 @@ class Measure(object):
                 self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
 
 
-
-    def _measure_file_pdbonly(self, pdb_code, lock):
+    def _measure_file_pdbonly(self, lock, pdb_code):
         '''
         Take a file and calculate the required measurements for this. Return the dataframe of the
         calculations to the overall self.df. This is the worked for measure_PDB_only.
@@ -1314,14 +1309,17 @@ class Measure(object):
             time
         :type lock: multiprocessing manager lock
         '''
+        pdb_code = str(pdb_code)
         file_df_list = []
         for f in self.files_to_analyse:
-            if (pdb_code.lower() != os.path.basename(f).split("-")[0].lower()) and (pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()):
+            if ((pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()) and
+                (pdb_code.lower() != os.path.basename(f).lower())):
                 continue
 
             if self.only_relaxed:
                 f_stem = os.path.splitext(os.path.basename(f))[0]
-                if '_relaxed' not in f and os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
+                if ('_relaxed' not in f and
+                    os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb'))):
                     continue
 
             if f in self.pdb_only_files_to_ignore:
@@ -1340,18 +1338,19 @@ class Measure(object):
                 M = bb.Molecule()
                 M.import_pdb(f, include_hetatm=True)
             except Exception as e:
-                terminal_out_statements.append(f'Failed to create biobox molecule for file {f} with error: {e}')
+                terminal_out_statements.append(f'Failed to create biobox molecule for file '
+                                               f'{f} with error: {e}')
                 if self.report_errors:
-                    self._report_error_to_file(f'Failed to create bb molecule for file: {f}', 'measure pdb only', str(e))
+                    self._report_error_to_file(f'Failed to create bb molecule for file: {f}',
+                                               'measure pdb only', str(e))
                 self.wrong_pdb_file.append(f)
                 continue
 
+            resnames_to_explore = list(self.aa_properties['non_modified_codes'])
             if self.include_mod:
-                _, idxs = M.atomselect("*", (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']),
-                                        ['CA'], get_index=True, use_resname=True)
-            else:
-                _, idxs = M.atomselect("*",  self.aa_properties['non_modified_codes'],
-                                        ['CA'], get_index=True, use_resname=True)
+                resnames_to_explore += list(self.aa_properties['modified_codes'])
+            _, idxs = M.atomselect("*",  resnames_to_explore,
+                                   ['CA'], get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
             # copies made by the assembly operators are environment only
@@ -1390,7 +1389,7 @@ class Measure(object):
                     with redirect_stdout(out_print_trap):
                         result = meas[1](f)
                     terminal_out_statements.append(out_print_trap.getvalue())
-                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0]) #insert measures into temporary DataFrame
+                    df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
                 except Exception as e:
                     if self.report_errors:

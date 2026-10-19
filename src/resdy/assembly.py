@@ -23,7 +23,7 @@ require_biobox(bb)
 from .geometry import check_geometry
 
 
-#: Suffix of the record written beside each curated structure.
+# Suffix of the record written beside each curated structure.
 RECORD_SUFFIX = '.assembly.json'
 
 
@@ -44,6 +44,7 @@ def read_biomolecules(path):
     determined = {}
     current = None
     has_biomt = False
+
     with open(path) as fin:
         for line in fin:
             if not line.startswith('REMARK 350'):
@@ -67,6 +68,7 @@ def read_biomolecules(path):
     M.import_pdb(path, include_hetatm=True)
     biomatrix = M.properties.get('biomatrix', {})
     determined = {k: determined.get(k, 'unspecified') for k in biomatrix}
+
     return biomatrix, determined
 
 
@@ -138,8 +140,9 @@ def build_assembly(path, biomatrix, determined, max_atoms=None):
     chain keeps its name and later copies take names not used in the structure. The
     structure is left as it is when the operators are all identities covering every
     chain, when no listed chain is present, when the assembly would need chain names
-    longer than one character (PROPKA and Biopython read only column 22 of a pdb file), or
-    when it would hold more than ``max_atoms`` atoms. Every chain is then reported.
+    longer than one character (many programmes for features only handle single character
+    chain names), or when it would hold more than ``max_atoms`` atoms. Every chain is then
+    reported.
 
     The record holds the biomolecule id, how it was determined, the status ('built',
     'identity', 'none' when the file has no BIOMT operator, or 'kept' when the asymmetric

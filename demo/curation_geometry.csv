@@ -1,0 +1,18 @@
+file,inter_chain,involves_hetatm,involves_modelled,involves_water,min_contact,n_atoms,n_clashes,n_modelled_residues,worst
+1A6M-alt1B.pdb,False,False,False,False,2.3023722548710497,1204,0,0,
+2MWS-alt-7.pdb,False,False,False,False,2.5003915693346905,1219,0,0,
+8Y8Y-alt-1.pdb,False,False,False,False,2.191972171356198,2323,0,0,
+8GVV-alt-1.pdb,False,False,False,False,2.408303552295683,2387,0,8,
+8GWH-alt-1.pdb,False,False,False,False,2.4615458557581267,2436,0,1,
+4DCN-alt-1.pdb,False,False,False,False,2.394681816024834,5739,0,0,
+8GVL-alt-1.pdb,False,False,False,False,1.3371619198885392,4759,1,3,B/SER21:C <-> B/CYS25:N
+8GXE-alt-1.pdb,False,False,False,False,2.1747445827039096,4766,0,17,
+1UPT-alt-1.pdb,False,False,False,False,2.3135308513179584,7148,0,0,
+1A6M-alt1A.pdb,False,False,False,False,2.330511960921891,1204,0,0,
+2MWS-alt-6.pdb,False,False,False,False,2.5046502749885056,1219,0,0,
+2MWS-alt-1.pdb,False,False,False,False,2.501428791710849,1219,0,0,
+2MWS-alt-8.pdb,False,False,False,False,2.4949949899749297,1219,0,0,
+2MWS-alt-5.pdb,False,False,False,False,2.49684220566699,1219,0,0,
+2MWS-alt-4.pdb,False,False,False,False,2.4948621204387234,1219,0,0,
+2MWS-alt-3.pdb,False,False,False,False,2.504697985785913,1219,0,0,
+2MWS-alt-2.pdb,False,False,False,False,2.4978284568800957,1219,0,0,

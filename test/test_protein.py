@@ -11,9 +11,9 @@ import resdy as RD
 
 class Test_Protein(unittest.TestCase):
     def setUp(self):
-        self.tmpdir = tempfile.mkdtemp(prefix='resdy_test_')
-        self.outdir = self.tmpdir
-        shutil.copyfile(os.path.join('demo', 'demo_input.csv'), os.path.join(self.tmpdir, 'demo_input.csv'))
+        self.outdir = tempfile.mkdtemp(prefix='resdy_test_protein_')
+        os.makedirs(self.outdir, exist_ok=True)
+        shutil.copyfile(os.path.join('demo', 'demo_input.csv'), os.path.join(self.outdir, 'demo_input.csv'))
         self.gap = 10
         self.parallel = False
         self.PDB_only = False
@@ -29,7 +29,7 @@ class Test_Protein(unittest.TestCase):
                            max_nmr_conformers=3)
 
     def tearDown(self):
-        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        shutil.rmtree(self.outdir, ignore_errors=True)
 
     def test_downloads(self):
         self.PDB.download_pdb('1PAE')
@@ -171,7 +171,7 @@ class Test_Protein(unittest.TestCase):
 
     def test_gathering(self):
         UP = RD.Uniprot()
-        UP.from_csv_file(f'{self.tmpdir}{os.sep}demo_input.csv')
+        UP.from_csv_file(f'{self.outdir}{os.sep}demo_input.csv')
 
         gap = 10
         parallel = False

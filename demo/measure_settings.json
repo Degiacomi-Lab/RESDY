@@ -1,6 +1,6 @@
 {
   "resdy_version": "1.0",
-  "biobox_version": "1.1.5",
+  "biobox_version": "2.0.0",
   "residue_of_interest": {
     "non_modified_codes": [
       "LYS",
@@ -25,7 +25,7 @@
     ]
   },
   "include_modified": false,
-  "only_relaxed": true,
+  "only_relaxed": false,
   "features": {
     "propka": {},
     "sasa": {

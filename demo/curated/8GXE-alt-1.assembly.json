@@ -1,0 +1,21 @@
+{
+  "biomolecule": 1,
+  "determined": "author",
+  "status": "identity",
+  "reason": "",
+  "n_operators": 1,
+  "original_chains": [
+    "A",
+    "B"
+  ],
+  "chains": [
+    "A",
+    "B"
+  ],
+  "measured_chains": [
+    "A",
+    "B"
+  ],
+  "n_atoms": 4766,
+  "n_clashes": null
+}

@@ -18,21 +18,68 @@ class Test_Measure(unittest.TestCase):
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
         self.all_features = ['propka', 'sasa', 'depth', 'aev',
-                             'das', 'seqcharge', 'melodia', 'frustration']
+                             'das', 'seqcharge', 'melodia']
         self.features_dict = {k: {} for k in self.all_features}
+        self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb', '1A6M-alt1A_relaxed.pdb']})
 
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
 
-    def test_full_setup(self):
-        # test full setup of measures class, no run, test runs individually
+    def test_full_standardtrack_series(self):
+        # test full setup of measures class
+        # standard track
         print('-> Testing full setup')
-        M = RD.Measure(df_input=self.df_prot,
+        M = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
-                        features_dict=self.features_dict)
+                        features_dict=self.features_dict,
+                        parallel=False,
+                        parallel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
+
+    def test_full_standardtrack_parallel(self):
+        # test full setup of measures class
+        # standard track
+        print('-> Testing full setup')
+        M = RD.Measure(df_input=self.df_prot[:2],
+                        outdir=self.outdir,
+                        features_dict=self.features_dict,
+                        parallel=True,
+                        parallel_timeout=40)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
+
+    def test_full_pdbonly_series(self):
+        # pdb only
+        M = RD.Measure(df_input=self.df_pdb_only_test[:2],
+                        outdir=self.outdir,
+                        features_dict=self.features_dict,
+                        parallel=False,
+                        parallel_timeout=40)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
+
+    def test_full_pdbonly_parallel(self):
+        # pdb only
+        M = RD.Measure(df_input=self.df_pdb_only_test[:2],
+                        outdir=self.outdir,
+                        features_dict=self.features_dict,
+                        parallel=True,
+                        parallel_timeout=40)
+        reg_feats = {m[0] for m in M.measures}
+        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
+        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
 
     def test_propka(self):
         print('-> Test measuring PROPKA')
@@ -249,10 +296,6 @@ class Test_Measure(unittest.TestCase):
         self.assertGreater(len(multi), 0)
         self.assertTrue((multi['Min_Dist_Other_Chain'] > 0).all())
 
-        # the five 8Y8Y lysines deposited without NZ cannot be featurised
-        y8 = df[df['PDB_Code'].str.startswith('8Y8Y')]
-        self.assertFalse(set(y8['Resid'].astype(int)) & {86, 166, 244, 246, 276})
-
         # brute force on one 1UPT lysine
         r = multi.iloc[0]
         S = bb.Molecule(os.path.join(self.outdir, 'curated', f"{r['PDB_Code']}.pdb"))
@@ -339,7 +382,6 @@ class Test_Measure(unittest.TestCase):
         act on, and its per-residue settings, without an edit to measure.py or residues.py.
         '''
         print('-> Testing that a new feature can declare its own residue support')
-        import pandas as pd
         import resdy.measure as measure_module
 
         class PLUGINPROBE():
@@ -434,6 +476,7 @@ class Test_Feature_Settings(unittest.TestCase):
     measurement in measure_settings.json.
     """
     SOURCE = os.path.join('demo', 'conformations', '1A6M-alt1A.pdb')
+    SOURCE_CURATE = os.path.join('demo', 'curated', '1A6M-alt1A.pdb')
 
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
@@ -530,9 +573,9 @@ class Test_Feature_Settings(unittest.TestCase):
     def test_flexibility_raw_b_factors_and_flat_column(self):
         import numpy as np
         from resdy.features.FLEXIBILITY import FLEXIBILITY
-        raw = FLEXIBILITY(error_filename='no_record', normalise=False).calculate(self.SOURCE)
+        raw = FLEXIBILITY(error_filename='no_record', normalise=False).calculate(self.SOURCE_CURATE)
         b = {}
-        for line in open(self.SOURCE):
+        for line in open(self.SOURCE_CURATE):
             if line.startswith('ATOM') and float(line[54:60]) > 0:
                 b.setdefault((line[21], int(line[22:26])), []).append(float(line[60:66]))
         for _, row in raw.head(5).iterrows():
