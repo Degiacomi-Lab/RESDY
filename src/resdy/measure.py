@@ -683,6 +683,29 @@ class Measure(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
+    @staticmethod
+    def _parallel_context():
+        '''
+        Return the multiprocessing context the worker pool is built from. This function is used
+        to get the available context and if possible prefer 'forkserver' method first and then
+        'spawn' if this is not available. If neither preferred option is available, it will fall
+        back onto whatever multiprocessing context is available. 
+
+        With several features importing torch, and torch leaving its thread pools running in the
+        parent for the rest of the session. Forking a multi-threaded parent gives the child a copy
+        of those pools with none of their threads, so the first call that reaches the inherited
+        OpenMP or BLAS runtime can block forever.
+
+        :returns: A multiprocessing context whose start method is not 'fork', where one is
+            available.
+        '''
+        available = mp.get_all_start_methods()
+        for method in ('forkserver', 'spawn'):
+            if method in available:
+                return mp.get_context(method)
+        return mp.get_context()
+
+
     def _ensure_logger(self):
         '''
         Reattach the log file handler if the current process does not have it.
@@ -759,8 +782,9 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
+                    ctx = self._parallel_context()
                     results = []
-                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+                    with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
                         iterator = pool.imap(partial(self._measure_file, lock),
                                                 [tuple(item) for item in items], chunksize=1)
                         while True:
@@ -1218,8 +1242,9 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
+                    ctx = self._parallel_context()
                     results = []
-                    with Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
+                    with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
                         iterator = pool.imap(partial(self._measure_file_pdbonly, lock),
                                                 items, chunksize=1)
                         while True:

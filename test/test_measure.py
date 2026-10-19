@@ -29,10 +29,11 @@ class Test_Measure(unittest.TestCase):
         # test full setup of measures class
         # standard track
         print('-> Testing full setup')
-        M = RD.Measure(df_input=self.df_prot[:1],
+        M = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
-                        parallel=False)
+                        parallel=False,
+                        parellel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
@@ -43,10 +44,11 @@ class Test_Measure(unittest.TestCase):
         # test full setup of measures class
         # standard track
         print('-> Testing full setup')
-        M = RD.Measure(df_input=self.df_prot[:1],
+        M = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
-                        parallel=True)
+                        parallel=True,
+                        parallel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
@@ -55,10 +57,11 @@ class Test_Measure(unittest.TestCase):
 
     def test_full_pdbonly_series(self):
         # pdb only
-        M = RD.Measure(df_input=self.df_pdb_only_test[:1],
+        M = RD.Measure(df_input=self.df_pdb_only_test[:2],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
-                        parallel=False)
+                        parallel=False,
+                        parallel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
@@ -67,10 +70,11 @@ class Test_Measure(unittest.TestCase):
 
     def test_full_pdbonly_parallel(self):
         # pdb only
-        M = RD.Measure(df_input=self.df_pdb_only_test[:1],
+        M = RD.Measure(df_input=self.df_pdb_only_test[:2],
                         outdir=self.outdir,
                         features_dict=self.features_dict,
-                        parallel=True)
+                        parallel=True,
+                        parallel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
