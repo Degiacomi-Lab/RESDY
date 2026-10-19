@@ -33,7 +33,7 @@ class Test_Measure(unittest.TestCase):
                         outdir=self.outdir,
                         features_dict=self.features_dict,
                         parallel=False,
-                        parellel_timeout=40)
+                        parallel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
         self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
