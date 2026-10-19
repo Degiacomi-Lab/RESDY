@@ -703,6 +703,8 @@ class Measure(object):
         for method in ('forkserver', 'spawn'):
             if method in available:
                 return mp.get_context(method)
+        print(">> Could not get 'forkserver' or 'spawn' multiprocessing context," \
+            "defaulting to 'fork'")
         return mp.get_context()
 
 
