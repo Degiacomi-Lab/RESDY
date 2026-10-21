@@ -209,7 +209,6 @@ class Measure(object):
 
         # for restarting
         self.current_index = 0
-        self.progress_index = 0
         self.pdb_only_files_to_ignore = []
 
         # for parallel measurements
@@ -421,9 +420,20 @@ class Measure(object):
 
                             self.measures.append([m, meas_dict[tmp_name].calculate])
                             self.feature_settings[tmp_name] = _resolved_settings(cls_dets, kwargs)
+                        except TypeError as e:
+                            accepted_args = sorted(inspect.signature(cls_dets).parameters)
+                            print(f'>> {m} does not accept one of the arguments given in '
+                                  f'features_dict with error {str(e)}. It accepts: {accepted_args}'
+                                  f'. {m} has been removed from features to calculate.')
+                            if self.report_errors:
+                                self._report_error_to_file('Setup measures: custom measure failed to be added due to problem in the arguments passed',
+                                                           'setup', f'Custom measure {m} failed to be added')
+                            self.features.remove(m)
+                            continue
                         except Exception as e:
                             if self.report_errors:
-                                self._report_error_to_file('Setup measures: custom measure failed to be added', 'setup', f'Custom measure {m} failed to be added')
+                                self._report_error_to_file('Setup measures: custom measure failed to be added',
+                                                           'setup', f'Custom measure {m} failed to be added')
                             self.features.remove(m)
                             print(f'Failed to add measure feature {m}, please check new scripts follow the template correctly. Error: {e}')
                             continue
@@ -1503,7 +1513,6 @@ class Measure(object):
         final_protein = proteins_completed[-1]
         proteins_completed = [c for c in proteins_completed if c != final_protein]
         proteins_completed = list(set(proteins_completed))
-        self.progress_index = len(proteins_completed)
 
         # 3. Update df_input to only have the files which haven't been analysed yet
         if 'completed' not in self.df_input.columns:

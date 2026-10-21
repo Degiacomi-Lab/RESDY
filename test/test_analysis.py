@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import pandas as pd
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
@@ -94,6 +95,33 @@ class Test_Analysis(unittest.TestCase):
                                     save_name='violin_all_features_all.svg',
                                     show_graph=False)
 
+    def test_class_labels(self):
+        if 'class' in self.A.df.columns:
+            self.A.df = self.A.df.drop('class')
+        label_df = pd.DataFrame({'Uniprot_Entry': ['P02185', 'P02185', 'P02185', 'P0CG48', 'P0CG48'],
+                                'Resid': [48, 79, 141, 27, 33]})
+        self.A.df = self.A.add_class_labels(self.A.df, label_df, label='1')
+        self.assertTrue('class' in self.A.df.columns)
+        self.assertEqual(len(self.A.df[self.A.df['class'] == '1'].drop_duplicates(subset=['Uniprot_Entry', 'Resid'])), 5)
+        self.assertTrue(np.array_equal(self.A.df.loc[self.A.df['class'] == '1', ['Uniprot_Entry', 'Resid']].drop_duplicates().values,
+                        label_df.drop(columns='class').values))
+
+        self.A.df = self.A.rename_class_label(self.A.df, '1', '2')
+        self.assertEqual(len(self.A.df[self.A.df['class'] == '2'].drop_duplicates(subset=['Uniprot_Entry', 'Resid'])), 5)
+        self.assertTrue(np.array_equal(self.A.df.loc[self.A.df['class'] == '2', ['Uniprot_Entry', 'Resid']].drop_duplicates().values,
+                        label_df.drop(columns='class').values))
+
+        self.A.df = self.A.remove_class_from_df(self.A.df, '2')
+        for i, r in label_df.iterrows():
+            self.assertEqual(len(self.A.df[(self.A.df['Uniprot_Entry'] == r['Uniprot_Entry']) &
+                                           (self.A.df['Uniprot_Entry'] == r['Resid'])]), 0)
+
+    def test_data_to_ml(self):
+        agg_df_np, y, metadata, goterms = self.A.data_to_ml(self.A.df, output_goterms=True)
+        self.assertEqual(len(agg_df_np), len(y))
+        self.assertTrue(np.assert_equal(agg_df_np[['Uniprot_Entry', 'Resid']].values,
+                                        metadata[['Uniprot_Entry', 'Resid']].values))
+        self.assertEqual(set(agg_df_np['Uniprot_Entry']), set(goterms['Uniprot_Entry']))
 
 
 if __name__ == "__main__":

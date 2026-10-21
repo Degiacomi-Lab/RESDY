@@ -3,6 +3,8 @@
 [![Tests](https://github.com/Degiacomi-Lab/RESDY/actions/workflows/tests.yml/badge.svg)](https://github.com/Degiacomi-Lab/RESDY/actions/workflows/tests.yml)
 [![Documentation](https://readthedocs.org/projects/resdy/badge/?version=latest)](https://resdy.readthedocs.io/en/latest/)
 
+Extensive featurisation toolkit of protein sidechain structure and properties for classification tasks.
+
 ## Introduction
 
 This toolkit is subdivided in a set of classes that together operate as a pipeline enabling the rapid featurisation of aminoacids from collections of protein structures. Features and associated protein metadata can be explored with dedicated analysis and visualisation tools. In short, the pipeline will:

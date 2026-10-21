@@ -14,7 +14,6 @@ except Exception as e:
     print(f'>> preprocessing.py statsmodel import is unavailable, the VIF AEV reduction '
           f'method can\'t be used. Error: {e}')
 
-scaler = StandardScaler()
 
 class Preprocessing:
     '''
@@ -227,9 +226,7 @@ class Preprocessing:
         """
 
         data_input = data_input.copy()
-        features = features.copy()
-        if features is None:
-            features = list(data_input.columns)
+        features = list(data_input.columns) if features is None else list(features)
 
         for feature in features:
             data_input[feature] = (data_input[feature] - np.mean(data_input[feature])) / np.std(data_input[feature], ddof=0)

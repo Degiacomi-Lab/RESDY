@@ -2038,6 +2038,14 @@ class PDB(object):
             print(f'>> Finished minimising structure: {pdb}_relaxed.pdb '
                   f'(heavy atoms moved {heavy_rmsd:.2f} A rmsd)')
 
+            if not self.keep_all_curated:
+                print('>> Keep all curated set to False, removing curated structure as '
+                      'minimised version has been produced.')
+                try:
+                    os.remove(pdb_path)
+                except Exception as e:
+                    print('>> Failed to remove original curated structure, structure remains.')
+
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
             if os.path.exists(relaxed_path):

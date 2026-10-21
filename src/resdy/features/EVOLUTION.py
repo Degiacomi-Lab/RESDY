@@ -15,7 +15,8 @@ class EVOLUTION():
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
                                 'atom_select_names_modified': ['NZ', 'N07']},
-                 error_filename = 'measure_errors.txt'):
+                 error_filename = 'measure_errors.txt',
+                 num_add_aa=20):
         '''
         Initialise the Evolution class, include any global variables that are required from measures
         in here.
@@ -35,6 +36,8 @@ class EVOLUTION():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param num_add_aa: Number of amino acids to go either side of the lysine of interest
+        :type num_add_aa: int
         '''
 
         try:
@@ -59,6 +62,15 @@ class EVOLUTION():
             self.record_errors = True
         else:
             self.record_errors = False
+
+        if not isinstance(num_add_aa, int):
+            try:
+                num_add_aa = int(num_add_aa)
+            except Exception as e:
+                raise TypeError(f'> Parameter passed to num_add_aa in seqcharge ({num_add_aa}) '
+                                f'could not be converted to an integer, please pass an integer '
+                                f'value. Error: {str(e)}') from e
+        self.num_add_aa = num_add_aa
 
         self.model_loaded = False
 
@@ -96,15 +108,21 @@ class EVOLUTION():
         self.model_loaded = True
 
 
-    def calculate(self, path, num_add_aa=20):
+    def calculate(self, path):
         '''
         Calculate the ESM LLM output for subset protein sequences obtained through searching over
         the path of the protein structure given.
 
         :param path: Path of the pdb file of interest
         :type path: str
-        :param num_add_aa: Number of amino acids to go either side of the lysine of interest
-        :type num_add_aa: int
+
+        :returns:
+            Dataframe with information on chain, residue number and ESM output.
+            Outline::
+
+                Chain   Resid   evolution
+                x           x           x
+        :rtype: pandas.DataFrame
         '''
 
         if not self.model_loaded:
@@ -194,11 +212,11 @@ class EVOLUTION():
                     print(f'> Res {lys_num} on chain {lys_chain} has no CA in {path}, skipped')
                     continue
 
-                start_idx = seq_lys_index - num_add_aa
-                end_idx = seq_lys_index + num_add_aa + 1
+                start_idx = seq_lys_index - self.num_add_aa
+                end_idx = seq_lys_index + self.num_add_aa + 1
                 start_null = 0
                 end_null = 0
-                
+
                 if start_idx < 0:
                     start_null = - start_idx
                     start_idx = 0
@@ -215,21 +233,40 @@ class EVOLUTION():
                 with self.torch.no_grad():
                     results = self.esm2_model_650M(batch_tokens, repr_layers=[33], return_contacts=False)
                     seq_encode_tokens = results["representations"][33]
-                    seq_out = seq_encode_tokens[0, num_add_aa + 1, :]  # this bit of code can be used to extract a direct lysine representation without dimension reduction
+                    seq_out = seq_encode_tokens[0, self.num_add_aa + 1, :]  # this bit of code can be used to extract a direct lysine representation without dimension reduction
                     seq_out = seq_out.to('cpu')
 
                 if self.include_modified:
-                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'evolution': str(seq_out.tolist()), 'Modified': list_modified[idx]}])], ignore_index=True)
+                    df_esm = pd.concat([df_esm,
+                                        pd.DataFrame([{'Chain': lys_chain,
+                                                       'Resid': lys_num,
+                                                       'evolution': str(seq_out.tolist()),
+                                                       'Modified': list_modified[idx]}])],
+                                       ignore_index=True)
                 else:
-                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'evolution': str(seq_out.tolist())}])], ignore_index=True)
+                    df_esm = pd.concat([df_esm,
+                                        pd.DataFrame([{'Chain': lys_chain,
+                                                       'Resid': lys_num,
+                                                       'evolution': str(seq_out.tolist())}])],
+                                       ignore_index=True)
 
             except Exception as e:
                 if self.record_errors: report_error_to_file('Evolution ESM 2', path, str(e), self.error_filename)
-                print(f'Evolution ESM Calculation 2: Failed to encode sequence for uniprot: {path}, chain: {lys_chain}, resid: {lys_num}, error: {e}')
+                print(f'Evolution ESM Calculation 2: Failed to encode sequence for uniprot: {path}'
+                      f', chain: {lys_chain}, resid: {lys_num}, error: {e}')
                 if self.include_modified:
-                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'evolution': None, 'Modified': list_modified[idx]}])], ignore_index=True)
+                    df_esm = pd.concat([df_esm,
+                                        pd.DataFrame([{'Chain': lys_chain,
+                                                       'Resid': lys_num,
+                                                       'evolution': None,
+                                                       'Modified': list_modified[idx]}])],
+                                       ignore_index=True)
                 else:
-                    df_esm = pd.concat([df_esm, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'evolution': None}])], ignore_index=True)
+                    df_esm = pd.concat([df_esm,
+                                        pd.DataFrame([{'Chain': lys_chain,
+                                                       'Resid': lys_num,
+                                                       'evolution': None}])],
+                                       ignore_index=True)
 
         return df_esm
 

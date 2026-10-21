@@ -20,7 +20,7 @@ class Aggregation:
                  features_to_include=['all'], aev_red_method='pca',
                  num_sd_aev_features=100, include_chain=False,
                  max_feature_nan_fraction=0.5, get_nan_df=False,
-                 aev_pca_variance=0.99, vif_threshold=5.0):
+                 aev_pca_variance=0.99, aev_reducer=None, vif_threshold=5.0):
         '''
         Initialisation of the Aggregation class.
 
@@ -88,6 +88,9 @@ class Aggregation:
         :param vif_threshold: Used when aev_red_method is 'vif'. AEV columns are removed until
             every remaining one has a variance inflation factor below this value. Default 5.
         :type vif_threshold: float, optional
+        :param aev_reducer: sklearn transformer to enable consistent reduction across sets if this
+            is required in your pipeline, optional
+        :type aev_reducer
         '''
         if isinstance(aev_pca_variance, bool) or not (
                 (isinstance(aev_pca_variance, numbers.Integral) and aev_pca_variance >= 1)
@@ -115,6 +118,7 @@ class Aggregation:
         os.makedirs(outdir, exist_ok=True)
         self.aggregation_method = aggregation_method
         self.aev_red_method = aev_red_method
+        self.aev_reducer = aev_reducer
         self.num_sd_aev_features = num_sd_aev_features
         self.include_chain = include_chain
         self.get_nan_df = get_nan_df
@@ -363,13 +367,14 @@ class Aggregation:
         data in self.X_all ready for the aggregation to actually reduce the dataset for training on
         '''
         print('>> Calculating PCA on AEV data...')
-        n_components = self.aev_pca_variance
-        pca = PCA(n_components=n_components)
-        aev_col_names = [a for a in self.df_measurements.columns if 'AEV_' in a]
-        aev_data = self.df_measurements[aev_col_names].values.tolist()
-        pca_data = pca.fit_transform(aev_data)
 
-        variance_data = pca.explained_variance_ratio_
+        aev_col_names = [a for a in self.df_measurements.columns if 'AEV_' in a]
+        aev_data = self.df_measurements[aev_col_names].to_numpy(dtype=float)
+        if self.aev_reducer is None:
+            self.aev_reducer = PCA(n_components=self.aev_pca_variance).fit(aev_data)
+        pca_data = self.aev_reducer.transform(aev_data)
+
+        variance_data = pca_data.explained_variance_ratio_
 
         self.df_measurements.drop(aev_col_names, axis=1, inplace=True)
         df_out = pd.DataFrame(pca_data)

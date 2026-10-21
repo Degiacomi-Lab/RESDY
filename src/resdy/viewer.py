@@ -36,8 +36,7 @@ class Viewer(object):
         '''
         if isinstance(df_measures, str):
             self.df_measures = pd.read_csv(df_measures)
-        else:
-            self.df_measures = df_measures
+        self.df_measures = df_measures.copy()
 
         self.df_measures.columns.name = 'Feature'
         self.outdir = outdir
@@ -84,7 +83,8 @@ class Viewer(object):
                                'Atomic Environment Vector': 'aev',
                                '15N NMR Shift (LEGOLAS)': 'legolas',
                                'Frustration': 'frustration',
-                               'Density': 'density'}
+                               'Density': 'density',
+                               'Secondary Structure': 'secondarystructure'}
 
         self.axis_labels = {'depth': 'Depth (Å)',
                         'sasa': 'Solvent Accessible Surface Area (Å\u00b2)',
@@ -103,10 +103,11 @@ class Viewer(object):
                         'frustration': 'Frustration',
                         'rmsf': 'Root Mean Square Fluctuation',
                         'density': 'Density',
-                        'aev': 'Atomic Environment Vector'}
+                        'aev': 'Atomic Environment Vector',
+                        'secondarystructure': 'Secondary Structure'}
 
         self.feature_labels_reverse = {v: k for k, v in self.feature_labels.items()}
-        self.feature_labels_list = [self.feature_labels_reverse[a] for a in self.features]
+        self.feature_labels_list = [self.feature_labels_reverse.get(a, a) for a in self.features]
 
         self.colour_cols = [a for a in ['PLDDT', 'Method', 'Source', 'class'] if a in self.df_scalar_measures.columns]
 
@@ -131,20 +132,22 @@ class Viewer(object):
             self.GO_display_names = list(self.GO_codes.values())
 
         if not self.suppress_unimportant_output:
-            for line in f:
-                print(line)
+            print(f.getvalue())
 
         self.data_viewer_app = Dash(__name__, suppress_callback_exceptions=True)
         self._setup_html()
 
 
-    def launch_viewer(self):
+    def launch_viewer(self, debug=True):
         '''
         Launch a plotly web browser window which can then be used for analysis of the
         measurements data. Will launch on a local address which can be opened in a browser
         or preview in many code editors.
+        
+        :param debug: Toggleable option to run the viewer in debug mode
+        :type debug: bool
         '''
-        self.data_viewer_app.run(debug=True)
+        self.data_viewer_app.run(debug=debug)
 
 
     def _setup_html(self):
@@ -161,7 +164,8 @@ class Viewer(object):
             html.Div(id='tabs_content_analysis')
         ])
 
-        @callback(Output('tabs_content_analysis', 'children'),
+        app = self.data_viewer_app
+        @app.callback(Output('tabs_content_analysis', 'children'),
                   Input('tabs_analysis', 'value'))
         def render_content(tab):
             if tab == 'tab_2d_scalar_analysis':

@@ -824,7 +824,7 @@ class Analysis(object):
             print(f"Extracting data for: {uniprot}")
 
             desired_residues = list(df_req_res.loc[df_req_res["Uniprot_Entry"] == uniprot, "Resid"].drop_duplicates())
-            search_uniprot = df_working.loc[self.df["Uniprot_Entry"] == uniprot.strip(), ["Uniprot_Entry", "Resid"]]
+            search_uniprot = df_working.loc[df_working["Uniprot_Entry"] == uniprot.strip(), ["Uniprot_Entry", "Resid"]]
             all_search_rows = search_uniprot.index.tolist()
             wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
             not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
@@ -841,18 +841,23 @@ class Analysis(object):
         return df_working
 
 
-    def add_class_labels(self, df_class_set, label='1'):
+    def add_class_labels(self, df, df_class_set, label='1', unlisted='-1'):
         '''
         Add class labels to a measurements dataframe given an input dataframe of the combinations
         of Uniprot and Residue number you would like to mark. Note to save a new csv file post,
         you will need to call ``save_state`` again.
 
+        :param df: Dataframe of measurements to add the class label to
+        :type df: Pandas DataFrame
         :param df_class_set: Dataframe containing columns 'Uniprot_Entry' and 'Resid' for which
             you would like measurements in the measurements dataframe to assign the class label to.
             This will look for the dataframe in the output directory.
         :type df_class_set: Pandas DataFrame
         :param label: Label to apply to the specific sites given. Default is 1.
         :type label: str
+        :param unlisted: Label to apply to any sites that aren't given if a class columns is not
+            already present or there are NaN values in the 'class' column. Default is -1.
+        :type unlisted: str
 
         :returns: Measurements dataframe with a class column attached
         :rtype: Pandas DataFrame
@@ -865,29 +870,83 @@ class Analysis(object):
                 raise NameError(f'>> No file available for class labels at the location given '
                                 f'{df_class_set}, please check the file name is correct.')
 
+        if not isinstance(label, str):
+            label = str(label)
+        if not isinstance(unlisted, str):
+            unlisted = str(unlisted)
+
         df_class_set['class'] = label
 
-        if 'class' in self.df.columns:
-            print('Values for class are already present in the measurements dataframe, overwriting.')
-            df_class_set = df_class_set.rename(columns={'class': 'new_class'})
-            df_labelled = self.df.join(df_class_set, on=['Uniprot_Entry', 'Resid'])
-            df_labelled['class'] = [orig if new == np.nan else new for orig, new in zip(list(df_labelled['class']), list(df_labelled['new_class']))]
-            df_labelled = df_labelled.drop(columns='new_class')
-        else:
-            print('No previous class assignment found, class column will be created and the label '
-                  '0 will be given to anything that is not in the desired class')
-            df_labelled = self.df.join(df_class_set, on=['Uniprot_Entry', 'Resid'])
-            df_labelled['class'] = df_labelled['class'].fillna('0')
+        sites_to_label = df_class_set[['Uniprot_Entry', 'Resid']].drop_duplicates().copy()
+        sites_to_label['_required'] = True
+        df = df.merge(sites_to_label, on=['Uniprot_Entry', 'Resid'], how='left')
+        df_sites_required = df.pop('_required').eq(True).to_numpy()
 
-        self.df = df_labelled
-        return self.df
+        if 'class' in df.columns:
+            print('Values for class are already present in the measurements dataframe, overwriting.')
+            current_class_col = df['class']
+        else:
+            print(f'No previous class assignment found, class column will be created and the label '
+                f'{unlisted} will be given to anything that is not in the desired class')
+            current_class_col = pd.Series(np.nan, index=df.index)
+
+        df['class'] = np.where(df_sites_required,
+                               label,
+                               current_class_col.fillna(unlisted))
+
+        return df
+
+
+    def rename_class_label(self, df, old_label, new_label):
+        '''
+        Renames a class label in the dataframe through finding all instances of the variable
+        given in 'old_label' and replacing it with 'new_label'
+
+        :param df: Dataframe to rename a class label in
+        :param old_label: the name of the label to replace in the measurements dataframe
+        '''
+        if 'class' not in df.columns:
+            print('>> class column not found in the given dataframe, call add_class_label()'
+                  'to create one with a subset of the data or assign one manually.')
+            return
+
+        if old_label not in df['class'].unique():
+            print(f'>> old label given: {old_label}, was not found in the \'class\' column,'
+                  f'nothing to rename.')
+            return
+
+        if not isinstance(old_label, str):
+            old_label = str(old_label)
+        if not isinstance(new_label, str):
+            new_label = str(new_label)
+
+        df.loc[df['class'] == old_label, 'class'] = new_label
+        return df
+
+
+    def remove_class_from_df(self, df, class_label):
+        '''
+        Function to delete any measurements in the measurement dataframe which are assigned to a
+        given class. This will remove the rows altogether from the dataframe. To write a new
+        class lable over a set of values, 
+        '''
+        if not isinstance(class_label, str):
+            class_label = str(class_label)
+
+        if class_label not in df['class'].unique():
+            print(f'>> old label given: {class_label}, was not found in the \'class\' column,'
+                    f'nothing to remove.')
+            return
+
+        df = df[df['class'] != class_label]
+        return df
 
 
     def relative_best(self, weights, features=['depth']):
         '''
-        Function to extract the best relative list of features for all combinations of uniprot entry
-        and residues based on a given list of metrics to do the calculation over and the desired
-        weightings for each of those features.
+        Function to extract the best relative list of features for all combinations of uniprot
+        entry and residues based on a given list of metrics to do the calculation over and the
+        desired weightings for each of those features.
 
         :param weights: List of floats which sum to 1 of the weights for each of the given features.
             Length should match the list of features given
@@ -1047,7 +1106,8 @@ class Analysis(object):
         return table
 
 
-    def enrichment_analysis(self, feature_one = ['propka', 7, 11], feature_two = ['sasa', 0, 10], uniprot_cnt_cutoff=1):
+    def enrichment_analysis(self, feature_one = ['propka', 7, 11],
+                            feature_two = ['sasa', 0, 10], uniprot_cnt_cutoff=1):
         '''
         Analyse prevalence of GO-terms in sub-regions of the SASA vs pKa graph
 
@@ -1077,6 +1137,12 @@ class Analysis(object):
         selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
         uniprot_selected = selected_df['Uniprot_Entry'].unique()
         uniprot_reference = self.df['Uniprot_Entry'].unique()
+
+        if not self.GO_dict:
+            self.GO_get_data()
+        if not self.GO_dict:
+            raise RuntimeError('>> No GO annotation could be loaded for the set of Uniprot codes '
+                               'provided in the table, no enrichment can be computed.')
 
         # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
         GO_bacgou = [code for code in list(self.GO_dict.keys()) if len(self.GO_dict[code]) >= uniprot_cnt_cutoff]
@@ -1129,29 +1195,45 @@ class Analysis(object):
         return df
 
 
-    def df_to_numpy(self):
+    def data_to_ml(self, df_in, output_goterms=False):
         '''
-        Convert the dataframe into a numpy array ready for transfer into a ML model.
-        This checks that the dataframe given is aggregated before doing this. Training ML
-        models on un-aggregated data will give false results.
+        Takes the data provided into the analysis class and prepares this into the format
+        required for training an ML model on it. This will return 3 different arrays:
+        1. numpy array of the feature data from the given dataframe to the analysis class
+        2. class array corresponding to the data array, if a class column is present within
+            the dataframe, this is used, otherwise set to -1. Class labels can be set with
+            function add_class_label()
+        3. meta data array listing the corresponding data on Uniprot_Entry, Resid, Resname
+            and the number of structures associated with the aggregated data
+        4. optional json file linking the uniprot codes that are present in the dataset
+            to the GO terms that are associated with this.
+
+        WARNING: while this function will return ML ready arrays from whatever is given as
+        input, if the dataframe is not aggregated it may lead to artificially inflated
+        performance across trained models due to data leakage. You should be careful how you
+        split the data downstream.
+        
+        :param df_in: The input dataframe of measurements either aggregated already or not
+        :type df_in: Pandas DataFrame
+        :param output_goterms: Toggleable option to make the codebase dump the GO terms
+            associated with the Uniprot codes provided in the dataframe. Default is False,
+            set to True to get a json file for this.
+        :type output_goterms: bool
 
         :returns (agg_df_np, y): Numpy array containing all the feature data for the set, y
             numpy array containing the corresponding class labels for the set, if a 'class'
             column was not provided it sets these all to -1.
         :rtype: numpy arrays
         '''
-        len_dropduplicates_df = len(self.df.drop_duplicates(subset=[['Uniprot_Entry', 'Resid']]))
 
-        if len(self.df) != len_dropduplicates_df:
+        len_dropduplicates_df = len(df_in.drop_duplicates(subset=[['Uniprot_Entry', 'Resid']]))
+
+        if len(df_in) != len_dropduplicates_df:
             print('>> Data to convert to numpy array is not aggregated. Training ML models on '
-                  'data that is not aggregated will produce inflated prediction metrics. '
-                  'Aggregating data on default methods.')
-            agg = Aggregation(df_measurements=self.df,
-                                outdir=self.outdir,
-                            aggregation_method='all')
-            agg_df = agg.aggregate_data()
-        else:
-            agg_df = self.df
+                  'data that is not aggregated may lead to inflated prediction metrics. Be careful'
+                  'splitting data downstream in models.')
+
+        df_metadata = agg_df['Uniprot_Entry', ]
 
         cols_to_drop = [a for a in NON_FEATURE_COLUMNS if a in agg_df.columns and a != 'class']
         agg_df = agg_df.drop(columns=cols_to_drop)
