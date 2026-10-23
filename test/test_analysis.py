@@ -117,11 +117,11 @@ class Test_Analysis(unittest.TestCase):
                                            (self.A.df['Uniprot_Entry'] == r['Resid'])]), 0)
 
     def test_data_to_ml(self):
-        agg_df_np, y, metadata, goterms = self.A.data_to_ml(self.A.df, output_goterms=True)
-        self.assertEqual(len(agg_df_np), len(y))
-        self.assertTrue(np.assert_equal(agg_df_np[['Uniprot_Entry', 'Resid']].values,
+        X, y, metadata, feature_names, go_terms = self.A.data_to_ml(self.A.df, output_goterms=True)
+        self.assertEqual(len(X), len(y))
+        self.assertTrue(np.assert_equal(X[['Uniprot_Entry', 'Resid']].values,
                                         metadata[['Uniprot_Entry', 'Resid']].values))
-        self.assertEqual(set(agg_df_np['Uniprot_Entry']), set(goterms['Uniprot_Entry']))
+        self.assertEqual(set(X['Uniprot_Entry']), set(go_terms['Uniprot_Entry']))
 
 
 if __name__ == "__main__":

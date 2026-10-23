@@ -12,13 +12,11 @@ from datetime import date
 from functools import partial
 import multiprocessing as mp
 from multiprocessing import cpu_count
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
 from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from .helper import require_biobox
+from .helper import require_biobox, get_worker_lock
 require_biobox(bb)
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
@@ -135,11 +133,13 @@ class Measure(object):
         :type residue_of_interest: str, dict
         :param parallel: Option to run the measurements in parallel.
         :type parallel: bool
-        :param include_modified: Option to include lysines that have been seen to be modified in the
-            measurements analysis. If False, only lysines of type 'LYS' will be included in the
-            measurements. If True, lysines of types 'LYE' will be included in the measurements as
-            well as all 'LYS' residues. In either case, a column will be included stating if the
-            measured residue is a modified one.
+        :param include_modified: Option to include residues of interest that have been seen to be
+            modified in the measurements analysis. If False, only residues of interest of their
+            standard 3 letter code will be included in the measurements. If True, residues of
+            interest of with alternative 3 letter codes denoted in aa_properties will be included
+            in the measurements as well as all the residues of interest in the standard 3 letter
+            name format. In either case, a column will be included stating if the measured residue
+            is a modified one.
         :type include_modified: bool
         :param report_errors: Option to record any of the protein files which are giving errors when
             measures calculations are being performed. This will write the file and the error to a
@@ -765,11 +765,7 @@ class Measure(object):
         files = [file for file in files if 'pkaani' not in file]
         self.files_to_analyse = files
 
-        total_structures = len(files)
-        print(f'Total number of structures to analyse: {total_structures}')
-
-        with Manager() as manager:
-            lock = manager.Lock()
+        with get_worker_lock(self.parallel, self._parallel_context()) as lock:
             items = []
             for i, r in self.df_input.iterrows():
                 pdb_code = r["PDB_Code"]
@@ -783,6 +779,9 @@ class Measure(object):
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
                 items.append(file_details)
+
+            tot_struc_to_measure = len(items)
+            print(f'Total number of structures to analyse: {tot_struc_to_measure}')
 
             base_cols = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
             df_parallel = pd.DataFrame()
@@ -855,9 +854,9 @@ class Measure(object):
         .. rubric:: Method
 
         Take the given information about the file and through the given file_list, find the files to
-        analyse. Through the structure, identify all lysines and create a temporary dataframe for
-        the results. Iterate over the required measurements (self.measures) and insert results into
-        the temporary dataframe. Append temporary dataframe to main dataframe.
+        analyse. Through the structure, identify all residues of interest and create a temporary
+        dataframe for the results. Iterate over the required measurements (self.measures) and insert
+        results into the temporary dataframe. Append temporary dataframe to main dataframe.
 
         :param file_details: list of details for the file that has been selected to be calculated,
             taking the form of [uniprot_code, pdb_code, method, res, chains]
@@ -944,7 +943,7 @@ class Measure(object):
                 records.append(data)
 
             df_currentfile = pd.DataFrame.from_records(records, columns=columns)
-            terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest of interest found")
             if no_anchor:
                 terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
                                                f"anchor atom missing, cannot be featurised")
@@ -1233,8 +1232,7 @@ class Measure(object):
         if 'completed' not in self.df_input.columns:
             self.df_input['completed'] = False
 
-        with Manager() as manager:
-            lock = manager.Lock()
+        with get_worker_lock(self.parallel, self._parallel_context()) as lock:
             items = []
             for i, r in self.df_input.iterrows():
 
@@ -1243,6 +1241,11 @@ class Measure(object):
 
                 pdb_code = str(r['PDB_Code'])
                 items.append(pdb_code)
+
+            if not items:
+                print('>> Nothing to measure: every structure in the input is already marked as' \
+                        'completed.')
+                return
 
             base_cols = ['PDB_Code', 'Chain', 'Resid']
             df_parallel = pd.DataFrame()
@@ -1275,13 +1278,13 @@ class Measure(object):
                                     f'series.') from None
                     df_parallel = pd.concat(results, ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file_pdbonly(file_dets, lock) for file_dets in items],
+                    df_parallel = pd.concat([self._measure_file_pdbonly(lock, pdb_code) for pdb_code in items],
                                             ignore_index=True)
 
             self.measures = gpu_measurements
             if gpu_measurements:
                 df_gpu = pd.concat([self._measure_file_pdbonly(lock, d) for d in items],
-                                   ignore_index=True)
+                                ignore_index=True)
 
                 if df_parallel.empty:
                     df_parallel = df_gpu
@@ -1387,7 +1390,7 @@ class Measure(object):
                 records.append(data)
 
             df_currentfile = pd.DataFrame.from_records(records, columns=columns)
-            terminal_out_statements.append(f">> {len(df_currentfile)} lysines of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest of interest found")
             if no_anchor:
                 terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
                                                f"anchor atom missing, cannot be featurised")

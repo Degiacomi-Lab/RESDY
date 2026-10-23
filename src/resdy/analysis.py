@@ -1225,28 +1225,30 @@ class Analysis(object):
             column was not provided it sets these all to -1.
         :rtype: numpy arrays
         '''
+        key = ['Uniprot_Entry', 'Resid']
 
-        len_dropduplicates_df = len(df_in.drop_duplicates(subset=[['Uniprot_Entry', 'Resid']]))
-
-        if len(df_in) != len_dropduplicates_df:
+        data_aggregated_bool = not df_in.duplicated(subset=key).any()
+        if not data_aggregated_bool:
             print('>> Data to convert to numpy array is not aggregated. Training ML models on '
                   'data that is not aggregated may lead to inflated prediction metrics. Be careful'
                   'splitting data downstream in models.')
 
-        df_metadata = agg_df['Uniprot_Entry', ]
+        # GO terms method needs updating once GO terms moved to uniprot.py
+        if not self.GO_dict:
+            self.GO_get_data()
+        uniprots_present = list(df_in['Uniprot_Entry'])
+        go_terms = [a for a in self.GO_dict if a in uniprots_present]
 
-        cols_to_drop = [a for a in NON_FEATURE_COLUMNS if a in agg_df.columns and a != 'class']
-        agg_df = agg_df.drop(columns=cols_to_drop)
+        metadata_cols = [a for a in df_in.columns if a in METADATA_COLUMNS]
+        y = (df_in['class'].to_numpy(dtype=np.int8) if 'class' in df_in.columns else
+             np.full(len(df_in), -1, dtype=np.int8))
+        meta_data = df_in[[a for a in metadata_cols if a != 'class']].reset_index(drop=True)
 
-        if 'class' in agg_df.columns:
-            y = agg_df['class'].values
-        else:
-            y = np.full(shape=len(agg_df), fill_value=-1, dtype=np.int)
+        X_all = df_in.drop(columns=metadata_cols)
+        feature_names = list(X_all.columns)
+        X = X_all.to_numpy()
 
-        agg_df = agg_df.drop('class')
-        agg_df_np = agg_df.to_numpy()
-
-        return agg_df_np, y
+        return X, y, meta_data, feature_names, go_terms
 
 
 if __name__ == '__main__':

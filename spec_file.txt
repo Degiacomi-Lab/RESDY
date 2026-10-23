@@ -19,7 +19,6 @@ dependencies:
   - pytorch
   - torchani
   - openmm
-  - pdbfixer
   - msms
   - mdtraj
   - nglview

@@ -1,6 +1,10 @@
 import shutil
 import sys
 import os
+import contextlib
+import multiprocessing as mp
+import threading
+
 
 #: Oldest biobox RESDY works with. Earlier versions lack ``Xlink.get_half_sphere``, which the
 #: DAS feature calls. Versions before 1.1.5 also wrote the occupancy and B-factor columns of a
@@ -13,6 +17,28 @@ MIN_BIOBOX_VERSION = (2, 0, 0)
 METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Resolution',
                     'Source', 'Modified', 'class', 'Class', 'PLDDT', 'Largest_Gap',
                     'Min_Dist_Other_Chain')
+
+
+@contextlib.contextmanager
+def get_worker_lock(parallel, ctx=None):
+    '''
+    Return a lock suitable for workers that are going to run when parallel running is required.
+    This stops creation of a lock when running in series, reducing the chance of hanging scripts.
+
+    :param parallel: True when work is given to a multiprocessing pool with either protein curation
+        or sidechain measurements desired to be ran in parallel
+    :type parallel: bool
+    :param ctx: Multiprocessing context that the pool is built off such that the Manager created in
+        the function sorting the parallelisation and this share the same start method. None will
+        use the default multiprocessing context
+    '''
+    mp.freeze_support()
+    if parallel:
+        manager_cls = ctx.Manager if ctx is not None else mp.Manager
+        with manager_cls() as manager:
+            yield manager.Lock()
+    else:
+        yield threading.Lock()
 
 
 def require_biobox(biobox):

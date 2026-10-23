@@ -23,8 +23,7 @@ are merged into the output table on chain and residue number.
 
 The constructor is given ``include_modified``, ``aa_properties`` and ``error_filename`` by
 ``Measure``, so it has to accept all three. ``aa_properties`` is what tells the feature which
-residue to look at and at which atom, and is the only thing standing between a feature and a
-hard-coded lysine.
+residue to look at and at which atom.
 
 .. code-block:: python
 
@@ -171,10 +170,7 @@ following hold:
   force field (``amber14-all.xml`` and ``implicit/gbn2.xml``), ``keep_waters=True`` skips
   minimisation, since the solvent would be counted twice.
 * Every residue matches a force field template. This fails for a retained ligand or ion that
-  the force field does not describe (add its XML file to ``forcefield``), for a C-terminus
-  lacking its ``OXT`` atom, and for a residue with an incomplete side chain. The last two are
-  common in deposited chains that have no gaps, because the patcher only rebuilds chains with
-  missing residues.
+  the force field does not describe (add its XML file to ``forcefield``).
 
 A structure that is not minimised is still measured, from its unrelaxed coordinates. The
 outcome for each structure (``relaxed``, ``skipped`` or ``failed``, with the reason) is
@@ -217,3 +213,30 @@ the chains reported, the number of atoms and the number of clashes found in the 
 :meth:`gather_proteins <resdy.protein.PDB.gather_proteins>` collects these records into
 ``assembly_log.csv``. Pass ``biological_assembly=False`` to measure the asymmetric unit
 instead. AlphaFold models do not go through this step.
+
+
+How are protein structures containing DNA/RNA handled?
+------------------------------------------------------
+
+Currently structures that contain DNA or RNA molecules are not possible to curate through
+the RESDY software and will fail if tried to curate. This is a design choice to ensure that
+protein conformers that have been gathered are realistic structures. Removing DNA/RNA from
+the molecule and treating this as a conformation may not leave the structure in a realistic
+conformation. Therefore, to ensure that data produced through the software is accurate,
+this software will not attempt to curate these structures.
+
+
+Why is running RESDY in parallel mode taking more cores than set?
+-----------------------------------------------------------------
+
+Setting the number of cores to use will set the initial number or cores to use for the task
+and the number of workers to use at that given time. However, due to the nature of calling
+other programmes in processes in this codebase in the classes :class:`PDB <resdy.protein.PDB>`
+and :class:`Measures <resdy.measures.PDB>`, these may spawn other processes at the same time
+causing more cores than allocated to be used. Please be mindful when setting the number of
+cores to use as this may use more computational power than you are anticipating using.
+The default number of cores to use is currently set at 50% of the available cores. if
+running on a large number of cores in parallel creates memory problems, please look into
+using big_protein mode for featuristaion in :class:`Measures <resdy.measures.PDB>` where
+large proteins are sectioned off and measurements for these are done in series after the
+remaining proteins are done in parallel first.

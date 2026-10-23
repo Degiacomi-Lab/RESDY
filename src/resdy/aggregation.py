@@ -20,7 +20,8 @@ class Aggregation:
                  features_to_include=['all'], aev_red_method='pca',
                  num_sd_aev_features=100, include_chain=False,
                  max_feature_nan_fraction=0.5, get_nan_df=False,
-                 aev_pca_variance=0.99, aev_reducer=None, vif_threshold=5.0):
+                 aev_pca_variance=0.99, aev_reducer=None, vif_threshold=5.0,
+                 source_pooling='together', rand_state=None):
         '''
         Initialisation of the Aggregation class.
 
@@ -91,6 +92,22 @@ class Aggregation:
         :param aev_reducer: sklearn transformer to enable consistent reduction across sets if this
             is required in your pipeline, optional
         :type aev_reducer
+        :param source_pooling: There are 2 options for the 'source' column within the dataframe,
+            either relaxed or not depending on if the structure was re-minimised within the
+            curation of the dataset. This parameter deals with which should be included in the
+            aggregation. There are 4 options:
+                1. 'together' (default) - include all measurements for the uniprot and resid code
+                    together in the aggregation (minimised structures are effectively just another
+                    conformer unless significant problems in original structure.)
+                2. 'seperate' - include all measurements in the aggregation but add source to the
+                    aggregation key to keep the data seperate.
+                3. 'unrelaxed' - include only the unrelaxed structures and not the relaxed ones.
+                4. 'relaxed' - include only the relaxed structures and not the unrelaxed ones.
+        :type source_pooling: str
+        :param rand_state: random state seed for the creation of random numbers to get a random
+            row when aggregating the data. None (default) will get a different state every call
+            whereas passing an integer will generate the same state each time.
+        :type rand_state: int
         '''
         if isinstance(aev_pca_variance, bool) or not (
                 (isinstance(aev_pca_variance, numbers.Integral) and aev_pca_variance >= 1)
@@ -102,6 +119,7 @@ class Aggregation:
         if not vif_threshold > 1:
             raise ValueError(f'vif_threshold must be greater than 1, the smallest possible '
                              f'variance inflation factor, got {vif_threshold}')
+
         self.aev_pca_variance = aev_pca_variance
         self.vif_threshold = vif_threshold
         if isinstance(df_measurements, str):
@@ -124,6 +142,8 @@ class Aggregation:
         self.get_nan_df = get_nan_df
         self.df_agg = pd.DataFrame()
         self.max_feature_nan_fraction = max_feature_nan_fraction
+        self.rand_state = rand_state
+        self._rng = np.random.default_rng(self.rand_state)
 
         self.non_feature_cols = list(METADATA_COLUMNS)
 
@@ -132,19 +152,36 @@ class Aggregation:
             self.features_to_include = [a for a in self.df_measurements.columns if a not in self.non_feature_cols]
 
         if 'Uniprot_Entry' in self.df_measurements.columns:
-            self.lys_key = ['Uniprot_Entry', 'Resid']
+            self.res_key = ['Uniprot_Entry', 'Resid']
             if self.include_chain:
-                self.lys_key.append('Chain')
+                self.res_key.append('Chain')
         elif 'PDB_Code' in self.df_measurements.columns:
-            self.lys_key = ['PDB_Code', 'Resid']
+            self.res_key = ['PDB_Code', 'Resid']
             if self.include_chain:
-                self.lys_key.append('Chain')
+                self.res_key.append('Chain')
         else:
             return KeyError('>> Measurements dataframe must contain either a Uniprot_Entry '
                             'or PDB_Code column in measurements file')
 
+        pot_source_pool_vals = ['together', 'seperate', 'unrelaxed', 'relaxed']
+        if source_pooling not in pot_source_pool_vals:
+            raise ValueError(f'>> Value given for the input parameter for source_pooling: '
+                             f'{source_pooling} was not recognised, possible input values '
+                             f'for this are {', '.join(pot_source_pool_vals)}')
+        self.source_pooling = source_pooling
+        match self.source_pooling:
+            case 'together':
+                print('>> All values of \'source\' column of data in the given measurements '
+                      'dataframe are included together in the aggregation')
+            case 'seperate':
+                self.res_key.append('source')
+            case 'unrelaxed':
+                self.df_measurements = self.df_measurements[self.df_measurements['source'] == 'unrelaxed']
+            case 'relaxed':
+                self.df_measurements = self.df_measurements[self.df_measurements['source'] == 'relaxed']
+
         data_cols_entered = self.df_measurements.columns.values
-        cols_required = [a for a in self.df_measurements.columns if a in self.lys_key + ['PDB_Code', 'class']]
+        cols_required = [a for a in self.df_measurements.columns if a in self.res_key + ['PDB_Code', 'class']]
         cols_removed = [f for f in self.features_to_include if f not in data_cols_entered]
         self.features_to_include = [f for f in self.features_to_include if f in data_cols_entered]
         if cols_removed:
@@ -189,7 +226,7 @@ class Aggregation:
                                         if feat not in sparse_features]
 
         keep = self.df_measurements.dropna(subset=self.features_to_include)
-        del_lysines = (self.df_measurements[self.lys_key].drop_duplicates().shape[0] - keep[self.lys_key].drop_duplicates().shape[0])
+        del_lysines = (self.df_measurements[self.res_key].drop_duplicates().shape[0] - keep[self.res_key].drop_duplicates().shape[0])
         if len_before_df and keep.empty:
             raise ValueError('>> Every row was removed by the NaN filter. The features with the most missing '
                              'values are: ' + ', '.join(f'{c} ({n})' for c, n in
@@ -218,7 +255,7 @@ class Aggregation:
             if bad_feat in self.df_measurements.columns:
                 self._remove_bad_data(feature=bad_feat, lower=feat_low, upper=feat_up)
         df_stats = self._calculate_statistics()
-        not_cols = self.lys_key + ['class']
+        not_cols = self.res_key + ['class']
         match self.aggregation_method:
             case 'avg':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in not_cols])
@@ -380,7 +417,7 @@ class Aggregation:
         df_out = pd.DataFrame(pca_data)
         df_out = df_out.add_prefix('AEV_')
         self.df_measurements = pd.concat([self.df_measurements, df_out], axis=1)
-        print(f'>> PCA used {pca.n_components_} components to explain '
+        print(f'>> PCA used {pca_data.n_components_} components to explain '
               f'{variance_data.sum():.4f} of the variance. AEVs are now in reduced dimension '
               f'format.')
 
@@ -398,45 +435,54 @@ class Aggregation:
         if 'class' not in self.df_measurements.columns:
             self.df_measurements['class'] = -1  # set to -1 as unsure if pos or neg
 
-        cols_key = self.lys_key + ['class']
+        cols_key = self.res_key + ['class']
         df_stats = pd.DataFrame(columns=cols_key)
 
         if 'aev' in self.features_to_include or 'evolution' in self.features_to_include:
             self._reduce_aev_dimensions()
 
-        for row_key, df_query in self.df_measurements.groupby(self.lys_key):
+        for row_key, df_query in self.df_measurements.groupby(self.res_key):
             if not isinstance(row_key, tuple):
                 row_key = (row_key,)
             df_query = df_query.reset_index(drop=True)
+
             if len(set(df_query['class'])) != 1:
                 print(f'>> Not all instances of resid assigned to same class (instances: '
                       f'{list(set(df_query["class"]))}), using class -1 instead')
                 class_val = -1
             else:
-                class_val = df_query['class'].iloc[0]  # take first value of class as overall class for resid
-            data = dict(zip(self.lys_key, row_key))
+                # take first value of class as overall class for resid
+                class_val = df_query['class'].iloc[0]
+
+            data = dict(zip(self.res_key, row_key))
             data['class'] = class_val
             features = [a for a in self.features_to_include if a not in self.non_feature_cols]
-            rand_row = random.randrange(0, len(df_query))
+            rand_row = int(self._rng.integers(0, len(df_query)))
+
             for feature in features:
                 if feature == 'aev':
-                    df_query['sumaev'] = df_query[[a for a in df_query.columns if 'AEV_' in a]].sum(axis=1)
-                    min_row = df_query['sumaev'].idxmin()
-                    max_row = df_query['sumaev'].idxmax()
-                    for feat in [a for a in df_query.columns if 'AEV_' in a]:
+                    aev_cols = [a for a in df_query.columns if 'AEV_' in a]
 
-                        data[feat + '_min'] = round(float(df_query[feat].loc[min_row]), 2)  # min value at this position in min AEV
-                        data[feat + '_max'] = round(float(df_query[feat].loc[max_row]), 2)  # max value at this position in max AEV
-                        data[feat + '_rand'] = round(df_query[feat].loc[rand_row], 2)
+                    norms = np.linalg.norm(df_query[aev_cols].to_numpy(dtype=float), axis=1)
+                    low_row = df_query.index[np.argmin(norms)]
+                    high_row = df_query.index[np.argmax(norms)]
 
-                        data[feat + '_absmin'] = round(df_query[feat].min(), 2)  # min value of any AEV at this position in the AEV
-                        data[feat + '_absmax'] = round(df_query[feat].max(), 2)  # max value of any AEV at this position in the AEV
-                        data[feat + '_med'] = round(df_query[feat].median(), 2)
-                        data[feat + '_avg'] = round(df_query[feat].mean(), 2)
-                        data[feat + '_sd'] = round(df_query[feat].std(ddof=0), 2)
-                        data[feat + '_range'] = round(df_query[feat].max(), 2) - round(df_query[feat].min(), 2)
+                    for feat in aev_cols:
+
+                        data[feat + '_nearest'] = float(df_query[feat].loc[low_row])
+                        data[feat + '_furthest'] = float(df_query[feat].loc[high_row])
+                        data[feat + '_rand'] = float(df_query[feat].loc[rand_row])
+
+                        data[feat + '_min'] = float(df_query[feat].min())
+                        data[feat + '_max'] = float(df_query[feat].max())
+                        data[feat + '_med'] = float(df_query[feat].median())
+                        data[feat + '_avg'] = float(df_query[feat].mean())
+                        data[feat + '_sd'] = float(df_query[feat].std(ddof=0))
+                        data[feat + '_range'] = float(df_query[feat].max()) - float(df_query[feat].min())
+
                 elif feature == 'evolution':
                     pred_query = df_query[df_query.get('Method', pd.Series(dtype=object)) == 'Predicted']
+
                     if not pred_query.empty:
                         for feat in [a for a in df_query.columns if 'EVL_' in a]:
                             data[feat] = pred_query[feat].iloc[0]
@@ -445,11 +491,11 @@ class Aggregation:
                             data[feat] = df_query[feat].iloc[0]
 
                 else:
-                    data[feature + '_min'] = round(float(df_query[feature].min()), 2)
-                    data[feature + '_max'] = round(float(df_query[feature].max()), 2)
-                    data[feature + '_med'] = round(df_query[feature].median(), 2)
-                    data[feature + '_avg'] = round(df_query[feature].mean(),2)
-                    data[feature + '_sd'] = round(df_query[feature].std(ddof=0),2)
+                    data[feature + '_min'] = float(df_query[feature].min())
+                    data[feature + '_max'] = float(df_query[feature].max())
+                    data[feature + '_med'] = float(df_query[feature].median())
+                    data[feature + '_avg'] = float(df_query[feature].mean())
+                    data[feature + '_sd'] = float(df_query[feature].std(ddof=0))
                     data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
                     data[feature + '_rand'] = df_query[feature].iloc[rand_row]
 
