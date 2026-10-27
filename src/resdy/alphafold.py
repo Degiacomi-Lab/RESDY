@@ -43,8 +43,8 @@ def download_AF_struc(pdb, outfolder="result"):
 
 def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     '''
-    Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value for each lysine in an
-    alphafold structure.
+    Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value for each residue
+    of interest in an alphafold structure.
 
     .. rubric:: Method
 
@@ -61,8 +61,8 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     :param resnames: list of resid names to search for in the pdb files. Default is ['LYS'], set in
         overall run through curation on aa_properties
     :type resnames: list
-    :returns: A dictionary matching up all the lysines with their corresponding PLDDT values for the
-        given AF structure.
+    :returns: A dictionary matching up all the residues of interest up with their corresponding
+        PLDDT values for the given AF structure.
     :rtype: dict
     '''
     cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']

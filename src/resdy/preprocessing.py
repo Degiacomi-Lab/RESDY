@@ -17,9 +17,10 @@ except Exception as e:
 
 class Preprocessing:
     '''
-    Class encompassing methods used for preprocessing the data before it is passed through to a model
-    to train on the data. Functions include correlation analysis of the features using VIF and
-    undersampling to be used to reduce the size of a dataset without losing key information.
+    Class encompassing methods used for preprocessing the data before it is passed through
+    to a model to train on the data. Functions include correlation analysis of the features
+    using VIF and undersampling to be used to reduce the size of a dataset without losing
+    key information.
     '''
 
     def __init__(self, df, features=[]):
@@ -70,6 +71,7 @@ class Preprocessing:
         :type df: pandas.DataFrame
         :param features: List of features (columns) to be checked for NaN entries and duplication
         :type features: list
+
         :returns: The cleaned dataframe ``df_cleaned``, and ``n_obs_cleaned``, the number of rows in
             the cleaned dataframe.
         :rtype: tuple(pandas.DataFrame, int)
@@ -97,11 +99,11 @@ class Preprocessing:
         :param features: List of features to be considered for VIF calculations
         :type features: list
         """
-        
+
         if not statsmodel_available:
             raise ImportWarning(f'>> VIF reduction method requires statsmodels; use '
                                 f'aev_red_method=\'pca\' or install statsmodel')
-        
+
         if not multi_vif:
             data = data[features]
             data = add_constant(data)
@@ -164,7 +166,7 @@ class Preprocessing:
 
         all_decorrelated = False
         min_feats = 2
-        
+
         if not statsmodel_available:
             raise ImportError('>> Packages required for VIF analysis (statsmodel) are not '
                               'available, install statsmodel or use aev_red_method=\'pca\'')

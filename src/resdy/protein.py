@@ -1011,6 +1011,7 @@ class PDB(object):
 
                 if self.biological_assembly:
                     self._build_assembly(fname, biomatrix, determined)
+                    self._record_geometry(check_geometry(fname)[0])
 
                 test_patch = True
 

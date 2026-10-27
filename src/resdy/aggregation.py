@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from .preprocessing import Preprocessing
-from .helper import METADATA_COLUMNS
+from .helper import METADATA_COLUMNS, sort_residue_key
 
 
 class Aggregation:
     '''
     Class to handle the different aggregation methods for sorting over the different measurements
     that have been calculated. This will take a dataframe of measurements, and return a dataframe
-    with only one set of measurements per lysine residue according to the aggregation method.
+    with only one set of measurements per residue of interest according to the aggregation method.
     '''
 
     def __init__(self, df_measurements, outdir='result', aggregation_method='minmax',
@@ -32,11 +32,11 @@ class Aggregation:
         :param aggregation_method: The aggregation method chosen to reduce the measurements into a
             usable format for training on. Options are:
 
-            - 'avg': Take the average of all measurements for each lysine
-            - 'random': Take a random measurement out of all measurements for the lysine
-            - 'max': Take the maximum value of each feature for the lysine
-            - 'min': Take the minimum value of each feature for the lysine
-            - 'median': Take the median value of each feature for the lysine
+            - 'avg': Take the average of all measurements for each residue of interest
+            - 'random': Take a random measurement out of all measurements for the residue of interest
+            - 'max': Take the maximum value of each feature for the residue of interest
+            - 'min': Take the minimum value of each feature for the residue of interest
+            - 'median': Take the median value of each feature for the residue of interest
             - 'mixmatch': Takes the predicted metric which will work best for each feature. The
               max is used for features where a high value is likely to be important and min for
               features where less of it is required.
@@ -151,17 +151,7 @@ class Aggregation:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
             self.features_to_include = [a for a in self.df_measurements.columns if a not in self.non_feature_cols]
 
-        if 'Uniprot_Entry' in self.df_measurements.columns:
-            self.res_key = ['Uniprot_Entry', 'Resid']
-            if self.include_chain:
-                self.res_key.append('Chain')
-        elif 'PDB_Code' in self.df_measurements.columns:
-            self.res_key = ['PDB_Code', 'Resid']
-            if self.include_chain:
-                self.res_key.append('Chain')
-        else:
-            return KeyError('>> Measurements dataframe must contain either a Uniprot_Entry '
-                            'or PDB_Code column in measurements file')
+        self.res_key = sort_residue_key(df=self.df_measurements, include_chain=include_chain)
 
         pot_source_pool_vals = ['together', 'seperate', 'unrelaxed', 'relaxed']
         if source_pooling not in pot_source_pool_vals:
@@ -226,14 +216,14 @@ class Aggregation:
                                         if feat not in sparse_features]
 
         keep = self.df_measurements.dropna(subset=self.features_to_include)
-        del_lysines = (self.df_measurements[self.res_key].drop_duplicates().shape[0] - keep[self.res_key].drop_duplicates().shape[0])
+        del_res_interest = (self.df_measurements[self.res_key].drop_duplicates().shape[0] - keep[self.res_key].drop_duplicates().shape[0])
         if len_before_df and keep.empty:
             raise ValueError('>> Every row was removed by the NaN filter. The features with the most missing '
                              'values are: ' + ', '.join(f'{c} ({n})' for c, n in
                             sorted(((c, self.df_measurements[c].isna().sum()) for c in self.features_to_include), key=lambda t: -t[1])[:5]))
         else:
             print(f'>> Removed {len_before_df - len(keep)} rows of {len_before_df} possible measurement '
-                  f'rows containing nan values; which cost {del_lysines} distinct residues. The worst '
+                  f'rows containing nan values; which cost {del_res_interest} distinct residues. The worst '
                   f'features for this are: ' + ', '.join(f'{c} ({n})' for c, n in sorted(na_per_feature.items(), key=lambda t: -t[1])[:3]))
             self.df_measurements = keep
 
@@ -255,7 +245,7 @@ class Aggregation:
             if bad_feat in self.df_measurements.columns:
                 self._remove_bad_data(feature=bad_feat, lower=feat_low, upper=feat_up)
         df_stats = self._calculate_statistics()
-        not_cols = self.res_key + ['class']
+        not_cols = self.res_key + ['num_structures', 'class']
         match self.aggregation_method:
             case 'avg':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in not_cols])
@@ -411,13 +401,13 @@ class Aggregation:
             self.aev_reducer = PCA(n_components=self.aev_pca_variance).fit(aev_data)
         pca_data = self.aev_reducer.transform(aev_data)
 
-        variance_data = pca_data.explained_variance_ratio_
+        variance_data = self.aev_reducer.explained_variance_ratio_
 
         self.df_measurements.drop(aev_col_names, axis=1, inplace=True)
         df_out = pd.DataFrame(pca_data)
         df_out = df_out.add_prefix('AEV_')
         self.df_measurements = pd.concat([self.df_measurements, df_out], axis=1)
-        print(f'>> PCA used {pca_data.n_components_} components to explain '
+        print(f'>> PCA used {self.aev_reducer.n_components_} components to explain '
               f'{variance_data.sum():.4f} of the variance. AEVs are now in reduced dimension '
               f'format.')
 
@@ -498,6 +488,8 @@ class Aggregation:
                     data[feature + '_sd'] = float(df_query[feature].std(ddof=0))
                     data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
                     data[feature + '_rand'] = df_query[feature].iloc[rand_row]
+
+            data['num_structures'] = len(df_query)
 
             df_stats = pd.concat([df_stats, pd.DataFrame([data])], ignore_index=True)
 

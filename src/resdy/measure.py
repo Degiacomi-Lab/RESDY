@@ -299,6 +299,19 @@ class Measure(object):
         return 'relaxed' if stem.endswith('_relaxed') else 'unrelaxed'
 
 
+    @staticmethod
+    def _check_struc_name(pdb_code, path):
+        '''
+        Method for checking if a desired PDB code matches to one of the files that have been found
+        in the directory. Will return True if a match is given.
+        '''
+        pdb_code = os.path.basename(str(pdb_code)).lower()
+        name = os.path.basename(path).lower()
+        stem = os.path.splitext(name)[0]
+
+        return pdb_code in (name, stem) or pdb_code == stem.split('-')[0]
+
+
     def _other_chain_distances(self, M):
         '''
         Distance from each residue of interest to the closest other protein chain, and which
@@ -552,12 +565,12 @@ class Measure(object):
 
 
     def measurement_settings(self):
-        """
+        '''
         Everything that decides what a measurement means: the settings each feature was
         constructed with, the residue measured, and the versions of RESDY and biobox.
 
         :rtype: dict
-        """
+        '''
         from . import __version__ as resdy_version
         return json.loads(json.dumps({
             'resdy_version': resdy_version,
@@ -569,20 +582,24 @@ class Measure(object):
         }, default=str))
 
     def _write_settings(self):
-        """Write :meth:`measurement_settings` to MEASURE_SETTINGS_FILE in the output directory."""
+        '''
+        Write :meth:`measurement_settings` to MEASURE_SETTINGS_FILE in the output directory.
+        '''
         with open(os.path.join(self.outdir, MEASURE_SETTINGS_FILE), 'w') as fh:
             json.dump(self.measurement_settings(), fh, indent=2)
 
     def _check_settings(self):
-        """
+        '''
         Refuse to continue a measurement with settings other than those it was started with,
         which would leave rows measured two different ways in one table.
 
         :raises ValueError: when MEASURE_SETTINGS_FILE exists and differs from the present
             settings.
-        """
+        '''
         path = os.path.join(self.outdir, MEASURE_SETTINGS_FILE)
         if not os.path.exists(path):
+            print(f'>> Could not find a given settings json file at location: '
+                  f'{path}, could not get previously used settings.')
             return
         with open(path) as fh:
             previous = json.load(fh)
@@ -1325,8 +1342,7 @@ class Measure(object):
         pdb_code = str(pdb_code)
         file_df_list = []
         for f in self.files_to_analyse:
-            if ((pdb_code.lower() != os.path.splitext(os.path.basename(f))[0].lower()) and
-                (pdb_code.lower() != os.path.basename(f).lower())):
+            if not self._check_struc_name(pdb_code, f):
                 continue
 
             if self.only_relaxed:

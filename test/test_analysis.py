@@ -119,9 +119,18 @@ class Test_Analysis(unittest.TestCase):
     def test_data_to_ml(self):
         X, y, metadata, feature_names, go_terms = self.A.data_to_ml(self.A.df, output_goterms=True)
         self.assertEqual(len(X), len(y))
-        self.assertTrue(np.assert_equal(X[['Uniprot_Entry', 'Resid']].values,
-                                        metadata[['Uniprot_Entry', 'Resid']].values))
-        self.assertEqual(set(X['Uniprot_Entry']), set(go_terms['Uniprot_Entry']))
+        self.assertEqual(set(feature_names), set(self.features_to_analyse))
+        unis_in_go_terms = []
+        for v in go_terms.values():
+            for u in v:
+                if u not in unis_in_go_terms:
+                    unis_in_go_terms.append(u)
+        self.assertEqual(set(metadata['Uniprot_Entry']), set(unis_in_go_terms))
+
+    def test_aggregate_data_proxy(self):
+        df_agg = self.A.aggregate_data(agg_type='minmaxavg', aev_red_method='pca')
+        self.assertTrue(any('_avg' in a for a in df_agg.columns))
+        self.assertEqual(len(df_agg), len(df_agg.drop_duplicates(subset=['Uniprot_Entry', 'Resid'])))
 
 
 if __name__ == "__main__":

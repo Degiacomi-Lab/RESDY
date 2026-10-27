@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 from .aggregation import Aggregation
 from .helper import METADATA_COLUMNS
 from .analysis import Analysis
+from .uniprot import Uniprot
 
 
 class Viewer(object):
@@ -32,7 +33,9 @@ class Viewer(object):
             on the size of the dataset in the plot. Can either be set to 'svg' or 'webgl' if user
             wants more custom control.
         :type str
-        :param suppress_unimportant_output: Toggleable option to 
+        :param suppress_unimportant_output: Toggleable option to restrict the printed output to the
+            terminal from the background processes
+        :type suppress_unimportant_output: bool
         '''
         if isinstance(df_measures, str):
             self.df_measures = pd.read_csv(df_measures)
@@ -124,10 +127,12 @@ class Viewer(object):
             self.Analysis = Analysis(df=self.df_scalar_measures,
                                     outdir=self.outdir,
                                     features_to_analyse=self.features)
-            self.Analysis.GO_get_data()
-            self.GO_codes = {k: f'{k}: {v}' for k,v in self.Analysis.code_to_name.items()}
+
+            self.U = Uniprot(outdir=self.outdir)
+            self.U.GO_get_data(uniprot=list(self.df_scalar_measures['Uniprot_Entry']))
+            self.GO_codes = {k: f'{k}: {v}' for k,v in self.U.code_to_name.items()}
             self.GO_codes_reverse = {v:k for k,v in self.GO_codes.items()}
-            self.GO_dict = self.Analysis.GO_dict
+            self.GO_dict = self.U.GO_dict
             self.GO_list = list(self.GO_codes.keys())
             self.GO_display_names = list(self.GO_codes.values())
 

@@ -1,4 +1,8 @@
+import os
 import re
+import threading
+import concurrent.futures
+import json
 import urllib.request
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -15,15 +19,24 @@ class Uniprot(object):
     structures associated to take onto the next step: protein.py.
     '''
 
-    def __init__(self):
+    def __init__(self, outdir='data'):
         '''
-        Initialise the Uniprot class. This class provides the methods to take a list of uniprot
+        Initialise the Uniprot class. This class provides the methods to take a list of UNIPROT
         codes and return a list of structures that can be extracted for use in the overall model.
+        
+        :param outdir: The name of the output directory. Note this is currently only used for the
+            GO term work here.
         '''
         columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
+        self.outdir = outdir
         pd.reset_option('display.max_rows')
         pd.set_option("display.max_columns", None)
+
+        self.GO_dict = {}  # code as the key
+        self.uniprot_to_GO = {}  # uniprot as key
+        self.name_to_code = {}
+        self.code_to_name = None
 
 
     def count_organism_proteins(self, code, reviewed_only=False):
@@ -278,6 +291,202 @@ class Uniprot(object):
         :type outname: str
         '''
         self.df.to_csv(outname, index_label=False, index=False)
+
+
+    def GO_search_term(self, df, code = '', name = ''):
+        '''
+        List the subset of UNIPROT codes associated with a GO Term.
+
+        :param df: Dataframe to get matches to GO term from
+        :type  df: pandas.DataFrame
+        :param code: Code of the Go term to analyse; format: 7 numbers only
+        :type code: str
+        :param name: Name corresponding to the GO term
+        :type name: str
+        '''
+        if not self.GO_dict:
+            print('>> No GO terms have been searched for and as such this would return '
+                  'nothing. Please call GO_get_data() on a list of uniprot entries and '
+                  'then recall this function as needed.')
+            return pd.DataFrame()
+
+        if code == '' and name == '':
+            return 'Insufficient input!'
+        elif code == '' and name != '':
+            code = self.name_to_code[name]
+        elif code != '' and name != '':
+            # check if they match
+            if code != self.name_to_code[name]:
+                return f'Unmatched GO term code and name, wrong input code {code}.'
+
+        uni_list = self.GO_dict.get(code)
+        df_out = pd.DataFrame()
+        for uni in uni_list:
+            cdf = df[df['Uniprot_Entry'] == uni]
+            df_out = pd.concat([df_out, cdf], ignore_index=True)
+
+        return df_out
+
+
+    def GO_search_protein(self, uniprot_entry):
+        '''
+        List all the GO Terms associated with a specific UNIPROT code based
+        on previous work done by calling GO_get_data() to extract all the information
+        on the dataframe for GO terms. If GO_get_data() has not been already called,
+        this function will call it before searching the GO dictionary to give a list
+        of GO terms associated.
+        
+        :param uniprot_code: The uniprot code of interest to do an API call on to get
+            the GO terms associated with this code.
+        :type uniprot_code: str
+        '''
+
+        if self.GO_dict == {}:
+            self.GO_get_data(uniprot=uniprot_entry)
+        GO_list = []
+        for code, uni_list in self.GO_dict.items():
+            if uniprot_entry in uni_list:
+                GO_list.append(code)
+        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list] if a is not None]
+        return GO_list
+
+
+    def _GO_get_data(self, uniprot_code, lock, index, total):
+        '''
+        Worker function of the self.GO_get_data method. This performs and API call to
+        the UNIPROT website to obtain the details of the GO codes associated with the
+        specific UNIPROT code of interest. After details have been found, it assigns the
+        GO terms to the GO_dict key with the GO term as the key and the UNIPROT code
+        in a list as the value. If already in the dict, it just adds the UNIPROT code to
+        the list associated. It also adds it into the mapping between the GO term and
+        the GO name associated.
+        
+        :param uniprot_code: The uniprot code of interest to do an API call on to get
+            the GO terms associated with this code.
+        :type uniprot_code: str
+        :param lock: Lock provided by the multithreading instance for adding data out to
+            the dicionaries
+        :type lock: multithreading process lock
+        :param index: Number of the protein to investigate in the dataframe
+        :type index: int
+        :param total: Total number of the proteins to investigate in the dataframe
+        :type total: int
+        '''
+
+        print(f'Searching for {index}/{total} protein.')
+        try:
+            url_2 = f'https://www.uniprot.org/uniprot/{uniprot_code}.txt'
+            with urllib.request.urlopen(url_2, timeout=10) as response:
+                html_2 = response.read().decode('utf-8')
+        except Exception as e:
+            print(f'Failed to obtain UNIPROT data for {uniprot_code}. {e}')
+
+        try:
+            for line in html_2.splitlines():
+                line = str(line)
+                find_go = re.findall('GO; GO', line)
+                if len(find_go) > 0:
+                    # GO; GO:0030089; C:phycobilisome; IEA:UniProtKB-KW.
+                    # GO; GO:0102834; F:1-18:1-2-16:0-monogalactosyldiacylglycerol acyl-lipid omega-6 desaturase activity; IEA:UniProtKB-EC.
+                    GO_code = line.split('; ')[1].split(':')[1]
+                    idx = line.split('; ')[2].index(':') + 1
+                    GO_word = line.split('; ')[2][idx:]
+                    with lock:
+                        if GO_code not in self.GO_dict.keys():
+                            self.GO_dict[GO_code] = [uniprot_code]
+                        else:
+                            self.GO_dict[GO_code].append(uniprot_code)
+
+                        if uniprot_code not in self.uniprot_to_GO.keys():
+                            self.uniprot_to_GO[uniprot_code] = [GO_code]
+                        else:
+                            self.uniprot_to_GO[uniprot_code].append(GO_code)
+
+                        if GO_word not in self.name_to_code.keys():
+                            self.name_to_code[GO_word] = GO_code
+
+        except Exception as e:
+            print(f'Error analysis GO data for Uniprot: {uniprot_code} with error: {e}')
+
+
+    def GO_get_data(self, uniprot):
+        '''
+        Go over the measures dataframe given as input and extract all possible GO terms
+        that have associated with the Uniprot codes within the dataframe. This calls a
+        worked function _GO_get_data iteratively to do this automatically and will create
+        class dictionaries for converting a GO code to a name and name to a GO code.
+        
+        :param uniprot: Input either a uniprot code or list of uniprot codes and then the
+            function will go through the codes and obtain the GO terms associated.
+        :type uniprot: str, list
+        '''
+
+        if isinstance(uniprot, str):
+            uniprot = [uniprot]
+        uniprot_codes = list(set(uniprot))
+        num = len(uniprot_codes)
+        locks = [threading.Lock()]*num
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.map(self._GO_get_data, uniprot_codes, locks, range(num), [num]*num)
+
+        self.code_to_name = {v: k for k, v in self.name_to_code.items()}
+
+
+    def save_GO_metadata(self, outname='GO_metadata.json'):
+        '''
+        Save the GO term metadata that has been extracted to a json file. This will save the
+        UNIPROT code to GO term data, which can be loaded in to use later on or loaded in here
+        to avoid searching across a full dataset again. It will also save the GO terms to GO
+        names dict to allow full recovery after
+        '''
+
+        if not self.GO_dict:
+            print('>> No UNIPROT codes have had GO terms extracted for and as such there is nothing'
+                  'to write to a file. Please collect some GO data before saving.')
+            return
+
+        metadata = {k: {'uniprot': self.GO_dict[k], 'name': self.code_to_name[k]}
+                    for k in self.GO_dict}
+        json_GO_metadata = json.loads(json.dumps(metadata, default=str))
+
+        with open(os.path.join(self.outdir, outname), 'w') as fh:
+                json.dump(json_GO_metadata, fh, indent=2)
+
+
+    def load_GO_metadata(self, metadata_name='GO_metadata.json'):
+        '''
+        Load the GO metadata saved from previous investigation into this. Will setup the two GO term
+        dictionaries for use, however will not setup the 
+        '''
+
+        GO_metadata_path = os.path.join(self.outdir, metadata_name)
+        if not os.path.exists(GO_metadata_path):
+            print(f'>> Path given to the GO metadata json file does not exist at location:'
+                  f'{GO_metadata_path}, could not read anything.')
+            return
+
+        with open(GO_metadata_path) as fh:
+            json_go_data = json.load(fh)
+
+        for GO_code in json_go_data.keys():
+            go_metadata = json_go_data[GO_code]
+            name = go_metadata['name']
+            uniprot = go_metadata['uniprot']
+            if isinstance(uniprot, str):
+                uniprot = [uniprot]
+
+            if GO_code not in self.GO_dict.keys():
+                self.GO_dict[GO_code] = uniprot
+            else:
+                for uni in uniprot:
+                    self.GO_dict[GO_code].append(uni)
+                self.GO_dict[GO_code] = list(set(self.GO_dict[GO_code]))
+
+            if GO_code not in self.code_to_name.keys():
+                self.code_to_name[GO_code] = name
+
+        self.name_to_code = {v:k for k,v in self.code_to_name.items()}
+
 
 
 if __name__ == "__main__":

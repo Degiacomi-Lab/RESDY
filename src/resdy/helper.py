@@ -16,7 +16,11 @@ MIN_BIOBOX_VERSION = (2, 0, 0)
 #: came from, and the metadata recorded beside the features.
 METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Resolution',
                     'Source', 'Modified', 'class', 'Class', 'PLDDT', 'Largest_Gap',
-                    'Min_Dist_Other_Chain')
+                    'Min_Dist_Other_Chain', 'num_structures')
+
+
+RESIDUE_KEY = ['Uniprot_Entry', 'Resid']
+RESIDUE_KEY_CHAIN = ['Uniprot_Entry', 'Chain', 'Resid']
 
 
 @contextlib.contextmanager
@@ -80,6 +84,21 @@ def get_download_tool():
 
     else:
         return None
+
+
+def sort_residue_key(df, include_chain=False):
+    '''
+    Sort out the key for aggregating the residues. Standard procedure for aggregating the residue
+    data is to only aggregate on UNIPROT code and resid id, however there may be times aggregating
+    by chain is well is necessary. This will return the key to aggregate on. 
+    '''
+    key = RESIDUE_KEY_CHAIN if include_chain else RESIDUE_KEY
+    if 'Uniprot_Entry' not in df.columns:
+        key = ['PDB_Code'] + [k for k in key if k != 'Uniprot_Entry']
+    return [k for k in key if k in df.columns]
+
+
+
 
 class ShutUp(object):
     def __enter__(self):

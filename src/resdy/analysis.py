@@ -1,20 +1,17 @@
 import os
 import re
-import urllib.request
-import threading
-import concurrent.futures
 import math
+import inspect
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from .aggregation import Aggregation
-from .helper import METADATA_COLUMNS
+from .uniprot import Uniprot
+from .helper import METADATA_COLUMNS, sort_residue_key
 from scipy.stats import fisher_exact
 
 
-NON_FEATURE_COLUMNS = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
-                       'Resid', 'Source', 'Min_Dist_Other_Chain']
 
 class Analysis(object):
     '''
@@ -75,7 +72,8 @@ class Analysis(object):
 
         self.outdir = outdir
         os.makedirs(outdir, exist_ok=True)
-        self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
+
+        self.res_key = sort_residue_key(df=self.df, include_chain=False)
 
 
     def get_data(self, uniprot_entry, resid):
@@ -104,120 +102,6 @@ class Analysis(object):
         '''
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
-
-
-    def GO_search_term(self, df, code = '', name = ''):
-        '''
-        List the subset of Uniprot codes associated with a GO Term.
-
-        :param df: Dataframe to get matches to GO term from
-        :type  df: pandas.DataFrame
-        :param code: Code of the Go term to analyse; format: 7 numbers only
-        :type code: str
-        :param name: Name corresponding to the GO term
-        :type name: str
-        '''
-        if code == '' and name == '':
-            return 'Insufficient input!'
-        elif code == '' and name != '':
-            code = self.name_to_code[name]
-        elif code != '' and name != '':
-            # check if they match
-            if code != self.name_to_code[name]:
-                return f'Unmatched GO term code and name, wrong input code {code}.'
-
-        uni_list = self.GO_dict.get(code)
-        df_out = pd.DataFrame()
-        for uni in uni_list:
-            cdf = df[df['Uniprot_Entry'] == uni]
-            df_out = pd.concat([df_out, cdf], ignore_index=True)
-
-        return df_out
-
-
-    def GO_search_protein(self, uniprot_entry):
-        '''
-        List all the GO Terms associated with a specific UNIPROT code based
-        on previous work done by calling GO_get_data() to extract all the information
-        on the dataframe for GO terms. If GO_get_data() has not been already called,
-        this function will call it before searching the GO dictonary to give a list
-        of GO terms associated.
-        
-        :param uniprot_code: The uniprot code of interest to do an API call on to get
-            the GO terms associated with this code.
-        :type uniprot_code: str
-        '''
-        if self.GO_dict == {}:
-            self.GO_get_data()
-        GO_list = []
-        for code, uni_list in self.GO_dict.items():
-            if uniprot_entry in uni_list:
-                GO_list.append(code)
-        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list] if a is not None]
-        return GO_list
-
-
-    def _GO_get_data(self, uniprot_code, lock, index, total):
-        '''
-        Worker function of the self.GO_get_data method.
-        
-        :param uniprot_code: The uniprot code of interest to do an API call on to get
-            the GO terms associated with this code.
-        :type uniprot_code: str
-        :param lock: Lock provided by the multithreading instance for adding data out to
-            the dicionaries
-        :type lock: multithreading process lock
-        :param index: Number of the protein to investigate in the dataframe
-        :type index: int
-        :param total: Total number of the proteins to investigate in the dataframe
-        :type total: int
-        '''
-
-        print(f'Searching for {index}/{total} protein.')
-        try:
-            url_2 = f'https://www.uniprot.org/uniprot/{uniprot_code}.txt'
-            with urllib.request.urlopen(url_2, timeout=10) as response:
-                html_2 = response.read().decode('utf-8')
-        except Exception as e:
-            print(f'Failed to obtain UNIPROT data for {uniprot_code}. {e}')
-
-        try:
-            for line in html_2.splitlines():
-                line = str(line)
-                find_go = re.findall('GO; GO', line)
-                if len(find_go) > 0:
-                    # GO; GO:0030089; C:phycobilisome; IEA:UniProtKB-KW.
-                    # GO; GO:0102834; F:1-18:1-2-16:0-monogalactosyldiacylglycerol acyl-lipid omega-6 desaturase activity; IEA:UniProtKB-EC.
-                    GO_code = line.split('; ')[1].split(':')[1]
-                    idx = line.split('; ')[2].index(':') + 1
-                    GO_word = line.split('; ')[2][idx:]
-                    with lock:
-                        if GO_code not in self.GO_dict.keys():
-                            self.GO_dict[GO_code] = [uniprot_code]
-                        else:
-                            self.GO_dict[GO_code].append(uniprot_code)
-
-                        if GO_word not in self.name_to_code.keys():
-                            self.name_to_code[GO_word] = GO_code
-
-        except Exception as e:
-            print(f'Error analysis GO data for Uniprot: {uniprot_code} with error: {e}')
-
-
-    def GO_get_data(self):
-        '''
-        Go over the measures dataframe given as input and extract all possible GO terms
-        that have associated with the Uniprot codes within the dataframe. This calls a
-        worked function _GO_get_data iteratively to do this automatically and will create
-        class dictionaries for converting a GO code to a name and name to a GO code.
-        '''
-        uniprot_codes = self.df['Uniprot_Entry'].unique()
-        num = len(uniprot_codes)
-        locks = [threading.Lock()]*num
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(self._GO_get_data, uniprot_codes, locks, range(num), [num]*num)
-
-        self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
 
     def plot_feature_histogram(self, plot_type='all', feature='', agg_type='', uniprot='',
@@ -955,8 +839,8 @@ class Analysis(object):
             for.
         :type features: list
 
-        :returns: Dataframe containing 1 row per lysine which has the relative best options based on
-            optimal values of features and weightings applied
+        :returns: Dataframe containing 1 row per residue of interest which has the relative best
+            options based on optimal values of features and weightings applied.
         :rtype: pandas.DataFrame
         '''
         # go over the weights to make sure the values are good and then matches the number of features
@@ -1010,7 +894,7 @@ class Analysis(object):
                 if pref == 'min': min_feats.append(feat)
                 elif pref == 'max': max_feats.append(feat)
 
-        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df_rb.groupby(self.lys_key):
+        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df_rb.groupby(self.res_key):
             if len(df_query) > 1:
                 df_query = df_query.reset_index(drop=True)
 
@@ -1083,8 +967,8 @@ class Analysis(object):
         :param reference: Reference list to use for comparisons. ADD MORE
         :type reference: list
         
-        :returns: Dataframe containing 1 row per lysine which has the relative best options based on
-            optimal values of features and weightings applied
+        :returns: Dataframe containing 1 row per residue of interest which has the relative best
+            options based on optimal values of features and weightings applied.
         :rtype: pandas.DataFrame
         '''
 
@@ -1195,6 +1079,36 @@ class Analysis(object):
         return df
 
 
+    def aggregate_data(self, agg_type='minmax', **kwargs):
+        '''
+        Perform aggregation on the measures dataset that has been passed to the aggregation
+        class. This calls the Aggregation class and performs the aggregation based on the
+        parameters passed to this function. The 3 main parameters are given as default options
+        here but any aggregation parameter can be passed as kwargs here. This sets the aggregated
+        dataframe in analysis df_agg to be the output of the dataframe and also returns it.
+        Unless otherwise set, features_to_include will be set to all features that are
+        present in the measurements dataframe.
+        '''
+        agg_init_params = inspect.signature(Aggregation.__init__)
+        agg_init_param_names = [a.name for a in agg_init_params.parameters.values()]
+
+        kwargs = {k:v for (k,v) in kwargs.items() if k in agg_init_param_names}
+
+        if 'features_to_include' not in list(kwargs):
+            kwargs['features_to_include'] = [a for a in self.df.columns if a not in METADATA_COLUMNS]
+
+        print(kwargs)
+
+        agg = Aggregation(df_measurements=self.df,
+                        outdir=self.outdir,
+                        aggregation_method=agg_type,
+                        **kwargs)
+        self.df_agg = agg.aggregate_data()
+
+        return self.df_agg
+
+
+
     def data_to_ml(self, df_in, output_goterms=False):
         '''
         Takes the data provided into the analysis class and prepares this into the format
@@ -1233,11 +1147,33 @@ class Analysis(object):
                   'data that is not aggregated may lead to inflated prediction metrics. Be careful'
                   'splitting data downstream in models.')
 
-        # GO terms method needs updating once GO terms moved to uniprot.py
-        if not self.GO_dict:
-            self.GO_get_data()
-        uniprots_present = list(df_in['Uniprot_Entry'])
-        go_terms = [a for a in self.GO_dict if a in uniprots_present]
+        if output_goterms:
+            UP = Uniprot(outdir=self.outdir)
+            UP.load_GO_metadata()
+            if not UP.GO_dict:
+                print('>> Re-running extraction of GO terms for the UNIPROT codes given in the '
+                      'input dataframe')
+                UP.GO_get_data(uniprot=list(df_in['Uniprot_Entry']))
+            uniprots_present = list(df_in['Uniprot_Entry'])
+            go_terms = {k:[b for b in v if b in uniprots_present] for k,v in UP.GO_dict.items() if
+                        any(a for a in UP.GO_dict[k] if a in uniprots_present)}
+
+        if 'class' in df_in.columns:
+            unq_classses = list(df_in['class'].unique())
+            if any(isinstance(a, str) for a in unq_classses):
+                name_to_num = {}
+                max_class_num = max([a for a in unq_classses if isinstance(a, int)])
+                if max_class_num < 2:
+                    max_class_num = 2  # avoid the preset classes of -1, 0, 1
+                for c in unq_classses:
+                    try:
+                        n_c = int(c)
+                        name_to_num[c] = n_c
+                    except Exception:
+                        next_c = max_class_num + 1
+                        name_to_num[c] = next_c
+                        max_class_num = next_c
+            df_in['class'] = df_in['class'].replace(name_to_num)
 
         metadata_cols = [a for a in df_in.columns if a in METADATA_COLUMNS]
         y = (df_in['class'].to_numpy(dtype=np.int8) if 'class' in df_in.columns else
@@ -1245,10 +1181,15 @@ class Analysis(object):
         meta_data = df_in[[a for a in metadata_cols if a != 'class']].reset_index(drop=True)
 
         X_all = df_in.drop(columns=metadata_cols)
+        unrequired_features = [c for c in X_all.columns if c not in self.features_to_analyse]
+        X_all = X_all.drop(columns=unrequired_features)
         feature_names = list(X_all.columns)
         X = X_all.to_numpy()
 
-        return X, y, meta_data, feature_names, go_terms
+        if output_goterms:
+            return X, y, meta_data, feature_names, go_terms
+        else:
+            return X, y, meta_data, feature_names
 
 
 if __name__ == '__main__':
