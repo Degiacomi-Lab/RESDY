@@ -897,7 +897,7 @@ class PDB(object):
         if not geometry:
             return
         record = dict(geometry)
-        record['file'] = os.path.basename(str(record.get('file', '')))
+        record['structure'] = os.path.splitext(os.path.basename(str(record.get('file', ''))))[0]
         path = os.path.join(self.outdir, 'curation_geometry.csv')
         try:
             with open(path, 'a', newline='') as fh:

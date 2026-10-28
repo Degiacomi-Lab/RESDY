@@ -1192,6 +1192,80 @@ class Analysis(object):
             return X, y, meta_data, feature_names
 
 
+    def collate_metadata(self, min_log='minimisation_log.csv',
+                          curation_geometry='curation_geometry.csv',
+                          assembly_log='assembly_log.csv',
+                          outname='collated_metadata.csv'):
+        '''
+        Produce a collated csv file which contains all the metadata alongside the measures data
+        that has been collated. Default parameters are set to the filenames which are used when
+        saving metadata or file outputs. Sets the resulting dataframe to the string given to
+        outname which is set to default as 'collated_metadata.csv'.
+
+        :param min_log: Name of the minimisation log file in the given outdir to the Analysis
+            class.
+        :type min_log: str
+        :param curation_geometry: Name of the curation geometry file in the given outdir to
+            the Analysis class.
+        :type curation_geometry: str
+        :param assembly_log: Name of the assembly log file in the given outdir to
+            the Analysis class.
+        :type assembly_log: str
+        :param outname: Name of the output file in the given outdir to the Analysis class to
+            write the new collated metatdata file to.
+        :type outname: str
+
+        :returns df_collated: Dataframe of the collated metadata
+        :rtype: Pandas DataFrame
+        '''
+
+        min_log_path = os.path.join(self.outdir, min_log)
+        cur_geom_path = os.path.join(self.outdir, curation_geometry)
+        ass_log_path = os.path.join(self.outdir, assembly_log)
+        out_path = os.path.join(self.outdir, outname)
+
+        df_collated = pd.DataFrame()
+
+        if not os.path.isfile(cur_geom_path):
+            print(f'>> No curation geometry csv file found at the location given: {cur_geom_path}, '
+                f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_cur_geom = pd.read_csv(cur_geom_path)
+            if df_collated.empty:
+                df_collated = df_cur_geom
+            else:
+                df_collated = df_collated.merge(df_cur_geom, how='outer', on='structure')
+
+        if not os.path.isfile(min_log_path):
+            print(f'>> No minimisation log csv file found at the location given: {min_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_min_log = pd.read_csv(min_log_path)
+            if df_collated.empty:
+                df_collated = df_min_log
+            else:
+                df_collated = df_collated.merge(df_min_log, how='outer', on='structure')
+
+        if not os.path.isfile(ass_log_path):
+            print(f'>> No assembly log csv file found at the location given: {ass_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_ass_log = pd.read_csv(ass_log_path)
+            if df_collated.empty:
+                df_collated = df_ass_log
+            else:
+                df_collated = df_collated.merge(df_ass_log, how='outer', on='structure')
+
+        if not df_collated.empty:
+            df_collated.to_csv(out_path)
+        else:
+            print('>> No meta data found at any of the locations given, nothing to collate into '
+                  'the collated metadata csv. File not written.')
+
+        return df_collated
+
+
+
 if __name__ == '__main__':
     df_test = pd.read_csv(f'data{os.sep}measures_CannData_all_12.05.25.csv')
     analysis = Analysis(df_test, outdir='result')

@@ -1,6 +1,7 @@
 import re
 import os
 import io
+import sys
 import copy
 import logging
 import datetime
@@ -16,14 +17,12 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from .helper import require_biobox, get_worker_lock
+from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children
 require_biobox(bb)
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains
 from .assembly import measured_chains
-
-
 
 #: File, in the output directory, that records the settings a measurement was made with.
 MEASURE_SETTINGS_FILE = 'measure_settings.json'
@@ -71,7 +70,7 @@ class Measure(object):
                                 'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
                  report_errors= True, only_relaxed=False, num_cores=0,
-                 parallel_timeout=600):
+                 parallel_timeout=600, big_protein_mode=False):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -163,6 +162,14 @@ class Measure(object):
             that are slow per structure, or set it to None to wait indefinitely. Ignored when
             not running in parallel.
         :type parallel_timeout: int, float, None
+        :param big_protein_mode: Toggleable option to help machines cope with measuring features
+            for many large proteins at the same time which would all need to be loaded into memory.
+            This feature separates out protein files by their size as reported into
+            curation_geometry.csv after protein curation through checking the number of atoms in
+            the system. More than 10,000 atoms will take the protein into a separate list and
+            this list will run in series after the parallel run over most proteins has been
+            completed.
+        :type big_protein_mode: bool
         '''
 
         self.activate_log = False
@@ -275,6 +282,14 @@ class Measure(object):
                     print(f'WARNING: {f} not found in folder {self.folder}')
                     f_not_found.append(f)
 
+        self.big_protein_mode = big_protein_mode
+        if not self.parallel or self.PDB_only == True:
+            self.big_protein_mode = False
+        if self.big_protein_mode:
+            self.prot_sizes = self._get_protein_sizes(cur_geom_filename='curation_geometry.csv')
+        else:
+            self.prot_sizes = {}
+
         self.run_ready = True
         if len(f_not_found) == len(pdb_code_list):
             print(f'No files given in the input dataframe matches to pdb files in {self.folder}, '
@@ -310,6 +325,29 @@ class Measure(object):
         stem = os.path.splitext(name)[0]
 
         return pdb_code in (name, stem) or pdb_code == stem.split('-')[0]
+
+
+    def _get_protein_sizes(self, cur_geom_filename='curation_geometry.csv'):
+        '''
+        Initial support function for enabling big protein mode where the size of a protein
+        structure will determine whether this will join in the parallel queue or will run
+        afterwards in a series queue.
+        '''
+        cur_geom_path = os.path.join(self.outdir, cur_geom_filename)
+
+        if os.path.isfile(cur_geom_path):
+            try:
+                df_cur_geom = pd.read_csv(cur_geom_path)
+                struc_to_atoms = pd.Series(df_cur_geom['n_atoms'], index=df_cur_geom['structure']).to_dict()
+            except Exception as e_s:
+                print(f'>> Failed to extract protein sizes from the curation geometry csv '
+                      f'file given. Please check the file. Error: {str(e_s)}')
+                struc_to_atoms = {}
+        else:
+            struc_to_atoms = {}
+
+        return struc_to_atoms
+
 
 
     def _other_chain_distances(self, M):
@@ -624,32 +662,34 @@ class Measure(object):
             print(f'No pdb files available for measurements, see earlier error.')
             return
 
-        self._write_settings()
-        match (self.PDB_only, self.parallel):
-            case (False, True) | (False, False):
-                # not PDB only and parallel or series:
-                self.measure_dataframe()
-            case (True, True) | (True, False):
-                # PDB only and parallel or series:
-                self.measure_PDB_only()
+        with mp_hide_main_from_children():
 
-        plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
-        if os.path.exists(plddt_record_path):
-            df_af_plddt = pd.read_csv(plddt_record_path).drop_duplicates(
-                subset=['PDB_Code', 'Chain', 'Resid'], keep='last')
-            self.df['_plddt_key'] = self.df['PDB_Code'].str.replace('_relaxed', '', regex=False)
-            df_af_plddt = df_af_plddt.rename(columns={'PDB_Code': '_plddt_key'})
-            self.df = self.df.merge(df_af_plddt, how='left', on=['_plddt_key', 'Chain', 'Resid'])
-            self.df = self.df.drop(columns='_plddt_key')
-            n_af = int(self.df['PDB_Code'].str.contains('AF-').sum())
-            if n_af and not int(self.df['PLDDT'].notna().sum()):
-                print(f'>> {n_af} AlphaFold rows were measured but none matched a PLDDT record '
-                      f'in the PLDDT record path given {plddt_record_path}')
-        else:
-            print(f'>> No PLDDT record file available at {plddt_record_path}, '
-                  f'no PLDDT column added to measurement dataframe')
+            self._write_settings()
+            match (self.PDB_only, self.parallel):
+                case (False, True) | (False, False):
+                    # not PDB only and parallel or series:
+                    self.measure_dataframe()
+                case (True, True) | (True, False):
+                    # PDB only and parallel or series:
+                    self.measure_PDB_only()
 
-        self._cleanup_calculation_files()
+            plddt_record_path = os.path.join(self.folder, 'AF_PLDDT_Output.csv')
+            if os.path.exists(plddt_record_path):
+                df_af_plddt = pd.read_csv(plddt_record_path).drop_duplicates(
+                    subset=['PDB_Code', 'Chain', 'Resid'], keep='last')
+                self.df['_plddt_key'] = self.df['PDB_Code'].str.replace('_relaxed', '', regex=False)
+                df_af_plddt = df_af_plddt.rename(columns={'PDB_Code': '_plddt_key'})
+                self.df = self.df.merge(df_af_plddt, how='left', on=['_plddt_key', 'Chain', 'Resid'])
+                self.df = self.df.drop(columns='_plddt_key')
+                n_af = int(self.df['PDB_Code'].str.contains('AF-').sum())
+                if n_af and not int(self.df['PLDDT'].notna().sum()):
+                    print(f'>> {n_af} AlphaFold rows were measured but none matched a PLDDT record '
+                        f'in the PLDDT record path given {plddt_record_path}')
+            else:
+                print(f'>> No PLDDT record file available at {plddt_record_path}, '
+                    f'no PLDDT column added to measurement dataframe')
+
+            self._cleanup_calculation_files()
 
 
     def restart_measure_data(self):
@@ -784,6 +824,8 @@ class Measure(object):
 
         with get_worker_lock(self.parallel, self._parallel_context()) as lock:
             items = []
+            small_items = []
+            big_items = []
             for i, r in self.df_input.iterrows():
                 pdb_code = r["PDB_Code"]
                 chains = r["Chains"]
@@ -795,6 +837,12 @@ class Measure(object):
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
+                if self.big_protein_mode:
+                    pdb_size = self.prot_sizes.get(pdb_code, 10)
+                    if pdb_size <= 10000:
+                        small_items.append(file_details)
+                    else:
+                        big_items.append(file_details)
                 items.append(file_details)
 
             tot_struc_to_measure = len(items)
@@ -812,9 +860,13 @@ class Measure(object):
                 if self.parallel:
                     ctx = self._parallel_context()
                     results = []
+                    if self.big_protein_mode:
+                        parallel_items = small_items.copy()
+                    else:
+                        parallel_items = items.copy()
                     with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
                         iterator = pool.imap(partial(self._measure_file, lock),
-                                                [tuple(item) for item in items], chunksize=1)
+                                            [tuple(item) for item in parallel_items], chunksize=1)
                         while True:
                             try:
                                 results.append(iterator.next(timeout=self.parallel_timeout))
@@ -830,6 +882,12 @@ class Measure(object):
                                     f'slow on these structures, or set parallel=False to measure in '
                                     f'series.') from None
                     df_parallel = pd.concat(results, ignore_index=True)
+
+                    if self.big_protein_mode:
+                        df_parallel_extra = pd.concat([self._measure_file(lock, file_dets) for file_dets in big_items],
+                                                ignore_index=True)
+                        df_parallel = pd.concat([df_parallel, df_parallel_extra], ignore_index=True)
+
                 else:
                     df_parallel = pd.concat([self._measure_file(lock, file_dets) for file_dets in items],
                                             ignore_index=True)
@@ -849,7 +907,7 @@ class Measure(object):
                 print('>> No measurements are registered, nothing to calculate')
 
             self.measures = cpu_measurements + gpu_measurements
-            # skip empty frames
+
             frames = [f for f in (self.df, df_parallel) if not f.empty]
             if frames:
                 self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
@@ -1743,6 +1801,7 @@ class Measure(object):
 
 
 if __name__ == "__main__":
+    mp.freeze_support()
 
     file_one = "Demo{os.sep}curated{os.sep}1M2E-alt-1.pdb"
 

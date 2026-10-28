@@ -14,6 +14,9 @@ class Test_Analysis(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
         shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        shutil.copyfile(os.path.join('demo', 'minimisation_log.csv'), os.path.join(self.outdir, 'minimisation_log.csv'))
+        shutil.copyfile(os.path.join('demo', 'curation_geometry.csv'), os.path.join(self.outdir, 'curation_geometry.csv'))
+        shutil.copyfile(os.path.join('demo', 'assembly_log.csv'), os.path.join(self.outdir, 'assembly_log.csv'))
         self.df_measures = f'{self.outdir}{os.sep}measures.csv'
         self.features_to_analyse = ['depth', 'sasa', 'propka', 'das', 'curvature']
         self.A = RD.Analysis(df=self.df_measures,
@@ -132,6 +135,10 @@ class Test_Analysis(unittest.TestCase):
         self.assertTrue(any('_avg' in a for a in df_agg.columns))
         self.assertEqual(len(df_agg), len(df_agg.drop_duplicates(subset=['Uniprot_Entry', 'Resid'])))
 
+    def test_collate_metadata(self):
+        df_collated = self.A.collate_metadata()
+        self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'collated_metadata.csv')))
+        self.assertTrue(set(['structure', 'biomolecule', 'inter_chain', 'openmm_version']).issubset(df_collated.columns))
 
 if __name__ == "__main__":
     unittest.main()

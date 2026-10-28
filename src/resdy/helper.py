@@ -45,6 +45,40 @@ def get_worker_lock(parallel, ctx=None):
         yield threading.Lock()
 
 
+@contextlib.contextmanager
+def mp_hide_main_from_children():
+    '''
+    In order for the get the multiprocessing context methods to work across all systems
+    and reduce the potential for freezing children, need to prevent all children from
+    re-importing the user's __main__. By doing this, gets around for placing the onus
+    of using freeze_support on the user. This does have a few small caveats here but
+    nothing that will affect the actual results coming out.
+    '''
+    _hide_lock = threading.RLock()
+    _saved_main = {}
+    _hide_depth = 0
+    main = sys.modules["__main__"]
+
+    with _hide_lock:
+        if _hide_depth == 0:
+            _saved_main["__file__"] = getattr(main, "__file__", None)
+            _saved_main["__spec__"] = getattr(main, "__spec__", None)
+            main.__file__ = None
+            main.__spec__ = None
+        _hide_depth += 1
+
+    try:
+        yield
+
+    finally:
+        with _hide_lock:
+            _hide_depth -= 1
+            if _hide_depth == 0:
+                if _saved_main["__file__"] is not None:
+                    main.__file__ = _saved_main["__file__"]
+                main.__spec__ = _saved_main["__spec__"]
+
+
 def require_biobox(biobox):
     '''
     Raise if the biobox given is older than :data:`MIN_BIOBOX_VERSION`. This ensures
@@ -108,3 +142,7 @@ class ShutUp(object):
     def __exit__(self, *args):
         sys.stdout.close()
         sys.stdout =  self._stdout
+
+
+if __name__ == '__main__':
+    mp.freeze_support()
