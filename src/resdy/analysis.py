@@ -894,7 +894,7 @@ class Analysis(object):
                 if pref == 'min': min_feats.append(feat)
                 elif pref == 'max': max_feats.append(feat)
 
-        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df_rb.groupby(self.res_key):
+        for _, df_query in df_rb.groupby(self.res_key):
             if len(df_query) > 1:
                 df_query = df_query.reset_index(drop=True)
 
@@ -1019,12 +1019,12 @@ class Analysis(object):
         feat_two, feat_two_low, feat_two_upper = str(feature_two[0]), float(feature_two[1]), float(feature_two[2])
         selected_df = self.df[(self.df[feat_one] >= feat_one_low) & (self.df[feat_one] <= feat_one_upper)]
         selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
-        uniprot_selected = selected_df['Uniprot_Entry'].unique()
-        uniprot_reference = self.df['Uniprot_Entry'].unique()
+        uniprot_selected = list(selected_df['Uniprot_Entry'].unique())
+        uniprot_reference = list(self.df['Uniprot_Entry'].unique())
 
-        if not self.GO_dict:
-            self.GO_get_data()
-        if not self.GO_dict:
+        UP = Uniprot(outdir=self.outdir)
+        UP.GO_get_data(uniprot=list(set(uniprot_selected + uniprot_reference)))
+        if not UP.GO_dict:
             raise RuntimeError('>> No GO annotation could be loaded for the set of Uniprot codes '
                                'provided in the table, no enrichment can be computed.')
 
@@ -1059,7 +1059,7 @@ class Analysis(object):
                                     'num in the region', 'num in the bkgd'])
         for data in out_dict.items():
             id = data[0]
-            term = self.code_to_name[id]
+            term = UP.code_to_name[id]
 
             r_p = round(data[1][0],6)
             fdr = round(data[1][1],6)

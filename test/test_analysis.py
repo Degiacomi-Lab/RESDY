@@ -56,12 +56,7 @@ class Test_Analysis(unittest.TestCase):
                                     write_new_file=False)
             self.assertEqual(len(self.A.df.drop_duplicates(subset=['Uniprot_Entry'])), 4)
 
-    def test_GO_analysis(self):
-        self.A.GO_get_data()
-        df_term = self.A.GO_search_term(df=pd.read_csv(self.df_measures),
-                                        code='0031982',
-                                        name='')
-        go_list = self.A.GO_search_protein(uniprot_entry='P02185')
+    def test_GO_enrichment(self):
         df_enrichment = self.A.enrichment_analysis(feature_one = ['propka', 7, 11],
                                                    feature_two = ['sasa', 0, 10],
                                                    uniprot_cnt_cutoff=1)

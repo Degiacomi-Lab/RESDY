@@ -70,7 +70,8 @@ class Measure(object):
                                 'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
                  report_errors= True, only_relaxed=False, num_cores=0,
-                 parallel_timeout=600, big_protein_mode=False):
+                 parallel_timeout=600, big_protein_mode=False, struc_dir='',
+                 cache_policy='auto'):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
         specific quantities for the protein structures given as input
@@ -170,6 +171,17 @@ class Measure(object):
             this list will run in series after the parallel run over most proteins has been
             completed.
         :type big_protein_mode: bool
+        :param struc_dir: If you are running multiple sets of measurements on the same set of
+            structures, you may wish to separate calculations into different folders. This allows
+            you to point to the folder containing the structures separate to the place you want
+            to save the measures data to. If this is left as '', then struc_dir will default
+            to the curated directory within outdir.
+        :type struc_dir: str
+        :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
+            this is available. Options for this include 'auto' - recreate if propka output older
+            than curated pdb file, 'always' - always run propka, 'never' - always take previous
+            run if it exists
+        :type cache_policy: str
         '''
 
         self.activate_log = False
@@ -190,7 +202,10 @@ class Measure(object):
         self.outdir = outdir
         os.makedirs(outdir, exist_ok=True)
         self.df_input = df_input
-        self.folder = os.path.join(outdir, "curated")
+        if struc_dir == '' or struc_dir is None:
+            self.folder = os.path.join(outdir, "curated")
+        else:
+            self.folder = struc_dir
         self.only_relaxed = only_relaxed
 
         self.include_mod = include_modified
@@ -289,6 +304,12 @@ class Measure(object):
             self.prot_sizes = self._get_protein_sizes(cur_geom_filename='curation_geometry.csv')
         else:
             self.prot_sizes = {}
+
+        self.cache_policy = cache_policy
+        if self.cache_policy not in ['auto', 'always', 'never']:
+            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+                    f'using default setting of auto instead.')
+            self.cache_policy = 'auto'
 
         self.run_ready = True
         if len(f_not_found) == len(pdb_code_list):
@@ -456,10 +477,13 @@ class Measure(object):
                         try:
                             tmp_name = m.lower()
                             kwargs = features_dict.get(m, {})
+
                             if tmp_name in ['propka', 'legolas'] or 'outdir' in list(kwargs):
                                 kwargs['outdir'] = self.outdir
                             if tmp_name == 'rmsf' and 'df_proteins' not in list(kwargs):
                                 kwargs['df_proteins'] = self.df_input
+                            if tmp_name in ['propka', 'legolas'] and 'cache_policy' not in list(kwargs):
+                                kwargs['cache_policy'] = self.cache_policy
 
                             meas_dict[tmp_name] = globals()[m.upper()](include_modified=self.include_mod,
                                                     error_filename=self.error_filename,
