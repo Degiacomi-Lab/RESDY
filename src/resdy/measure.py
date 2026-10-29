@@ -230,6 +230,12 @@ class Measure(object):
         if 'all' in self.features_dict:
             self.features_dict = {k: {} for k in ALL_FEATURES}
 
+        self.cache_policy = cache_policy
+        if self.cache_policy not in ['auto', 'always', 'never']:
+            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+                    f'using default setting of auto instead.')
+            self.cache_policy = 'auto'
+
         self.aa_properties = self._setup_aa_properties(residue_of_interest)
         self._setup_measures(self.features_dict.copy())
         pd.set_option("display.max_columns", None)
@@ -310,12 +316,6 @@ class Measure(object):
             self.prot_sizes = self._get_protein_sizes(cur_geom_filename='curation_geometry.csv')
         else:
             self.prot_sizes = {}
-
-        self.cache_policy = cache_policy
-        if self.cache_policy not in ['auto', 'always', 'never']:
-            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
-                    f'using default setting of auto instead.')
-            self.cache_policy = 'auto'
 
         self.run_ready = True
         if len(f_not_found) == len(pdb_code_list):
@@ -488,7 +488,7 @@ class Measure(object):
                                 kwargs['outdir'] = self.outdir
                             if tmp_name == 'rmsf' and 'df_proteins' not in list(kwargs):
                                 kwargs['df_proteins'] = self.df_input
-                            if tmp_name in ['propka', 'legolas'] and 'cache_policy' not in list(kwargs):
+                            if tmp_name in ['propka', 'legolas'] or 'cache_policy' in list(kwargs):
                                 kwargs['cache_policy'] = self.cache_policy
 
                             meas_dict[tmp_name] = globals()[m.upper()](include_modified=self.include_mod,
