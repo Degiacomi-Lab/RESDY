@@ -39,7 +39,8 @@ class Viewer(object):
         '''
         if isinstance(df_measures, str):
             self.df_measures = pd.read_csv(df_measures)
-        self.df_measures = df_measures.copy()
+        else:
+            self.df_measures = df_measures.copy()
 
         self.df_measures.columns.name = 'Feature'
         self.outdir = outdir

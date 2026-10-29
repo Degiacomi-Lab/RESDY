@@ -36,7 +36,7 @@ class Uniprot(object):
         self.GO_dict = {}  # code as the key
         self.uniprot_to_GO = {}  # uniprot as key
         self.name_to_code = {}
-        self.code_to_name = None
+        self.code_to_name = {}
 
 
     def count_organism_proteins(self, code, reviewed_only=False):

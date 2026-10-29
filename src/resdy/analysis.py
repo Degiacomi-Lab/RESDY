@@ -1028,8 +1028,10 @@ class Analysis(object):
             raise RuntimeError('>> No GO annotation could be loaded for the set of Uniprot codes '
                                'provided in the table, no enrichment can be computed.')
 
+        self.GO_dict, self.code_to_name = UP.GO_dict, UP.code_to_name
+
         # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
-        GO_bacgou = [code for code in list(self.GO_dict.keys()) if len(self.GO_dict[code]) >= uniprot_cnt_cutoff]
+        GO_bacgou = [code for code, unis in self.GO_dict.items() if len(unis) >= uniprot_cnt_cutoff]
 
         p_val_dict = {}
 
