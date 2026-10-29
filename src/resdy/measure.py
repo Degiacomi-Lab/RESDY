@@ -69,7 +69,7 @@ class Measure(object):
                  features_dict={'propka': {}, 'sasa': {}, 'aev': {}, 'das': {},
                                 'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
-                 report_errors= True, only_relaxed=False, num_cores=0,
+                 report_errors= True, only_relaxed=False, require_relaxed=False, num_cores=0,
                  parallel_timeout=600, big_protein_mode=False, struc_dir='',
                  cache_policy='auto'):
         '''
@@ -149,6 +149,11 @@ class Measure(object):
             if there is a relaxed structure available for the structure. If set to False, measures
             will be calculated to both original and relaxed form. Default is False.
         :type only_relaxed: bool
+        :param only_relaxed: Option to only calculate measurements for structures that are relaxed.
+            If there is not a relaxed structure available for this structure, this structures are
+            skipped. To allow a fallback using the non-relaxed structure, see only_relaxed parameter.
+            Default is False.
+        :type only_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
             available will be used. Otherwise it will try and use the number of cores given
@@ -207,6 +212,7 @@ class Measure(object):
         else:
             self.folder = struc_dir
         self.only_relaxed = only_relaxed
+        self.require_relaxed = require_relaxed
 
         self.include_mod = include_modified
 
@@ -640,6 +646,8 @@ class Measure(object):
             'residue_of_interest': self.aa_properties,
             'include_modified': self.include_mod,
             'only_relaxed': self.only_relaxed,
+            'require_relaxed': self.require_relaxed,
+            'cache_policy': self.cache_policy,
             'features': self.feature_settings,
         }, default=str))
 
@@ -982,6 +990,12 @@ class Measure(object):
                 if ('_relaxed' not in f and
                     os.path.exists(os.path.join(self.folder, f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
                     continue
+
+            if self.require_relaxed:
+                if '_relaxed' not in f:
+                    if not os.path.exists(os.path.join(self.folder,
+                                        f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb')):
+                        continue
 
             terminal_out_statements = []
             tstart = time.time()
@@ -1432,6 +1446,12 @@ class Measure(object):
                 if ('_relaxed' not in f and
                     os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb'))):
                     continue
+
+            if self.require_relaxed:
+                f_stem = os.path.splitext(os.path.basename(f))[0]
+                if '_relaxed' not in f:
+                    if not os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
+                        continue
 
             if f in self.pdb_only_files_to_ignore:
                 continue

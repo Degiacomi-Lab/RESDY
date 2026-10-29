@@ -1265,6 +1265,85 @@ class Analysis(object):
         return df_collated
 
 
+    def add_metadata_to_measures(self, measures='measures.csv',
+                                min_log='minimisation_log.csv',
+                                curation_geometry='curation_geometry.csv',
+                                assembly_log='assembly_log.csv',
+                                outname='measures_metadata.csv'):
+        '''
+        Go over all the csv files containing metadata and add all this data into a given measures
+        dataframe. It will look for all of these files in the same outdir which is given to the
+        class upon initialisation. Default parameters are set to the filenames which are used when
+        saving metadata or file outputs. Sets the resulting dataframe to the string given to
+        outname which is set to default as 'measures_metadata.csv'.
+
+        :param measures: Name of the measures csv file in the given outdir to the Analysis
+            class.
+        :type min_log: str
+        :param min_log: Name of the minimisation log file in the given outdir to the Analysis
+            class.
+        :type min_log: str
+        :param curation_geometry: Name of the curation geometry file in the given outdir to
+            the Analysis class.
+        :type curation_geometry: str
+        :param assembly_log: Name of the assembly log file in the given outdir to
+            the Analysis class.
+        :type assembly_log: str
+        :param outname: Name of the output file in the given outdir to the Analysis class to
+            write the new collated metatdata file to.
+        :type outname: str
+
+        :returns df_meas_meta: Dataframe of the measures csv with the extra metadata assigned
+        :rtype: Pandas DataFrame
+        '''
+
+        meas_path = os.path.join(self.outdir, measures)
+        min_log_path = os.path.join(self.outdir, min_log)
+        cur_geom_path = os.path.join(self.outdir, curation_geometry)
+        ass_log_path = os.path.join(self.outdir, assembly_log)
+        out_path = os.path.join(self.outdir, outname)
+
+        df_meas_meta = pd.DataFrame()
+
+        if not os.path.isfile(meas_path):
+            print(f'>> Could not find a measures.csv file at the given path: {meas_path}, please '
+                  f'check the outdir serring and the filename are correct on input.')
+            return df_meas_meta
+        
+        df_meas_meta = pd.read_csv(meas_path)
+
+        if not os.path.isfile(cur_geom_path):
+            print(f'>> No curation geometry csv file found at the location given: {cur_geom_path}, '
+                f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_cur_geom = pd.read_csv(cur_geom_path)
+            df_cur_geom = df_cur_geom.rename(columns={'structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(df_cur_geom, how='left', on='PDB_Code')
+
+        if not os.path.isfile(min_log_path):
+            print(f'>> No minimisation log csv file found at the location given: {min_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_min_log = pd.read_csv(min_log_path)
+            df_min_log = df_min_log.rename(columns={'structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(df_min_log, how='left', on='PDB_Code')
+
+        if not os.path.isfile(ass_log_path):
+            print(f'>> No assembly log csv file found at the location given: {ass_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_ass_log = pd.read_csv(ass_log_path)
+            df_ass_log = df_ass_log.rename(columns={'structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(df_ass_log, how='left', on='PDB_Code')
+
+        if not df_meas_meta.empty:
+            df_meas_meta.to_csv(out_path)
+        else:
+            print('>> No files found at any of the locations given, nothing to write. ')
+
+        return df_meas_meta
+
+
 
 if __name__ == '__main__':
     df_test = pd.read_csv(f'data{os.sep}measures_CannData_all_12.05.25.csv')

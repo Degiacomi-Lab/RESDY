@@ -135,5 +135,11 @@ class Test_Analysis(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'collated_metadata.csv')))
         self.assertTrue(set(['structure', 'biomolecule', 'inter_chain', 'openmm_version']).issubset(df_collated.columns))
 
+    def test_add_metadata_to_measures(self):
+        df_meas_meta = self.A.add_metadata_to_measures()
+        self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'measures_metadata.csv')))
+        self.assertTrue(set(['PDB_Code', 'biomolecule', 'inter_chain', 'openmm_version']).issubset(df_meas_meta.columns))
+
+
 if __name__ == "__main__":
     unittest.main()
