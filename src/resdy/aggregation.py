@@ -92,15 +92,15 @@ class Aggregation:
         :param aev_reducer: sklearn transformer to enable consistent reduction across sets if this
             is required in your pipeline, optional
         :type aev_reducer
-        :param source_pooling: There are 2 options for the 'source' column within the dataframe,
+        :param source_pooling: There are 2 options for the 'Source' column within the dataframe,
             either relaxed or not depending on if the structure was re-minimised within the
             curation of the dataset. This parameter deals with which should be included in the
             aggregation. There are 4 options:
                 1. 'together' (default) - include all measurements for the uniprot and resid code
                     together in the aggregation (minimised structures are effectively just another
                     conformer unless significant problems in original structure.)
-                2. 'seperate' - include all measurements in the aggregation but add source to the
-                    aggregation key to keep the data seperate.
+                2. 'separate' - include all measurements in the aggregation but add Source to the
+                    aggregation key to keep the data separate.
                 3. 'unrelaxed' - include only the unrelaxed structures and not the relaxed ones.
                 4. 'relaxed' - include only the relaxed structures and not the unrelaxed ones.
         :type source_pooling: str
@@ -153,7 +153,7 @@ class Aggregation:
 
         self.res_key = sort_residue_key(df=self.df_measurements, include_chain=include_chain)
 
-        pot_source_pool_vals = ['together', 'seperate', 'unrelaxed', 'relaxed']
+        pot_source_pool_vals = ['together', 'separate', 'unrelaxed', 'relaxed']
         if source_pooling not in pot_source_pool_vals:
             raise ValueError(f'>> Value given for the input parameter for source_pooling: '
                              f'{source_pooling} was not recognised, possible input values '
@@ -161,14 +161,15 @@ class Aggregation:
         self.source_pooling = source_pooling
         match self.source_pooling:
             case 'together':
-                print('>> All values of \'source\' column of data in the given measurements '
+                print('>> All values of \'Source\' column of data in the given measurements '
                       'dataframe are included together in the aggregation')
-            case 'seperate':
-                self.res_key.append('source')
-            case 'unrelaxed':
-                self.df_measurements = self.df_measurements[self.df_measurements['source'] == 'unrelaxed']
-            case 'relaxed':
-                self.df_measurements = self.df_measurements[self.df_measurements['source'] == 'relaxed']
+            case 'separate':
+                self.res_key.append('Source')
+            case 'unrelaxed' | 'relaxed':
+                self.df_measurements = self.df_measurements[
+                    self.df_measurements['Source'] == self.source_pooling]
+                if self.df_measurements.empty:
+                    raise ValueError(f'>> No {self.source_pooling} rows in the measurements')
 
         data_cols_entered = self.df_measurements.columns.values
         cols_required = [a for a in self.df_measurements.columns if a in self.res_key + ['PDB_Code', 'class']]

@@ -7,7 +7,7 @@ name = "resdy"
 version = "1.0"
 description = "Rapid featurisation of amino acids from collections of protein structures"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [
     { name = "G. Weston" },
