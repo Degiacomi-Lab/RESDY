@@ -138,6 +138,7 @@ double_letter_file_count.txt
 *_tmp.txt
 ubq_pred/
 *.pdb
+!demo/**/*.pdb
 
 # temp ignore to fix git commit problem
 graph_measures_carbamylation.ipynb

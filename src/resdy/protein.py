@@ -11,7 +11,6 @@ from functools import partial
 from contextlib import redirect_stdout
 import multiprocessing as mp
 from multiprocessing import cpu_count
-from multiprocessing import Manager
 from multiprocessing.pool import Pool
 from collections import OrderedDict
 import requests
@@ -19,12 +18,13 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox
+from .helper import require_biobox, get_worker_lock
 require_biobox(bb)
 from . import alphafold as af
 from . import patcher
 from . import assembly
 from .residues import AA_PRESETS
+from .geometry import check_geometry
 
 try:
     import openmm
@@ -36,7 +36,6 @@ try:
     from openmm.app.simulation import Simulation
     from openmm.unit import (nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin,
                              angstrom)
-    from pdbfixer import PDBFixer
     openmm_available = True
 except Exception as e:
     print('Could not import openmm modules for running minimisations, please ensure '
@@ -614,8 +613,7 @@ class PDB(object):
             print('>> Protein curation running in series')
             n_cores_to_use = 1
 
-        with Manager() as manager:
-            lock = manager.Lock()
+        with get_worker_lock(self.parallel) as lock:
             items = []
             for i, r in uniprot_df.iterrows():
                 try:
@@ -642,7 +640,9 @@ class PDB(object):
                                             [tuple(item) for item in items], chunksize=1)
                     while True:
                         try:
-                            results.append(iterator.next(timeout=self.parallel_timeout))
+                            result = iterator.next(timeout=self.parallel_timeout)
+                            if result is not None:
+                                results.append(result)
                         except StopIteration:
                             break
                         except mp.TimeoutError:
@@ -860,11 +860,12 @@ class PDB(object):
             try:
                 with redirect_stdout(clean_split_print_trap):
                     if not self.PDB_only:
-                        largest_gap = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
+                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
                                 'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
+                        data = data | align_dets
                     else:
-                        largest_gap = self.clean_and_split_pdb(pdb_code)
+                        largest_gap, _ = self.clean_and_split_pdb(pdb_code)
                         data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
             except Exception as e:
                 print_statements.append(clean_split_print_trap.getvalue())
@@ -896,7 +897,7 @@ class PDB(object):
         if not geometry:
             return
         record = dict(geometry)
-        record['file'] = os.path.basename(str(record.get('file', '')))
+        record['structure'] = os.path.splitext(os.path.basename(str(record.get('file', ''))))[0]
         path = os.path.join(self.outdir, 'curation_geometry.csv')
         try:
             with open(path, 'a', newline='') as fh:
@@ -986,6 +987,7 @@ class PDB(object):
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
         test_patch = False
         largest_gap = np.nan
+        align_details = {}
         for cnt, f in enumerate(files):
             mypath = os.path.split(f)[0]
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
@@ -1001,16 +1003,15 @@ class PDB(object):
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
 
-                self.add_missing_capping_atoms(pdb_path=f)
-
                 if not self.PDB_only:
                     try:
-                        self._align_resnum_uniprot(uniprot_code, fname, chains)
+                        align_details = self._align_resnum_uniprot(uniprot_code, fname, chains)
                     except Exception as e:
                         print(f'>> Renumbering skipped for conformer {cnt} with error: {str(e)}')
 
                 if self.biological_assembly:
                     self._build_assembly(fname, biomatrix, determined)
+                    self._record_geometry(check_geometry(fname)[0])
 
                 test_patch = True
 
@@ -1029,7 +1030,7 @@ class PDB(object):
         if not test_patch:
             raise Exception("Patching failed for all conformers")
 
-        return largest_gap
+        return largest_gap, align_details
 
 
     def _build_assembly(self, path, biomatrix, determined):
@@ -1189,7 +1190,6 @@ class PDB(object):
                            'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
                            'TYR': 'Y', 'VAL': 'V'}
         standard_resids_inv = {v: k for k, v in standard_resids.items()}
-        fasta_chains = {}
         uniprot_fasta = ''
         list_prev_mod_resids = {}
 
@@ -1653,18 +1653,28 @@ class PDB(object):
                 print(f'Failed alignment of pdb {pdb_code}, chain {chain}, with error: {str(e)}')
                 failed.append(chain)
 
-        # Write as many chains with correct numbering to new file as possible.
-        if len(failed) < len(chains):
+        correct_chains = [c for c in chains if c not in failed]
+
+        if correct_chains:
             M.write_pdb(pdb_code)
-            placed = [c for c in chains if c not in failed]
             print(f'>> Chains aligned to canonical uniprot sequence for pdb code: '
-                  f'{pdb_code} ({", ".join(map(str, placed))})')
+                  f'{pdb_code} ({", ".join(map(str, correct_chains))})')
             if failed:
                 print(f'>> Chains left with their original numbering: '
                       f'{", ".join(map(str, failed))}')
         else:
             print(f'>> Alignment failed for pdb: {pdb_code}, no chain could be placed in '
                   f'the canonical sequence; the file keeps its original numbering')
+
+        if not correct_chains:
+            numbering = 'author'
+        elif failed:
+            numbering = 'mixed'
+        else:
+            numbering = 'uniprot'
+
+        return {'Numbering': numbering,
+                'Chains_Author_Numbering': ','.join(map(str, failed))}
 
 
     def get_chain_replacement(self, pdb_code):
@@ -1871,31 +1881,6 @@ class PDB(object):
             print(f'Failed rewriting pdb file with error: {str(e)}')
 
 
-    def add_missing_capping_atoms(self, pdb_path):
-        '''
-        Some structures may miss capping heavy atoms at termini regions of proteins. Utilise openmm
-        pdbfixer to add these in.
-        
-        :param pdb_path: Path of pdb file to check
-        :type pdb_path: str
-        '''
-        fixer = PDBFixer(filename=pdb_path)
-        fixer.missingResidues = {}
-        fixer.findMissingAtoms()
-        ter_res = set()
-        for c in fixer.topology.chains():
-            res = list(c.residues())
-            if res:
-                ter_res.add(res[0])
-                ter_res.add(res[-1])
-        fixer.missingAtoms = {r: a for r, a in fixer.missingAtoms.items()
-                                if r in ter_res}
-        fixer.missingTerminals = {r: a for r, a in fixer.missingTerminals.items()
-                                if r in ter_res}
-        fixer.addMissingAtoms()
-        PDBFile.writeFile(fixer.topology, fixer.positions, open(pdb_path, 'w'))
-
-
     def apply_minimisation(self, pdb, max_iterations=None):
         '''
         Utilise openmm to apply an energy minimisation to relax the structure, by default
@@ -2023,11 +2008,14 @@ class PDB(object):
                                   on=['chain', 'resid', 'name'],
                                   validate='one_to_one'))
             if len(merged) != len(N.data):
-                raise Exception(f'Occupancy and B-factor restoration after minimisation failed for pdb: {pdb}, '
-                                f'Lengths before ({len(N.data)}) and length merged '
-                                f'({len(merged)}) are different.')
+                raise Exception(f'Occupancy and B-factor restoration after minimisation failed '
+                                f'for pdb: {pdb}, Lengths before ({len(N.data)}) and length '
+                                f'merged ({len(merged)}) are different.')
             N.data = merged
             N.write_pdb(relaxed_path)
+
+            relaxed_geometry, _ = check_geometry(relaxed_path)
+            self._record_geometry(relaxed_geometry)
 
             details = {'platform_used': simulation.context.getPlatform().getName(),
                        'energy_initial_kj_mol': energy_initial.value_in_unit(kilojoule_per_mole),
@@ -2037,6 +2025,14 @@ class PDB(object):
             self._write_minimisation_record(pdb, 'relaxed', settings=settings, **details)
             print(f'>> Finished minimising structure: {pdb}_relaxed.pdb '
                   f'(heavy atoms moved {heavy_rmsd:.2f} A rmsd)')
+
+            if not self.keep_all_curated:
+                print('>> Keep all curated set to False, removing curated structure as '
+                      'minimised version has been produced.')
+                try:
+                    os.remove(pdb_path)
+                except Exception as e:
+                    print('>> Failed to remove original curated structure, structure remains.')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')

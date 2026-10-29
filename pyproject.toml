@@ -34,6 +34,7 @@ notebook = ["jupyter", "ipywidgets", "nglview", "plotly"]
 propka = ["propka"]                 # the 'propka' feature
 legolas = ["python-dotenv"]         # the 'legolas' feature
 docs = ["sphinx", "sphinx-autoapi"]
+viewer = ["plotly", "dash", "statsmodels"]
 
 [project.urls]
 Homepage = "https://github.com/Degiacomi-Lab/RESDY"

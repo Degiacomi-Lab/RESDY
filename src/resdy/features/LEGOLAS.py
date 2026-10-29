@@ -17,7 +17,8 @@ class LEGOLAS():
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
                                 'atom_select_names_modified': ['NZ', 'N07']},
-                 error_filename = 'measure_errors.txt'):
+                 error_filename = 'measure_errors.txt',
+                 cache_policy='auto'):
         '''
         Initialise the legolas nmr calculation class
 
@@ -35,6 +36,11 @@ class LEGOLAS():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
+            this is available. Options for this include 'auto' - recreate if propka output older
+            than curated pdb file, 'always' - always run propka, 'never' - always take previous
+            run if it exists
+        :type cache_policy: str
         '''
 
         try:
@@ -74,6 +80,12 @@ class LEGOLAS():
         self.legolas_output_path = os.path.join(self.outdir, 'legolas')
         os.makedirs(self.legolas_output_path, exist_ok=True)
 
+        self.cache_policy = cache_policy
+        if self.cache_policy not in ['auto', 'always', 'never']:
+            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+                    f'using default setting of auto instead.')
+            self.cache_policy = 'auto'
+
 
     def calculate(self, path):
         '''
@@ -94,13 +106,21 @@ class LEGOLAS():
             M.import_pdb(path, include_hetatm=True)
 
             result_filename = os.path.join(self.legolas_output_path, path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv')
-            if os.path.exists(result_filename):
-                already_exists = True
-                print(f'Legolas: The file {result_filename} already exists, using this file')
-            else:
-                already_exists = False
+
+            match self.cache_policy:
+                case 'auto':
+                    reuse_legolas = (os.path.isfile(result_filename) and
+                                    os.path.getmtime(result_filename) >= os.path.getmtime(path))
+                case 'always':
+                    reuse_legolas = False
+                case 'never':
+                    if os.path.isfile(result_filename):
+                        reuse_legolas = True
+                    else:
+                        reuse_legolas = False
+
             modified_struc = False
-            if not already_exists:
+            if not reuse_legolas:
                 if 'HIE' in list(M.data['resname']):
                     print('modifying the structure to change HIE to HIS')
                     M.data.loc[M.data['resname'] == 'HIE', 'resname'] = 'HIS'
@@ -135,7 +155,7 @@ class LEGOLAS():
             else:
                 pdb_absolute_path = os.path.join(os.getcwd(), path)
                 result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'
-            if not already_exists:
+            if not reuse_legolas:
                 subprocess.run([sys.executable, self.legolas_prog, pdb_absolute_path, '-atype', 'N'], check=True)
             else:
                 result_filename = os.path.join(self.legolas_output_path, result_filename)
@@ -147,7 +167,7 @@ class LEGOLAS():
                                '15': 'SER', '16': 'THR', '17': 'TRP', '18': 'TYR', '19': 'VAL',
                                '20': 'HOH', '21': 'DOD'}
 
-            if not already_exists:
+            if not reuse_legolas:
                 os.remove(result_filename.split('.')[0] + '.parquet')
                 os.rename(result_filename, path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv')
                 result_filename = path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv'

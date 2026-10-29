@@ -3,7 +3,7 @@ import pandas as pd
 import importlib
 from .error_reporting import report_error_to_file
 
-import melodia_py as mel
+
 class STRUCTURE():
     '''
     Structural measurement values for structures.
@@ -88,9 +88,9 @@ class STRUCTURE():
         '''
         if self.mel is None:
             self._setup()
-        
+
         try:
-            melodia_results = mel.geometry_from_structure_file(path)
+            melodia_results = self.mel.geometry_from_structure_file(path)
             if isinstance(melodia_results, pd.Series):
                 melodia_results = melodia_results.to_frame().T
 

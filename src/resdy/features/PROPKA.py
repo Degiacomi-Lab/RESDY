@@ -29,7 +29,8 @@ class PROPKA():
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
                                 'atom_select_names_modified': ['NZ', 'N07']},
-                 error_filename = 'measure_errors.txt'):
+                 error_filename = 'measure_errors.txt',
+                 cache_policy='auto'):
         '''
         Setup the PKA class as required. Take input on which method to use and if to include
         modified structures.
@@ -49,6 +50,11 @@ class PROPKA():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
+            this is available. Options for this include 'auto' - recreate if propka output older
+            than curated pdb file, 'always' - always run propka, 'never' - always take previous
+            run if it exists
+        :type cache_policy: str
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
@@ -60,6 +66,11 @@ class PROPKA():
         self.pka_outdir = os.path.join(outdir, "propkaoutput")
         if not os.path.exists(self.pka_outdir):
             os.makedirs(self.pka_outdir)
+        self.cache_policy = cache_policy
+        if self.cache_policy not in ['auto', 'always', 'never']:
+            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+                  f'using default setting of auto instead.')
+            self.cache_policy = 'auto'
 
 
     def calculate(self, path):
@@ -106,8 +117,17 @@ class PROPKA():
         propka_write_output = f'{code_for_df}.pka'
         propka_exist_output = os.path.join(self.pka_outdir, (code_for_df + '.pka'))
 
-        reuse_propka = (os.path.isfile(propka_exist_output) and
-                        os.path.getmtime(propka_exist_output) >= os.path.getmtime(path))
+        match self.cache_policy:
+            case 'auto':
+                reuse_propka = (os.path.isfile(propka_exist_output) and
+                                os.path.getmtime(propka_exist_output) >= os.path.getmtime(path))
+            case 'always':
+                reuse_propka = False
+            case 'never':
+                if os.path.isfile(propka_exist_output):
+                    reuse_propka = True
+                else:
+                    reuse_propka = False
 
         if not reuse_propka:
             if os.path.isfile(propka_exist_output):

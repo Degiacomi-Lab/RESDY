@@ -101,10 +101,12 @@ def _residue_ordinals(d):
     resid = d['resid'].astype(int).to_numpy()
     ordinal = np.empty(len(d), dtype=int)
     seen = {}
+    counts = {}
     for pos, (c, r) in enumerate(zip(chain, resid)):
         key = (c, r)
         if key not in seen:
-            seen[key] = len([k for k in seen if k[0] == c])
+            seen[key] = counts.get(c, 0)
+            counts[c] = seen[key] + 1
         ordinal[pos] = seen[key]
     return ordinal
 

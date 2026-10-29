@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import pandas as pd
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
@@ -13,6 +14,9 @@ class Test_Analysis(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
         shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        shutil.copyfile(os.path.join('demo', 'minimisation_log.csv'), os.path.join(self.outdir, 'minimisation_log.csv'))
+        shutil.copyfile(os.path.join('demo', 'curation_geometry.csv'), os.path.join(self.outdir, 'curation_geometry.csv'))
+        shutil.copyfile(os.path.join('demo', 'assembly_log.csv'), os.path.join(self.outdir, 'assembly_log.csv'))
         self.df_measures = f'{self.outdir}{os.sep}measures.csv'
         self.features_to_analyse = ['depth', 'sasa', 'propka', 'das', 'curvature']
         self.A = RD.Analysis(df=self.df_measures,
@@ -52,12 +56,7 @@ class Test_Analysis(unittest.TestCase):
                                     write_new_file=False)
             self.assertEqual(len(self.A.df.drop_duplicates(subset=['Uniprot_Entry'])), 4)
 
-    def test_GO_analysis(self):
-        self.A.GO_get_data()
-        df_term = self.A.GO_search_term(df=pd.read_csv(self.df_measures),
-                                        code='0031982',
-                                        name='')
-        go_list = self.A.GO_search_protein(uniprot_entry='P02185')
+    def test_GO_enrichment(self):
         df_enrichment = self.A.enrichment_analysis(feature_one = ['propka', 7, 11],
                                                    feature_two = ['sasa', 0, 10],
                                                    uniprot_cnt_cutoff=1)
@@ -94,6 +93,52 @@ class Test_Analysis(unittest.TestCase):
                                     save_name='violin_all_features_all.svg',
                                     show_graph=False)
 
+    def test_class_labels(self):
+        if 'class' in self.A.df.columns:
+            self.A.df = self.A.df.drop('class')
+        label_df = pd.DataFrame({'Uniprot_Entry': ['P02185', 'P02185', 'P02185', 'P0CG48', 'P0CG48'],
+                                'Resid': [48, 79, 141, 27, 33]})
+        self.A.df = self.A.add_class_labels(self.A.df, label_df, label='1')
+        self.assertTrue('class' in self.A.df.columns)
+        self.assertEqual(len(self.A.df[self.A.df['class'] == '1'].drop_duplicates(subset=['Uniprot_Entry', 'Resid'])), 5)
+        self.assertTrue(np.array_equal(self.A.df.loc[self.A.df['class'] == '1', ['Uniprot_Entry', 'Resid']].drop_duplicates().values,
+                        label_df.drop(columns='class').values))
+
+        self.A.df = self.A.rename_class_label(self.A.df, '1', '2')
+        self.assertEqual(len(self.A.df[self.A.df['class'] == '2'].drop_duplicates(subset=['Uniprot_Entry', 'Resid'])), 5)
+        self.assertTrue(np.array_equal(self.A.df.loc[self.A.df['class'] == '2', ['Uniprot_Entry', 'Resid']].drop_duplicates().values,
+                        label_df.drop(columns='class').values))
+
+        self.A.df = self.A.remove_class_from_df(self.A.df, '2')
+        for i, r in label_df.iterrows():
+            self.assertEqual(len(self.A.df[(self.A.df['Uniprot_Entry'] == r['Uniprot_Entry']) &
+                                           (self.A.df['Uniprot_Entry'] == r['Resid'])]), 0)
+
+    def test_data_to_ml(self):
+        X, y, metadata, feature_names, go_terms = self.A.data_to_ml(self.A.df, output_goterms=True)
+        self.assertEqual(len(X), len(y))
+        self.assertEqual(set(feature_names), set(self.features_to_analyse))
+        unis_in_go_terms = []
+        for v in go_terms.values():
+            for u in v:
+                if u not in unis_in_go_terms:
+                    unis_in_go_terms.append(u)
+        self.assertEqual(set(metadata['Uniprot_Entry']), set(unis_in_go_terms))
+
+    def test_aggregate_data_proxy(self):
+        df_agg = self.A.aggregate_data(agg_type='minmaxavg', aev_red_method='pca')
+        self.assertTrue(any('_avg' in a for a in df_agg.columns))
+        self.assertEqual(len(df_agg), len(df_agg.drop_duplicates(subset=['Uniprot_Entry', 'Resid'])))
+
+    def test_collate_metadata(self):
+        df_collated = self.A.collate_metadata()
+        self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'collated_metadata.csv')))
+        self.assertTrue(set(['structure', 'biomolecule', 'inter_chain', 'openmm_version']).issubset(df_collated.columns))
+
+    def test_add_metadata_to_measures(self):
+        df_meas_meta = self.A.add_metadata_to_measures()
+        self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'measures_metadata.csv')))
+        self.assertTrue(set(['PDB_Code', 'biomolecule', 'inter_chain', 'openmm_version']).issubset(df_meas_meta.columns))
 
 
 if __name__ == "__main__":

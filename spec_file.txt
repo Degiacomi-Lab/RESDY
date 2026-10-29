@@ -3,8 +3,8 @@ channels:
   - conda-forge
   - salilab
 dependencies:
-  - python=3.12
-  - pip
+  - python==3.12.16
+  - pip>=26.2.2
   - biobox>=2.0
   - biopython
   - numpy
@@ -19,7 +19,6 @@ dependencies:
   - pytorch
   - torchani
   - openmm
-  - pdbfixer
   - msms
   - mdtraj
   - nglview

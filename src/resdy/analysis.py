@@ -1,20 +1,17 @@
 import os
 import re
-import urllib.request
-import threading
-import concurrent.futures
 import math
+import inspect
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from .aggregation import Aggregation
-from .helper import METADATA_COLUMNS
+from .uniprot import Uniprot
+from .helper import METADATA_COLUMNS, sort_residue_key
 from scipy.stats import fisher_exact
 
 
-NON_FEATURE_COLUMNS = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
-                       'Resid', 'Source', 'Min_Dist_Other_Chain']
 
 class Analysis(object):
     '''
@@ -75,7 +72,8 @@ class Analysis(object):
 
         self.outdir = outdir
         os.makedirs(outdir, exist_ok=True)
-        self.lys_key = ['Uniprot_Entry', 'Chain', 'Resid']
+
+        self.res_key = sort_residue_key(df=self.df, include_chain=False)
 
 
     def get_data(self, uniprot_entry, resid):
@@ -104,120 +102,6 @@ class Analysis(object):
         '''
         df_query = self.df[self.df['Method'] == 'Predicted']
         return df_query
-
-
-    def GO_search_term(self, df, code = '', name = ''):
-        '''
-        List the subset of Uniprot codes associated with a GO Term.
-
-        :param df: Dataframe to get matches to GO term from
-        :type  df: pandas.DataFrame
-        :param code: Code of the Go term to analyse; format: 7 numbers only
-        :type code: str
-        :param name: Name corresponding to the GO term
-        :type name: str
-        '''
-        if code == '' and name == '':
-            return 'Insufficient input!'
-        elif code == '' and name != '':
-            code = self.name_to_code[name]
-        elif code != '' and name != '':
-            # check if they match
-            if code != self.name_to_code[name]:
-                return f'Unmatched GO term code and name, wrong input code {code}.'
-
-        uni_list = self.GO_dict.get(code)
-        df_out = pd.DataFrame()
-        for uni in uni_list:
-            cdf = df[df['Uniprot_Entry'] == uni]
-            df_out = pd.concat([df_out, cdf], ignore_index=True)
-
-        return df_out
-
-
-    def GO_search_protein(self, uniprot_entry):
-        '''
-        List all the GO Terms associated with a specific UNIPROT code based
-        on previous work done by calling GO_get_data() to extract all the information
-        on the dataframe for GO terms. If GO_get_data() has not been already called,
-        this function will call it before searching the GO dictonary to give a list
-        of GO terms associated.
-        
-        :param uniprot_code: The uniprot code of interest to do an API call on to get
-            the GO terms associated with this code.
-        :type uniprot_code: str
-        '''
-        if self.GO_dict == {}:
-            self.GO_get_data()
-        GO_list = []
-        for code, uni_list in self.GO_dict.items():
-            if uniprot_entry in uni_list:
-                GO_list.append(code)
-        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list] if a is not None]
-        return GO_list
-
-
-    def _GO_get_data(self, uniprot_code, lock, index, total):
-        '''
-        Worker function of the self.GO_get_data method.
-        
-        :param uniprot_code: The uniprot code of interest to do an API call on to get
-            the GO terms associated with this code.
-        :type uniprot_code: str
-        :param lock: Lock provided by the multithreading instance for adding data out to
-            the dicionaries
-        :type lock: multithreading process lock
-        :param index: Number of the protein to investigate in the dataframe
-        :type index: int
-        :param total: Total number of the proteins to investigate in the dataframe
-        :type total: int
-        '''
-
-        print(f'Searching for {index}/{total} protein.')
-        try:
-            url_2 = f'https://www.uniprot.org/uniprot/{uniprot_code}.txt'
-            with urllib.request.urlopen(url_2, timeout=10) as response:
-                html_2 = response.read().decode('utf-8')
-        except Exception as e:
-            print(f'Failed to obtain UNIPROT data for {uniprot_code}. {e}')
-
-        try:
-            for line in html_2.splitlines():
-                line = str(line)
-                find_go = re.findall('GO; GO', line)
-                if len(find_go) > 0:
-                    # GO; GO:0030089; C:phycobilisome; IEA:UniProtKB-KW.
-                    # GO; GO:0102834; F:1-18:1-2-16:0-monogalactosyldiacylglycerol acyl-lipid omega-6 desaturase activity; IEA:UniProtKB-EC.
-                    GO_code = line.split('; ')[1].split(':')[1]
-                    idx = line.split('; ')[2].index(':') + 1
-                    GO_word = line.split('; ')[2][idx:]
-                    with lock:
-                        if GO_code not in self.GO_dict.keys():
-                            self.GO_dict[GO_code] = [uniprot_code]
-                        else:
-                            self.GO_dict[GO_code].append(uniprot_code)
-
-                        if GO_word not in self.name_to_code.keys():
-                            self.name_to_code[GO_word] = GO_code
-
-        except Exception as e:
-            print(f'Error analysis GO data for Uniprot: {uniprot_code} with error: {e}')
-
-
-    def GO_get_data(self):
-        '''
-        Go over the measures dataframe given as input and extract all possible GO terms
-        that have associated with the Uniprot codes within the dataframe. This calls a
-        worked function _GO_get_data iteratively to do this automatically and will create
-        class dictionaries for converting a GO code to a name and name to a GO code.
-        '''
-        uniprot_codes = self.df['Uniprot_Entry'].unique()
-        num = len(uniprot_codes)
-        locks = [threading.Lock()]*num
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(self._GO_get_data, uniprot_codes, locks, range(num), [num]*num)
-
-        self.code_to_name = {v: k for k, v in self.name_to_code.items()}
 
 
     def plot_feature_histogram(self, plot_type='all', feature='', agg_type='', uniprot='',
@@ -824,7 +708,7 @@ class Analysis(object):
             print(f"Extracting data for: {uniprot}")
 
             desired_residues = list(df_req_res.loc[df_req_res["Uniprot_Entry"] == uniprot, "Resid"].drop_duplicates())
-            search_uniprot = df_working.loc[self.df["Uniprot_Entry"] == uniprot.strip(), ["Uniprot_Entry", "Resid"]]
+            search_uniprot = df_working.loc[df_working["Uniprot_Entry"] == uniprot.strip(), ["Uniprot_Entry", "Resid"]]
             all_search_rows = search_uniprot.index.tolist()
             wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
             not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
@@ -841,18 +725,23 @@ class Analysis(object):
         return df_working
 
 
-    def add_class_labels(self, df_class_set, label='1'):
+    def add_class_labels(self, df, df_class_set, label='1', unlisted='-1'):
         '''
         Add class labels to a measurements dataframe given an input dataframe of the combinations
         of Uniprot and Residue number you would like to mark. Note to save a new csv file post,
         you will need to call ``save_state`` again.
 
+        :param df: Dataframe of measurements to add the class label to
+        :type df: Pandas DataFrame
         :param df_class_set: Dataframe containing columns 'Uniprot_Entry' and 'Resid' for which
             you would like measurements in the measurements dataframe to assign the class label to.
             This will look for the dataframe in the output directory.
         :type df_class_set: Pandas DataFrame
         :param label: Label to apply to the specific sites given. Default is 1.
         :type label: str
+        :param unlisted: Label to apply to any sites that aren't given if a class columns is not
+            already present or there are NaN values in the 'class' column. Default is -1.
+        :type unlisted: str
 
         :returns: Measurements dataframe with a class column attached
         :rtype: Pandas DataFrame
@@ -865,29 +754,83 @@ class Analysis(object):
                 raise NameError(f'>> No file available for class labels at the location given '
                                 f'{df_class_set}, please check the file name is correct.')
 
+        if not isinstance(label, str):
+            label = str(label)
+        if not isinstance(unlisted, str):
+            unlisted = str(unlisted)
+
         df_class_set['class'] = label
 
-        if 'class' in self.df.columns:
-            print('Values for class are already present in the measurements dataframe, overwriting.')
-            df_class_set = df_class_set.rename(columns={'class': 'new_class'})
-            df_labelled = self.df.join(df_class_set, on=['Uniprot_Entry', 'Resid'])
-            df_labelled['class'] = [orig if new == np.nan else new for orig, new in zip(list(df_labelled['class']), list(df_labelled['new_class']))]
-            df_labelled = df_labelled.drop(columns='new_class')
-        else:
-            print('No previous class assignment found, class column will be created and the label '
-                  '0 will be given to anything that is not in the desired class')
-            df_labelled = self.df.join(df_class_set, on=['Uniprot_Entry', 'Resid'])
-            df_labelled['class'] = df_labelled['class'].fillna('0')
+        sites_to_label = df_class_set[['Uniprot_Entry', 'Resid']].drop_duplicates().copy()
+        sites_to_label['_required'] = True
+        df = df.merge(sites_to_label, on=['Uniprot_Entry', 'Resid'], how='left')
+        df_sites_required = df.pop('_required').eq(True).to_numpy()
 
-        self.df = df_labelled
-        return self.df
+        if 'class' in df.columns:
+            print('Values for class are already present in the measurements dataframe, overwriting.')
+            current_class_col = df['class']
+        else:
+            print(f'No previous class assignment found, class column will be created and the label '
+                f'{unlisted} will be given to anything that is not in the desired class')
+            current_class_col = pd.Series(np.nan, index=df.index)
+
+        df['class'] = np.where(df_sites_required,
+                               label,
+                               current_class_col.fillna(unlisted))
+
+        return df
+
+
+    def rename_class_label(self, df, old_label, new_label):
+        '''
+        Renames a class label in the dataframe through finding all instances of the variable
+        given in 'old_label' and replacing it with 'new_label'
+
+        :param df: Dataframe to rename a class label in
+        :param old_label: the name of the label to replace in the measurements dataframe
+        '''
+        if 'class' not in df.columns:
+            print('>> class column not found in the given dataframe, call add_class_label()'
+                  'to create one with a subset of the data or assign one manually.')
+            return
+
+        if old_label not in df['class'].unique():
+            print(f'>> old label given: {old_label}, was not found in the \'class\' column,'
+                  f'nothing to rename.')
+            return
+
+        if not isinstance(old_label, str):
+            old_label = str(old_label)
+        if not isinstance(new_label, str):
+            new_label = str(new_label)
+
+        df.loc[df['class'] == old_label, 'class'] = new_label
+        return df
+
+
+    def remove_class_from_df(self, df, class_label):
+        '''
+        Function to delete any measurements in the measurement dataframe which are assigned to a
+        given class. This will remove the rows altogether from the dataframe. To write a new
+        class lable over a set of values, 
+        '''
+        if not isinstance(class_label, str):
+            class_label = str(class_label)
+
+        if class_label not in df['class'].unique():
+            print(f'>> old label given: {class_label}, was not found in the \'class\' column,'
+                    f'nothing to remove.')
+            return
+
+        df = df[df['class'] != class_label]
+        return df
 
 
     def relative_best(self, weights, features=['depth']):
         '''
-        Function to extract the best relative list of features for all combinations of uniprot entry
-        and residues based on a given list of metrics to do the calculation over and the desired
-        weightings for each of those features.
+        Function to extract the best relative list of features for all combinations of uniprot
+        entry and residues based on a given list of metrics to do the calculation over and the
+        desired weightings for each of those features.
 
         :param weights: List of floats which sum to 1 of the weights for each of the given features.
             Length should match the list of features given
@@ -896,8 +839,8 @@ class Analysis(object):
             for.
         :type features: list
 
-        :returns: Dataframe containing 1 row per lysine which has the relative best options based on
-            optimal values of features and weightings applied
+        :returns: Dataframe containing 1 row per residue of interest which has the relative best
+            options based on optimal values of features and weightings applied.
         :rtype: pandas.DataFrame
         '''
         # go over the weights to make sure the values are good and then matches the number of features
@@ -951,7 +894,7 @@ class Analysis(object):
                 if pref == 'min': min_feats.append(feat)
                 elif pref == 'max': max_feats.append(feat)
 
-        for (uniprot_tmp, chain_tmp, resid_tmp), df_query in df_rb.groupby(self.lys_key):
+        for _, df_query in df_rb.groupby(self.res_key):
             if len(df_query) > 1:
                 df_query = df_query.reset_index(drop=True)
 
@@ -1024,8 +967,8 @@ class Analysis(object):
         :param reference: Reference list to use for comparisons. ADD MORE
         :type reference: list
         
-        :returns: Dataframe containing 1 row per lysine which has the relative best options based on
-            optimal values of features and weightings applied
+        :returns: Dataframe containing 1 row per residue of interest which has the relative best
+            options based on optimal values of features and weightings applied.
         :rtype: pandas.DataFrame
         '''
 
@@ -1047,7 +990,8 @@ class Analysis(object):
         return table
 
 
-    def enrichment_analysis(self, feature_one = ['propka', 7, 11], feature_two = ['sasa', 0, 10], uniprot_cnt_cutoff=1):
+    def enrichment_analysis(self, feature_one = ['propka', 7, 11],
+                            feature_two = ['sasa', 0, 10], uniprot_cnt_cutoff=1):
         '''
         Analyse prevalence of GO-terms in sub-regions of the SASA vs pKa graph
 
@@ -1075,8 +1019,14 @@ class Analysis(object):
         feat_two, feat_two_low, feat_two_upper = str(feature_two[0]), float(feature_two[1]), float(feature_two[2])
         selected_df = self.df[(self.df[feat_one] >= feat_one_low) & (self.df[feat_one] <= feat_one_upper)]
         selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
-        uniprot_selected = selected_df['Uniprot_Entry'].unique()
-        uniprot_reference = self.df['Uniprot_Entry'].unique()
+        uniprot_selected = list(selected_df['Uniprot_Entry'].unique())
+        uniprot_reference = list(self.df['Uniprot_Entry'].unique())
+
+        UP = Uniprot(outdir=self.outdir)
+        UP.GO_get_data(uniprot=list(set(uniprot_selected + uniprot_reference)))
+        if not UP.GO_dict:
+            raise RuntimeError('>> No GO annotation could be loaded for the set of Uniprot codes '
+                               'provided in the table, no enrichment can be computed.')
 
         # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
         GO_bacgou = [code for code in list(self.GO_dict.keys()) if len(self.GO_dict[code]) >= uniprot_cnt_cutoff]
@@ -1109,7 +1059,7 @@ class Analysis(object):
                                     'num in the region', 'num in the bkgd'])
         for data in out_dict.items():
             id = data[0]
-            term = self.code_to_name[id]
+            term = UP.code_to_name[id]
 
             r_p = round(data[1][0],6)
             fdr = round(data[1][1],6)
@@ -1129,42 +1079,270 @@ class Analysis(object):
         return df
 
 
-    def df_to_numpy(self):
+    def aggregate_data(self, agg_type='minmax', **kwargs):
         '''
-        Convert the dataframe into a numpy array ready for transfer into a ML model.
-        This checks that the dataframe given is aggregated before doing this. Training ML
-        models on un-aggregated data will give false results.
+        Perform aggregation on the measures dataset that has been passed to the aggregation
+        class. This calls the Aggregation class and performs the aggregation based on the
+        parameters passed to this function. The 3 main parameters are given as default options
+        here but any aggregation parameter can be passed as kwargs here. This sets the aggregated
+        dataframe in analysis df_agg to be the output of the dataframe and also returns it.
+        Unless otherwise set, features_to_include will be set to all features that are
+        present in the measurements dataframe.
+        '''
+        agg_init_params = inspect.signature(Aggregation.__init__)
+        agg_init_param_names = [a.name for a in agg_init_params.parameters.values()]
+
+        kwargs = {k:v for (k,v) in kwargs.items() if k in agg_init_param_names}
+
+        if 'features_to_include' not in list(kwargs):
+            kwargs['features_to_include'] = [a for a in self.df.columns if a not in METADATA_COLUMNS]
+
+        print(kwargs)
+
+        agg = Aggregation(df_measurements=self.df,
+                        outdir=self.outdir,
+                        aggregation_method=agg_type,
+                        **kwargs)
+        self.df_agg = agg.aggregate_data()
+
+        return self.df_agg
+
+
+
+    def data_to_ml(self, df_in, output_goterms=False):
+        '''
+        Takes the data provided into the analysis class and prepares this into the format
+        required for training an ML model on it. This will return 3 different arrays:
+        1. numpy array of the feature data from the given dataframe to the analysis class
+        2. class array corresponding to the data array, if a class column is present within
+            the dataframe, this is used, otherwise set to -1. Class labels can be set with
+            function add_class_label()
+        3. meta data array listing the corresponding data on Uniprot_Entry, Resid, Resname
+            and the number of structures associated with the aggregated data
+        4. optional json file linking the uniprot codes that are present in the dataset
+            to the GO terms that are associated with this.
+
+        WARNING: while this function will return ML ready arrays from whatever is given as
+        input, if the dataframe is not aggregated it may lead to artificially inflated
+        performance across trained models due to data leakage. You should be careful how you
+        split the data downstream.
+        
+        :param df_in: The input dataframe of measurements either aggregated already or not
+        :type df_in: Pandas DataFrame
+        :param output_goterms: Toggleable option to make the codebase dump the GO terms
+            associated with the Uniprot codes provided in the dataframe. Default is False,
+            set to True to get a json file for this.
+        :type output_goterms: bool
 
         :returns (agg_df_np, y): Numpy array containing all the feature data for the set, y
             numpy array containing the corresponding class labels for the set, if a 'class'
             column was not provided it sets these all to -1.
         :rtype: numpy arrays
         '''
-        len_dropduplicates_df = len(self.df.drop_duplicates(subset=[['Uniprot_Entry', 'Resid']]))
+        key = ['Uniprot_Entry', 'Resid']
 
-        if len(self.df) != len_dropduplicates_df:
+        data_aggregated_bool = not df_in.duplicated(subset=key).any()
+        if not data_aggregated_bool:
             print('>> Data to convert to numpy array is not aggregated. Training ML models on '
-                  'data that is not aggregated will produce inflated prediction metrics. '
-                  'Aggregating data on default methods.')
-            agg = Aggregation(df_measurements=self.df,
-                                outdir=self.outdir,
-                            aggregation_method='all')
-            agg_df = agg.aggregate_data()
+                  'data that is not aggregated may lead to inflated prediction metrics. Be careful'
+                  'splitting data downstream in models.')
+
+        if output_goterms:
+            UP = Uniprot(outdir=self.outdir)
+            UP.load_GO_metadata()
+            if not UP.GO_dict:
+                print('>> Re-running extraction of GO terms for the UNIPROT codes given in the '
+                      'input dataframe')
+                UP.GO_get_data(uniprot=list(df_in['Uniprot_Entry']))
+            uniprots_present = list(df_in['Uniprot_Entry'])
+            go_terms = {k:[b for b in v if b in uniprots_present] for k,v in UP.GO_dict.items() if
+                        any(a for a in UP.GO_dict[k] if a in uniprots_present)}
+
+        if 'class' in df_in.columns:
+            unq_classses = list(df_in['class'].unique())
+            if any(isinstance(a, str) for a in unq_classses):
+                name_to_num = {}
+                max_class_num = max([a for a in unq_classses if isinstance(a, int)])
+                if max_class_num < 2:
+                    max_class_num = 2  # avoid the preset classes of -1, 0, 1
+                for c in unq_classses:
+                    try:
+                        n_c = int(c)
+                        name_to_num[c] = n_c
+                    except Exception:
+                        next_c = max_class_num + 1
+                        name_to_num[c] = next_c
+                        max_class_num = next_c
+            df_in['class'] = df_in['class'].replace(name_to_num)
+
+        metadata_cols = [a for a in df_in.columns if a in METADATA_COLUMNS]
+        y = (df_in['class'].to_numpy(dtype=np.int8) if 'class' in df_in.columns else
+             np.full(len(df_in), -1, dtype=np.int8))
+        meta_data = df_in[[a for a in metadata_cols if a != 'class']].reset_index(drop=True)
+
+        X_all = df_in.drop(columns=metadata_cols)
+        unrequired_features = [c for c in X_all.columns if c not in self.features_to_analyse]
+        X_all = X_all.drop(columns=unrequired_features)
+        feature_names = list(X_all.columns)
+        X = X_all.to_numpy()
+
+        if output_goterms:
+            return X, y, meta_data, feature_names, go_terms
         else:
-            agg_df = self.df
+            return X, y, meta_data, feature_names
 
-        cols_to_drop = [a for a in NON_FEATURE_COLUMNS if a in agg_df.columns and a != 'class']
-        agg_df = agg_df.drop(columns=cols_to_drop)
 
-        if 'class' in agg_df.columns:
-            y = agg_df['class'].values
+    def collate_metadata(self, min_log='minimisation_log.csv',
+                          curation_geometry='curation_geometry.csv',
+                          assembly_log='assembly_log.csv',
+                          outname='collated_metadata.csv'):
+        '''
+        Produce a collated csv file which contains all the metadata alongside the measures data
+        that has been collated. Default parameters are set to the filenames which are used when
+        saving metadata or file outputs. Sets the resulting dataframe to the string given to
+        outname which is set to default as 'collated_metadata.csv'.
+
+        :param min_log: Name of the minimisation log file in the given outdir to the Analysis
+            class.
+        :type min_log: str
+        :param curation_geometry: Name of the curation geometry file in the given outdir to
+            the Analysis class.
+        :type curation_geometry: str
+        :param assembly_log: Name of the assembly log file in the given outdir to
+            the Analysis class.
+        :type assembly_log: str
+        :param outname: Name of the output file in the given outdir to the Analysis class to
+            write the new collated metatdata file to.
+        :type outname: str
+
+        :returns df_collated: Dataframe of the collated metadata
+        :rtype: Pandas DataFrame
+        '''
+
+        min_log_path = os.path.join(self.outdir, min_log)
+        cur_geom_path = os.path.join(self.outdir, curation_geometry)
+        ass_log_path = os.path.join(self.outdir, assembly_log)
+        out_path = os.path.join(self.outdir, outname)
+
+        df_collated = pd.DataFrame()
+
+        if not os.path.isfile(cur_geom_path):
+            print(f'>> No curation geometry csv file found at the location given: {cur_geom_path}, '
+                f'please check the outdir setting and the filename are correct on input.')
         else:
-            y = np.full(shape=len(agg_df), fill_value=-1, dtype=np.int)
+            df_cur_geom = pd.read_csv(cur_geom_path)
+            if df_collated.empty:
+                df_collated = df_cur_geom
+            else:
+                df_collated = df_collated.merge(df_cur_geom, how='outer', on='structure')
 
-        agg_df = agg_df.drop('class')
-        agg_df_np = agg_df.to_numpy()
+        if not os.path.isfile(min_log_path):
+            print(f'>> No minimisation log csv file found at the location given: {min_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_min_log = pd.read_csv(min_log_path)
+            if df_collated.empty:
+                df_collated = df_min_log
+            else:
+                df_collated = df_collated.merge(df_min_log, how='outer', on='structure')
 
-        return agg_df_np, y
+        if not os.path.isfile(ass_log_path):
+            print(f'>> No assembly log csv file found at the location given: {ass_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_ass_log = pd.read_csv(ass_log_path)
+            if df_collated.empty:
+                df_collated = df_ass_log
+            else:
+                df_collated = df_collated.merge(df_ass_log, how='outer', on='structure')
+
+        if not df_collated.empty:
+            df_collated.to_csv(out_path)
+        else:
+            print('>> No meta data found at any of the locations given, nothing to collate into '
+                  'the collated metadata csv. File not written.')
+
+        return df_collated
+
+
+    def add_metadata_to_measures(self, measures='measures.csv',
+                                min_log='minimisation_log.csv',
+                                curation_geometry='curation_geometry.csv',
+                                assembly_log='assembly_log.csv',
+                                outname='measures_metadata.csv'):
+        '''
+        Go over all the csv files containing metadata and add all this data into a given measures
+        dataframe. It will look for all of these files in the same outdir which is given to the
+        class upon initialisation. Default parameters are set to the filenames which are used when
+        saving metadata or file outputs. Sets the resulting dataframe to the string given to
+        outname which is set to default as 'measures_metadata.csv'.
+
+        :param measures: Name of the measures csv file in the given outdir to the Analysis
+            class.
+        :type min_log: str
+        :param min_log: Name of the minimisation log file in the given outdir to the Analysis
+            class.
+        :type min_log: str
+        :param curation_geometry: Name of the curation geometry file in the given outdir to
+            the Analysis class.
+        :type curation_geometry: str
+        :param assembly_log: Name of the assembly log file in the given outdir to
+            the Analysis class.
+        :type assembly_log: str
+        :param outname: Name of the output file in the given outdir to the Analysis class to
+            write the new collated metatdata file to.
+        :type outname: str
+
+        :returns df_meas_meta: Dataframe of the measures csv with the extra metadata assigned
+        :rtype: Pandas DataFrame
+        '''
+
+        meas_path = os.path.join(self.outdir, measures)
+        min_log_path = os.path.join(self.outdir, min_log)
+        cur_geom_path = os.path.join(self.outdir, curation_geometry)
+        ass_log_path = os.path.join(self.outdir, assembly_log)
+        out_path = os.path.join(self.outdir, outname)
+
+        df_meas_meta = pd.DataFrame()
+
+        if not os.path.isfile(meas_path):
+            print(f'>> Could not find a measures.csv file at the given path: {meas_path}, please '
+                  f'check the outdir serring and the filename are correct on input.')
+            return df_meas_meta
+        
+        df_meas_meta = pd.read_csv(meas_path)
+
+        if not os.path.isfile(cur_geom_path):
+            print(f'>> No curation geometry csv file found at the location given: {cur_geom_path}, '
+                f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_cur_geom = pd.read_csv(cur_geom_path)
+            df_cur_geom = df_cur_geom.rename(columns={'structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(df_cur_geom, how='left', on='PDB_Code')
+
+        if not os.path.isfile(min_log_path):
+            print(f'>> No minimisation log csv file found at the location given: {min_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_min_log = pd.read_csv(min_log_path)
+            df_min_log = df_min_log.rename(columns={'structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(df_min_log, how='left', on='PDB_Code')
+
+        if not os.path.isfile(ass_log_path):
+            print(f'>> No assembly log csv file found at the location given: {ass_log_path}, '
+                    f'please check the outdir setting and the filename are correct on input.')
+        else:
+            df_ass_log = pd.read_csv(ass_log_path)
+            df_ass_log = df_ass_log.rename(columns={'structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(df_ass_log, how='left', on='PDB_Code')
+
+        if not df_meas_meta.empty:
+            df_meas_meta.to_csv(out_path)
+        else:
+            print('>> No files found at any of the locations given, nothing to write. ')
+
+        return df_meas_meta
+
 
 
 if __name__ == '__main__':

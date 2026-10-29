@@ -68,6 +68,26 @@ class Test_Measure(unittest.TestCase):
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
+    def test_full_pdbonly_series_cpuonly(self):
+        # pdb only, cpu only
+        M = RD.Measure(df_input=self.df_pdb_only_test[:2],
+                        outdir=self.outdir,
+                        features_dict={'sasa': {}},
+                        parallel=False,
+                        parallel_timeout=40)
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
+
+    def test_full_pdbonly_series_gpuonly(self):
+        # pdb only, gpu only
+        M = RD.Measure(df_input=self.df_pdb_only_test[:2],
+                        outdir=self.outdir,
+                        features_dict={'aev': {}},
+                        parallel=False,
+                        parallel_timeout=40)
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
+
     def test_full_pdbonly_parallel(self):
         # pdb only
         M = RD.Measure(df_input=self.df_pdb_only_test[:2],
@@ -85,7 +105,7 @@ class Test_Measure(unittest.TestCase):
         print('-> Test measuring PROPKA')
         M_propka = RD.Measure(df_input=self.df_prot[:2],
                         outdir=self.outdir,
-                        features_dict={'propka': {}},
+                        features_dict={'propka': {'cache_policy': 'never'}},
                         parallel=True,
                         include_modified=False)
         M_propka.measure_data()

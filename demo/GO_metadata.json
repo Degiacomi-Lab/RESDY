@@ -1,0 +1,256 @@
+{
+  "0005737": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "cytoplasm"
+  },
+  "0005829": {
+    "uniprot": [
+      "P40616",
+      "P0CG48"
+    ],
+    "name": "cytosol"
+  },
+  "0005794": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "Golgi apparatus"
+  },
+  "0000139": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "Golgi membrane"
+  },
+  "0005802": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "trans-Golgi network"
+  },
+  "0032588": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "trans-Golgi network membrane"
+  },
+  "0008047": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "enzyme activator activity"
+  },
+  "0005525": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "GTP binding"
+  },
+  "0003924": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "GTPase activity"
+  },
+  "1990583": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "phospholipase D activator activity"
+  },
+  "0019904": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "protein domain specific binding"
+  },
+  "0007030": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "Golgi organization"
+  },
+  "0006886": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "intracellular protein transport"
+  },
+  "0034067": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "protein localization to Golgi apparatus"
+  },
+  "0042147": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "retrograde transport, endosome to Golgi"
+  },
+  "0009404": {
+    "uniprot": [
+      "P40616"
+    ],
+    "name": "toxin metabolic process"
+  },
+  "0022626": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "cytosolic ribosome"
+  },
+  "0030666": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "endocytic vesicle membrane"
+  },
+  "0005789": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "endoplasmic reticulum membrane"
+  },
+  "0010008": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "endosome membrane"
+  },
+  "0070062": {
+    "uniprot": [
+      "P0CG48",
+      "P02185"
+    ],
+    "name": "extracellular exosome"
+  },
+  "0005576": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "extracellular region"
+  },
+  "0005741": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "mitochondrial outer membrane"
+  },
+  "0005654": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "nucleoplasm"
+  },
+  "0005634": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "nucleus"
+  },
+  "0005886": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "plasma membrane"
+  },
+  "0031982": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "vesicle"
+  },
+  "0031386": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "protein tag activity"
+  },
+  "0003723": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "RNA binding"
+  },
+  "0019941": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "modification-dependent protein catabolic process"
+  },
+  "0016567": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "protein ubiquitination"
+  },
+  "0005856": {
+    "uniprot": [
+      "Q16825"
+    ],
+    "name": "cytoskeleton"
+  },
+  "0004725": {
+    "uniprot": [
+      "Q16825"
+    ],
+    "name": "protein tyrosine phosphatase activity"
+  },
+  "0035332": {
+    "uniprot": [
+      "Q16825"
+    ],
+    "name": "positive regulation of hippo signaling"
+  },
+  "0006470": {
+    "uniprot": [
+      "Q16825"
+    ],
+    "name": "protein dephosphorylation"
+  },
+  "0016528": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "sarcoplasm"
+  },
+  "0020037": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "heme binding"
+  },
+  "0098809": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "nitrite reductase activity"
+  },
+  "0019825": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "oxygen binding"
+  },
+  "0005344": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "oxygen carrier activity"
+  },
+  "0004601": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "peroxidase activity"
+  },
+  "0019430": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "removal of superoxide radicals"
+  }
+}

@@ -15,7 +15,8 @@ class SEQCHARGE():
                                 'modified_codes': ['LYE', 'KCX'],
                                 'atom_select_names_nonmod': ['NZ'],
                                 'atom_select_names_modified': ['NZ', 'N07']},
-                 error_filename = 'measure_errors.txt'):
+                 error_filename = 'measure_errors.txt',
+                 num_add_aa=10):
         '''
         Initialise the Charge class, include any global variables that are required from measures in
         here.
@@ -32,17 +33,28 @@ class SEQCHARGE():
         :param error_filename: Name of the text file passed through from overall measures to write
             any errors from calculating features out to.
         :type error_filename: str
+        :param num_add_aa: The number of amino acids to include either side of the amino acid of
+            interest. An optional parameter which is set to 10 by default.
+        :type num_add_aa: int
         '''
         self.include_modified = include_modified
         self.aa_properties = aa_properties
         self.error_filename = error_filename
+        if not isinstance(num_add_aa, int):
+            try:
+                num_add_aa = int(num_add_aa)
+            except Exception as e:
+                raise TypeError(f'> Parameter passed to num_add_aa in seqcharge ({num_add_aa}) '
+                                f'could not be converted to an integer, please pass an integer '
+                                f'value. Error: {str(e)}') from e
+        self.num_add_aa = num_add_aa
         if self.error_filename != 'no_record':
             self.record_errors = True
         else:
             self.record_errors = False
 
 
-    def calculate(self, path, num_add_aa=10):
+    def calculate(self, path):
         '''
         Calculate the Sequence Charge of the local sequence around a LYS of interest. This is a
         single value number representing the summation of the charges of the amino acids over the
@@ -57,9 +69,6 @@ class SEQCHARGE():
 
         :param path: The path of the pdb file that the sequence charge is being calculated for.
         :type path: str
-        :param num_add_aa: The number of amino acids to include either side of the lysine of
-            interest. An optional parameter which is set to 10 by default.
-        :type num_add_aa: int
         :returns:
             Dataframe with information on chain, residue number and seqcharge output.
             Outline::
@@ -159,8 +168,8 @@ class SEQCHARGE():
                     print(f'> Res {lys_num} on chain {lys_chain} has no CA in {path}, skipped')
                     continue
 
-                start_idx = seq_lys_index - num_add_aa
-                end_idx = seq_lys_index + num_add_aa + 1
+                start_idx = seq_lys_index - self.num_add_aa
+                end_idx = seq_lys_index + self.num_add_aa + 1
                 start_null = 0
                 end_null = 0
 
@@ -174,7 +183,7 @@ class SEQCHARGE():
 
                 seq = ('-' * start_null) + seq[start_idx:end_idx] + ('-' * end_null)
                 seq_split = list(seq)
-                if seq_split[num_add_aa] not in expected_letters:
+                if seq_split[self.num_add_aa] not in expected_letters:
                     print(f'>> The residue of interest was not found at the expected position '
                           f'{lys_num} on chain {lys_chain} of {path}; sequence -> {seq}')
                     continue
@@ -189,17 +198,35 @@ class SEQCHARGE():
                         count -= 1
 
                 if self.include_modified:
-                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count, 'Modified': list_modified[idx]}])], ignore_index=True)
+                    df_seqcharge = pd.concat([df_seqcharge,
+                                              pd.DataFrame([{'Chain': lys_chain,
+                                                             'Resid': lys_num,
+                                                             'seqcharge': count,
+                                                             'Modified': list_modified[idx]}])],
+                                             ignore_index=True)
                 else:
-                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': count}])], ignore_index=True)
+                    df_seqcharge = pd.concat([df_seqcharge,
+                                              pd.DataFrame([{'Chain': lys_chain,
+                                                             'Resid': lys_num,
+                                                             'seqcharge': count}])],
+                                             ignore_index=True)
 
             except Exception as e:
                 if self.record_errors: report_error_to_file('Seqcharge 2', path, str(e), self.error_filename)
                 print(f'SeqCharge Calculation 2: Could not calculate a charge for lysine at position {lys_num}, error: {e}')
                 if self.include_modified:
-                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None, 'Modified': list_modified[idx]}])], ignore_index=True)
+                    df_seqcharge = pd.concat([df_seqcharge,
+                                              pd.DataFrame([{'Chain': lys_chain,
+                                                             'Resid': lys_num,
+                                                             'seqcharge': None,
+                                                             'Modified': list_modified[idx]}])],
+                                             ignore_index=True)
                 else:
-                    df_seqcharge = pd.concat([df_seqcharge, pd.DataFrame([{'Chain': lys_chain, 'Resid': lys_num, 'seqcharge': None}])], ignore_index=True)
+                    df_seqcharge = pd.concat([df_seqcharge,
+                                              pd.DataFrame([{'Chain': lys_chain,
+                                                             'Resid': lys_num,
+                                                             'seqcharge': None}])],
+                                             ignore_index=True)
 
         return df_seqcharge
 

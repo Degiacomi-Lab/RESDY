@@ -85,7 +85,7 @@ class SECONDARYSTRUCTURE():
                         'T': 6,
                         'S': 7,
                         '-': 8,
-                        'C': 8}
+                        'C': 9}
 
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
