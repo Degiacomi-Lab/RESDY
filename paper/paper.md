@@ -16,6 +16,10 @@ authors:
     equal-contrib: false
     corresponding: true
     affiliation: 2, 3
+  - name: Martin J. Cann
+    orcid: 0009-0000-1924-7183
+    equal-contrib: false
+    affiliation: 1
 affiliations:
  - name: Department of Biosciences, Durham University, United Kingdom
    index: 1
@@ -34,8 +38,10 @@ We present `resdy` [TODO].
 
 # Statement of need
 
+Protein post-translational modifications (PTMs) are enzymatically or non-enzymatically generated, reversible or irreversible covalent changes to translated proteins. PTMs expand protein functional diversity by increasing the range of possible chemical interactions involving amino acid side chains or protein N- and C-termini. There are at least 650 known distinct PTMs that can occur on proteins across all known organisms. Whether an amino acid can be modified depends, to some extent, on its local physical environment. A challenge for computational biology is to predict whether an amino acid is amenable to a given PTM under defined conditions. 
+
 Assigning numerical descriptors to individual amino acids within a protein structure is a task carried out repeatedly, and largely independently, across structural bioinformatics.
-It underpins the prediction of post-translational modification sites [@huang2013], the identification of catalytic residues, the ranking of residues for covalent ligand design, and the assessment of chemical liabilities in biologics.
+It underpins the prediction of PTM sites [@huang2013], as well as the identification of catalytic residues, the ranking of residues for covalent ligand design, and the assessment of chemical liabilities in biologics.
 In each case the practitioner assembles a broadly similar codebase, involving a means of gathering relevant atomic structures, tools for cleaning them, a set of calls to third-party descriptor programs, and a means of reducing the result to a table suitable for a classifier.
 
 As a first, practical hurdle, building a datasets of interest often involves processing thousands of structures, so that computational tractability requires the whole procedure to be streamlined. More profoundly though, several properties of the underlying data make this task substantially harder than it appears.
