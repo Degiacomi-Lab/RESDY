@@ -53,9 +53,11 @@ class Uniprot(object):
         :rtype: int
         '''
         if reviewed_only:
-            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
+            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A' \
+                f'{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
         else:
-            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29&size=500'
+            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A' \
+                f'{code}%29%29&size=500'
 
         retries = Retry(total=5, backoff_factor=0.25, status_forcelist=[500, 502, 503, 504])
         session = requests.Session()
@@ -81,9 +83,11 @@ class Uniprot(object):
         :rtype: list
         '''
         if reviewed_only:
-            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
+            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A' \
+                f'{code}%29%29%20AND%20%28reviewed%3Atrue%29&size=500'
         else:
-            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A{code}%29%29&size=500'
+            url = f'https://rest.uniprot.org/uniprotkb/search?format=list&query=%28%28proteome%3A' \
+                f'{code}%29%29&size=500'
 
         re_next_link = re.compile(r'<(.+)>; rel="next"')
         retries = Retry(total=5, backoff_factor=0.25, status_forcelist=[500, 502, 503, 504])
@@ -148,18 +152,24 @@ class Uniprot(object):
             try:
                 # get latest AF structure details for the uniprot code
                 try:
-                    af_details_response = requests.get(f'https://alphafold.ebi.ac.uk/api/prediction/{uniprot_code}?include_complexes=false', timeout=10)
+                    af_details_response = requests.get(f'https://alphafold.ebi.ac.uk/api/prediction/{uniprot_code}?include_complexes=false',
+                                                       timeout=10)
                     if not af_details_response.ok:
                         af_details_response.raise_for_status()
                     af_data = af_details_response.json()
                     latest_version = str(af_data[0]['latestVersion'])
                     af_code = f'AF-{uniprot_code}-F1-model_v{latest_version}'
+
                 except Exception as e:
-                    print(f'>> Failed to obtain information about AF structure for uniprot code {uniprot_code} with error {e}, using v6 for AF code.')
+                    print(f'>> Failed to obtain information about AF structure for uniprot code'
+                          f'{uniprot_code} with error {e}, using v6 for AF code.')
                     af_code = f'AF-{uniprot_code}-F1-model_v6'
 
-                data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': af_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
-                self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': af_code,
+                         'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
+
+                self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
+                                    ignore_index=True)
 
             except Exception as e:
                 print(f'Error {e}')
@@ -190,14 +200,17 @@ class Uniprot(object):
                         for c in chains.split('/'):
                             if chain_target == c:
                                 data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
-                                        'Method': method_obtained, 'Resolution': resolution, 'Chains' : c}
+                                        'Method': method_obtained, 'Resolution': resolution,
+                                        'Chains' : c}
                                 break
                     else:
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
-                                'Method': method_obtained, 'Resolution': resolution, 'Chains' : chains}
+                                'Method': method_obtained, 'Resolution': resolution,
+                                'Chains' : chains}
 
                     if data is not None:
-                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
+                                            ignore_index=True)
 
             except Exception as e:
                 print(f'Error {e}')
@@ -257,8 +270,10 @@ class Uniprot(object):
                 elif pdb_code == 'AF':
                     pdb_code = f'AF-{uniprot_code}-F1-model_v6'
 
-                    d = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}
-                    self.df = pd.concat([self.df, pd.DataFrame.from_records(d, index=[0])], ignore_index=True)
+                    d = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                         'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan}
+                    self.df = pd.concat([self.df, pd.DataFrame.from_records(d, index=[0])],
+                                        ignore_index=True)
 
                 else:
                     self.get_protein_data(uniprot_code, pdb_code)
@@ -347,7 +362,8 @@ class Uniprot(object):
         for code, uni_list in self.GO_dict.items():
             if uniprot_entry in uni_list:
                 GO_list.append(code)
-        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list] if a is not None]
+        GO_list = [a for a in [self.code_to_name.get(code) for code in GO_list]
+                   if a is not None]
         return GO_list
 
 
@@ -374,10 +390,12 @@ class Uniprot(object):
         '''
 
         print(f'Searching for {index}/{total} protein.')
+
         try:
             url_2 = f'https://www.uniprot.org/uniprot/{uniprot_code}.txt'
             with urllib.request.urlopen(url_2, timeout=10) as response:
                 html_2 = response.read().decode('utf-8')
+
         except Exception as e:
             print(f'Failed to obtain UNIPROT data for {uniprot_code}. {e}')
 
@@ -387,10 +405,10 @@ class Uniprot(object):
                 find_go = re.findall('GO; GO', line)
                 if len(find_go) > 0:
                     # GO; GO:0030089; C:phycobilisome; IEA:UniProtKB-KW.
-                    # GO; GO:0102834; F:1-18:1-2-16:0-monogalactosyldiacylglycerol acyl-lipid omega-6 desaturase activity; IEA:UniProtKB-EC.
                     GO_code = line.split('; ')[1].split(':')[1]
                     idx = line.split('; ')[2].index(':') + 1
                     GO_word = line.split('; ')[2][idx:]
+
                     with lock:
                         if GO_code not in self.GO_dict.keys():
                             self.GO_dict[GO_code] = [uniprot_code]

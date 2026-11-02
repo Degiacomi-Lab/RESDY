@@ -1,7 +1,6 @@
 from ast import literal_eval
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.spatial.distance import euclidean
 
@@ -40,10 +39,12 @@ class Preprocessing:
         self.data = self.df_cleaned[features]
 
         if 'aev' in self.data.columns:
-            vects = [np.array(v.strip('[]').split(','), dtype=float) for v in self.df_cleaned['aev']]
+            vects = [np.array(v.strip('[]').split(','), dtype=float) for
+                     v in self.df_cleaned['aev']]
             widths = {len(v) for v in vects}
             if len(widths) > 1:
-                raise ValueError(f'>> aev column holds vectors of differing widths, can\'t use; widths: {widths}')
+                raise ValueError(f'>> aev column holds vectors of differing widths, '
+                                 f'can\'t use; widths: {widths}')
             self.aev = np.vstack(vects) if vects else np.zeros((0, 0))
 
             self.aev = pd.DataFrame(self.aev)
@@ -101,8 +102,8 @@ class Preprocessing:
         """
 
         if not statsmodel_available:
-            raise ImportWarning(f'>> VIF reduction method requires statsmodels; use '
-                                f'aev_red_method=\'pca\' or install statsmodel')
+            raise ImportWarning('>> VIF reduction method requires statsmodels; use '
+                                'aev_red_method=\'pca\' or install statsmodel')
 
         if not multi_vif:
             data = data[features]
@@ -119,14 +120,6 @@ class Preprocessing:
                         df_out = df_out.drop(col, axis=1)
                 data = pd.concat([data, df_out], axis=1)
                 data = data.drop('aev', axis=1)
-
-        '''
-        data_correlation_matrix = data.corr()
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(data_correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
-        plt.title('Pairwise Correlation Matrix')
-        plt.show()
-        '''
 
         print(f'Number columns = {len(data.columns)}')
 
@@ -189,7 +182,8 @@ class Preprocessing:
         while not all_decorrelated:
             # check for correlation and then change the data
             if not self.vif.empty:
-                latest_vals = [a for a in list(self.vif[list(self.vif.columns)[-1]]) if str(a) != 'nan']
+                latest_vals = [a for a in list(self.vif[list(self.vif.columns)[-1]])
+                               if str(a) != 'nan']
                 if all(x < vif_threshold for x in latest_vals):
                     all_decorrelated = True
                     break
@@ -231,7 +225,8 @@ class Preprocessing:
         features = list(data_input.columns) if features is None else list(features)
 
         for feature in features:
-            data_input[feature] = (data_input[feature] - np.mean(data_input[feature])) / np.std(data_input[feature], ddof=0)
+            data_input[feature] = ((data_input[feature] - np.mean(data_input[feature])) /
+                                   np.std(data_input[feature], ddof=0))
 
         return data_input
 
@@ -282,7 +277,8 @@ class Preprocessing:
         for feature in features:
             quartiles = np.percentile(data[feature], [25,75])
             iqr = quartiles[1] - quartiles[0]
-            new_outliers = np.where((data[feature] < quartiles[0]-iqr_reject_range*iqr)|(data[feature] > quartiles[1]+iqr_reject_range*iqr))[0]
+            new_outliers = np.where((data[feature] < quartiles[0]-iqr_reject_range*iqr) |
+                                    (data[feature] > quartiles[1]+iqr_reject_range*iqr))[0]
             outlier_indices = np.unique(np.concatenate((outlier_indices, new_outliers)))
 
         data_outliers = data.iloc[outlier_indices]
@@ -296,7 +292,9 @@ class Preprocessing:
         data_common_normalised = self._normalise(data_common, features)
 
         print("K-means clustering...")
-        kmeans = KMeans(n_clusters=n_cluster, n_init=n_init, max_iter=max_iter).fit(data_common_normalised)
+        kmeans = KMeans(n_clusters=n_cluster,
+                        n_init=n_init,
+                        max_iter=max_iter).fit(data_common_normalised)
         avgdistance = np.sqrt(kmeans.inertia_/len(data_common_normalised))
         r = outlier_cluster_radius * avgdistance
 
@@ -305,8 +303,8 @@ class Preprocessing:
         for clust in range(kmeans.n_clusters):
             cluster_pts_indices = np.where(kmeans.labels_ == clust)[0]
             cluster_cen = kmeans.cluster_centers_[clust]
-            min_idx = np.argmin([euclidean(data_common_normalised.iloc[idx], cluster_cen) for idx in cluster_pts_indices])
-            #print(np.array([euclidean(data_common_normalised.iloc[idx], cluster_cen) for idx in cluster_pts_indices])/r)
+            min_idx = np.argmin([euclidean(data_common_normalised.iloc[idx], cluster_cen)
+                                 for idx in cluster_pts_indices])
 
             common_pts_idx.append(cluster_pts_indices[min_idx])
 
@@ -321,7 +319,8 @@ class Preprocessing:
                 outlier_pts_idx.append(ocluster_pts_indices[0])
                 continue
             ocluster_cen = np.mean(data_outliers_normalised.iloc[ocluster_pts_indices], axis=0)
-            min_idx = np.argmin([euclidean(data_outliers_normalised.iloc[idx], ocluster_cen) for idx in ocluster_pts_indices])
+            min_idx = np.argmin([euclidean(data_outliers_normalised.iloc[idx], ocluster_cen)
+                                 for idx in ocluster_pts_indices])
 
             outlier_pts_idx.append(ocluster_pts_indices[min_idx])
 
@@ -330,7 +329,11 @@ class Preprocessing:
         common_normalised_final = data_common_normalised.iloc[common_pts_idx]
         outlier_normalised_final = data_outliers_normalised.iloc[outlier_pts_idx]
 
-        self.undersampled_data = pd.concat([common_final_list, outlier_final_list], ignore_index=True)
+        self.undersampled_data = pd.concat([common_final_list,
+                                            outlier_final_list],
+                                            ignore_index=True)
         self.undersampled_data_common = common_final_list
         self.undersampled_data_outlier = outlier_final_list
-        self.undersampled_data_normalised = pd.concat([common_normalised_final, outlier_normalised_final], ignore_index=True)
+        self.undersampled_data_normalised = pd.concat([common_normalised_final,
+                                                       outlier_normalised_final],
+                                                       ignore_index=True)

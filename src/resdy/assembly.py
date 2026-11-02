@@ -196,7 +196,8 @@ def build_assembly(path, biomatrix, determined, max_atoms=None):
     chains = list(dict.fromkeys(A.data['chain'].values))
     if any(len(c) > 1 for c in chains):
         record['status'] = 'kept'
-        record['reason'] = f'the assembly has {len(chains)} chains, more than single-character chain names allow'
+        record['reason'] = f'the assembly has {len(chains)} chains, more than ' \
+                            f'single-character chain names allow'
         return _write_record(path, record)
     if max_atoms is not None and len(A.data) > max_atoms:
         record['status'] = 'kept'

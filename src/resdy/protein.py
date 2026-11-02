@@ -342,14 +342,16 @@ class PDB(object):
         if not forcefield or not all(isinstance(f, str) and f for f in forcefield):
             raise ValueError(f'forcefield must be a file name or a sequence of file names, '
                              f'got {forcefield!r}')
-        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or tolerance <= 0:
+        if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+                or tolerance <= 0):
             raise ValueError(f'minimise_tolerance must be a positive number (kJ/mol/nm), '
                              f'got {tolerance!r}')
         if (isinstance(max_iterations, bool) or not isinstance(max_iterations, (int, np.integer))
                 or max_iterations < 0):
             raise ValueError(f'minimise_max_iterations must be an integer >= 0 (0 means until '
                              f'the tolerance is reached), got {max_iterations!r}')
-        if isinstance(restraint_k, bool) or not isinstance(restraint_k, (int, float)) or restraint_k < 0:
+        if (isinstance(restraint_k, bool) or not isinstance(restraint_k, (int, float))
+                or restraint_k < 0):
             raise ValueError(f'restraint_k must be a number >= 0 (kcal/mol/A^2), '
                              f'got {restraint_k!r}')
         if platform is not None and not isinstance(platform, str):
@@ -547,7 +549,7 @@ class PDB(object):
                 self.df = pd.read_csv(fname)
 
             except Exception as e:
-                raise Exception(f"Could not read csv file, error: {str(e)}")
+                raise Exception(f"Could not read csv file, error: {str(e)}") from e
 
         else:
             self.df = fname
@@ -602,12 +604,13 @@ class PDB(object):
                     if self.num_cores <= os.cpu_count():
                         n_cores_to_use = self.num_cores
                     else:
-                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
-                              f'possible on current setup; defaulting to 0.75 times max possible')
+                        print(f'>> Given number of cores for parllel running '
+                              f'({self.num_cores}) is not possible on current setup; '
+                              f'defaulting to 0.75 times max possible')
                         n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
             else:
-                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
-                      f'defaulting to 0.75 times max possible.')
+                print(f'>> Input given to number of cores is not an integer '
+                      f'({str(self.num_cores)}); defaulting to 0.75 times max possible.')
                 n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
         else:
             print('>> Protein curation running in series')
@@ -621,7 +624,8 @@ class PDB(object):
                         method_obtained = r.get('Method', '')
                         resolution = r.get('Resolution', '')
                         chains = r.get('Chains', '')
-                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains])
+                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained,
+                                      resolution, chains])
                     else:
                         items.append([r['PDB_Code']])
                 except Exception as e:
@@ -649,13 +653,14 @@ class PDB(object):
                             pool.terminate()
                             raise RuntimeError(
                                 f'A parallel protein curation worker produced no result for '
-                                f'{self.parallel_timeout} s working on '
-                                f'structures, so it is treated as stalled and the run was stopped. '
-                                f'Either raise parallel_timeout if the features requested are simply '
+                                f'{self.parallel_timeout} s working on structures, so it is '
+                                f'treated as stalled and the run was stopped. Either raise '
+                                f'parallel_timeout if the features requested are simply '
                                 f'slow on these structures, or set parallel=False to measure in '
                                 f'series.') from None
             else:
-                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items) if t is not None]
+                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
+                           if t is not None]
 
             if self.biological_assembly:
                 self.collect_assembly_log()
@@ -704,7 +709,8 @@ class PDB(object):
             uniprot_code = 'Running PDB only'
             method_obtained, resolution, chains = '', '', ''
 
-        print_statements.append(f'>> Start file curation for uniprot: {uniprot_code}, pdb code: {pdb_code}')
+        print_statements.append(f'>> Start file curation for uniprot: '
+                                f'{uniprot_code}, pdb code: {pdb_code}')
 
         if not self.PDB_only:
             print_statements.append(f"UNIPROT: {uniprot_code}, PDB: {pdb_code}")
@@ -724,9 +730,12 @@ class PDB(object):
 
             time_taken = round((time.time() - start_time), 2)
             if not failed:
-                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; file curated in {time_taken}s\n\n')
+                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; '
+                                        f'file curated in {time_taken}s\n\n')
             else:
-                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; file attempted curation in {time_taken}s\n\n')
+                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; '
+                                        f'file attempted curation in {time_taken}s\n\n')
+
             with lock:
                 for statement in print_statements:
                     print(statement)
@@ -734,11 +743,13 @@ class PDB(object):
         if pdb_code[:2] == "AF":
 
             if skip_if_found:
-                files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
+                files=[os.path.basename(c).split(".")[0] for c in
+                       glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
                     if not self.PDB_only:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
                     else:
                         data = {'PDB_Code': pdb_code}
 
@@ -757,8 +768,10 @@ class PDB(object):
                     try:
                         af.download_AF_struc(pdb_code,outfolder=self.outdir)
                     except Exception as e:
-                        print_statements.append(f'>> Failed to download AF structure calling af.download_AF_struc() with error: {str(e)}')
+                        print_statements.append(f'>> Failed to download AF structure calling '
+                                                f'af.download_AF_struc() with error: {str(e)}')
                 print_statements.append(out_print_trap_af_download.getvalue())
+
             except Exception as e:
                 print_statements.append(f">> FAILED on calling download_AF_struc: {str(e)}")
                 finish_curate_jobs(failed=True)
@@ -781,7 +794,8 @@ class PDB(object):
 
             if pdb_data_present:
                 if not self.PDB_only:
-                    data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                    data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                            'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
                 else:
                     data = {'PDB_Code': pdb_code}
 
@@ -790,10 +804,12 @@ class PDB(object):
                     out_print_trap_af_plddt = io.StringIO()
                     with redirect_stdout(out_print_trap_af_plddt):
                         with lock:
-                            af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
+                            af.find_af_plddt(pdb_code,outfolder=self.outdir,
+                                             resnames=self.resnames_of_interest)
                     print_statements.append(out_print_trap_af_plddt.getvalue())
                 except Exception as e:
-                    print(f'> Failed to calculate PLDDT values for Af structure: {pdb_code}; Error: {str(e)}')
+                    print(f'> Failed to calculate PLDDT values for Af structure: '
+                          f'{pdb_code}; Error: {str(e)}')
 
                 try:
                     if self.minimise_af:
@@ -802,7 +818,8 @@ class PDB(object):
                             self.apply_minimisation(pdb_code)
                         print_statements.append(out_print_trap_af_minimisation.getvalue())
                 except Exception as e:
-                    print(f'>> Failed on af.apply_minimisation() for AF {pdb_code} with error: {str(e)}')
+                    print(f'>> Failed on af.apply_minimisation() for AF {pdb_code} '
+                          f'with error: {str(e)}')
                     finish_curate_jobs(failed=True)
                     return None
 
@@ -821,21 +838,27 @@ class PDB(object):
             if isinstance(chains, str):
                 chains = [c for c in chains.split('/') if c]
             if skip_if_found:
-                files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
+                files=[os.path.basename(c).split("-")[0] for c in
+                       glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
                     if not self.PDB_only:
-                        matched_curated_files = [os.path.basename(a) for a in glob.glob(os.path.join(self.curated_dir, "*pdb")) if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]]
+                        matched_curated_files = [os.path.basename(a) for a in glob.glob(os.path.join(self.curated_dir, "*pdb"))
+                                                 if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]]
                         for file in matched_curated_files:
                             out_print_trap_check = io.StringIO()
                             with redirect_stdout(out_print_trap_check):
                                 try:
-                                    self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
+                                    self._check_curated_structure(os.path.join(self.curated_dir, file),
+                                                                  uniprot_code, chains)
                                 except Exception as e:
-                                    print_statements.append(f'>> Failed checking structure on previously curated structure with error {str(e)}')
+                                    print_statements.append(f'>> Failed checking structure on '
+                                                            f'previously curated structure with '
+                                                            f'error {str(e)}')
                             print_statements.append(out_print_trap_check.getvalue())
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
-                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': np.nan}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': method_obtained, 'Resolution': resolution,
+                                'Chains': '/'.join(chains), 'Largest_Gap': np.nan}
                     else:
                         data = {'PDB_Code': pdb_code}
 
@@ -845,6 +868,7 @@ class PDB(object):
                             for a in glob.glob(os.path.join(self.curated_dir, "*pdb"))
                             if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]
                             and not os.path.splitext(a)[0].endswith('_relaxed'))
+
                         reuse_print_trap = io.StringIO()
                         with redirect_stdout(reuse_print_trap):
                             for stem in stems:
@@ -861,18 +885,21 @@ class PDB(object):
                 with redirect_stdout(clean_split_print_trap):
                     if not self.PDB_only:
                         largest_gap, align_dets = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
-                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': method_obtained, 'Resolution': resolution,
+                                'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
                         data = data | align_dets
                     else:
                         largest_gap, _ = self.clean_and_split_pdb(pdb_code)
                         data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
             except Exception as e:
                 print_statements.append(clean_split_print_trap.getvalue())
-                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': f'{type(e).__name__}: {str(e)}'}])
+                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code,
+                                             'Error': f'{type(e).__name__}: {str(e)}'}])
                 broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
                 with lock:
-                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
+                    broken_prot.to_csv(broken_path, mode='a', index=False,
+                                       header=not os.path.exists(broken_path))
                 print_statements.append(f'>> Failed clean_and_split_pdb() with error: {str(e)}')
                 finish_curate_jobs(failed=True)
                 return None
@@ -1109,7 +1136,8 @@ class PDB(object):
         if test_file not in files:
             print(f">> Downloading PDB {pdb}")
             try:
-                response = requests.get(url=f'https://files.rcsb.org/download/{pdb}.pdb', timeout=20)
+                response = requests.get(url=f'https://files.rcsb.org/download/{pdb}.pdb',
+                                        timeout=20)
                 response.raise_for_status()
                 open(os.path.join(self.raw_dir, f'{pdb}.pdb'), 'wb').write(response.content)
 
@@ -1133,13 +1161,16 @@ class PDB(object):
             try:
                 print(f">> downloading FASTA for {pdb}")
 
-                response = requests.get(url=f'https://www.rcsb.org/fasta/entry/{pdb}/download', timeout=20)
+                response = requests.get(url=f'https://www.rcsb.org/fasta/entry/{pdb}/download',
+                                        timeout=20)
                 response.raise_for_status()
                 open(os.path.join(self.raw_dir, f'{pdb}.fasta'), 'wb').write(response.content)
 
             except Exception as e:
-                print(f'>> Failed downloading FASTA sequence for chain name comparison for {pdb}, error: {str(e)}')
-                raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{str(e)}') from e
+                print(f'>> Failed downloading FASTA sequence for chain name comparison for {pdb}'
+                      f', error: {str(e)}')
+                raise Exception(f'Failed downloading FASTA sequence for chain name '
+                                f'comparison.{str(e)}') from e
         files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
         if pdb not in files:
             get_data()
@@ -1263,12 +1294,15 @@ class PDB(object):
                     continue
 
             #check that amino acid is one of the 20 standard amino acids
-            if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and (line[21] + line[22:26].strip()) in list(list_prev_mod_resids):
+            if ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
+                (line[21] + line[22:26].strip()) in list(list_prev_mod_resids)):
                 if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
                     continue
                 line = line.replace('HETATM', 'ATOM  ')
                 line = line.replace(line[17:20], list_prev_mod_resids[line[21] + line[22:26].strip()])
-            elif (line[:4] == 'ATOM' or line[:6] == 'HETATM') and line[17:20].upper() not in standard_resids:
+
+            elif ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
+                  line[17:20].upper() not in standard_resids):
 
                 if (line[21] + line[22:26].strip()) not in modres_sites:
                     continue
@@ -1291,7 +1325,8 @@ class PDB(object):
                     pdb_seqs = {}
                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                         tmp_data = subset_data[subset_data['chain'] == chain]
-                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys())
+                                                   else 'X' for a in list(tmp_data['resname'])])
                     chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
                     aligner = PairwiseAligner()
                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
@@ -1337,7 +1372,7 @@ class PDB(object):
 
                                 else:
                                     fasta_seq.append(fasta_line)
-    
+
                             fasta_seqs.append(fasta_seq)
                             f.close()
 
@@ -1346,7 +1381,7 @@ class PDB(object):
                                 new_fasta.write(header)
                                 seq = seq[0].strip()
                                 if chain[0] == line[21]:
-                                    
+
                                     F = bb.Molecule()
                                     F.import_pdb(filename=read_file_path, include_hetatm=True)
                                     F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
@@ -1354,7 +1389,8 @@ class PDB(object):
                                     pdb_seqs = {}
                                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                         tmp_data = subset_data[subset_data['chain'] == chain]
-                                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys())
+                                                                   else 'X' for a in list(tmp_data['resname'])])
                                     chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
                                     aligner = PairwiseAligner()
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
@@ -1365,7 +1401,7 @@ class PDB(object):
 
                                     for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
                                         fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
-                                    
+
                                     seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:]
                                 seq = seq + '\n'
                                 new_fasta.write(seq)
@@ -1405,7 +1441,8 @@ class PDB(object):
             os.remove(write_file_path)
             os.remove(read_file_path)
             raise Exception(f'>> Residue insertion codes found for pdb {pdb}, '
-                            f'insertion codes found: {res_insertion_codes}, residue numbering therefore not unique')
+                            f'insertion codes found: {res_insertion_codes}, '
+                            f'residue numbering therefore not unique')
 
         os.remove(read_file_path)
 
@@ -1605,7 +1642,8 @@ class PDB(object):
         pdb_seqs = {}
         for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
             tmp_data = subset_data[subset_data['chain'] == chain]
-            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in list(protein_letters_dict.keys()) else 'X' for a in list(tmp_data['resname'])])
+            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in list(protein_letters_dict.keys())
+                                       else 'X' for a in list(tmp_data['resname'])])
 
         if isinstance(chains, str):
             chains = [c for c in chains.split('/') if c]
@@ -2007,10 +2045,12 @@ class PDB(object):
                            .merge(df_columns, how='left',
                                   on=['chain', 'resid', 'name'],
                                   validate='one_to_one'))
+
             if len(merged) != len(N.data):
                 raise Exception(f'Occupancy and B-factor restoration after minimisation failed '
                                 f'for pdb: {pdb}, Lengths before ({len(N.data)}) and length '
                                 f'merged ({len(merged)}) are different.')
+
             N.data = merged
             N.write_pdb(relaxed_path)
 
@@ -2032,13 +2072,15 @@ class PDB(object):
                 try:
                     os.remove(pdb_path)
                 except Exception as e:
-                    print('>> Failed to remove original curated structure, structure remains.')
+                    print(f'>> Failed to remove original curated structure, '
+                          f'structure remains. Error: {str(e)}')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
             if os.path.exists(relaxed_path):
                 os.remove(relaxed_path)
-            self._write_minimisation_record(pdb, 'failed', f'{type(e).__name__}: {e}',
+            self._write_minimisation_record(pdb, 'failed',
+                                            f'{type(e).__name__}: {e}',
                                             settings)
 
 

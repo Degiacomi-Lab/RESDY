@@ -1,6 +1,5 @@
 import os
 import numbers
-import random
 from ast import literal_eval
 import numpy as np
 import pandas as pd
@@ -14,6 +13,11 @@ class Aggregation:
     Class to handle the different aggregation methods for sorting over the different measurements
     that have been calculated. This will take a dataframe of measurements, and return a dataframe
     with only one set of measurements per residue of interest according to the aggregation method.
+
+    This is important for analysis comparing different residues of interest to ensure that bias
+    towards proteins with more structures are removed while preserving information of the dynamics
+    across the conformational landscape for the protein. This is also important in downstream
+    ML models to ensure that there is no chance of data leakage and inflated prediction outputs.
     '''
 
     def __init__(self, df_measurements, outdir='result', aggregation_method='minmax',
@@ -109,6 +113,7 @@ class Aggregation:
             whereas passing an integer will generate the same state each time.
         :type rand_state: int
         '''
+
         if isinstance(aev_pca_variance, bool) or not (
                 (isinstance(aev_pca_variance, numbers.Integral) and aev_pca_variance >= 1)
                 or (isinstance(aev_pca_variance, numbers.Real)
@@ -116,7 +121,8 @@ class Aggregation:
                     and 0.0 < aev_pca_variance < 1.0)):
             raise ValueError(f'aev_pca_variance must be a fraction between 0 and 1, or a '
                              f'number of components of at least 1, got {aev_pca_variance}')
-        if not vif_threshold > 1:
+
+        if vif_threshold <= 1:
             raise ValueError(f'vif_threshold must be greater than 1, the smallest possible '
                              f'variance inflation factor, got {vif_threshold}')
 
@@ -149,7 +155,8 @@ class Aggregation:
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
-            self.features_to_include = [a for a in self.df_measurements.columns if a not in self.non_feature_cols]
+            self.features_to_include = [a for a in self.df_measurements.columns
+                                        if a not in self.non_feature_cols]
 
         self.res_key = sort_residue_key(df=self.df_measurements, include_chain=include_chain)
 
@@ -172,16 +179,22 @@ class Aggregation:
                     raise ValueError(f'>> No {self.source_pooling} rows in the measurements')
 
         data_cols_entered = self.df_measurements.columns.values
-        cols_required = [a for a in self.df_measurements.columns if a in self.res_key + ['PDB_Code', 'class']]
-        cols_removed = [f for f in self.features_to_include if f not in data_cols_entered]
-        self.features_to_include = [f for f in self.features_to_include if f in data_cols_entered]
+        cols_required = [a for a in self.df_measurements.columns if
+                         a in self.res_key + ['PDB_Code', 'class']]
+        cols_removed = [f for f in self.features_to_include if
+                        f not in data_cols_entered]
+        self.features_to_include = [f for f in self.features_to_include if
+                                    f in data_cols_entered]
+
         if cols_removed:
             print(f'The following features given as input not available in all '
                   f'input files, will not be included: {cols_removed}')
         self.df_measurements = self.df_measurements[cols_required + self.features_to_include]
 
-        self.meta_data_cols = [a for a in ['Method', 'Resolution'] if a in self.df_measurements.columns]
-        self.features_to_include = [a for a in self.features_to_include if a not in self.meta_data_cols]
+        self.meta_data_cols = [a for a in ['Method', 'Resolution'] if
+                               a in self.df_measurements.columns]
+        self.features_to_include = [a for a in self.features_to_include if
+                                    a not in self.meta_data_cols]
 
         print('>> Finding numbers of na values present in each feature column in the dataframe')
         always_na_cols = []
@@ -194,17 +207,21 @@ class Aggregation:
             print(f'>> Columns {", ".join(always_na_cols)} are always na and provide '
                   f'no information, removing from dataframe')
             self.df_measurements = self.df_measurements.drop(columns=always_na_cols, axis=1)
-            self.features_to_include = [a for a in self.features_to_include if a not in always_na_cols]
+            self.features_to_include = [a for a in self.features_to_include if
+                                        a not in always_na_cols]
 
         len_before_df = len(self.df_measurements)
 
         if self.get_nan_df:
             df_nan = self.df_measurements[self.df_measurements[self.features_to_include].isna().any(axis=1)]
-            df_nan.to_csv(f'{self.outdir}{os.sep}measures_nan_feature_data_removed.csv', index=False)
-            print(f'>> Wrote {len(df_nan)} rows carrying a NaN of data which have been removed from the '
-                  f'aggregation data to \'measures_nan_feature_data_removed.csv\'')
+            df_nan.to_csv(f'{self.outdir}{os.sep}measures_nan_feature_data_removed.csv',
+                          index=False)
+            print(f'>> Wrote {len(df_nan)} rows carrying a NaN of data which have been '
+                  f'removed from the aggregation data to '
+                  f'\'measures_nan_feature_data_removed.csv\'')
 
-        na_per_feature = {c: int(self.df_measurements[c].isna().sum()) for c in self.features_to_include}
+        na_per_feature = {c: int(self.df_measurements[c].isna().sum())
+                          for c in self.features_to_include}
         n_meas = len(self.df_measurements)
         sparse_features = [c for c, k in na_per_feature.items() if n_meas and
                                 k / n_meas > self.max_feature_nan_fraction]
@@ -217,15 +234,20 @@ class Aggregation:
                                         if feat not in sparse_features]
 
         keep = self.df_measurements.dropna(subset=self.features_to_include)
-        del_res_interest = (self.df_measurements[self.res_key].drop_duplicates().shape[0] - keep[self.res_key].drop_duplicates().shape[0])
+        del_res_interest = (self.df_measurements[self.res_key].drop_duplicates().shape[0] -
+                            keep[self.res_key].drop_duplicates().shape[0])
         if len_before_df and keep.empty:
-            raise ValueError('>> Every row was removed by the NaN filter. The features with the most missing '
-                             'values are: ' + ', '.join(f'{c} ({n})' for c, n in
-                            sorted(((c, self.df_measurements[c].isna().sum()) for c in self.features_to_include), key=lambda t: -t[1])[:5]))
+            raise ValueError('>> Every row was removed by the NaN filter. The features with the '
+                             'most missing values are: ' + ', '.join(f'{c} ({n})' for c, n in
+                            sorted(((c, self.df_measurements[c].isna().sum()) for c in
+                                    self.features_to_include), key=lambda t: -t[1])[:5]))
+
         else:
-            print(f'>> Removed {len_before_df - len(keep)} rows of {len_before_df} possible measurement '
-                  f'rows containing nan values; which cost {del_res_interest} distinct residues. The worst '
-                  f'features for this are: ' + ', '.join(f'{c} ({n})' for c, n in sorted(na_per_feature.items(), key=lambda t: -t[1])[:3]))
+            print(f'>> Removed {len_before_df - len(keep)} rows of {len_before_df} possible '
+                  f'measurement rows containing nan values; which cost {del_res_interest} '
+                  f'distinct residues. The worst features for this are: ' +
+                  ', '.join(f'{c} ({n})' for c, n in sorted(na_per_feature.items(),
+                                                            key=lambda t: -t[1])[:3]))
             self.df_measurements = keep
 
 
@@ -242,41 +264,71 @@ class Aggregation:
         '''
 
         bad_feature_sets = [('depth', 0, 20)]  # add to as more confinements on features needed
+
         for bad_feat, feat_low, feat_up in bad_feature_sets:
             if bad_feat in self.df_measurements.columns:
                 self._remove_bad_data(feature=bad_feat, lower=feat_low, upper=feat_up)
         df_stats = self._calculate_statistics()
         not_cols = self.res_key + ['num_structures', 'class']
+
         match self.aggregation_method:
+
             case 'avg':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'avg' not in b] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in
+                                                    [b for b in df_stats.columns if 'avg' not in b]
+                                                    if a not in not_cols])
             case 'random':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'rand' not in b] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in
+                                                    [b for b in df_stats.columns if 'rand' not in b]
+                                                    if a not in not_cols])
             case 'max':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'max' not in b] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in 
+                                                    [b for b in df_stats.columns if 'max' not in b]
+                                                    if a not in not_cols])
             case 'min':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'min' not in b] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in
+                                                    [b for b in df_stats.columns if 'min' not in b]
+                                                    if a not in not_cols])
             case 'median':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if 'med' not in b] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in
+                                                    [b for b in df_stats.columns if 'med' not in b]
+                                                    if a not in not_cols])
             case 'mixmatch':
                 max_features = ['sasa', 'das', 'frustration', 'seqcharge']
                 min_features = ['propka', 'pkaANI', 'depth', 'density', 'legolas']
-                max_feat_cols = [a for a in self.features_to_include if any(b in a for b in max_features) and 'max' in a]
-                min_feat_cols = [a for a in self.features_to_include if any(b in a for b in min_features) and 'min' in a]
-                avg_features = [a for a in [b for b in self.features_to_include if not any (c in b for c in max_features) and not any (c in b for c in min_features)] if 'avg' in a]
-                self.df_agg = df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + avg_features])
+                max_feat_cols = [a for a in self.features_to_include if
+                                 any(b in a for b in max_features) and 'max' in a]
+                min_feat_cols = [a for a in self.features_to_include if
+                                 any(b in a for b in min_features) and 'min' in a]
+                avg_features = [a for a in [b for b in self.features_to_include if not any
+                                (c in b for c in max_features) and not any
+                                (c in b for c in min_features)] if 'avg' in a]
+                self.df_agg = df_stats.drop(columns=[a for a in self.features_to_include if a not in
+                                                     max_feat_cols + min_feat_cols + avg_features])
+
             case 'minmax':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not
+                                                    any(c in b for c in ['min', 'max'])]
+                                                    if a not in not_cols])
+
             case 'minmaxavg':
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max', 'avg'])] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not
+                                                    any(c in b for c in ['min', 'max', 'avg'])]
+                                                    if a not in not_cols])
+
             case 'all':
                 self.df_agg = df_stats
+
             case 'choose':
                 self.df_agg = self._aggregate_choose(df_stats)
+
             case _:
                 print('Aggregation method not recognised; using minmax values')
                 self.aggregation_method = 'minmax'
-                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not any(c in b for c in ['min', 'max'])] if a not in not_cols])
+                self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not
+                                                    any(c in b for c in ['min', 'max'])]
+                                                    if a not in not_cols])
+
         return self.df_agg
 
 
@@ -291,9 +343,11 @@ class Aggregation:
         :param upper: The upper bound of bad values to accept
         :type upper: float
         '''
-        df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) | (self.df_measurements[feature] > upper)]
+        df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) |
+                                             (self.df_measurements[feature] > upper)]
         self.df_measurements = self.df_measurements[self.df_measurements[feature].between(lower, upper)]
-        print(f'>> Removed {len(df_suspicious)} rows which contain out of bounds entries for {feature} from the measurements data.')
+        print(f'>> Removed {len(df_suspicious)} rows which contain out of bounds '
+              f'entries for {feature} from the measurements data.')
 
 
     def _reduce_aev_dimensions(self):
@@ -312,8 +366,10 @@ class Aggregation:
         if 'aev' in self.features_to_include:
             df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.df_measurements['aev']]))
             df_aevs = df_aevs.add_prefix('AEV_')
-            self.df_measurements = pd.concat([self.df_measurements.reset_index(), df_aevs.reset_index()], axis=1)
+            self.df_measurements = pd.concat([self.df_measurements.reset_index(),
+                                              df_aevs.reset_index()], axis=1)
             self.df_measurements = self.df_measurements.drop(['index', 'aev'], axis=1)
+
             match self.aev_red_method:
                 case 'pca':
                     self._prepare_pca()
@@ -327,12 +383,14 @@ class Aggregation:
                     print(f'>> AEV dimensionality reduction method: {self.aev_red_method}, '
                           f'was not recognised, using PCA method.')
                     self._prepare_pca()
-        if 'evolution' in self.features_to_include:
-            df_evolution = pd.DataFrame(list([literal_eval(evol) for evol in self.df_measurements['evolution']]))
-            df_evolution = df_evolution.add_prefix('EVL_')
-            self.df_measurements = pd.concat([self.df_measurements.reset_index(), df_evolution.reset_index()], axis=1)
-            self.df_measurements = self.df_measurements.drop(['index', 'evolution'], axis=1)
 
+        if 'evolution' in self.features_to_include:
+            df_evolution = pd.DataFrame(list([literal_eval(evol) for evol in
+                                              self.df_measurements['evolution']]))
+            df_evolution = df_evolution.add_prefix('EVL_')
+            self.df_measurements = pd.concat([self.df_measurements.reset_index(),
+                                              df_evolution.reset_index()], axis=1)
+            self.df_measurements = self.df_measurements.drop(['index', 'evolution'], axis=1)
 
 
     def _prepare_aev_sd(self):
@@ -355,7 +413,8 @@ class Aggregation:
         aev_cols = [a for a in self.df_measurements.columns if 'AEV_' in a]
         cols_to_remove = [a for a in aev_cols if a not in top_n_features]
         self.df_measurements.drop(cols_to_remove, axis=1, inplace=True)
-        print(f'>> Removed {len(cols_to_remove)} from AEVs, {len(top_n_features)} kept instead of the AEVs.')
+        print(f'>> Removed {len(cols_to_remove)} from AEVs, {len(top_n_features)} '
+              f'kept instead of the AEVs.')
 
 
     def _cut_null_aev_columns(self):
@@ -384,9 +443,11 @@ class Aggregation:
         columns_to_keep = P.calculate_diff_features(self.df_measurements,
                                                     vif_threshold=self.vif_threshold)
 
-        cols_to_remove = [a for a in self.df_measurements.columns if ('AEV_' in a) and (a not in columns_to_keep)]
+        cols_to_remove = [a for a in self.df_measurements.columns if ('AEV_' in a)
+                          and (a not in columns_to_keep)]
         self.df_measurements.drop(cols_to_remove, axis=1, inplace=True)
-        print(f'>> VIF analysis reduced AEV dimensions from {len(aev_cols)} to {len(columns_to_keep)}')
+        print(f'>> VIF analysis reduced AEV dimensions from {len(aev_cols)} '
+              f'to {len(columns_to_keep)}')
 
 
     def _prepare_pca(self):
@@ -409,8 +470,8 @@ class Aggregation:
         df_out = df_out.add_prefix('AEV_')
         self.df_measurements = pd.concat([self.df_measurements, df_out], axis=1)
         print(f'>> PCA used {self.aev_reducer.n_components_} components to explain '
-              f'{variance_data.sum():.4f} of the variance. AEVs are now in reduced dimension '
-              f'format.')
+              f'{variance_data.sum():.4f} of the variance. AEVs are now in reduced '
+              f'dimension format.')
 
 
     def _calculate_statistics(self):
@@ -469,10 +530,12 @@ class Aggregation:
                         data[feat + '_med'] = float(df_query[feat].median())
                         data[feat + '_avg'] = float(df_query[feat].mean())
                         data[feat + '_sd'] = float(df_query[feat].std(ddof=0))
-                        data[feat + '_range'] = float(df_query[feat].max()) - float(df_query[feat].min())
+                        data[feat + '_range'] = (float(df_query[feat].max()) -
+                                                 float(df_query[feat].min()))
 
                 elif feature == 'evolution':
-                    pred_query = df_query[df_query.get('Method', pd.Series(dtype=object)) == 'Predicted']
+                    pred_query = df_query[df_query.get('Method',
+                                            pd.Series(dtype=object)) == 'Predicted']
 
                     if not pred_query.empty:
                         for feat in [a for a in df_query.columns if 'EVL_' in a]:
@@ -501,9 +564,13 @@ class Aggregation:
         '''
         Choose method of aggregation allowing the user to choose the statistics they require
         '''
-        max_features = []; min_features = []; med_features = []; avg_features = []; sd_features = []; range_features = []; rand_features = []
-        print('>> For the following list of features, please choosen which statistics you would like to include in the aggregation')
-        print('>> The following statistics can be chosen (enter word or number seperated by ;): all (1), max (2), min (3), med (4), avg (5), sd (6), range (7), random (8)')
+        max_features = []; min_features = []; med_features = []; avg_features = []
+        sd_features = []; range_features = []; rand_features = []
+        print('>> For the following list of features, please choosen which statistics '
+              'you would like to include in the aggregation')
+        print('>> The following statistics can be chosen (enter word or number seperated '
+              'by ;): all (1), max (2), min (3), med (4), avg (5), sd (6), range (7), random (8)')
+
         for feat in list(set([a.split('_')[0] for a in self.features_to_include if 'max' in a])):
             tmp_stats = input(f'>> Choose statistics for feature: {feat}')
             try:
@@ -511,45 +578,88 @@ class Aggregation:
                 for stat in stats:
                     match stat:
                         case 'all' | '1':
-                            if feat not in max_features: max_features.append(feat)
-                            if feat not in min_features: min_features.append(feat)
-                            if feat not in avg_features: avg_features.append(feat)
-                            if feat not in sd_features: sd_features.append(feat)
-                            if feat not in range_features: range_features.append(feat)
-                            if feat not in rand_features: rand_features.append(feat)
+                            if feat not in max_features:
+                                max_features.append(feat)
+                            if feat not in min_features:
+                                min_features.append(feat)
+                            if feat not in avg_features:
+                                avg_features.append(feat)
+                            if feat not in sd_features:
+                                sd_features.append(feat)
+                            if feat not in range_features:
+                                range_features.append(feat)
+                            if feat not in rand_features:
+                                rand_features.append(feat)
+
                         case 'max' | '2':
-                            if feat not in max_features: max_features.append(feat)
+                            if feat not in max_features:
+                                max_features.append(feat)
+
                         case 'min' | '3':
-                            if feat not in min_features: min_features.append(feat)
+                            if feat not in min_features:
+                                min_features.append(feat)
+
                         case 'med' | '4':
-                            if feat not in med_features: med_features.append(feat)
+                            if feat not in med_features:
+                                med_features.append(feat)
+
                         case 'avg' | '5':
-                            if feat not in avg_features: avg_features.append(feat)
+                            if feat not in avg_features:
+                                avg_features.append(feat)
+
                         case 'sd' | '6':
-                            if feat not in sd_features: sd_features.append(feat)
+                            if feat not in sd_features:
+                                sd_features.append(feat)
+
                         case 'range' | '7':
-                            if feat not in range_features: range_features.append(feat)
+                            if feat not in range_features:
+                                range_features.append(feat)
+
                         case 'random' | '8':
-                            if feat not in rand_features: rand_features.append(feat)
+                            if feat not in rand_features:
+                                rand_features.append(feat)
+
                         case _:
-                            print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat}, using all metrics for {feat} instead')
-                            if feat not in max_features: max_features.append(feat)
-                            if feat not in min_features: min_features.append(feat)
-                            if feat not in med_features: med_features.append(feat)
-                            if feat not in avg_features: avg_features.append(feat)
-                            if feat not in sd_features: sd_features.append(feat)
-                            if feat not in range_features: range_features.append(feat)
-                            if feat not in rand_features: rand_features.append(feat)
+                            print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat}'
+                                  f', using all metrics for {feat} instead')
+                            if feat not in max_features:
+                                max_features.append(feat)
+                            if feat not in min_features:
+                                min_features.append(feat)
+                            if feat not in med_features:
+                                med_features.append(feat)
+                            if feat not in avg_features:
+                                avg_features.append(feat)
+                            if feat not in sd_features:
+                                sd_features.append(feat)
+                            if feat not in range_features:
+                                range_features.append(feat)
+                            if feat not in rand_features:
+                                rand_features.append(feat)
+
             except Exception as e:
-                print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat} with error {e}, using all metrics for {feat} instead')
-        max_feat_cols = [a for a in self.features_to_include if any(b in a for b in max_features) and 'max' in a]
-        min_feat_cols = [a for a in self.features_to_include if any(b in a for b in min_features) and 'min' in a]
-        med_feat_cols = [a for a in self.features_to_include if any(b in a for b in med_features) and 'med' in a]
-        avg_feat_cols = [a for a in self.features_to_include if any(b in a for b in avg_features) and 'avg' in a]
-        sd_feat_cols = [a for a in self.features_to_include if any(b in a for b in sd_features) and 'sd' in a]
-        range_feat_cols = [a for a in self.features_to_include if any(b in a for b in range_features) and 'range' in a]
-        rand_feat_cols = [a for a in self.features_to_include if any(b in a for b in rand_features) and 'rand' in a]
-        return df_stats.drop(columns=[a for a in self.features_to_include if a not in max_feat_cols + min_feat_cols + med_feat_cols + avg_feat_cols + sd_feat_cols + range_feat_cols + rand_feat_cols])
+                print(f'>> Could not evaluate input ({tmp_stats}) for feature: {feat} with '
+                      f'error {e}, using all metrics for {feat} instead')
+
+        max_feat_cols = [a for a in self.features_to_include if
+                         any(b in a for b in max_features) and 'max' in a]
+        min_feat_cols = [a for a in self.features_to_include if
+                         any(b in a for b in min_features) and 'min' in a]
+        med_feat_cols = [a for a in self.features_to_include if
+                         any(b in a for b in med_features) and 'med' in a]
+        avg_feat_cols = [a for a in self.features_to_include if
+                         any(b in a for b in avg_features) and 'avg' in a]
+        sd_feat_cols = [a for a in self.features_to_include if
+                        any(b in a for b in sd_features) and 'sd' in a]
+        range_feat_cols = [a for a in self.features_to_include if
+                           any(b in a for b in range_features) and 'range' in a]
+        rand_feat_cols = [a for a in self.features_to_include if
+                          any(b in a for b in rand_features) and 'rand' in a]
+
+        return df_stats.drop(columns=[a for a in self.features_to_include if a
+                                      not in max_feat_cols + min_feat_cols +
+                                      med_feat_cols + avg_feat_cols + sd_feat_cols +
+                                      range_feat_cols + rand_feat_cols])
 
 
     def save_state(self, outname="measures_aggregated.csv"):
@@ -559,7 +669,8 @@ class Aggregation:
         :param outname: the name of the csv file that the output is written to
         :type outname: str
         '''
-        self.df_agg.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
+        self.df_agg.to_csv(os.path.join(self.outdir, outname),
+                           index_label=False, index=False)
 
 
 if __name__ == "__main__":
@@ -567,7 +678,7 @@ if __name__ == "__main__":
     test_measures_dataframe = pd.read_csv(test_dataframe_name)
     agg = Aggregation(test_measures_dataframe,
                       aggregation_method='median',
-                      features_to_include=['all'], 
+                      features_to_include=['all'],
                       aev_red_method='pca')
     agg.aggregate_data()
     print(agg.df_agg)

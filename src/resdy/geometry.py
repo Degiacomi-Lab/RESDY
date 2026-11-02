@@ -12,12 +12,12 @@ The module also holds :func:`distance_to_other_chains`, which records how close 
 sits to a neighbouring chain, the metadata column Min_Dist_Other_Chain.
 '''
 
+from scipy.spatial import cKDTree
 import numpy as np
 import pandas as pd
 import biobox as bb
 from .helper import require_biobox
 require_biobox(bb)
-from scipy.spatial import cKDTree
 from .residues import PROTEIN_RESNAMES
 
 

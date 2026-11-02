@@ -1,5 +1,4 @@
 import os
-import re
 import math
 import inspect
 import pandas as pd
@@ -11,7 +10,29 @@ from .uniprot import Uniprot
 from .helper import METADATA_COLUMNS, sort_residue_key
 from scipy.stats import fisher_exact
 
+FEATURE_LABELS = {'depth': 'Depth (Å)',
+                'sasa': 'SASA (Å\u00b2)',
+                'propka': 'pKa (propka)',
+                'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                'curvature': 'Curvature',
+                'arc_length': 'Arc Length',
+                'das': 'Dynamically Accessible Surface',
+                'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                'phi': 'Phi',
+                'psi': 'Psi',
+                'seqcharge': 'Sequence Charge',
+                'torsion': 'Torsion Angle',
+                'writhing': 'Writhing',
+                'frustration': 'Frustration',
+                'rmsf': 'RMSF'}
 
+AGG_LABELS = {'avg': 'Average',
+            'med': 'Median',
+            'min': 'Minimum',
+            'max': 'Maximum',
+            'rand': 'Random',
+            'sd': 'Standard Deviation',
+            'range': 'Range'}
 
 class Analysis(object):
     '''
@@ -89,7 +110,8 @@ class Analysis(object):
         :returns: Dataframe containing only information from an alphafold structure
         :rtype: pandas.DataFrame
         '''
-        df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
+        df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) &
+                           (self.df['Resid'] == resid)]
         return df_query
 
 
@@ -159,45 +181,33 @@ class Analysis(object):
             return
 
         if uniprot != '' and chain != '' and resid != '':
-            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) &
+                              (self.df['Chain'] == chain) &
+                              (self.df['Resid'] == resid)]
+
         elif uniprot != '' and chain != '' and resid == '':
-            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) &
+                              (self.df['Chain'] == chain)]
+
         elif uniprot != '' and chain == '' and resid != '':
-            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Resid'] == resid)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) &
+                              (self.df['Resid'] == resid)]
+
         elif uniprot == '' and chain != '' and resid != '':
-            df_plot = self.df[(self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+            df_plot = self.df[(self.df['Chain'] == chain) &
+                              (self.df['Resid'] == resid)]
+
         elif uniprot != '' and chain == '' and resid == '':
             df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot)]
+
         elif uniprot == '' and chain != '' and resid == '':
             df_plot = self.df[(self.df['Chain'] == chain)]
+
         elif uniprot == '' and chain == '' and resid != '':
             df_plot = self.df[(self.df['Resid'] == resid)]
+
         else:
             df_plot = self.df
-
-        feature_labels = {'depth': 'Depth (Å)',
-                        'sasa': 'SASA (Å\u00b2)',
-                        'propka': 'pKa (propka)',
-                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
-                        'curvature': 'Curvature',
-                        'arc_length': 'Arc Length',
-                        'das': 'Dynamically Accessible Surface',
-                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
-                        'phi': 'Phi',
-                        'psi': 'Psi',
-                        'seqcharge': 'Sequence Charge',
-                        'torsion': 'Torsion Angle',
-                        'writhing': 'Writhing',
-                        'frustration': 'Frustration',
-                        'rmsf': 'RMSF'}
-
-        agg_labels = {'avg': 'Average',
-                      'med': 'Median',
-                      'min': 'Minimum',
-                      'max': 'Maximum',
-                      'rand': 'Random',
-                      'sd': 'Standard Deviation',
-                      'range': 'Range'}
 
         feature_histwidths = {'depth': 0.1,
                             'sasa': 2,
@@ -238,14 +248,15 @@ class Analysis(object):
                 step=feature_histwidths[feature]
 
                 palatinate_colour = '#682860'
-                ax.hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
-                        bins=np.arange(x_left, x_right, step), color=palatinate_colour,
-                        alpha=0.5, label='')
-                sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=ax)
-                ax.set_xlabel(feature_labels[feature])
+                ax.hist(df_plot[agg_feature], rwidth=1, density=True,
+                        histtype='bar', bins=np.arange(x_left, x_right, step),
+                        color=palatinate_colour, alpha=0.5, label='')
+                sns.kdeplot(df_plot[agg_feature], color=palatinate_colour,
+                            clip=(x_left, x_right), ax=ax)
+                ax.set_xlabel(FEATURE_LABELS[feature])
                 ax.set_xlim(x_left, x_right)
 
-                ax.set_title(f'Histogram Feature Analysis: {feature_labels[feature]}')
+                ax.set_title(f'Histogram Feature Analysis: {FEATURE_LABELS[feature]}')
 
             case 'all':
                 non_feat_cols = METADATA_COLUMNS
@@ -254,10 +265,12 @@ class Analysis(object):
                     feat_cols.remove('arc')
                     feat_cols.append('arc_length')
                 if 'aev' in feat_cols:
-                    print(f'> Feature \'aev\' in dataframe, ignoring for scalar feature histogram creation')
+                    print('> Feature \'aev\' in dataframe, ignoring for scalar '
+                          'feature histogram creation')
                     feat_cols.remove('aev')
                 if 'evolution' in feat_cols:
-                    print(f'> Feature \'evolution\' in dataframe, ignoring for scalar feature histogram creation')
+                    print('> Feature \'evolution\' in dataframe, ignoring for scalar '
+                          'feature histogram creation')
                     feat_cols.remove('evolution')
 
                 if agg_type == '':
@@ -293,7 +306,8 @@ class Analysis(object):
                 fig.set_figheight(12)
                 fig.set_figwidth(12)
                 fig.suptitle(f'Histogram All Features Analysis: Aggregation Type={agg_type}')
-                fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05, wspace=0.27, hspace=0.25)
+                fig.subplots_adjust(left=0.07, right=0.98, top=0.95, bottom=0.05,
+                                    wspace=0.27, hspace=0.25)
 
                 used_plots = []
                 for i, feat in enumerate(new_feat_cols):
@@ -310,8 +324,9 @@ class Analysis(object):
                     axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
                             bins=np.arange(x_left, x_right, step), color=palatinate_colour,
                             alpha=0.5, label='')
-                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=axs[row,col])
-                    axs[row,col].set_xlabel(feature_labels[feat])
+                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour,
+                                clip=(x_left, x_right), ax=axs[row,col])
+                    axs[row,col].set_xlabel(FEATURE_LABELS[feat])
                     axs[row,col].set_xlim(x_left, x_right)
 
                 for i in range(row_len * col_len):
@@ -335,16 +350,20 @@ class Analysis(object):
                 non_feat_cols = METADATA_COLUMNS
                 agg_types = [a.split('_')[-1] for a in df_plot.columns if a not in non_feat_cols]
 
-                if len(agg_types) <= 4: col_len = 2
-                else: col_len = 3
+                if len(agg_types) <= 4:
+                    col_len = 2
+                else:
+                    col_len = 3
 
                 row_len = math.ceil(len(agg_types) / col_len)
 
                 fig, axs = plt.subplots(row_len, col_len)
                 fig.set_figheight(12)
                 fig.set_figwidth(12)
-                fig.suptitle(f'Histogram All Aggregation Analysis; Feature: {feature_labels[feature]}')
-                fig.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.05, wspace=0.27, hspace=0.27)
+                fig.suptitle(f'Histogram All Aggregation Analysis; Feature: '
+                             f'{FEATURE_LABELS[feature]}')
+                fig.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.05,
+                                    wspace=0.27, hspace=0.27)
 
                 used_plots = []
                 for i, agg in enumerate(agg_types):
@@ -358,13 +377,14 @@ class Analysis(object):
                     step=feature_histwidths[feature]
 
                     palatinate_colour = '#682860'
-                    axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True, histtype='bar',
-                            bins=np.arange(x_left, x_right, step), color=palatinate_colour,
-                            alpha=0.5, label='')
-                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour, clip=(x_left, x_right), ax=axs[row,col])
-                    axs[row,col].set_xlabel(feature_labels[feature])
+                    axs[row,col].hist(df_plot[agg_feature], rwidth=1, density=True,
+                                      histtype='bar', bins=np.arange(x_left, x_right, step),
+                                      color=palatinate_colour, alpha=0.5, label='')
+                    sns.kdeplot(df_plot[agg_feature], color=palatinate_colour,
+                                clip=(x_left, x_right), ax=axs[row,col])
+                    axs[row,col].set_xlabel(FEATURE_LABELS[feature])
                     axs[row,col].set_xlim(x_left, x_right)
-                    axs[row,col].set_title(agg_labels[agg])
+                    axs[row,col].set_title(AGG_LABELS[agg])
 
                 for i in range(row_len * col_len):
                     row = math.floor(i / col_len)
@@ -372,7 +392,8 @@ class Analysis(object):
                     if [row, col] not in used_plots:
                         fig.delaxes(axs[row][col])
             case _:
-                print(f'>> Plot type give ({plot_type}) not recognised, please choose either all, single, agg')
+                print(f'>> Plot type give ({plot_type}) not recognised, please choose '
+                      f'either all, single, agg')
 
         if save_name != '':
             plt.savefig(os.path.join(self.outdir, save_name))
@@ -382,7 +403,7 @@ class Analysis(object):
 
 
     def plot_feature_violins(self, features='', agg_type='', uniprot='',
-                               chain='', resid='', save_name='', show_graph=True):
+                            chain='', resid='', save_name='', show_graph=True):
         '''
         Create a basic plot showing the distribution of values for the specified feature
         across the set of measurements passed into the analysis class. An aggregation
@@ -421,45 +442,33 @@ class Analysis(object):
             agg_type = 'all'
 
         if uniprot != '' and chain != '' and resid != '':
-            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) &
+                              (self.df['Chain'] == chain) &
+                              (self.df['Resid'] == resid)]
+
         elif uniprot != '' and chain != '' and resid == '':
-            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Chain'] == chain)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) &
+                              (self.df['Chain'] == chain)]
+
         elif uniprot != '' and chain == '' and resid != '':
-            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) & (self.df['Resid'] == resid)]
+            df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot) &
+                              (self.df['Resid'] == resid)]
+
         elif uniprot == '' and chain != '' and resid != '':
-            df_plot = self.df[(self.df['Chain'] == chain) & (self.df['Resid'] == resid)]
+            df_plot = self.df[(self.df['Chain'] == chain) &
+                              (self.df['Resid'] == resid)]
+
         elif uniprot != '' and chain == '' and resid == '':
             df_plot = self.df[(self.df['Uniprot_Entry'] == uniprot)]
+
         elif uniprot == '' and chain != '' and resid == '':
             df_plot = self.df[(self.df['Chain'] == chain)]
+
         elif uniprot == '' and chain == '' and resid != '':
             df_plot = self.df[(self.df['Resid'] == resid)]
+
         else:
             df_plot = self.df
-
-        feature_labels = {'depth': 'Depth (Å)',
-                        'sasa': 'SASA (Å\u00b2)',
-                        'propka': 'pKa (propka)',
-                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
-                        'curvature': 'Curvature',
-                        'arc_length': 'Arc Length',
-                        'das': 'Dynamically Accessible Surface',
-                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
-                        'phi': 'Phi',
-                        'psi': 'Psi',
-                        'seqcharge': 'Sequence Charge',
-                        'torsion': 'Torsion Angle',
-                        'writhing': 'Writhing',
-                        'frustration': 'Frustration',
-                        'rmsf': 'RMSF'}
-
-        agg_labels = {'avg': 'Average',
-                      'med': 'Median',
-                      'min': 'Minimum',
-                      'max': 'Maximum',
-                      'rand': 'Random',
-                      'sd': 'Standard Deviation',
-                      'range': 'Range'}
 
         non_feat_cols = METADATA_COLUMNS
 
@@ -488,7 +497,7 @@ class Analysis(object):
                 agg_non_feat_cols = [a for a in df_plot_feat.columns if a in non_feat_cols]
                 df_plot_feat = df_plot_feat.drop(columns=agg_non_feat_cols)
                 df_plot_feat = df_plot_feat.rename(columns={k: v for k, v in zip(list(df_plot_feat.columns),
-                                        [agg_labels[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
+                                [AGG_LABELS[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
 
                 sns.violinplot(data=df_plot_feat,
                             inner="quart",
@@ -498,8 +507,8 @@ class Analysis(object):
 
                 if i == num_feats - 1:
                     ax.set(xlabel='Aggregation Types')
-                ax.set(ylabel=feature_labels[feat])
-                ax.set(title=f'Feature Aggregation Analysis: {feature_labels[features[0]]}')
+                ax.set(ylabel=FEATURE_LABELS[feat])
+                ax.set(title=f'Feature Aggregation Analysis: {FEATURE_LABELS[features[0]]}')
 
             plt.xticks(rotation=20)
 
@@ -519,7 +528,7 @@ class Analysis(object):
                 agg_non_feat_cols = [a for a in df_plot_feat.columns if a in non_feat_cols]
                 df_plot_feat = df_plot_feat.drop(columns=agg_non_feat_cols)
                 df_plot_feat = df_plot_feat.rename(columns={k: v for k, v in zip(list(df_plot_feat.columns),
-                                        [agg_labels[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
+                                [AGG_LABELS[a.split('_')[-1]] for a in list(df_plot_feat.columns)])})
 
                 sns.violinplot(data=df_plot_feat,
                             inner="quart",
@@ -531,7 +540,7 @@ class Analysis(object):
                     axs[i].set(xlabel='Aggregation Types')
                 else:
                     axs[i].set(xticks=[])
-                axs[i].set(ylabel=feature_labels[feat])
+                axs[i].set(ylabel=FEATURE_LABELS[feat])
 
             fig.suptitle('Violin Feature Aggregation Analysis')
             plt.xticks(rotation=20)
@@ -558,7 +567,8 @@ class Analysis(object):
         :param whis:
         :type whis: float
         '''
-        df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) & (self.df['Resid'] == resid)]
+        df_query = self.df[(self.df['Uniprot_Entry'] == uniprot_entry) &
+                           (self.df['Resid'] == resid)]
         x = df_query[feature]
 
         q_one = x.quantile(0.25)
@@ -615,15 +625,21 @@ class Analysis(object):
         try:
             if isinstance(extra_measures_filename, str):
                 new_df = pd.read_csv(extra_measures_filename)
-            if 'Unnamed: 0' in new_df.columns: new_df = new_df.drop(columns='Unnamed: 0')
-            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
+            if 'Unnamed: 0' in new_df.columns:
+                new_df = new_df.drop(columns='Unnamed: 0')
+
+            base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method',
+                            'Resolution', 'Chain', 'Resid', 'Source']
             orig_measures_columns = [a for a in self.df.columns if a not in base_columns]
             new_measures_columns = [a for a in new_df.columns if a not in base_columns]
             overlap_columns = [a for a in new_measures_columns if a in orig_measures_columns]
-            new_nonoverlap_columns = [a for a in new_measures_columns if a not in orig_measures_columns]
+            new_nonoverlap_columns = [a for a in new_measures_columns if
+                                      a not in orig_measures_columns]
+
             for column in overlap_columns:
                 proper_answer = False
-                print(f'Measurement {column} already present in the loaded dataframe, do you want to replace it?')
+                print(f'Measurement {column} already present in the loaded dataframe, '
+                      f'do you want to replace it?')
 
                 while not proper_answer:
                     col_to_keep = input('Enter old or new for data to keep: ')
@@ -652,10 +668,11 @@ class Analysis(object):
                 self.df = self.df.merge(new_df[cols_to_use], how='left',
                                         on=['PDB_Code', 'Chain', 'Resid'])
 
-            print(f'\nFinished adding extra measures data to dataframe')
+            print('\nFinished adding extra measures data to dataframe')
 
         except Exception as e:
-            print(f'Failed to load in the new measures dataframe (name: {extra_measures_filename}), error: {e}')
+            print(f'Failed to load in the new measures dataframe (name: '
+                  f'{extra_measures_filename}), error: {e}')
 
         # Step 2: write new measures.csv file if required
         if write_new_file:
@@ -666,8 +683,8 @@ class Analysis(object):
     def remove_not_important_residues(self, req_resid_table, outname='measures_cut.csv'):
         '''
         Function to take the input file documenting which residues are required to keep due to being
-        of interest and remove anything from the dataframe that is not in this list. This is required
-        due to the codebase calculating data for every possible resid in the structure.
+        of interest and remove anything from the dataframe that is not in this list. This is
+        required due to the codebase calculating data for every possible resid in the structure.
 
         .. rubric:: Method
 
@@ -682,11 +699,12 @@ class Analysis(object):
             Auto set to measures_cut.csv
         :type outname: str
 
-        :returns: Resulting dataframe containing only residues of interest given from the req_resid_table
+        :returns: Resulting dataframe containing only residues of interest given from
+            the req_resid_table
         :rtype: pandas.DataFrame
         '''
         print('>> Removing unrequired residues')
-        
+
         if isinstance(req_resid_table, str):
             df_req_res = pd.read_csv(req_resid_table)
         else:
@@ -701,14 +719,17 @@ class Analysis(object):
         req_uniprot_codes = df_req_res['Uniprot_Entry'].drop_duplicates().tolist()
         df_unreq_uni_codes = df_working[~df_working['Uniprot_Entry'].isin(req_uniprot_codes)]
         df_working = df_working[df_working['Uniprot_Entry'].isin(req_uniprot_codes)]
-        print(f'Removed {len(df_unreq_uni_codes)} rows of Uniprot codes which were not mentioned in the required residues file')
+        print(f'Removed {len(df_unreq_uni_codes)} rows of Uniprot codes which were '
+              f'not mentioned in the required residues file')
 
         for i, uniprot in enumerate(req_uniprot_codes):
             print(f"Number of rows left: {(len(df_req_res) - i)}")
             print(f"Extracting data for: {uniprot}")
 
-            desired_residues = list(df_req_res.loc[df_req_res["Uniprot_Entry"] == uniprot, "Resid"].drop_duplicates())
-            search_uniprot = df_working.loc[df_working["Uniprot_Entry"] == uniprot.strip(), ["Uniprot_Entry", "Resid"]]
+            desired_residues = list(df_req_res.loc[df_req_res["Uniprot_Entry"] == uniprot,
+                                                   "Resid"].drop_duplicates())
+            search_uniprot = df_working.loc[df_working["Uniprot_Entry"] == uniprot.strip(),
+                                            ["Uniprot_Entry", "Resid"]]
             all_search_rows = search_uniprot.index.tolist()
             wanted_rows = search_uniprot[search_uniprot["Resid"].isin(desired_residues)].index.tolist()
             not_wanted_rows = [x for x in all_search_rows if x not in wanted_rows]
@@ -720,7 +741,9 @@ class Analysis(object):
         print(f'Original num of rows: {initial_full_data_rows}')
         print(f'Current num of rows: {final_full_data_rows}')
         print(f'Num of rows removed: {diff_rows}')
-        df_working.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
+        df_working.to_csv(os.path.join(self.outdir, outname),
+                          index_label=False, index=False)
+
         self.df = df_working
         return df_working
 
@@ -767,7 +790,8 @@ class Analysis(object):
         df_sites_required = df.pop('_required').eq(True).to_numpy()
 
         if 'class' in df.columns:
-            print('Values for class are already present in the measurements dataframe, overwriting.')
+            print('Values for class are already present in the measurements '
+                  'dataframe, overwriting.')
             current_class_col = df['class']
         else:
             print(f'No previous class assignment found, class column will be created and the label '
@@ -848,30 +872,47 @@ class Analysis(object):
             if isinstance(weights, float) or isinstance(weights, int):
                 if weights == 0.5:
                     print('>> Weight remains as default and equal for all metrics')
-                    if len(features) == 1: weights = [1]
-                    else: weights = [1/len(features)] * len(features)
+                    if len(features) == 1:
+                        weights = [1]
+                    else:
+                        weights = [1/len(features)] * len(features)
+
                 elif len(features) == 2:
-                    print(f'>> 1 weight given, 2 features, assigning given weight ({weights}) to first feature ({features[0]}), second feature ({features[1]}) will take {1-weights} for weighting.')
+                    print(f'>> 1 weight given, 2 features, assigning given weight ({weights}) to '
+                          f'first feature ({features[0]}), second feature ({features[1]}) will '
+                          f'take {1-weights} for weighting.')
                     weights = [weights, 1-weights]
+
                 else:
-                    print('>> Not enough weights entered to work out weightings for features. Assuming equal weight for all metrics')
+                    print('>> Not enough weights entered to work out weightings for features. '
+                          'Assuming equal weight for all metrics')
                     weights = [1/len(features)] * len(features)
+
             elif isinstance(weights, list):
                 if len(set(weights)) == 1:
                     print('>> Weight remains as default and equal for all metrics')
                     weights = [1/len(features)] * len(features)
+
                 elif len(weights) < len(features):
-                    print('>> Number of weights given is lower than the number of features. Adjusting weights to include')
-                    while len(weights) != len(features): weights.append(1/len(features))
+                    print('>> Number of weights given is lower than the number of features. '
+                          'Adjusting weights to include')
+                    while len(weights) != len(features):
+                        weights.append(1/len(features))
                     weights = [round((i/sum(weights)), 2) for i in weights]
+
                 elif len(weights) > len(features):
-                    print(f'>> Number of weights given is greater than the number of features. Taking first {len(features)} through')
+                    print(f'>> Number of weights given is greater than the number of features. '
+                          f'Taking first {len(features)} through')
                     weights = weights[:len(features)]
                     weights = [round((i/sum(weights)), 2) for i in weights]
+
                 elif sum(weights) != 1:
                     print('>> Weights do not sum to 1. Adjusting weights as required.')
                     weights = [round((i/sum(weights)), 2) for i in weights]
-                else: print('>> Weights fit, taking through as given')
+
+                else:
+                    print('>> Weights fit, taking through as given')
+
         except Exception as e:
                 print(f'Error sorting the weights for the analysis: {e}')
 
@@ -880,19 +921,25 @@ class Analysis(object):
         self.df_sub = pd.DataFrame(columns=['Uniprot_Entry'])
 
         # if features not known which trend is best, ask user which is required
-        unsure_feats = ['phi', 'psi', 'curvture', 'writhing', 'arc_length', 'rmsf', 'secondarystructure']
+        unsure_feats = ['phi', 'psi', 'curvture', 'writhing', 'arc_length',
+                        'rmsf', 'secondarystructure']
         min_feats = ['propka', 'pkaANI', 'legolas', 'depth']
         max_feats = ['sasa', 'das', 'seqcharge', 'frustration']
+
         for feat in features:
             if feat in ['aev', 'evolution']:
                 print(f'>> Feature {feat} is not supported with this analysis. '
                       f'Dropping feature from list to analyse')
+
             if feat not in min_feats + max_feats:
                 pref = 'tmp'
                 while pref not in ['min', 'max']:
-                    pref = input(f'Enter bias towards min or max for {feat} (enter "min" or "max"): ')
-                if pref == 'min': min_feats.append(feat)
-                elif pref == 'max': max_feats.append(feat)
+                    pref = input(f'Enter bias towards min or max for {feat} '
+                                 f'(enter "min" or "max"): ')
+                if pref == 'min':
+                    min_feats.append(feat)
+                elif pref == 'max':
+                    max_feats.append(feat)
 
         for _, df_query in df_rb.groupby(self.res_key):
             if len(df_query) > 1:
@@ -901,8 +948,9 @@ class Analysis(object):
                 try:
                     features_and_weights = zip(features, weights)
                 except Exception as e:
-                    print(f'Failed to link metrics with weights, were the metrics entered correctly? {e}')
-                
+                    print(f'Failed to link metrics with weights, were the metrics '
+                          f'entered correctly? {e}')
+
                 metric_calculated_values_list_temp = []
                 try:
                     for feature, weight in features_and_weights:
@@ -918,17 +966,24 @@ class Analysis(object):
                                 case _:
                                     print(f'>> Feature ({feature}) unknown, taking minimum')
                                     feat_list = list(df_query[feature])
+
                             feat_avg, feat_std = np.mean(feat_list), np.std(feat_list)
+
                             if feat_std == 0:
-                                print(f'Standard deviation of feature: {feature} is 0 as is always constant, '
-                                      f'{feature} therefore contributes 0 to relative best.')
+                                print(f'Standard deviation of feature: {feature} is 0 as is '
+                                      f'always constant, {feature} therefore contributes 0 '
+                                      f'to relative best.')
                                 feat_list_standardised = np.zeros(len(feat_list))
+
                             else:
                                 feat_list_standardised = (feat_list - feat_avg) / feat_std
+
                             feat_list_weighted = feat_list_standardised * weight
                             metric_calculated_values_list_temp.append(feat_list_weighted)
+
                         except Exception as e:
                             print(f'>> Failed to load the data for the metric: {feature} with error: {e}')
+
                 except Exception as e:
                     print(f'Error loading data for the metrics provided: {e}')
 
@@ -937,14 +992,15 @@ class Analysis(object):
                     base = -np.inf
                     for i, val in enumerate(metric_calculated_values_list_temp[0]):
                         weighted_sum = 0
-                        for weighted_value_index, metric_value in enumerate(metric_calculated_values_list_temp):
+                        for _, metric_value in enumerate(metric_calculated_values_list_temp):
                             weighted_sum += metric_value[i]
                         if np.isfinite(weighted_sum) and weighted_sum >= base:
                             index = i
                             base = weighted_sum
                     row_to_append = df_query.iloc[[index],:]
                 except Exception as e:
-                    print(f'Failed to find the best row for the desired trade off between the three metrics: {e}')
+                    print(f'Failed to find the best row for the desired trade off '
+                          f'between the three metrics: {e}')
                     row_to_append = df_query.iloc[[0],:]
             else:
                 row_to_append = df_query.iloc[[0],:]
@@ -1012,13 +1068,16 @@ class Analysis(object):
         '''
 
         if not self.statsmodel_available:
-            raise ImportError(f'>> GO enrichment analysis requires statsmodel.multipletests which isn\' available')
+            raise ImportError(f'>> GO enrichment analysis requires statsmodel.multipletests '
+                              f'which isn\'t available')
 
         # get all the uniprot codes inside the range and the reference uniprot code list
         feat_one, feat_one_low, feat_one_upper = str(feature_one[0]), float(feature_one[1]), float(feature_one[2])
         feat_two, feat_two_low, feat_two_upper = str(feature_two[0]), float(feature_two[1]), float(feature_two[2])
-        selected_df = self.df[(self.df[feat_one] >= feat_one_low) & (self.df[feat_one] <= feat_one_upper)]
-        selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) & (selected_df[feat_two] <= feat_two_upper)]
+        selected_df = self.df[(self.df[feat_one] >= feat_one_low) &
+                              (self.df[feat_one] <= feat_one_upper)]
+        selected_df = selected_df[(selected_df[feat_two] >= feat_two_low) &
+                                  (selected_df[feat_two] <= feat_two_upper)]
         uniprot_selected = list(selected_df['Uniprot_Entry'].unique())
         uniprot_reference = list(self.df['Uniprot_Entry'].unique())
 
@@ -1030,7 +1089,7 @@ class Analysis(object):
 
         self.GO_dict, self.code_to_name = UP.GO_dict, UP.code_to_name
 
-        # get all the GO Terms in the background (that are associated with more than uniprot_cnt_cutoff)
+        # get all the GO Terms in the background (associated with more than uniprot_cnt_cutoff)
         GO_bacgou = [code for code, unis in self.GO_dict.items() if len(unis) >= uniprot_cnt_cutoff]
 
         p_val_dict = {}
@@ -1055,7 +1114,9 @@ class Analysis(object):
             go_code = list(p_val_dict.items())[i][0]
             raw_p = p_val_list[i]
             adj_p = y[1][i]
-            out_dict[go_code] = (raw_p, adj_p, self.get_contingency_table(go_code, uniprot_selected, uniprot_reference))
+            out_dict[go_code] = (raw_p, adj_p,
+                                 self.get_contingency_table(go_code, uniprot_selected,
+                                                            uniprot_reference))
 
         df = pd.DataFrame(columns = ['GO ID', 'GO Term', 'raw p value', 'FDR',
                                     'num in the region', 'num in the bkgd'])
@@ -1097,7 +1158,8 @@ class Analysis(object):
         kwargs = {k:v for (k,v) in kwargs.items() if k in agg_init_param_names}
 
         if 'features_to_include' not in list(kwargs):
-            kwargs['features_to_include'] = [a for a in self.df.columns if a not in METADATA_COLUMNS]
+            kwargs['features_to_include'] = [a for a in self.df.columns if
+                                             a not in METADATA_COLUMNS]
 
         print(kwargs)
 
@@ -1311,7 +1373,7 @@ class Analysis(object):
             print(f'>> Could not find a measures.csv file at the given path: {meas_path}, please '
                   f'check the outdir serring and the filename are correct on input.')
             return df_meas_meta
-        
+
         df_meas_meta = pd.read_csv(meas_path)
 
         if not os.path.isfile(cur_geom_path):
