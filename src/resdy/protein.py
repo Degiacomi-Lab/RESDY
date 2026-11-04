@@ -24,7 +24,7 @@ from . import alphafold as af
 from . import patcher
 from . import assembly
 from .residues import AA_PRESETS
-from .geometry import check_geometry
+from .geometry import check_geometry, GEOMETRY_COLUMNS
 
 try:
     import openmm
@@ -890,8 +890,9 @@ class PDB(object):
                                 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
                         data = data | align_dets
                     else:
-                        largest_gap, _ = self.clean_and_split_pdb(pdb_code)
+                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code)
                         data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
+                        data = data | align_dets
             except Exception as e:
                 print_statements.append(clean_split_print_trap.getvalue())
                 broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code,
@@ -909,7 +910,7 @@ class PDB(object):
             return pd.DataFrame.from_records(data, index=[0])
 
 
-    def _record_geometry(self, geometry):
+    def _record_geometry(self, geometry, stage, align_details={}):
         '''
         Write a geometry report given from a specific structure to the ``curation_geometry.csv``
         file. This appends on to any other geometry data already in this file. This is written
@@ -920,15 +921,23 @@ class PDB(object):
         :param geometry: report as returned by resdy.geometry.check_geometry, with
             n_modelled_residues added by patcher.curate.
         :type geometry: dict
+        :param stage: Option to record whether the structure is 'patched', 'relaxed' or 'assembly'
+        :type stage: str
+        :param align_details: report given from the attempted alignment of the chains to the
+            canonical uniprot sequence done through _align_resnum_uniprot() in protein.py
+        :type align_details: dict
         '''
         if not geometry:
             return
-        record = dict(geometry)
-        record['structure'] = os.path.splitext(os.path.basename(str(record.get('file', ''))))[0]
+        record = {k: geometry.get(k, '') for k in GEOMETRY_COLUMNS}
+        record['structure'] = os.path.splitext(os.path.basename(str(geometry.get('file', ''))))[0]
+        record['stage'] = stage
+        if align_details:
+            record = record | align_details
         path = os.path.join(self.outdir, 'curation_geometry.csv')
         try:
             with open(path, 'a', newline='') as fh:
-                writer = csv.DictWriter(fh, fieldnames=sorted(record))
+                writer = csv.DictWriter(fh, fieldnames=GEOMETRY_COLUMNS)
                 if fh.tell() == 0:
                     writer.writeheader()
                 writer.writerow(record)
@@ -1013,9 +1022,9 @@ class PDB(object):
 
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
         test_patch = False
-        largest_gap = np.nan
-        align_details = {}
         for cnt, f in enumerate(files):
+            largest_gap = np.nan
+            align_details = {}
             mypath = os.path.split(f)[0]
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
 
@@ -1025,7 +1034,7 @@ class PDB(object):
                     f, fasta_loc, outdir=self.curated_dir,
                     gap=self.gap, include_hetatm=self.include_hetatm,
                     block_bulk_modeller_output=block_bulk_modeller_output)
-                self._record_geometry(geometry)
+
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
@@ -1034,13 +1043,22 @@ class PDB(object):
                     try:
                         align_details = self._align_resnum_uniprot(uniprot_code, fname, chains)
                     except Exception as e:
+                        align_details = {'numbering': 'author',
+                                        'chains_author_numbering': 'all'}
                         print(f'>> Renumbering skipped for conformer {cnt} with error: {str(e)}')
+                else:
+                    align_details = {}
 
                 if self.biological_assembly:
-                    self._build_assembly(fname, biomatrix, determined)
-                    self._record_geometry(check_geometry(fname)[0])
+                    try:
+                        self._build_assembly(fname, biomatrix, determined)
+                        self._record_geometry(check_geometry(fname)[0], 'assembly', align_details)
+                    except Exception as e:
+                        print(f'>> Failed to build assembly for file {fname} with error: {str(e)}')
+                        continue
 
                 test_patch = True
+                self._record_geometry(geometry, 'patched', align_details)
 
             except Exception as e:
                 tmp_name = f'tmp_{os.path.splitext(os.path.basename(f))[0]}'
@@ -1050,7 +1068,7 @@ class PDB(object):
 
             try:
                 if self.minimise_pdb:
-                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0])
+                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0], align_details=align_details)
             except Exception as e:
                 print(f'Failed to apply minimisation to file {f}')
 
@@ -1642,8 +1660,9 @@ class PDB(object):
         pdb_seqs = {}
         for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
             tmp_data = subset_data[subset_data['chain'] == chain]
-            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in list(protein_letters_dict.keys())
-                                       else 'X' for a in list(tmp_data['resname'])])
+            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in
+                                       list(protein_letters_dict.keys()) else
+                                       'X' for a in list(tmp_data['resname'])])
 
         if isinstance(chains, str):
             chains = [c for c in chains.split('/') if c]
@@ -1651,7 +1670,8 @@ class PDB(object):
         if not chains:
             # no chain was declared for this Uniprot entry, so there is nothing to place
             # in the canonical sequence and nothing to report
-            return
+            return {'numbering': 'author',
+                    'chains_author_numbering': ''}
 
         failed = []
         for chain in chains:
@@ -1664,10 +1684,13 @@ class PDB(object):
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
 
                 res_mapper = {}
-                chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == chain, 'resid']))
+                chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == chain,
+                                                             'resid']))
 
-                for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                    for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
+                for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                      alignment.aligned[1]):
+                    for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1),
+                                                range(pdb_start, pdb_end)):
                         res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
                 mapped_res = M.data['resid'].map(res_mapper)
@@ -1711,8 +1734,8 @@ class PDB(object):
         else:
             numbering = 'uniprot'
 
-        return {'Numbering': numbering,
-                'Chains_Author_Numbering': ','.join(map(str, failed))}
+        return {'numbering': numbering,
+                'nhains_author_numbering': ','.join(map(str, failed))}
 
 
     def get_chain_replacement(self, pdb_code):
@@ -1919,7 +1942,7 @@ class PDB(object):
             print(f'Failed rewriting pdb file with error: {str(e)}')
 
 
-    def apply_minimisation(self, pdb, max_iterations=None):
+    def apply_minimisation(self, pdb, max_iterations=None, align_details={}):
         '''
         Utilise openmm to apply an energy minimisation to relax the structure, by default
         in implicit solvent. The force field, tolerance, iteration cap, heavy-atom restraints
@@ -1939,6 +1962,12 @@ class PDB(object):
             constructor's minimise_max_iterations for this call only (0 runs until the
             tolerance is reached). None uses the constructor's value.
         :type max_iterations: int
+        :param align_details: report given from the attempted alignment of the chains to the
+            canonical uniprot sequence done through _align_resnum_uniprot() in protein.py. This
+            is carried through in the protein curation and has no affect on the actual minimisation
+            being done, it is solely for reporting the curated geometry to curation_geometry.csv
+            afterwards.
+        :type align_details: dict
         '''
         settings = dict(self.minimisation_settings)
         if max_iterations is not None:
@@ -1950,7 +1979,8 @@ class PDB(object):
             os.remove(relaxed_path)
 
         if self.keep_waters and self._uses_implicit_solvent(settings['forcefield']):
-            # the implicit solvent model already accounts for solvation, so minimising explicit waters would count it twice
+            # the implicit solvent model already accounts for solvation, so
+            # minimising explicit waters would count it twice
             reason = 'explicit waters are being kept'
             print(f'>> Not minimising {pdb}: explicit waters are being kept, which the '
                   f'implicit solvent model would double-count. The unminimised structure '
@@ -2055,7 +2085,7 @@ class PDB(object):
             N.write_pdb(relaxed_path)
 
             relaxed_geometry, _ = check_geometry(relaxed_path)
-            self._record_geometry(relaxed_geometry)
+            self._record_geometry(relaxed_geometry, 'relaxed', align_details)
 
             details = {'platform_used': simulation.context.getPlatform().getName(),
                        'energy_initial_kj_mol': energy_initial.value_in_unit(kilojoule_per_mole),

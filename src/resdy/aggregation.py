@@ -154,7 +154,8 @@ class Aggregation:
         self.non_feature_cols = list(METADATA_COLUMNS)
 
         if self.features_to_include == ['all']:
-            self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements.columns.str.contains('^Unnamed')]
+            self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements
+                                                            .columns.str.contains('^Unnamed')]
             self.features_to_include = [a for a in self.df_measurements.columns
                                         if a not in self.non_feature_cols]
 
@@ -553,7 +554,7 @@ class Aggregation:
                     data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
                     data[feature + '_rand'] = df_query[feature].iloc[rand_row]
 
-            data['num_structures'] = len(df_query)
+            data['num_structures'] = df_query['PDB_Code'].nunique()
 
             df_stats = pd.concat([df_stats, pd.DataFrame([data])], ignore_index=True)
 

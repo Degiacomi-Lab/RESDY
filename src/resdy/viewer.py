@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, ctx, callback, no_update
 from .aggregation import Aggregation
-from .helper import METADATA_COLUMNS
+from .helper import METADATA_COLUMNS, FEATURE_LABELS, AGG_LABELS
 from .analysis import Analysis
 from .uniprot import Uniprot
 
@@ -62,13 +62,7 @@ class Viewer(object):
                       f'removing {feat} from dataframe')
         self.features = [a for a in self.features if a not in self.vector_features]
 
-        self.aggregation_types = {'Average': 'avg',
-                                  'Standard Deviation': 'sd',
-                                  'Median': 'med',
-                                  'Minimum': 'min',
-                                  'Maximum': 'max',
-                                  'Range': 'range',
-                                  'Random': 'rand'}
+        self.aggregation_types = {v:k for k,v in AGG_LABELS.items()}
 
         self.feature_labels = {'pKa (PROPKA3)': 'propka',
                                'pKa (pKaANI)': 'pkaani',
@@ -90,25 +84,7 @@ class Viewer(object):
                                'Density': 'density',
                                'Secondary Structure': 'secondarystructure'}
 
-        self.axis_labels = {'depth': 'Depth (Å)',
-                        'sasa': 'Solvent Accessible Surface Area (Å\u00b2)',
-                        'propka': 'pKa (PROPKA3)',
-                        'pkaani': 'pKa (pKaANI)',
-                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
-                        'curvature': 'Curvature',
-                        'arc_length': 'Arc Length',
-                        'das': 'Dynamically Accessible Surface Area',
-                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
-                        'phi': 'Phi',
-                        'psi': 'Psi',
-                        'seqcharge': 'Sequence Charge',
-                        'torsion': 'Torsion Angle',
-                        'writhing': 'Writhing',
-                        'frustration': 'Frustration',
-                        'rmsf': 'Root Mean Square Fluctuation',
-                        'density': 'Density',
-                        'aev': 'Atomic Environment Vector',
-                        'secondarystructure': 'Secondary Structure'}
+        self.axis_labels = FEATURE_LABELS
 
         self.feature_labels_reverse = {v: k for k, v in self.feature_labels.items()}
         self.feature_labels_list = [self.feature_labels_reverse.get(a, a) for a in self.features]
@@ -657,7 +633,7 @@ class Viewer(object):
                 ])
 
 
-        @callback(
+        @app.callback(
             Output('2d-indicator-scatter', 'figure'),
             Output('2d-axis-column', 'value'),
             Output('2d-yaxis-column', 'value'),
@@ -912,7 +888,7 @@ class Viewer(object):
             return dff, axis_name, title, subset, colour
 
 
-        @callback(
+        @app.callback(
             Output('x-feat-hist', 'figure'),
             Output('2d-little_hist_subset_dropdown', 'value'),
             Output('2d-little_hist_colour_dropdown', 'value'),
@@ -926,7 +902,7 @@ class Viewer(object):
             return create_feature_hist(dff, xaxis, title, axis_type, subset, colour), subset, colour
 
 
-        @callback(
+        @app.callback(
             Output('y-feat-hist', 'figure'),
             Input('2d-indicator-scatter', 'hoverData'),
             Input('2d-yaxis-column', 'value'),
@@ -991,7 +967,7 @@ class Viewer(object):
             return fig
 
 
-        @callback(
+        @app.callback(
             Output('histogram-main', 'figure'),
             Output('crossfilter-feature-hist', 'value'),
             Output('2d-agg-type-hist', 'value'),
@@ -1116,7 +1092,7 @@ class Viewer(object):
 
 
 
-        @callback(
+        @app.callback(
             Output('3d-indicator-scatter', 'figure'),
             Output('3d-xaxis-column', 'value'),
             Output('3d-yaxis-column', 'value'),
@@ -1264,7 +1240,7 @@ class Viewer(object):
             return fig, xaxis_column_name, yaxis_column_name, zaxis_column_name, agg_type, xaxis_range_header, yaxis_range_header, zaxis_range_header, xaxis_min, xaxis_max, yaxis_min, yaxis_max, zaxis_min, zaxis_max, xaxis_range, yaxis_range, zaxis_range
 
 
-        @callback(
+        @app.callback(
             Output('3d-x-feat-hist', 'figure'),
             Output('3d-little_hist_subset_dropdown', 'value'),
             Output('3d-little_hist_colour_dropdown', 'value'),
@@ -1277,7 +1253,7 @@ class Viewer(object):
             dff, xaxis, title, subset, colour = update_little_hist(hoverData, xaxis_column_name, subset, colour)
             return create_feature_hist(dff, xaxis, title, axis_type, subset, colour), subset, colour
 
-        @callback(
+        @app.callback(
             Output('3d-y-feat-hist', 'figure'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-yaxis-column', 'value'),
@@ -1288,7 +1264,7 @@ class Viewer(object):
             dff, yaxis, title, subset, colour = update_little_hist(hoverData, yaxis_column_name, subset, colour)
             return create_feature_hist(dff, yaxis, title, axis_type, subset, colour)
 
-        @callback(
+        @app.callback(
             Output('3d-z-feat-hist', 'figure'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-zaxis-column', 'value'),

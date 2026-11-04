@@ -4,23 +4,46 @@ import os
 import shutil
 import tempfile
 import pandas as pd
+import importlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
+
+def _backend_available(module):
+    '''
+    Test if the packages are available for a feature in order to run tests on this feature.
+    '''
+    try:
+        importlib.import_module(module)
+        return True
+    except Exception:
+        return False
+
+BACKENDS = {'aev': 'torchani',
+            'melodia': 'melodia_py',
+            'evolution': 'esm',
+            'frustration': 'frustratometer',
+            'propka': 'propka'}
 
 class Test_Measure(unittest.TestCase):
     def setUp(self):
         print('-> Setting up measures tests')
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
-        shutil.copytree(os.path.join('demo', 'curated'), os.path.join(self.outdir, 'curated'))
-        shutil.copyfile(os.path.join('demo', 'demo_input.csv'), os.path.join(self.outdir, 'demo_input.csv'))
-        shutil.copyfile(os.path.join('demo', 'proteins.csv'), os.path.join(self.outdir, 'proteins.csv'))
+        shutil.copytree(os.path.join('demo', 'curated'),
+                        os.path.join(self.outdir, 'curated'))
+        shutil.copyfile(os.path.join('demo', 'demo_input.csv'),
+                        os.path.join(self.outdir, 'demo_input.csv'))
+        shutil.copyfile(os.path.join('demo', 'proteins.csv'),
+                        os.path.join(self.outdir, 'proteins.csv'))
+        shutil.copyfile(os.path.join('demo', 'measure_log.txt'),
+                        os.path.join(self.outdir, 'measure_log.txt'))
         self.df_input = pd.read_csv(f'{self.outdir}{os.sep}demo_input.csv')
         self.df_prot = pd.read_csv(f'{self.outdir}{os.sep}proteins.csv')
         self.all_features = ['propka', 'sasa', 'depth', 'aev',
                              'das', 'seqcharge', 'melodia']
         self.features_dict = {k: {} for k in self.all_features}
-        self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb', '1A6M-alt1A_relaxed.pdb']})
+        self.df_pdb_only_test = pd.DataFrame({'PDB_Code': ['1A6M-alt1A.pdb',
+                                                           '1A6M-alt1A_relaxed.pdb']})
 
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
@@ -34,9 +57,9 @@ class Test_Measure(unittest.TestCase):
                         features_dict=self.features_dict,
                         parallel=False,
                         parallel_timeout=40)
-        reg_feats = {m[0] for m in M.measures}
-        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
-        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        expected = {f for f in self.features_dict if
+                    _backend_available(BACKENDS.get(f, 'biobox'))}
+        self.assertEqual({m[0] for m in M.measures}, expected)
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
@@ -49,9 +72,9 @@ class Test_Measure(unittest.TestCase):
                         features_dict=self.features_dict,
                         parallel=True,
                         parallel_timeout=40)
-        reg_feats = {m[0] for m in M.measures}
-        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
-        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        expected = {f for f in self.features_dict if
+                    _backend_available(BACKENDS.get(f, 'biobox'))}
+        self.assertEqual({m[0] for m in M.measures}, expected)
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
@@ -62,9 +85,9 @@ class Test_Measure(unittest.TestCase):
                         features_dict=self.features_dict,
                         parallel=False,
                         parallel_timeout=40)
-        reg_feats = {m[0] for m in M.measures}
-        dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
-        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        expected = {f for f in self.features_dict if
+                    _backend_available(BACKENDS.get(f, 'biobox'))}
+        self.assertEqual({m[0] for m in M.measures}, expected)
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
@@ -78,6 +101,7 @@ class Test_Measure(unittest.TestCase):
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
+    @unittest.skipUnless(_backend_available('torchani'), 'torchani is not installed')
     def test_full_pdbonly_series_gpuonly(self):
         # pdb only, gpu only
         M = RD.Measure(df_input=self.df_pdb_only_test[:2],
@@ -97,10 +121,12 @@ class Test_Measure(unittest.TestCase):
                         parallel_timeout=40)
         reg_feats = {m[0] for m in M.measures}
         dereg_feats = set(self.features_dict) - reg_feats - set(M.features)
-        self.assertEqual(dereg_feats, set(), f'> Some features vanished without being removed: {dereg_feats}')
+        self.assertEqual(dereg_feats, set(),
+                         f'> Some features vanished without being removed: {dereg_feats}')
         M.measure_data()
         self.assertTrue(len(M.df) > 0)
 
+    @unittest.skipUnless(_backend_available('propka'), 'propka is not installed')
     def test_propka(self):
         print('-> Test measuring PROPKA')
         M_propka = RD.Measure(df_input=self.df_prot[:2],
@@ -137,6 +163,7 @@ class Test_Measure(unittest.TestCase):
         print('len depth', len(M_depth.df))
         self.assertTrue(len(M_depth.df) > 0)
 
+    @unittest.skipUnless(_backend_available('torchani'), 'torchani is not installed')
     def test_aev(self):
         print('-> Test measuring AEV')
         M_aev = RD.Measure(df_input=self.df_prot[:2],
@@ -194,7 +221,8 @@ class Test_Measure(unittest.TestCase):
         M_legolas.measure_data()
         print(M_legolas.df)
         print('len legolas:', len(M_legolas.df))
-    '''
+
+    @unittest.skipUnless(_backend_available('frustratometer'), 'frustratometer is not installed')
     def test_frustration(self):
         print('-> Test measuring FRUSTRATION')
         M_frustration = RD.Measure(df_input=self.df_prot[:2],
@@ -205,7 +233,8 @@ class Test_Measure(unittest.TestCase):
         M_frustration.measure_data()
         print(M_frustration.df)
         print('len frustration', len(M_frustration.df))
-    '''
+
+    @unittest.skipUnless(_backend_available('melodia_py'), 'melodia_py is not installed')
     def test_melodia(self):
         print('-> Test measuring MELODIA')
         M_melodia = RD.Measure(df_input=self.df_prot[:2],
@@ -218,6 +247,7 @@ class Test_Measure(unittest.TestCase):
         print('len melodia', len(M_melodia.df))
         self.assertTrue(len(M_melodia.df) > 0)
 
+    @unittest.skipUnless(_backend_available('melodia_py'), 'melodia_py is not installed')
     def test_phi(self):
         print('-> Test measuring PHI')
         M_phi = RD.Measure(df_input=self.df_prot[:2],
@@ -230,6 +260,7 @@ class Test_Measure(unittest.TestCase):
         print('len phi', len(M_phi.df))
         self.assertTrue(len(M_phi.df) > 0)
 
+    @unittest.skipUnless(_backend_available('esm'), 'esm is not installed')
     def test_evolution(self):
         print('-> Test measuring EVOLUTION')
         M_evolution = RD.Measure(df_input=self.df_prot[:2],
@@ -285,7 +316,7 @@ class Test_Measure(unittest.TestCase):
                         parallel=True,
                         include_modified=False)
         M.restart_measure_data()
-
+    
     def test_recovery(self):
         print('-> Test recovering data')
         M = RD.Measure(df_input=self.df_prot,
@@ -301,7 +332,8 @@ class Test_Measure(unittest.TestCase):
         print('-> Testing Min_Dist_Other_Chain')
         import numpy as np
         import biobox as bb
-        rows = self.df_prot[self.df_prot['PDB_Code'].isin(['AF-P40616-F1-model_v6', '1UPT', '8Y8Y'])]
+        rows = self.df_prot[self.df_prot['PDB_Code'].isin(['AF-P40616-F1-model_v6',
+                                                           '1UPT', '8Y8Y'])]
         M = RD.Measure(df_input=rows, outdir=self.outdir, features_dict={'sasa': {}},
                        parallel=False)
         M.measure_data()

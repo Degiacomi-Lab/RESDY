@@ -67,7 +67,7 @@ class EVOLUTION():
             try:
                 num_add_aa = int(num_add_aa)
             except Exception as e:
-                raise TypeError(f'> Parameter passed to num_add_aa in seqcharge ({num_add_aa}) '
+                raise TypeError(f'> Parameter passed to num_add_aa in EVOLUTION ({num_add_aa}) '
                                 f'could not be converted to an integer, please pass an integer '
                                 f'value. Error: {str(e)}') from e
         self.num_add_aa = num_add_aa

@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import biobox as bb
 from .helper import require_biobox
-require_biobox(bb)
 from .residues import PROTEIN_RESNAMES
+require_biobox(bb)
 
 
 #: Residue names treated as solvent.
@@ -36,6 +36,11 @@ STANDARD_RESIDUES = ('ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HI
 #: whether the metal is a free ion or an atom inside a cofactor such as the haem iron.
 METAL_ELEMENTS = ('FE', 'ZN', 'CU', 'MG', 'MN', 'NI', 'CO', 'MO', 'CA', 'NA', 'K', 'LI',
                   'CD', 'HG', 'PT', 'AU', 'AG', 'W', 'V', 'CR', 'SR', 'BA', 'CS', 'RB')
+
+GEOMETRY_COLUMNS = ['structure', 'stage', 'n_atoms', 'n_clashes', 'min_contact', 'worst',
+                    'inter_chain', 'involves_hetatm', 'ivolved_modelled', 'involves_water',
+                    'n_modelled_residues', 'numbering', 'chains_author_numbering']
+
 
 def _read_altloc_occupancy(path, n_expected):
     '''

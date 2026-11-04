@@ -100,17 +100,20 @@ class PROPKA():
                 M = bb.Molecule()
                 M.import_pdb(path, include_hetatm=True)
     
-                idx_mod_res = M.atomselect('*', self.aa_properties['modified_codes'], 'CA', use_resname=True, get_index=True)[1]
+                idx_mod_res = M.atomselect('*', self.aa_properties['modified_codes'],
+                                           'CA', use_resname=True, get_index=True)[1]
                 lys_res_nums = list(M.data['resid'][idx_mod_res])
                 list_chains = list(M.data['chain'][idx_mod_res])
-                list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.data['resname'][idx_mod_res]))
+                list_modified = list(a in self.aa_properties['modified_codes'] for a
+                                     in list(M.data['resname'][idx_mod_res]))
                 df_mod = pd.DataFrame({'Resid': lys_res_nums,
                                        'Chain': list_chains,
                                        'Modified': list_modified,
                                        'propka': ['NonTitratable'] * len(lys_res_nums)})
             except Exception as e:
                 print(f'>> Failed to identify modified residues for path:{path}. '
-                      f'If there are any modified residues present, they may be listed as NaN for this structure.')
+                      f'If there are any modified residues present, they may be '
+                      f'listed as NaN for this structure. Error: {str(e)}')
         code_for_df = os.path.basename(path).split(".")[0]
         propka_error_file_name = os.path.join(self.pka_outdir, f"{code_for_df}_propka_errors.txt")
 
@@ -161,7 +164,7 @@ class PROPKA():
             propka_res_interest_fails = self._parse_propka_errors(propka_error_file_name)
         except Exception as e:
             if self.record_errors: report_error_to_file('PROPKA 2', path, str(e), self.error_filename)
-            raise Exception(f"Failed extracting PROPKA errors from output file. {e}")
+            raise Exception(f"Failed extracting PROPKA errors from output file. {e}") from e
 
         try:
             propka_outfile = open(propka_exist_output)
@@ -174,15 +177,19 @@ class PROPKA():
         chain = []
         try:
             for line in propka_outfile:
-                # Only searching for non-modified canonical amino acid code as these codes only form part of the titratable subset which can be calculated by PROPKA
+                # Only searching for non-modified canonical amino acid code as these codes only
+                # form part of the titratable subset which can be calculated by PROPKA
                 if re.search(rf'^\s{{3}}(?:{self.aa_properties["non_modified_codes"][0]})\s' , line):
                     try:
                         line = line.split()
                         # reject adding entries associated with errors in structure (as per logfile)
                         if len(propka_res_interest_fails)>0:
-                            idx = np.where((propka_res_interest_fails["Chain"] == line[2]) & (propka_res_interest_fails["Resid"].astype(int) == int(line[1])))
+                            idx = np.where((propka_res_interest_fails["Chain"] == line[2]) &
+                                           (propka_res_interest_fails["Resid"].astype(int) == int(line[1])))
                             if len(idx[0])>0:
-                                print(f'Error associated with lysine {int(line[1])} on chain {line[2]} found in the log file at index {idx[0]} for pKa calculation. Value not taken through to measurements.')
+                                print(f'Error associated with lysine {int(line[1])} on chain '
+                                      f'{line[2]} found in the log file at index {idx[0]} for pKa '
+                                      f'calculation. Value not taken through to measurements.')
                                 continue
 
                         res_interest_numbers.append(int(line[1]))
@@ -207,7 +214,8 @@ class PROPKA():
                                       'propka': pka_vals})
 
             df_propka = df_propka.dropna()
-            df_propka = df_propka.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=True)
+            df_propka = df_propka.drop_duplicates(subset=None, keep='first',
+                                                  inplace=False, ignore_index=True)
             
             if self.include_modified:
                 df_propka = df_propka.assign(**{'Modified': [False] * len(df_propka)})
@@ -261,7 +269,9 @@ class PROPKA():
                     resid = words[1]
                     chain = words[2]
                     if resid != '' and chain != '':
-                        df_propka_errors = pd.concat([df_propka_errors, pd.DataFrame([{'Chain': chain, 'Resid': resid}])], axis=0, ignore_index=True)
+                        df_propka_errors = pd.concat([df_propka_errors,
+                                                      pd.DataFrame([{'Chain': chain, 'Resid': resid}])],
+                                                      axis=0, ignore_index=True)
             else:
                 res_interest_raw_2 = re.findall(rf'[\d]*-{self.aa_properties["non_modified_codes"][0]} \(\w\)', line)
                 for line in res_interest_raw_2:
@@ -269,7 +279,9 @@ class PROPKA():
                     resid = line.split('-')[0]
                     chain = words[1].strip(' ()')
                     if resid != '' and chain != '':
-                        df_propka_errors = pd.concat([df_propka_errors, pd.DataFrame([{'Chain': chain, 'Resid': resid}])], axis=0, ignore_index=True)
+                        df_propka_errors = pd.concat([df_propka_errors,
+                                                      pd.DataFrame([{'Chain': chain, 'Resid': resid}])],
+                                                      axis=0, ignore_index=True)
 
         f.close()
 

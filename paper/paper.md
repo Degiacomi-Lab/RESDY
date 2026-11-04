@@ -7,7 +7,7 @@ tags:
   - featurization
   
 authors:
-  - name: George Weston
+  - name: George M. I. Weston
     orcid: 0009-0000-1924-7183
     equal-contrib: false
     affiliation: 1

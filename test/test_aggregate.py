@@ -190,6 +190,15 @@ class Test_Aggregation(unittest.TestCase):
         df_agg = Agg.aggregate_data()
         self.assertTrue(len(df_agg) > 0)
 
+    def test_source_pooling(self):
+        for sp in ['together', 'separate', 'unrelaxed', 'relaxed']:
+            RD.Aggregation(df_measurements=self.demo_measure,
+                             outdir=self.outdir,
+                            aggregation_method='avg',
+                            features_to_include=['sasa'],
+                            aev_red_method='null',
+                            source_pooling=sp).aggregate_data()
+
 
 class Test_Aggregation_Settings(unittest.TestCase):
     """aev_pca_variance and vif_threshold, which used to be fixed at 0.99 and 5."""

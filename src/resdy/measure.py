@@ -149,11 +149,11 @@ class Measure(object):
             if there is a relaxed structure available for the structure. If set to False, measures
             will be calculated to both original and relaxed form. Default is False.
         :type only_relaxed: bool
-        :param only_relaxed: Option to only calculate measurements for structures that are relaxed.
-            If there is not a relaxed structure available for this structure, this structures are
-            skipped. To allow a fallback using the non-relaxed structure, see only_relaxed parameter.
-            Default is False.
-        :type only_relaxed: bool
+        :param require_relaxed: Option to only calculate measurements for structures that are
+            relaxed. If there is not a relaxed structure available for this structure, this
+            structures are skipped. To allow a fallback using the non-relaxed structure, see
+            only_relaxed parameter. Default is False.
+        :type require_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
             available will be used. Otherwise it will try and use the number of cores given
@@ -174,7 +174,8 @@ class Measure(object):
             curation_geometry.csv after protein curation through checking the number of atoms in
             the system. More than 10,000 atoms will take the protein into a separate list and
             this list will run in series after the parallel run over most proteins has been
-            completed.
+            completed. This option is only available when running in parallel and not running in
+            PDB_only mode.
         :type big_protein_mode: bool
         :param struc_dir: If you are running multiple sets of measurements on the same set of
             structures, you may wish to separate calculations into different folders. This allows
@@ -184,7 +185,7 @@ class Measure(object):
         :type struc_dir: str
         :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
             this is available. Options for this include 'auto' - recreate if propka output older
-            than curated pdb file, 'always' - always run propka, 'never' - always take previous
+            than curated pdb file, 'never' - always run propka, 'always' - always take previous
             run if it exists
         :type cache_policy: str
         '''
@@ -232,7 +233,7 @@ class Measure(object):
 
         self.cache_policy = cache_policy
         if self.cache_policy not in ['auto', 'always', 'never']:
-            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+            print(f'>> Cache policy ({self.cache_policy}) given to Measures class not recognised, '
                     f'using default setting of auto instead.')
             self.cache_policy = 'auto'
 
@@ -348,10 +349,11 @@ class Measure(object):
         in the directory. Will return True if a match is given.
         '''
         pdb_code = os.path.basename(str(pdb_code)).lower()
-        name = os.path.basename(path).lower()
-        stem = os.path.splitext(name)[0]
+        name_part = os.path.basename(path).lower()
+        stem = os.path.splitext(name_part)[0].removesuffix('_relaxed')
+        code = os.path.splitext(pdb_code)[0].removesuffix('_relaxed')
 
-        return pdb_code in (name, stem) or pdb_code == stem.split('-')[0]
+        return code == stem or (not code.startswith('af-') and code == stem.split('alt-')[0])
 
 
     def _get_protein_sizes(self, cur_geom_filename='curation_geometry.csv'):
@@ -365,7 +367,10 @@ class Measure(object):
         if os.path.isfile(cur_geom_path):
             try:
                 df_cur_geom = pd.read_csv(cur_geom_path)
-                struc_to_atoms = pd.Series(df_cur_geom['n_atoms'], index=df_cur_geom['structure']).to_dict()
+                sizes = df_cur_geom.dropna(subset=['structure', 'n_atoms'])
+                # take back to absolute pdb code to ensure matching later on
+                codes = sizes['structure'].str.replace('_relaxed', '').str.split('-alt')[0]
+                struc_to_atoms = sizes.groupby(codes)['n_atoms'].max().to_dict()
             except Exception as e_s:
                 print(f'>> Failed to extract protein sizes from the curation geometry csv '
                       f'file given. Please check the file. Error: {str(e_s)}')
@@ -871,6 +876,7 @@ class Measure(object):
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
+
                 if self.big_protein_mode:
                     pdb_size = self.prot_sizes.get(pdb_code, 10)
                     if pdb_size <= 10000:
@@ -910,20 +916,23 @@ class Measure(object):
                                 pool.terminate()
                                 raise RuntimeError(
                                     f'A parallel measuring worker produced no result for '
-                                    f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
-                                    f'structures, so it is treated as stalled and the run was stopped. '
-                                    f'Either raise parallel_timeout if the features requested are simply '
-                                    f'slow on these structures, or set parallel=False to measure in '
-                                    f'series.') from None
+                                    f'{self.parallel_timeout} s after {len(results)} of '
+                                    f'{len(items)} structures, so it is treated as stalled and '
+                                    f'the run was stopped. Either raise parallel_timeout if the '
+                                    f'features requested are simply slow on these structures, or '
+                                    f'set parallel=False to measure in series.') from None
+
                     df_parallel = pd.concat(results, ignore_index=True)
 
-                    if self.big_protein_mode:
-                        df_parallel_extra = pd.concat([self._measure_file(lock, file_dets) for file_dets in big_items],
+                    if self.big_protein_mode and big_items:
+                        df_parallel_extra = pd.concat(
+                            [self._measure_file(lock, file_dets) for file_dets in big_items],
                                                 ignore_index=True)
                         df_parallel = pd.concat([df_parallel, df_parallel_extra], ignore_index=True)
 
                 else:
-                    df_parallel = pd.concat([self._measure_file(lock, file_dets) for file_dets in items],
+                    df_parallel = pd.concat(
+                        [self._measure_file(lock, file_dets) for file_dets in items],
                                             ignore_index=True)
 
             self.measures = gpu_measurements
@@ -996,11 +1005,8 @@ class Measure(object):
                     os.path.exists(os.path.join(self.folder, f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
                     continue
 
-            if self.require_relaxed:
-                if '_relaxed' not in f:
-                    if not os.path.exists(os.path.join(self.folder,
-                                        f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb')):
-                        continue
+            if self.require_relaxed and '_relaxed' not in f:
+                continue
 
             terminal_out_statements = []
             tstart = time.time()
@@ -1061,7 +1067,7 @@ class Measure(object):
                 records.append(data)
 
             df_currentfile = pd.DataFrame.from_records(records, columns=columns)
-            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest found")
             if no_anchor:
                 terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
                                                f"anchor atom missing, cannot be featurised")
@@ -1463,11 +1469,8 @@ class Measure(object):
                     os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb'))):
                     continue
 
-            if self.require_relaxed:
-                f_stem = os.path.splitext(os.path.basename(f))[0]
-                if '_relaxed' not in f:
-                    if not os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
-                        continue
+            if self.require_relaxed and '_relaxed' not in f:
+                continue
 
             if f in self.pdb_only_files_to_ignore:
                 continue
@@ -1524,7 +1527,7 @@ class Measure(object):
                 records.append(data)
 
             df_currentfile = pd.DataFrame.from_records(records, columns=columns)
-            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest found")
             if no_anchor:
                 terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
                                                f"anchor atom missing, cannot be featurised")

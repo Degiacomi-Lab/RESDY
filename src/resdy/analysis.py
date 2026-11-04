@@ -5,34 +5,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import fisher_exact
 from .aggregation import Aggregation
 from .uniprot import Uniprot
-from .helper import METADATA_COLUMNS, sort_residue_key
-from scipy.stats import fisher_exact
+from .helper import METADATA_COLUMNS, sort_residue_key, FEATURE_LABELS, AGG_LABELS
 
-FEATURE_LABELS = {'depth': 'Depth (Å)',
-                'sasa': 'SASA (Å\u00b2)',
-                'propka': 'pKa (propka)',
-                'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
-                'curvature': 'Curvature',
-                'arc_length': 'Arc Length',
-                'das': 'Dynamically Accessible Surface',
-                'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
-                'phi': 'Phi',
-                'psi': 'Psi',
-                'seqcharge': 'Sequence Charge',
-                'torsion': 'Torsion Angle',
-                'writhing': 'Writhing',
-                'frustration': 'Frustration',
-                'rmsf': 'RMSF'}
-
-AGG_LABELS = {'avg': 'Average',
-            'med': 'Median',
-            'min': 'Minimum',
-            'max': 'Maximum',
-            'rand': 'Random',
-            'sd': 'Standard Deviation',
-            'range': 'Range'}
 
 class Analysis(object):
     '''
@@ -723,7 +700,7 @@ class Analysis(object):
               f'not mentioned in the required residues file')
 
         for i, uniprot in enumerate(req_uniprot_codes):
-            print(f"Number of rows left: {(len(df_req_res) - i)}")
+            print(f"Number of rows left: {(len(req_uniprot_codes) - i)}")
             print(f"Extracting data for: {uniprot}")
 
             desired_residues = list(df_req_res.loc[df_req_res["Uniprot_Entry"] == uniprot,
@@ -748,7 +725,7 @@ class Analysis(object):
         return df_working
 
 
-    def add_class_labels(self, df, df_class_set, label='1', unlisted='-1'):
+    def add_class_labels(self, df, df_class_set, label=1, unlisted=-1):
         '''
         Add class labels to a measurements dataframe given an input dataframe of the combinations
         of Uniprot and Residue number you would like to mark. Note to save a new csv file post,
@@ -769,6 +746,7 @@ class Analysis(object):
         :returns: Measurements dataframe with a class column attached
         :rtype: Pandas DataFrame
         '''
+        df_class_set = df_class_set.copy()
 
         if isinstance(df_class_set, str):
             if os.path.isfile(df_class_set):
@@ -816,17 +794,14 @@ class Analysis(object):
         if 'class' not in df.columns:
             print('>> class column not found in the given dataframe, call add_class_label()'
                   'to create one with a subset of the data or assign one manually.')
-            return
+            return df
+
+        old_label, new_label = str(old_label), str(new_label)
 
         if old_label not in df['class'].unique():
             print(f'>> old label given: {old_label}, was not found in the \'class\' column,'
                   f'nothing to rename.')
-            return
-
-        if not isinstance(old_label, str):
-            old_label = str(old_label)
-        if not isinstance(new_label, str):
-            new_label = str(new_label)
+            return df
 
         df.loc[df['class'] == old_label, 'class'] = new_label
         return df
@@ -1161,8 +1136,6 @@ class Analysis(object):
             kwargs['features_to_include'] = [a for a in self.df.columns if
                                              a not in METADATA_COLUMNS]
 
-        print(kwargs)
-
         agg = Aggregation(df_measurements=self.df,
                         outdir=self.outdir,
                         aggregation_method=agg_type,
@@ -1223,21 +1196,11 @@ class Analysis(object):
                         any(a for a in UP.GO_dict[k] if a in uniprots_present)}
 
         if 'class' in df_in.columns:
-            unq_classses = list(df_in['class'].unique())
-            if any(isinstance(a, str) for a in unq_classses):
-                name_to_num = {}
-                max_class_num = max([a for a in unq_classses if isinstance(a, int)])
-                if max_class_num < 2:
-                    max_class_num = 2  # avoid the preset classes of -1, 0, 1
-                for c in unq_classses:
-                    try:
-                        n_c = int(c)
-                        name_to_num[c] = n_c
-                    except Exception:
-                        next_c = max_class_num + 1
-                        name_to_num[c] = next_c
-                        max_class_num = next_c
-            df_in['class'] = df_in['class'].replace(name_to_num)
+            labels = pd.to_numeric(df_in['class'], errors='coerce')
+            named = sorted(df_in.loc[labels.isna(), 'class'].astype(str).unique())
+            start = max(2, int(labels.max()) if labels.notna().any() else 2) + 1
+            name_to_num = {n: start + i for i,n in enumerate(named)}
+            df_in['class'] = labels.fillna((df_in['class'].astype(str).replace(name_to_num)))
 
         metadata_cols = [a for a in df_in.columns if a in METADATA_COLUMNS]
         y = (df_in['class'].to_numpy(dtype=np.int8) if 'class' in df_in.columns else
@@ -1245,7 +1208,8 @@ class Analysis(object):
         meta_data = df_in[[a for a in metadata_cols if a != 'class']].reset_index(drop=True)
 
         X_all = df_in.drop(columns=metadata_cols)
-        unrequired_features = [c for c in X_all.columns if c not in self.features_to_analyse]
+        unrequired_features = [a for a in X_all.columns if not
+                            any(a == f or a.startswith(f + '_') for f in self.features_to_analyse)]
         X_all = X_all.drop(columns=unrequired_features)
         feature_names = list(X_all.columns)
         X = X_all.to_numpy()
@@ -1290,35 +1254,19 @@ class Analysis(object):
 
         df_collated = pd.DataFrame()
 
-        if not os.path.isfile(cur_geom_path):
-            print(f'>> No curation geometry csv file found at the location given: {cur_geom_path}, '
-                f'please check the outdir setting and the filename are correct on input.')
-        else:
-            df_cur_geom = pd.read_csv(cur_geom_path)
-            if df_collated.empty:
-                df_collated = df_cur_geom
+        for n, p in (('geometry',cur_geom_path),
+                    ('minimisation', min_log_path),
+                    ('assembly', ass_log_path)):
+            if os.path.isfile(p):
+                log = pd.read_csv(p).drop_duplicates('structure', keep='last')
+                if df_collated.empty:
+                    df_collated = log
+                else:
+                    df_collated = df_collated.merge(log, how='left', on='structure',
+                                                    validate='many_to_one')
             else:
-                df_collated = df_collated.merge(df_cur_geom, how='outer', on='structure')
-
-        if not os.path.isfile(min_log_path):
-            print(f'>> No minimisation log csv file found at the location given: {min_log_path}, '
-                    f'please check the outdir setting and the filename are correct on input.')
-        else:
-            df_min_log = pd.read_csv(min_log_path)
-            if df_collated.empty:
-                df_collated = df_min_log
-            else:
-                df_collated = df_collated.merge(df_min_log, how='outer', on='structure')
-
-        if not os.path.isfile(ass_log_path):
-            print(f'>> No assembly log csv file found at the location given: {ass_log_path}, '
-                    f'please check the outdir setting and the filename are correct on input.')
-        else:
-            df_ass_log = pd.read_csv(ass_log_path)
-            if df_collated.empty:
-                df_collated = df_ass_log
-            else:
-                df_collated = df_collated.merge(df_ass_log, how='outer', on='structure')
+                print(f'>> Could not read in data for metadata file {n}, '
+                        f'please check the path given.')
 
         if not df_collated.empty:
             df_collated.to_csv(out_path)
@@ -1375,30 +1323,20 @@ class Analysis(object):
             return df_meas_meta
 
         df_meas_meta = pd.read_csv(meas_path)
-
-        if not os.path.isfile(cur_geom_path):
-            print(f'>> No curation geometry csv file found at the location given: {cur_geom_path}, '
-                f'please check the outdir setting and the filename are correct on input.')
-        else:
-            df_cur_geom = pd.read_csv(cur_geom_path)
-            df_cur_geom = df_cur_geom.rename(columns={'structure': 'PDB_Code'})
-            df_meas_meta = df_meas_meta.merge(df_cur_geom, how='left', on='PDB_Code')
-
-        if not os.path.isfile(min_log_path):
-            print(f'>> No minimisation log csv file found at the location given: {min_log_path}, '
-                    f'please check the outdir setting and the filename are correct on input.')
-        else:
-            df_min_log = pd.read_csv(min_log_path)
-            df_min_log = df_min_log.rename(columns={'structure': 'PDB_Code'})
-            df_meas_meta = df_meas_meta.merge(df_min_log, how='left', on='PDB_Code')
-
-        if not os.path.isfile(ass_log_path):
-            print(f'>> No assembly log csv file found at the location given: {ass_log_path}, '
-                    f'please check the outdir setting and the filename are correct on input.')
-        else:
-            df_ass_log = pd.read_csv(ass_log_path)
-            df_ass_log = df_ass_log.rename(columns={'structure': 'PDB_Code'})
-            df_meas_meta = df_meas_meta.merge(df_ass_log, how='left', on='PDB_Code')
+        stem = df_meas_meta['PDB_Code'].str.replace('_relaxed', '')
+        df_meas_meta['_stem'] = stem
+        for n, p in (('geometry',cur_geom_path),
+                     ('minimisation', min_log_path),
+                     ('assembly', ass_log_path)):
+            if os.path.isfile(p):
+                log = pd.read_csv(p).drop_duplicates('structure', keep='last')
+                log = log.add_prefix(f'{n}_').rename(columns={f'{n}_structure': '_stem'})
+                df_meas_meta = df_meas_meta.merge(log, how='left', on='_stem',
+                                                  validate='many_to_one')
+            else:
+                print(f'>> Could not read in data for metadata file {n}, '
+                      f'please check the path given.')
+        df_meas_meta = df_meas_meta.drop(columns='_stem')
 
         if not df_meas_meta.empty:
             df_meas_meta.to_csv(out_path)
