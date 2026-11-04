@@ -215,6 +215,40 @@ the chains reported, the number of atoms and the number of clashes found in the 
 instead. AlphaFold models do not go through this step.
 
 
+How are ions, ligands and other entities in the structure managed?
+------------------------------------------------------------------
+
+Structural biology techniques do more than reveal a protein’s three-dimensional structure.
+At sufficiently high resolution, they can also identify the molecules associated with that
+structure, including ordered water molecules, bound ions, cofactors, substrates, inhibitors
+and other ligands. These components are often essential for understanding protein function,
+revealing hydration networks, metal-binding sites, catalytic centres, and protein-ligand
+interactions that the structure alone cannot infer.
+
+Through the RESDY structure we have tried to keep as many customisation options open to the
+user as possible for these molecules. On the default track, without any differing parameters passed, all ions,
+crystallographic waters, modifications on amino acids, ligands etc are removed from the
+structure. This strips it right back to the simplest possible version of the structure
+which is done to allow as many features as possible to be able to calculate data on a protein
+that is now the same in all areas other than coordinate space.
+We recognise that this may not be desired for all users, and as such have given you the option
+to keep as much or as little of the structures in while the curation of the structures is being
+completed. The following flags can be utilised within the :class:`PDB <resdy.protein.PDB>` class
+to customise the level of curation applied to the structures:
+•	'keep_waters': This boolean parameter allows you to hold onto crystallographic waters present in
+o	the structure if set to True.
+•	'keep_ions': This boolean parameter allows you to keep monoatomic ions in the structure. The ions
+o	in the list to watch out for are defined by DEFAULT_KEPT_IONS at the header of the protein.py
+o	
+•	'keep_ligands': This parameter allows selection of which heteroatom groups to retain in
+o	the structure through a list of the 3 letter codes eg ('HEM', 'NAD'). If you would like to keep
+everything, pass 'all' to this parameter.
+•	'remove_all_modifications': This boolean parameter allows you to control whether amino acids
+o	in the structure remain as in the full crystallographic form or modifications on the side
+chains are removed (default), this is done to allow downstream calculation of features to work
+on as many structures as possible as many programmes can't handle modified amino acids.
+
+
 How are protein structures containing DNA/RNA handled?
 ------------------------------------------------------
 
