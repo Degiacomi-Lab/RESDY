@@ -18,7 +18,7 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox, get_worker_lock
+from .helper import require_biobox, STANDARD_RESIDS
 require_biobox(bb)
 from . import alphafold as af
 from . import patcher
@@ -44,8 +44,7 @@ except Exception as e:
 
 
 #: The twenty standard residue names.
-STANDARD_RESIDUES = ('ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE',
-                     'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL')
+STANDARD_RESIDUES = list(STANDARD_RESIDS.keys())
 
 #: Residue names treated as solvent.
 WATER_RESNAMES = ('HOH', 'WAT', 'DOD', 'H2O')
@@ -104,7 +103,7 @@ class PDB(object):
                  forcefield=DEFAULT_FORCEFIELD, minimise_tolerance=10.0,
                  minimise_max_iterations=1000, restrain_heavy_atoms=False,
                  restraint_k=10.0, minimisation_platform=None,
-                 remove_all_modifications=False,
+                 keep_modifications=(),
                  num_cores=0, max_nmr_conformers='',
                  biological_assembly=True, max_assembly_atoms=None,
                  keep_all_curated=True, parallel_timeout = 12000):
@@ -182,12 +181,13 @@ class PDB(object):
             'CUDA', 'OpenCL'). None lets OpenMM pick the fastest, which on a GPU platform does
             not give identical coordinates from one run to the next.
         :type minimisation_platform: str
-        :param remove_all_modifications: Option to remove all other modifications from curated
-            protein structures. By default, modifications on the residue of interest will be
-            removed. Default for other removal of mutations is set to False, in this case only
-            residues which have unknown amino residue codes to allow for downstream pipelines
-            to work.
-        :type remove_all_modifications: bool
+        :param keep_modifications: Residue names of other heteroatom groups to keep as their
+            modified versions, for example ``('KCX', 'MSE')``, or the string 'all' to keep
+            every modified residue as it is. Reverting the amino acids back to their non-modified
+            form increases the likelihood that the structure can be minimised and features can
+            be calculated on the structure. The default setting is () which will remove all
+            modifications within the structure.
+        :type keep_modifications: tuple, str
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
             available will be used. Otherwise it will try and use the number of cores given
@@ -246,7 +246,15 @@ class PDB(object):
             resnames_of_interest = (list(preset['non_modified_codes']) if preset is not None
                                     else [resnames_of_interest])
         self.resnames_of_interest = list(resnames_of_interest)
-        self.remove_all_modifications = remove_all_modifications
+
+        if keep_modifications == 'all':
+            self.keep_modifications = keep_modifications
+        elif isinstance(keep_modifications, str):
+            self.keep_modifications = keep_modifications
+        elif len(keep_modifications) == 1:
+            self.keep_modifications = tuple([keep_modifications])
+        else:
+            self.keep_modifications = tuple(a.upper() for a in keep_modifications)
 
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
@@ -795,7 +803,7 @@ class PDB(object):
             if pdb_data_present:
                 if not self.PDB_only:
                     data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
-                            'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                            'Method': 'Predicted', 'Resolution': np.nan, 'Chains': 'A'}
                 else:
                     data = {'PDB_Code': pdb_code}
 
@@ -1049,6 +1057,8 @@ class PDB(object):
                 else:
                     align_details = {}
 
+                self._record_geometry(geometry, 'patched', align_details)
+
                 if self.biological_assembly:
                     try:
                         self._build_assembly(fname, biomatrix, determined)
@@ -1058,7 +1068,6 @@ class PDB(object):
                         continue
 
                 test_patch = True
-                self._record_geometry(geometry, 'patched', align_details)
 
             except Exception as e:
                 tmp_name = f'tmp_{os.path.splitext(os.path.basename(f))[0]}'
@@ -1208,12 +1217,20 @@ class PDB(object):
         Iterates over the lines of the file performing checks:
 
         - insertion codes -> make note and not patch structure if present
-        - modified lysines (KCX) -> remove CO2 and rename to LYS
-        - modified cysteines (SEC) -> rename the selenium SE to SG (element S) and the residue to CYS
-        - modified methionine (MSE) -> rename the selenium SE to SD (element S) and the residue to MET
+        - modified lysines (KCX) -> remove CO2 and rename to LYS if remove_all_modifications_set
+            set to True
+        - modified cysteines (SEC) -> rename the selenium SE to SG (element S) and the residue
+            to CYS if remove_all_modifications_set set to True
+        - modified methionine (MSE) -> rename the selenium SE to SD (element S) and the residue
+            to MET if remove_all_modifications_set set to True
         - element codes -> if not present in pdb file, add these in based on guess from atomtype col
         - neglect HETATMs unless metal ions and hydrogens
-        - check for modified residues in structure, convert back to backbone for patching
+        - check for modified residues in structure, convert back to backbone for patching if
+            remove_all_modifications_set set to True
+
+        WARNING: if you choose to not remove modifications on the structure, it is likely that many
+        feature calculations will fail due to inability of other packages to handle modified
+        residues.
 
         :param pdb: pdb code for the structure of interest
         :type pdb: str
@@ -1233,12 +1250,9 @@ class PDB(object):
         except Exception as e:
             raise Exception(f'Error renaming chains. {str(e)}')
 
-        #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
-        standard_resids = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q',
-                           'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
-                           'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
-                           'TYR': 'Y', 'VAL': 'V'}
-        standard_resids_inv = {v: k for k, v in standard_resids.items()}
+        # Next it opens and starts reading the .pdb file and starts writing
+        # a new file with the ending '-clean.pdb'.
+        standard_resids_inv = {v: k for k, v in STANDARD_RESIDS.items()}
         uniprot_fasta = ''
         list_prev_mod_resids = {}
 
@@ -1248,10 +1262,11 @@ class PDB(object):
         write_file_path = os.path.join(self.raw_dir, f"{pdb}-clean.pdb")
         write_file = open(write_file_path, 'w')
 
-        # Write the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
-        test_MSE = False
-        test_SEC = False
-        test_KCX = False
+        # Write the clean file, including HETATMs (if they are metal ions),
+        # all atoms and lines starting with TER and END.
+        test_mse = False
+        test_sec = False
+        test_kcx = False
 
         res_insertion_codes = []
         modres_sites = {}
@@ -1260,54 +1275,72 @@ class PDB(object):
 
             # check for modified residues
             if line[:6] == 'MODRES':
-                if self.remove_all_modifications:
-                    chain = line[16]
-                    res_num = line[18:22].strip()
-                    modres_sites[chain + res_num] = line[24:27]
-                elif line[12:15] != line[24:27]:
-                    # if not by default removing all residues with mutations, only modify ones with unkown resid codes
-                    chain = line[16]
-                    res_num = line[18:22].strip()
-                    modres_sites[chain + res_num] = line[24:27]
+                chain = line[16]
+                res_num = line[18:22].strip()
+                mod_code = line[12:15]
+                norm_code = line[24:27]
+                if self.keep_modifications == ():
+                    modres_sites[chain + res_num] = norm_code
+                elif ((mod_code not in self.keep_modifications or
+                      mod_code != self.keep_modifications) and
+                      self.keep_modifications != 'all'):
+                    modres_sites[chain + res_num] = norm_code
 
             # check for resid insertion code in position 26 on ATOM records
             if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
                 res_insertion_codes.append(line[26])
 
-            # replace selenomethionine with methionine
-            if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
-                line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
-                test_MSE = True
+            if self.keep_modifications != 'all' and 'MSE' not in self.keep_modifications:
+                # replace selenomethionine with methionine
+                if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
+                    line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
+                    test_mse = True
 
-            # replace selenocysteine with cysteine
-            if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
-                line = selenium_to_sulfur(line, 'CYS', 'SG')
-                test_SEC = True
+            if self.keep_modifications != 'all' and 'SEC' not in self.keep_modifications and 'SEC' != self.keep_modifications:
+                # replace selenocysteine with cysteine
+                if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
+                    line = selenium_to_sulfur(line, 'CYS', 'SG')
+                    test_sec = True
 
-            #transform carboxylated lysine into a normal lysine
-            if line[17:20] == 'KCX':
+            if self.keep_modifications != 'all' and 'KCX' not in self.keep_modifications:
+                #transform carboxylated lysine into a normal lysine
+                if line[17:20] == 'KCX':
 
-                if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
-                    continue
+                    if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
+                        continue
 
-                else:
-                    line = line.replace('HETATM', 'ATOM  ')
-                    line = line.replace('KCX', 'LYS')
+                    else:
+                        line = line.replace('HETATM', 'ATOM  ')
+                        line = line.replace('KCX', 'LYS')
 
-                test_KCX = True
+                    test_kcx = True
 
             element_col = line[76:78].strip().upper()
             if not element_col:
                 # guess element based on atom type name
                 element_col = line[12:16].strip().lstrip('0123456789')[:2].upper()
 
+            if line[:4] == 'ATOM' and line[17:20].strip().upper() not in STANDARD_RESIDS:
+                het_key = line[21] + line[22:26].strip()
+                if het_key not in modres_sites and het_key not in list_prev_mod_resids:
+                    if (self.keep_modifications == 'all' or
+                        line[17:20].strip().upper() in self.keep_modifications or
+                        line[17:20].strip().upper() == self.keep_modifications):
+                        write_file.write(line)
+                    continue
+
             # Identify HETATM records and go to _keep_hetatm() to work out whether to keep or not.
             if (line[:6] == 'HETATM' and len(line) > 26
-                    and line[17:20].strip().upper() not in standard_resids):
+                    and line[17:20].strip().upper() not in STANDARD_RESIDS):
                 het_key = line[21] + line[22:26].strip()
 
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
                     if self._keep_hetatm(line, element_col):
+                        write_file.write(line)
+                    elif (self.keep_modifications == 'all' or
+                          line[17:20].strip().upper() in self.keep_modifications or
+                          line[17:20].strip().upper() == self.keep_modifications):
+                        line = line.replace('HETATM', 'ATOM  ')
                         write_file.write(line)
                     continue
 
@@ -1317,10 +1350,11 @@ class PDB(object):
                 if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
                     continue
                 line = line.replace('HETATM', 'ATOM  ')
-                line = line.replace(line[17:20], list_prev_mod_resids[line[21] + line[22:26].strip()])
+                line = line.replace(line[17:20],
+                                    list_prev_mod_resids[line[21] + line[22:26].strip()])
 
             elif ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
-                  line[17:20].upper() not in standard_resids):
+                  line[17:20].upper() not in STANDARD_RESIDS):
 
                 if (line[21] + line[22:26].strip()) not in modres_sites:
                     continue
@@ -1338,14 +1372,20 @@ class PDB(object):
 
                     M = bb.Molecule()
                     M.import_pdb(filename=read_file_path, include_hetatm=True)
-                    M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                    M = M.get_subset(M.atomselect('*', '*', 'CA',
+                                                  use_resname=True,
+                                                  get_index=True)[1])
+                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA',
+                                                           use_resname=True,
+                                                           get_index=True)[1]]
                     pdb_seqs = {}
                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                         tmp_data = subset_data[subset_data['chain'] == chain]
-                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys())
+                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                   list(STANDARD_RESIDS.keys())
                                                    else 'X' for a in list(tmp_data['resname'])])
-                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                 'resid']))
                     aligner = PairwiseAligner()
                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                     aligner.open_gap_score = -11
@@ -1360,7 +1400,7 @@ class PDB(object):
                             res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
                     aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
-                    if aa_interest in list(standard_resids.values()):
+                    if aa_interest in list(STANDARD_RESIDS.values()):
                         line = line.replace('HETATM', 'ATOM  ')
                         line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
                         list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
@@ -1395,7 +1435,9 @@ class PDB(object):
                             f.close()
 
                             new_fasta = open(fasta_name, 'w')
-                            for header, chain, seq in zip(fasta_headers, fasta_chain_letters, fasta_seqs):
+                            for header, chain, seq in zip(fasta_headers,
+                                                          fasta_chain_letters,
+                                                          fasta_seqs):
                                 new_fasta.write(header)
                                 seq = seq[0].strip()
                                 if chain[0] == line[21]:
@@ -1407,7 +1449,7 @@ class PDB(object):
                                     pdb_seqs = {}
                                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                         tmp_data = subset_data[subset_data['chain'] == chain]
-                                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys())
+                                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in list(STANDARD_RESIDS.keys())
                                                                    else 'X' for a in list(tmp_data['resname'])])
                                     chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
                                     aligner = PairwiseAligner()
@@ -1446,11 +1488,13 @@ class PDB(object):
                 write_file.write(line)
                 continue
 
-        if test_MSE: print(">> mutated MSE to MET")
-        if test_SEC:
+        if test_mse:
+            print(">> mutated MSE to MET")
+        if test_sec:
             print('>> mutated SEC to CYS')
             self._adapt_fasta(pdb=pdb)
-        if test_KCX: print(">> mutation added to remove a lysine carboxylation")
+        if test_kcx:
+            print(">> mutation added to remove a lysine carboxylation")
 
         write_file.close()
         read_file.close()

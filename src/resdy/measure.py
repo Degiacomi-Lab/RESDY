@@ -109,11 +109,11 @@ class Measure(object):
             'aev', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
             'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'frustration',
             'density', 'evolution', 'rmsf', 'secondarystructure'. Any class defined in a script
-            added to the features folder can also be requested by its class name. 'all' is a shorthand
-            for the preset list defined in _setup_measures(). A dict should be given here with a
-            dict per feature included eg {'depth': {}, etc...}, inside the dict per feature should
-            house any optional arguments available for that specific feature class, if defaults are
-            okay, leave as {}.
+            added to the features folder can also be requested by its class name. 'all' is a
+            shorthand for the preset list defined in _setup_measures(). A dict should be given
+            here with a dict per feature included eg {'depth': {}, etc...}, inside the dict per
+            feature should house any optional arguments available for that specific feature class,
+            if defaults are okay, leave as {}.
         :type features_dict: dict
         :param residue_of_interest: The residue of interest to calculate measurements for. The
             three-letter code of any of the twenty standard amino acids can be given as a
@@ -260,12 +260,13 @@ class Measure(object):
                     if self.num_cores <= os.cpu_count():
                         self.n_cores_to_use = self.num_cores
                     else:
-                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
-                                f'possible on current setup; defaulting to 0.75 times max possible')
+                        print(f'>> Given number of cores for parllel running ({self.num_cores}) '
+                              f'is not possible on current setup; defaulting to 0.75 times max '
+                              f'possible')
                         self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
             else:
-                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
-                        f'defaulting to 0.75 times max possible.')
+                print(f'>> Input given to number of cores is not an integer '
+                      f'({str(self.num_cores)}); defaulting to 0.75 times max possible.')
                 self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
         else:
             self.n_cores_to_use = 1
@@ -311,7 +312,7 @@ class Measure(object):
                     f_not_found.append(f)
 
         self.big_protein_mode = big_protein_mode
-        if not self.parallel or self.PDB_only == True:
+        if not self.parallel or self.PDB_only is True:
             self.big_protein_mode = False
         if self.big_protein_mode:
             self.prot_sizes = self._get_protein_sizes(cur_geom_filename='curation_geometry.csv')
@@ -361,6 +362,12 @@ class Measure(object):
         Initial support function for enabling big protein mode where the size of a protein
         structure will determine whether this will join in the parallel queue or will run
         afterwards in a series queue.
+
+        :param cur_geom_filename: Filename of the curation_geometry.csv file which is
+            produced after a run through PDB to gather protein has been completed. By default
+            this will look in the 'outdir' given to the Measures class. This is matching the
+            behaviour of a default run.
+        :type cur_geom_filename: str
         '''
         cur_geom_path = os.path.join(self.outdir, cur_geom_filename)
 
@@ -418,6 +425,27 @@ class Measure(object):
             key = (c, int(r))
             out[key] = np.fmin(out[key], v) if key in out else v
         return out
+
+    # PUT OTHER METADATAMEASUREMENTS HERE
+    def _dist_to_mods(self, M):
+        '''
+        Get information on the distances of residues of interest to the modifife 
+        Distance from each residue of interest to the closest other protein chain, and which
+        residues can be featurised at all.
+
+        A residue is featurised at its anchor atom, the ``atom_select_names_nonmod`` (or,
+        for a modified code, ``atom_select_names_modified``) entry of ``aa_properties``. A
+        residue whose anchor is absent cannot be featurised and is missing from the returned
+        dictionary, which is how the callers leave it out of the table. When a residue has
+        more than one anchor atom the shortest distance is kept.
+
+        :param M: the structure being measured.
+        :type M: biobox.Molecule
+        :returns: {(chain, resid): distance in A}, NaN when the structure holds no other
+            protein chain.
+        :rtype: dict
+        '''
+        d = M.data
 
 
     def _setup_measures(self, features_dict):
@@ -992,7 +1020,8 @@ class Measure(object):
         for f in self.files_to_analyse:
             if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
                 if 'AF-' in f and 'AF-' in pdb_code:
-                    if pdb_code.split("-")[1].lower() != os.path.splitext(os.path.basename(f))[0].split("-")[1].lower():
+                    if (pdb_code.split("-")[1].lower() !=
+                        os.path.splitext(os.path.basename(f))[0].split("-")[1].lower()):
                         continue
                 else:
                     continue
@@ -1002,7 +1031,8 @@ class Measure(object):
 
             if self.only_relaxed:
                 if ('_relaxed' not in f and
-                    os.path.exists(os.path.join(self.folder, f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
+                    os.path.exists(os.path.join(self.folder,
+                                                f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
                     continue
 
             if self.require_relaxed and '_relaxed' not in f:
@@ -1083,7 +1113,9 @@ class Measure(object):
 
                 except Exception as e_meas:
                     if self.report_errors:
-                        self._report_error_to_file('Meas feat error', f'measure file parallel; feature {meas[0]}', str(e_meas))
+                        self._report_error_to_file('Meas feat error',
+                                                   f'measure file parallel; feature {meas[0]}',
+                                                   str(e_meas))
                     terminal_out_statements.append(f"ERROR: {e_meas}")
                     continue
 
@@ -1149,7 +1181,8 @@ class Measure(object):
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
         print(f'Recovering measured data from file: {log_path}')
-        print('WARNING: could take up to a few minutes depending on the number of measurements completed.')
+        print('WARNING: could take up to a few minutes depending on '
+              'the number of measurements completed.')
 
         test_lines = 0
         columns_all_set = False
@@ -1173,7 +1206,8 @@ class Measure(object):
                         print(f'The first 6 columns are assumed to be: {base_columns}')
                         continue
                     elif len(parts) >= 6 and not columns_all_set:
-                        # if all seems correct with the writing check that all the columns can be found in the current columns, if not, add in
+                        # if all seems correct with the writing check that all the columns
+                        # can be found in the current columns, if not, add in
                         for part in parts:
                             if part not in base_columns:
                                 base_columns.append(part)
@@ -1410,7 +1444,8 @@ class Measure(object):
 
                     df_parallel = pd.concat(results, ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file_pdbonly(lock, pdb_code) for pdb_code in items],
+                    df_parallel = pd.concat([self._measure_file_pdbonly(lock, pdb_code)
+                                             for pdb_code in items],
                                             ignore_index=True)
 
             self.measures = gpu_measurements

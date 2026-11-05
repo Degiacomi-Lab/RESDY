@@ -15,7 +15,7 @@ MIN_BIOBOX_VERSION = (2, 0, 0)
 #: Columns of the measurements table that are not features
 METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Resolution',
                     'Source', 'Modified', 'class', 'Class', 'PLDDT', 'Largest_Gap',
-                    'Min_Dist_Other_Chain', 'num_structures')
+                    'Min_Dist_Other_Chain', 'num_structures', 'numbering')
 
 RESIDUE_KEY = ['Uniprot_Entry', 'Resid']
 RESIDUE_KEY_CHAIN = ['Uniprot_Entry', 'Chain', 'Resid']
@@ -47,6 +47,11 @@ AGG_LABELS = {'avg': 'Average',
             'rand': 'Random',
             'sd': 'Standard Deviation',
             'range': 'Range'}
+
+STANDARD_RESIDS = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q',
+                    'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
+                    'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
+                    'TYR': 'Y', 'VAL': 'V'}
 
 
 @contextlib.contextmanager

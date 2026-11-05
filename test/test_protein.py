@@ -38,14 +38,32 @@ class Test_Protein(unittest.TestCase):
         self.PDB.download_fasta('1PAE')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE.fasta'))
 
-    def test_clean_split_KCXmut(self):
+    def test_clean_split_rmv_KCXmut(self):
         # test KCX to LYS mutation
         self.PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb'))
         M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb')
         self.assertFalse(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
 
-    def test_clean_split_SECmut(self):
+    '''
+    def test_clean_split_keep_KCXmut(self):
+        # test keeping the KCX mutation
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    keep_modifications='KCX')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb'))
+        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb')
+        self.assertTrue(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
+    '''
+
+    def test_clean_split_rmv_SECmut(self):
         # test SEC to CYS mutation
         self.PDB.clean_and_split_pdb('1PAE', 'P22887')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
@@ -53,13 +71,65 @@ class Test_Protein(unittest.TestCase):
         self.assertFalse(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
         self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
 
-    def test_clean_split_MSEmut(self):
+    '''
+    def test_clean_split_keep_SECmut(self):
+        # test keeping the SEC mutation
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    keep_modifications=('SEC'))
+        PDB.clean_and_split_pdb('1PAE', 'P22887')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
+        M_1pae = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb')
+        self.assertTrue(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
+        self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
+    '''
+
+    def test_clean_split_rmv_MSEmut(self):
         # test MSE to MET mutation
         self.PDB.clean_and_split_pdb('1A8O', 'P12497')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
         M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
         self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb', 'MET', 'SD')
+
+    def test_clean_split_keep_MSEmut(self):
+        # test keeping the MSE mutation in the structure
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=3,
+            keep_modifications=('MSE'))
+        PDB.clean_and_split_pdb('1A8O', 'P12497')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
+        M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
+        self.assertTrue(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
+
+    def test_clean_split_keepallmod(self):
+        # test the 'all' flag in keep_modifications
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=3,
+            keep_modifications='all')
+        print(PDB.keep_modifications)
+        PDB.clean_and_split_pdb('1A8O', 'P12497')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
+        M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
+        self.assertTrue(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
 
     def _assert_sulfur_named(self, path, resname, sulfur):
         '''
