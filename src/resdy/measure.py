@@ -429,7 +429,8 @@ class Measure(object):
     # PUT OTHER METADATAMEASUREMENTS HERE
     def _dist_to_mods(self, M):
         '''
-        Get information on the distances of residues of interest to the modifife 
+        Get information on the distances of residues of interest to the nearest patched
+        section of the protein in different methods. This will gain information on the 
         Distance from each residue of interest to the closest other protein chain, and which
         residues can be featurised at all.
 

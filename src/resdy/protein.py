@@ -106,7 +106,8 @@ class PDB(object):
                  keep_modifications=(),
                  num_cores=0, max_nmr_conformers='',
                  biological_assembly=True, max_assembly_atoms=None,
-                 keep_all_curated=True, parallel_timeout = 12000):
+                 keep_all_curated=True, parallel_timeout = 12000,
+                 nmr_conformer_selection='all'):
         '''
         Initialise the PDB class.
 
@@ -220,6 +221,14 @@ class PDB(object):
             and stops curation getting stuck. Default is 12000 (2 hours) to allow for large
             protein assemblies to pass curation.
         :type parallel_timeout: int
+        :param nmr_conformer_selection: Option for the method for how to select the n models
+            of the nmr conformers which are available from the structure. Available options are
+            'first' (take the first n from each protein up to max_nmr_conformers), 'all' (take
+            all possible structures ignoring anything set by max_nmr_conformers ,this the default),
+            'representative' (takes the representative if denoted in the pdb file REMARKS,
+            otherwise defaults to conformer 1) or list of ints (pass directly a list of integers
+            for which all possible integers up to the max_nmr_conformers will be taken).
+        :type nmr_conformer_selection: str, list
         '''
 
         self.outdir = outdir
@@ -291,6 +300,25 @@ class PDB(object):
             restrain_heavy_atoms, restraint_k, minimisation_platform)
         self.keep_all_curated = keep_all_curated
 
+        self.curated_dir = os.path.join(outdir, "curated")
+        if not os.path.exists(self.curated_dir):
+            os.makedirs(self.curated_dir)
+
+        self.raw_dir = os.path.join(outdir, "conformations")
+        if not os.path.exists(self.raw_dir):
+            os.makedirs(self.raw_dir)
+
+        if self.PDB_only:
+            columns = ['PDB_Code']
+            self.df = pd.DataFrame(columns=columns)
+        else:
+            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains', 'Largest_Gap']
+            self.df = pd.DataFrame(columns=columns)
+
+        self.gap = gap
+        self.biological_assembly = biological_assembly
+        self.max_assembly_atoms = max_assembly_atoms
+        
         if isinstance(max_nmr_conformers, int):
             self.max_nmr_conformers = max_nmr_conformers
         elif isinstance(max_nmr_conformers, str):
@@ -310,24 +338,23 @@ class PDB(object):
                       f'({max_nmr_conformers}), taking all conformers as default.')
             self.max_nmr_conformers = None
 
-        self.curated_dir = os.path.join(outdir, "curated")
-        if not os.path.exists(self.curated_dir):
-            os.makedirs(self.curated_dir)
 
-        self.raw_dir = os.path.join(outdir, "conformations")
-        if not os.path.exists(self.raw_dir):
-            os.makedirs(self.raw_dir)
-
-        if self.PDB_only:
-            columns = ['PDB_Code']
-            self.df = pd.DataFrame(columns=columns)
+        if isinstance(nmr_conformer_selection, list):
+            self.nmr_conformer_selection = [int(a) for a in nmr_conformer_selection if
+                                            int(a) < self.max_nmr_conformers]
+        elif isinstance(nmr_conformer_selection, str):
+            if nmr_conformer_selection not in ['all', 'first', 'representative']:
+                print('>> Input given to nmr_conformer_selection is not an available option. '
+                      'Available options are all, first, representative or pass a list of '
+                      'integers. Setting to the default of \'all\'')
+                self.nmr_conformer_selection = 'all'
+            else:
+                self.nmr_conformer_selection = nmr_conformer_selection
         else:
-            columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains', 'Largest_Gap']
-            self.df = pd.DataFrame(columns=columns)
-
-        self.gap = gap
-        self.biological_assembly = biological_assembly
-        self.max_assembly_atoms = max_assembly_atoms
+            print('>> Input given to nmr_conformer_selection could not be inferred, setting '
+                  'it to the default of \'all\'')
+            self.nmr_conformer_selection = 'all'
+        self.nmr_conformer_selection = nmr_conformer_selection
 
 
     def _setup_minimisation_settings(self, forcefield, tolerance, max_iterations,
@@ -1019,9 +1046,9 @@ class PDB(object):
                 except Exception as e:
                     print(f'>> Could not read the REMARK 350 records of {pdb}, the asymmetric '
                           f'unit will be measured; error: {e}')
-            replacement_dict = self.clean(pdb, uniprot_code=uniprot_code)
+            replacement_dict, rep_struc = self.clean(pdb, uniprot_code=uniprot_code)
 
-            self.split_struc_nmr(pdb)
+            self.split_struc_nmr(pdb, rep_struc)
             self.split_struc_alt_aa(pdb)
 
         except Exception as e:
@@ -1267,11 +1294,22 @@ class PDB(object):
         test_mse = False
         test_sec = False
         test_kcx = False
+        representative_struc = 1
 
         res_insertion_codes = []
         modres_sites = {}
 
         for line in read_file:
+
+            # check for a representative struc REMARK
+            if line[:6] == 'REMARK' and 'BEST REPRESENTATIVE CONFORMER' in line:
+                try:
+                    representative_struc = int(line.split(':')[-1].strip())
+                except Exception as e:
+                    if self.nmr_conformer_selection == 'representative':
+                        print('>> Failed to get representative structure from the pdb file, '
+                              'keeping the representative structure as 1.')
+                    representative_struc = 1
 
             # check for modified residues
             if line[:6] == 'MODRES':
@@ -1508,10 +1546,10 @@ class PDB(object):
 
         os.remove(read_file_path)
 
-        return replacement_dict
+        return replacement_dict, representative_struc
 
 
-    def split_struc_nmr(self, pdb):
+    def split_struc_nmr(self, pdb, rep_struc=1):
         '''
         Write a new file for each alternate NMR structure. Takes the clean pdb file produced
         previously and identifies statements in the pdb file indicating different conformations, for
@@ -1519,14 +1557,19 @@ class PDB(object):
 
         :param pdb: pdb name for the protein to split
         :type pdb: str
+        :param rep_struc: the number of the representative structure to be used if this method of
+            selecting nmr structures is chosen. Set by default to 1.
+        :type rep_struc: int
         '''
 
+        rep_struc_written = False
         number = 1
         name = f'{pdb}-alt-{str(number)}.pdb'
 
         path = os.path.join(self.raw_dir, f"{pdb}-clean.pdb")
 
-        # Open the cleaned file, search over the data to find 'ENDMDL' statements to work out the number of structures available
+        # Open the cleaned file, search over the data to find 'ENDMDL' statements to work
+        # out the number of structures available
         f = open(path)
         endmdl_instances = []
 
@@ -1565,16 +1608,42 @@ class PDB(object):
                         break
 
                     elif re.search('ENDMDL', line):
-                        f_write.write(line)
-                        f_write.close()
-                        number = number + 1
+                        if isinstance(self.nmr_conformer_selection, list):
+                            print(number)
+                            if number in self.nmr_conformer_selection:
+                                print(number)
+                                f_write.write(line)
+                                f_write.close()
 
-                        if (self.max_nmr_conformers is not None and
-                            number > self.max_nmr_conformers):
+                        elif self.nmr_conformer_selection == 'first':
+                            if number < self.max_nmr_conformers:
+                                f_write.write(line)
+                                f_write.close()
+
+                            else:
+                                f_write.close()
+                                f.close()
+                                os.remove(path)
+                                break
+
+                        elif self.nmr_conformer_selection == 'representative':
+                            if number == rep_struc:
+                                f_write.write(line)
+                                f_write.close()
+                                rep_struc_written = True
+
+                            if rep_struc_written:
+                                f_write.close()
+                                f.close()
+                                os.remove(path)
+                                break
+
+                        else:
+                            # 'all' or default track
+                            f_write.write(line)
                             f_write.close()
-                            f.close()
-                            os.remove(path)
-                            break
+
+                        number += 1
 
                         name = pdb + '-alt-' + str(number) + '.pdb'
                         path_rename = os.path.join(self.raw_dir, name)

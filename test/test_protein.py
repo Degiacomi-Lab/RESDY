@@ -1,6 +1,7 @@
 import unittest
 import sys
 import os
+import re
 import shutil
 import tempfile
 import pandas as pd
@@ -125,7 +126,6 @@ class Test_Protein(unittest.TestCase):
             minimise_strucs=None,
             max_nmr_conformers=3,
             keep_modifications='all')
-        print(PDB.keep_modifications)
         PDB.clean_and_split_pdb('1A8O', 'P12497')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
         M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
@@ -165,6 +165,63 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
         M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
+
+    def test_nmr_confomer_selection_all(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=5,
+            nmr_conformer_selection='all')
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,9)))
+
+    def test_nmr_confomer_selection_first(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=5,
+            nmr_conformer_selection='first')
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,6)))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 5)
+
+    def test_nmr_confomer_selection_representative(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=10,
+            nmr_conformer_selection='representative')
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 1)
+
+    def test_nmr_confomer_selection_list(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=10,
+            nmr_conformer_selection=[1,4,6,7])
+        print(PDB.nmr_conformer_selection)
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        print(os.listdir(f'{self.outdir}{os.sep}curated'))
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,4,6,7]))
+
 
     # ---- heteroatom retention policy -------------------------------------------
 
