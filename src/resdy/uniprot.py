@@ -140,13 +140,13 @@ class Uniprot(object):
 
         #check if there is uniprot information available for the protein
         try:
-            url_2 = 'https://www.uniprot.org/uniprot/' + uniprot_code + '.txt'
-            html_2 = urllib.request.urlopen(url_2)
+            uniprot_url = 'https://www.uniprot.org/uniprot/' + uniprot_code + '.txt'
+            html_uniprot = urllib.request.urlopen(uniprot_url)
 
         except Exception as e:
             raise Exception(f'Failed to obtain UNIPROT data for code: {uniprot_code}. {e}') from e
 
-        if pdb_code_target == "":
+        if pdb_code_target == '':
 
             #appends the AF structure to the df (if this isn't present it will be removed later).
             try:
@@ -160,14 +160,19 @@ class Uniprot(object):
                     af_data = af_details_response.json()
                     latest_version = str(af_data[0]['latestVersion'])
                     af_code = f'AF-{uniprot_code}-F1-model_v{latest_version}'
+                    org_name = str(af_data[0]['organismScientificName'])
+                    org_taxid = str(af_data[0]['taxId'])
 
                 except Exception as e:
                     print(f'>> Failed to obtain information about AF structure for uniprot code'
                           f'{uniprot_code} with error {e}, using v6 for AF code.')
                     af_code = f'AF-{uniprot_code}-F1-model_v6'
+                    org_name = ''
+                    org_taxid = ''
 
                 data = ({'Uniprot_Entry': uniprot_code, 'PDB_Code': af_code,
-                         'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan})
+                         'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan,
+                         'Organism_Name': org_name, 'Organism_TaxID': org_taxid})
 
                 self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
                                     ignore_index=True)
@@ -175,7 +180,7 @@ class Uniprot(object):
             except Exception as e:
                 print(f'Error {e}')
 
-        for line in html_2:
+        for line in html_uniprot:
             try:
                 line = str(line)
                 messy_entry = re.findall(r'PDB; [\w -. ; \d /]*=', line)
@@ -185,7 +190,9 @@ class Uniprot(object):
                     words = messy_entry[0].split("; ")
                     pdb_code = words[1]
 
-                    if pdb_code_target != "" and pdb_code != pdb_code_target:
+                    pdb_org_dets = self.get_pdb_organism_details(pdb_code)
+
+                    if pdb_code_target != '' and pdb_code != pdb_code_target:
                         continue
 
                     method_obtained = words[2]
@@ -209,6 +216,8 @@ class Uniprot(object):
                                 'Method': method_obtained, 'Resolution': resolution,
                                 'Chains' : chains}
 
+                    data = data | pdb_org_dets
+
                     if data is not None:
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
                                             ignore_index=True)
@@ -216,6 +225,50 @@ class Uniprot(object):
             except Exception as e:
                 print(f'Error {e}')
                 continue
+
+
+    def get_pdb_organism_details(self, pdb_code):
+        '''
+        Function which takes a pdb code, contacts the RCSB API to obtain information on the
+        organism name and taxonomy id (taxid) assocatied with it.
+        
+        :param pdb_code: PDB code to contact the RCSB API with to get infomormation on, 4
+            characters long.
+        :type pdb_code: str
+
+        :returns org_out: Dictionary containing information on the organism name and taxid across
+            all entities associated with the PDB code.
+        :rtype: dict
+        '''
+
+        pdb_code = pdb_code.upper()
+        org_out = {'Organism_Name': [],
+                   'Organism_TaxID': []}
+
+        try:
+            org_req = requests.get(f'https://data.rcsb.org/rest/v1/core/'
+                                   f'polymer_entity/{pdb_code}/1', timeout=10)
+            org_req.raise_for_status()
+
+            for ent in org_req.json().get('rcsb_entity_source_organism', []):
+                org_name = str(ent['ncbi_scientific_name'])
+                taxid = str(ent['ncbi_taxonomy_id'])
+
+                if org_name not in org_out['Organism_Name']:
+                    org_out['Organism_Name'].append(org_name)
+                if taxid not in org_out['Organism_TaxID']:
+                    org_out['Organism_TaxID'].append(taxid)
+
+            if len(org_out['Organism_Name']) == 1:
+                org_out['Organism_Name'] = org_out['Organism_Name'][0]
+            if len(org_out['Organism_TaxID']) == 1:
+                org_out['Organism_TaxID'] = org_out['Organism_TaxID'][0]
+
+        except Exception as e:
+            print(f'>> Failed to get all information on the organism for pdb code: {pdb_code}. '
+                  f'Error: {str(e)}')
+
+        return org_out
 
 
     def from_organism(self, code, reviewed_only=False):
@@ -465,11 +518,11 @@ class Uniprot(object):
             return
 
         metadata = {k: {'uniprot': self.GO_dict[k], 'name': self.code_to_name[k]}
-                    for k in self.GO_dict}
+                    for k,_ in self.GO_dict.items()}
         json_GO_metadata = json.loads(json.dumps(metadata, default=str))
 
         with open(os.path.join(self.outdir, outname), 'w') as fh:
-                json.dump(json_GO_metadata, fh, indent=2)
+            json.dump(json_GO_metadata, fh, indent=2)
 
 
     def load_GO_metadata(self, metadata_name='GO_metadata.json'):

@@ -18,11 +18,11 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children
-require_biobox(bb)
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains
 from .assembly import measured_chains
+require_biobox(bb)
 
 #: File, in the output directory, that records the settings a measurement was made with.
 MEASURE_SETTINGS_FILE = 'measure_settings.json'
@@ -430,15 +430,16 @@ class Measure(object):
     def _dist_to_mods(self, M):
         '''
         Get information on the distances of residues of interest to the nearest patched
-        section of the protein in different methods. This will gain information on the 
-        Distance from each residue of interest to the closest other protein chain, and which
-        residues can be featurised at all.
+        section of the protein in different methods. This will gain information on the 3D
+        distance to the nearest modelled atom, the sequence length difference between the
+        residue of interest and the nearest residue which contains modelled residues and a
+        flag for if the residue of interest is in the region of modelled atoms (or contains
+        any modelled atoms).
 
         A residue is featurised at its anchor atom, the ``atom_select_names_nonmod`` (or,
         for a modified code, ``atom_select_names_modified``) entry of ``aa_properties``. A
         residue whose anchor is absent cannot be featurised and is missing from the returned
-        dictionary, which is how the callers leave it out of the table. When a residue has
-        more than one anchor atom the shortest distance is kept.
+        dictionary. When a residue has more than one anchor atom the shortest distance is kept.
 
         :param M: the structure being measured.
         :type M: biobox.Molecule
@@ -447,6 +448,27 @@ class Measure(object):
         :rtype: dict
         '''
         d = M.data
+        resname = d['resname'].astype(str).str.strip().to_numpy()
+        name = d['name'].astype(str).str.strip().to_numpy()
+        anchor = (np.isin(resname, self.aa_properties['non_modified_codes'])
+                    & np.isin(name, self.aa_properties['atom_select_names_nonmod']))
+        if self.include_mod:
+            anchor |= (np.isin(resname, self.aa_properties['modified_codes'])
+                        & np.isin(name, self.aa_properties['atom_select_names_modified']))
+        protein = (PROTEIN_RESNAMES | set(self.aa_properties['non_modified_codes'])
+                    | set(self.aa_properties['modified_codes']))
+        
+        idx = np.flatnonzero(anchor)
+        out = {}
+        for cha, res in zip(d['chain'].to_numpy()[idx], d['resid'].to_numpy()[idx]):
+            # get bool for if in modelled region
+            in_modelled = any(a == 0 for a in list(d.loc[(d['chain'] == cha) & (d['resid'] == res),
+                                                         'occupancy']))
+            
+            # get sequential distance to residues containing modelled atoms
+
+            key = (c, int(r))
+            out[key] = np.fmin(out[key], v) if key in out else v
 
 
     def _setup_measures(self, features_dict):

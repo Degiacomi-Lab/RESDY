@@ -267,7 +267,13 @@ class Test_Protein(unittest.TestCase):
         print(os.listdir(f'{self.outdir}{os.sep}curated'))
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1HiOcc.pdb'))
 
-
+    def test_get_prot_org(self):
+        shutil.copyfile(os.path.join('demo', 'curated', 'AF-P40616-F1-model_v6.pdb'),
+                        os.path.join(self.outdir, 'curated', 'AF-P40616-F1-model_v6.pdb'))
+        f = f'{self.outdir}{os.sep}curated{os.sep}AF-P40616-F1-model_v6.pdb'
+        org_dets = self.PDB._get_prot_org(f)
+        expected_dets = {'organism_name': 'HOMO SAPIENS', 'organism_taxid': '9606'}
+        self.assertTrue(org_dets == expected_dets)
 
     # ---- heteroatom retention policy -------------------------------------------
 

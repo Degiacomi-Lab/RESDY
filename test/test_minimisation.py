@@ -45,7 +45,7 @@ def _write_fragment(path, zinc=False, water=False):
         fh.write(''.join(frag) + 'TER\n' + ''.join(het) + 'END\n')
 
 
-@unittest.skipUnless(protein.openmm_available, 'openmm is not installed')
+@unittest.skipUnless(protein.OPENMM_AVAILABLE, 'openmm is not installed')
 class Test_Minimisation(unittest.TestCase):
     '''
     Minimisation settings, the per-structure record, heteroatom retention, and reuse of
@@ -217,7 +217,7 @@ class Test_Minimisation(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.outdir, 'minimisation_log.csv')))
 
 
-@unittest.skipUnless(protein.openmm_available, 'openmm is not installed')
+@unittest.skipUnless(protein.OPENMM_AVAILABLE, 'openmm is not installed')
 class Test_Minimisation_Pipeline(unittest.TestCase):
     '''
     Minimisation reached through curation, on downloaded structures. Slower than

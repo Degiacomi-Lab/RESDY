@@ -19,12 +19,12 @@ import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
 from .helper import require_biobox, STANDARD_RESIDS
-require_biobox(bb)
 from . import alphafold as af
 from . import patcher
 from . import assembly
 from .residues import AA_PRESETS
 from .geometry import check_geometry, GEOMETRY_COLUMNS
+require_biobox(bb)
 
 try:
     import openmm
@@ -36,11 +36,11 @@ try:
     from openmm.app.simulation import Simulation
     from openmm.unit import (nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin,
                              angstrom)
-    openmm_available = True
+    OPENMM_AVAILABLE = True
 except Exception as e:
     print('Could not import openmm modules for running minimisations, please ensure '
           'that openmm has been installed')
-    openmm_available = False
+    OPENMM_AVAILABLE = False
 
 
 #: The twenty standard residue names.
@@ -294,7 +294,7 @@ class PDB(object):
             self.minimise_af = False
             self.minimise_pdb = False
 
-        if (self.minimise_af or self.minimise_pdb) and not openmm_available:
+        if (self.minimise_af or self.minimise_pdb) and not OPENMM_AVAILABLE:
             raise ImportError(f'Minimisation of structures requested (minimise_strucs='
                               f'{minimise_strucs!r}) but openmm not available, either install '
                               f'openmm or change minimise_strucs parameter to None to skip '
@@ -323,7 +323,7 @@ class PDB(object):
         self.gap = gap
         self.biological_assembly = biological_assembly
         self.max_assembly_atoms = max_assembly_atoms
-        
+
         if isinstance(max_nmr_conformers, int):
             self.max_nmr_conformers = max_nmr_conformers
         elif isinstance(max_nmr_conformers, str):
@@ -338,7 +338,7 @@ class PDB(object):
                           f'default; Error: {e}')
                     self.max_nmr_conformers = None
         else:
-            if max_nmr_conformers != None:
+            if max_nmr_conformers is not None:
                 print(f'>> Unknown option given as input for max_nmr_conformers '
                       f'({max_nmr_conformers}), taking all conformers as default.')
             self.max_nmr_conformers = None
@@ -416,7 +416,7 @@ class PDB(object):
                     'restraint_k_kcal_mol_a2': float(restraint_k) if restrain_heavy_atoms else None,
                     'platform': platform}
 
-        if (self.minimise_af or self.minimise_pdb) and openmm_available:
+        if (self.minimise_af or self.minimise_pdb) and OPENMM_AVAILABLE:
             try:
                 ForceField(*forcefield)
             except Exception as e:
@@ -475,7 +475,7 @@ class PDB(object):
             self.minimisation_skipped[pdb] = reason
         record = {'structure': pdb, 'status': status, 'reason': reason,
                   'settings': settings if settings is not None else self.minimisation_settings,
-                  'openmm_version': openmm.__version__ if openmm_available else None,
+                  'openmm_version': openmm.__version__ if OPENMM_AVAILABLE else None,
                   'date': datetime.datetime.now().isoformat(timespec='seconds')}
         record.update(details)
         try:
@@ -686,7 +686,8 @@ class PDB(object):
                                                  'PDB': r.get('PDB_Code', ''),
                                                  'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
                     broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
-                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
+                    broken_prot.to_csv(broken_path, mode='a', index=False,
+                                       header=not os.path.exists(broken_path))
 
             if self.parallel:
                 results = []
@@ -935,7 +936,9 @@ class PDB(object):
             try:
                 with redirect_stdout(clean_split_print_trap):
                     if not self.PDB_only:
-                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
+                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code,
+                                                                           uniprot_code,
+                                                                           chains)
                         data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
                                 'Method': method_obtained, 'Resolution': resolution,
                                 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
@@ -959,6 +962,41 @@ class PDB(object):
             print_statements.append(clean_split_print_trap.getvalue())
             finish_curate_jobs(failed=False)
             return pd.DataFrame.from_records(data, index=[0])
+
+
+    def _get_prot_org(self, fname_path):
+        '''
+        For any downloaded pdb file, search over the source remarks to extract both the scientific
+        name of the organism and the taxid. These are available in both initial downloads of PDB
+        files from RCSB and AF structures. The function will return a dictionary with this
+        information to be included in the proteins.csv file in the overall process.
+
+        :param fname_path: Path of the pdb file to extract the information on the organism on
+        :type fname_path: str
+
+        :returns 
+        :rtype: dict
+        '''
+        org_dets = {'organism_name': '',
+                    'organism_taxid': ''}
+
+        try:
+            with open(file=fname_path, mode='r') as f1:
+                for line in f1:
+                    if line[:6] == 'SOURCE' and 'ORGANISM_SCIENTIFIC' in line:
+                        org_dets['organism_name'] = line.split(':')[-1].strip().replace(';', '')
+                    if line[:6] == 'SOURCE' and 'ORGANISM_TAXID' in line:
+                        org_dets['organism_taxid'] = line.split(':')[-1].strip()
+                    if line[:4] == 'ATOM':
+                        break
+
+        except Exception as e:
+            print(f'>> Failed to extract organism information from the given PDB file, left blank '
+                  f' for file: {fname_path} with error: {str(e)}')
+
+        return org_dets
+
+
 
 
     def _record_geometry(self, geometry, stage, align_details={}):
@@ -1120,7 +1158,8 @@ class PDB(object):
 
             try:
                 if self.minimise_pdb:
-                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0], align_details=align_details)
+                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0],
+                                            align_details=align_details)
             except Exception as e:
                 print(f'Failed to apply minimisation to file {f}')
 
@@ -1696,9 +1735,11 @@ class PDB(object):
 
         for f in list_of_files:
 
-            #Next it checks if there are any alternate amino acid conformations present (i.e. if line[16 == A, B or C]).
+            # Next it checks if there are any alternate amino acid
+            # conformations present (i.e. if line[16 == A, B or C]).
             read_file = open(f, 'r')
-            alt_loc_vals = sorted({line[16] for line in read_file if line[:4] == 'ATOM' and line[16] != ' '})
+            alt_loc_vals = sorted({line[16] for line in read_file if
+                                   line[:4] == 'ATOM' and line[16] != ' '})
             read_file.close()
 
             # If there are none for this file it moves on to the next.
@@ -1740,7 +1781,9 @@ class PDB(object):
 
                                 continue
 
-                            if (line[:4] == 'ATOM') or (line[:6] == 'HETATM') or (line[:3] == 'TER'):
+                            if ((line[:4] == 'ATOM') or
+                                (line[:6] == 'HETATM') or
+                                (line[:3] == 'TER')):
                                 f_write.write(line)
 
                         f_write.close()
@@ -1886,7 +1929,8 @@ class PDB(object):
                 mapped_res = M.data['resid'].map(res_mapper)
                 sel_chain = M.data['chain'] == chain
 
-                # Only the polymer is renumbered. Retained waters, ions and ligands are numbered in their own range
+                # Only the polymer is renumbered. Retained waters, ions and
+                # ligands are numbered in their own range
                 is_polymer = M.data['resname'].astype(str).str.upper().isin(STANDARD_RESIDUES)
                 sel_poly = sel_chain & is_polymer
 
@@ -2056,7 +2100,8 @@ class PDB(object):
             lines = open(path, 'r').readlines()
             first_lines = []
             for line in lines:
-                if line[:4]  == "ATOM" or line[:6] == 'HETATM' or line[:3] == 'TER' or line[:5] == 'MODEL':
+                if (line[:4]  == "ATOM" or line[:6] == 'HETATM' or
+                    line[:3] == 'TER' or line[:5] == 'MODEL'):
                     break
                 first_lines.append(line)
 
