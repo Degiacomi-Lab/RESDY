@@ -20,7 +20,7 @@ import biobox as bb
 from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
-from .geometry import distance_to_other_chains
+from .geometry import distance_to_other_chains, distance_to_modified, distance_to_nearest_termini
 from .assembly import measured_chains
 require_biobox(bb)
 
@@ -283,11 +283,13 @@ class Measure(object):
 
         if 'Uniprot_Entry' in self.df_input.columns:
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
-                       'Resid', 'Source', 'Min_Dist_Other_Chain']
+                       'Resid', 'Source', 'Min_Dist_Other_Chain', 'Dist_To_Nearest_Terminus',
+                       'In_Modelled_Region', 'Dist_To_Modelled']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
+                       'Dist_To_Nearest_Terminus', 'In_Modelled_Region', 'Dist_To_Modelled']
             self.df = pd.DataFrame(columns = columns)
 
         files_af=[os.path.splitext(os.path.basename(c))[0] for c
@@ -426,15 +428,15 @@ class Measure(object):
             out[key] = np.fmin(out[key], v) if key in out else v
         return out
 
+
     # PUT OTHER METADATAMEASUREMENTS HERE
     def _dist_to_mods(self, M):
         '''
         Get information on the distances of residues of interest to the nearest patched
         section of the protein in different methods. This will gain information on the 3D
         distance to the nearest modelled atom, the sequence length difference between the
-        residue of interest and the nearest residue which contains modelled residues and a
-        flag for if the residue of interest is in the region of modelled atoms (or contains
-        any modelled atoms).
+        residue of interest and the nearest terminus and a flag for if the residue of
+        interest is in the region of modelled atoms (or contains any modelled atoms).
 
         A residue is featurised at its anchor atom, the ``atom_select_names_nonmod`` (or,
         for a modified code, ``atom_select_names_modified``) entry of ``aa_properties``. A
@@ -457,18 +459,39 @@ class Measure(object):
                         & np.isin(name, self.aa_properties['atom_select_names_modified']))
         protein = (PROTEIN_RESNAMES | set(self.aa_properties['non_modified_codes'])
                     | set(self.aa_properties['modified_codes']))
-        
+
+        dist_modified = distance_to_modified(d['chain'].to_numpy(), resname,
+                                    d['atomtype'].to_numpy(), d['occupancy'].to_numpy(),
+                                    M.points, anchor, protein)
+        dist_termini = distance_to_nearest_termini(d['chain'].to_numpy(), resname,
+                                            d['atomtype'].to_numpy(), M.points, anchor,
+                                            d['resid'].to_numpy())
+
         idx = np.flatnonzero(anchor)
         out = {}
-        for cha, res in zip(d['chain'].to_numpy()[idx], d['resid'].to_numpy()[idx]):
-            # get bool for if in modelled region
-            in_modelled = any(a == 0 for a in list(d.loc[(d['chain'] == cha) & (d['resid'] == res),
+        for cha, res, near_any, near_term in zip(d['chain'].to_numpy()[idx],
+                                                 d['resid'].to_numpy()[idx],
+                                                 dist_modified,
+                                                 dist_termini):
+            in_modelled = any(a == 0 for a in list(d.loc[(d['chain'] == cha) &
+                                                         (d['resid'] == res),
                                                          'occupancy']))
-            
-            # get sequential distance to residues containing modelled atoms
 
-            key = (c, int(r))
-            out[key] = np.fmin(out[key], v) if key in out else v
+            key = (cha, int(res))
+            details = {}
+            if key in out:
+                details = out[key]
+                details['Dist_To_Modelled'] = np.fmin(details['Dist_To_Modelled'], near_any)
+                details['Dist_To_Nearest_Terminus'] = np.fmin(details['Dist_To_Nearest_Terminus'],
+                                                           near_term)
+                details['In_Modelled_Region'] = any(details['In_Modelled_Region'] + in_modelled)
+            else:
+                details['Dist_To_Modelled'] = near_any
+                details['Dist_To_Nearest_Terminus'] = near_term
+                details['In_Modelled_Region'] = in_modelled
+            out[key] = details
+
+        return out
 
 
     def _setup_measures(self, features_dict):
@@ -680,7 +703,8 @@ class Measure(object):
             if '_no' in new_file_name:
                 error_file_num = int(os.path.splitext(new_file_name)[0].split('_no')[-1])
                 new_file_name = os.path.join(self.outdir,
-                                             f'measures_errors_{date.today()}_no{(error_file_num + 1)}.txt')
+                                             f'measures_errors_{date.today()}_no'
+                                             f'{(error_file_num + 1)}.txt')
             else:
                 new_file_name = os.path.join(self.outdir,
                                              f'measures_errors_{date.today()}_no{1}.txt')
@@ -1066,7 +1090,8 @@ class Measure(object):
             terminal_out_statements.append(f"\n> File: {f}")
 
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
-                       'Resid', 'Source', 'Min_Dist_Other_Chain']
+                       'Resid', 'Source', 'Min_Dist_Other_Chain', 'Dist_To_Modelled',
+                       'Dist_To_Nearest_Terminus', 'In_Modelled_Region']
             if self.include_mod:
                 columns.append('Modified')
             records = []
@@ -1088,6 +1113,7 @@ class Measure(object):
                                    get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
+            dist_metadata = self._dist_to_mods(M)
             # copies made by the assembly operators are environment only
             reported = measured_chains(f)
             no_anchor = 0
@@ -1104,14 +1130,17 @@ class Measure(object):
                     no_anchor += 1
                     continue
 
-                data = ({'Uniprot_Entry': uniprot_code,
-                    'PDB_Code':os.path.splitext(os.path.basename(f))[0],
-                    'Method': method,
-                    'Resolution': res,
-                    'Chain': M.data['chain'].values[i],
-                    'Resid': M.data['resid'].values[i],
-                    'Source': self._source_of(f),
-                    'Min_Dist_Other_Chain': other_chain[key]})
+                data = {'Uniprot_Entry': uniprot_code,
+                        'PDB_Code':os.path.splitext(os.path.basename(f))[0],
+                        'Method': method,
+                        'Resolution': res,
+                        'Chain': M.data['chain'].values[i],
+                        'Resid': M.data['resid'].values[i],
+                        'Source': self._source_of(f),
+                        'Min_Dist_Other_Chain': other_chain[key]}
+
+                data = data | dist_metadata[key]
+                print(data)
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]
@@ -1158,7 +1187,8 @@ class Measure(object):
                                       "display.max_rows", None)
                         try:
                             self.logger.info(df_currentfile)
-                            self.logger.info('--------------------------------------------------------------------------')
+                            self.logger.info('-------------------------------------------'
+                                             '-------------------------------')
                         except Exception as e_log:
                             if self.report_errors:
                                 self._report_error_to_file('logging', 'measure file parallel',
@@ -1175,7 +1205,9 @@ class Measure(object):
 
         if not frames_df_list:
             return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution',
-                                         'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
+                                         'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
+                                         'Dist_To_Modelled','Dist_To_Nearest_Terminus',
+                                         'In_Modelled_Region'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -1537,7 +1569,8 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
+                       'In_Modelled_Region', 'Dist_To_Nearest_Terminus', 'Dist_To_Modelled']
             if self.include_mod:
                 columns.append('Modified')
             records = []
@@ -1561,6 +1594,7 @@ class Measure(object):
                                    ['CA'], get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
+            dist_metadata = self._dist_to_mods(M)
             # copies made by the assembly operators are environment only
             reported = measured_chains(f)
             no_anchor = 0
@@ -1577,6 +1611,8 @@ class Measure(object):
                     'Resid': M.data['resid'].values[i],
                     'Source': self._source_of(f),
                     'Min_Dist_Other_Chain': other_chain[key]})
+
+                data = data | dist_metadata[key]
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]
@@ -1641,7 +1677,9 @@ class Measure(object):
                 file_df_list.append(df_currentfile)
 
         if not file_df_list:
-            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
+            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid', 'Source',
+                                         'Min_Dist_Other_Chain', 'Dist_To_Modelled',
+                                         'Dist_To_Nearest_Terminus', 'In_Modelled_Region'])
 
         return pd.concat(file_df_list, ignore_index=True)
 

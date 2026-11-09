@@ -18,7 +18,7 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox, STANDARD_RESIDS
+from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock
 from . import alphafold as af
 from . import patcher
 from . import assembly
@@ -1167,6 +1167,20 @@ class PDB(object):
             raise Exception("Patching failed for all conformers")
 
         return largest_gap, align_details
+
+
+    def _rename_charged_termini(self, fname):
+        '''
+        Little script to change the capping atoms added with modeller to stop these being charged
+        which may not be the natural state for this protein unless it is at the true end of the
+        chain. To utilise minimisation on partial structures, capping atoms are needed and non-
+        charged capping atoms are more realistic for this purpose.
+        
+        :param fname: Name of the pdb file of interest to check the capping atoms and change to
+            non-charged if these aren't at the true terminus of the protein chain.
+        :type fname: str
+        '''
+        i = 1
 
 
     def _build_assembly(self, path, biomatrix, determined):

@@ -15,7 +15,8 @@ MIN_BIOBOX_VERSION = (2, 0, 0)
 #: Columns of the measurements table that are not features
 METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Resolution',
                     'Source', 'Modified', 'class', 'Class', 'PLDDT', 'Largest_Gap',
-                    'Min_Dist_Other_Chain', 'num_structures', 'numbering')
+                    'Min_Dist_Other_Chain', 'num_structures', 'numbering', 'Dist_To_Modelled',
+                    'Dist_To_Nearest_Terminus', 'In_Modelled_Region')
 
 RESIDUE_KEY = ['Uniprot_Entry', 'Resid']
 RESIDUE_KEY_CHAIN = ['Uniprot_Entry', 'Chain', 'Resid']

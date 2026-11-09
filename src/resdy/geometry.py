@@ -201,6 +201,91 @@ def distance_to_other_chains(chain, resname, element, xyz, anchor,
     return out
 
 
+def distance_to_nearest_termini(chain, resname, element, xyz, anchor, resid):
+    '''
+    Distance from each anchor atom to the closest termini in the structure.
+
+    Only heavy atoms of protein residues count as a partner: an ion, a water or a ligand
+    that carries a chain identifier of its own is not a chain. Which chain is the closest is
+    not reported.
+
+    :param chain: (n,) chain identifier of every atom.
+    :param resname: (n,) residue name of every atom.
+    :param element: (n,) element symbol of every atom, used to leave out hydrogens.
+    :param xyz: (n, 3) coordinates.
+    :param anchor: (n,) boolean mask of the atoms to measure from.
+    :param resid: (n,) Indexes of the residues within the protein.
+    :returns: (number of anchors,) distances in A, in the order of ``np.flatnonzero(anchor)``,
+        NaN for an anchor whose structure holds no other protein chain.
+    :rtype: numpy.ndarray
+    '''
+    chain = np.asarray(chain).astype(str)
+    resname = np.char.upper(np.char.strip(np.asarray(resname).astype(str)))
+    element = np.char.upper(np.char.strip(np.asarray(element).astype(str)))
+    xyz = np.asarray(xyz, dtype=float)
+    anchor = np.asarray(anchor, dtype=bool)
+    resid = np.asarray(resid).astype(int)
+
+    anchor_idx = np.flatnonzero(anchor)
+    out = np.full(len(anchor_idx), np.nan)
+
+    if len(anchor_idx) == 0:
+        return out
+
+    term_idx = []
+    for c in np.unique(chain):
+        idx = np.flatnonzero(chain == c)
+        r = np.asarray(resid)[idx]
+        term_idx.extend(idx[(r == r[0]) | (r == r[-1])])
+
+    term_idx = np.unique(term_idx)
+    out[:] = cKDTree(xyz[term_idx]).query(xyz[anchor_idx])[0]
+
+    return out
+
+
+def distance_to_modified(chain, resname, element, occupancy, xyz, anchor,
+                             protein_resnames=PROTEIN_RESNAMES):
+    '''
+    Distance from each anchor atom to the closest modelled atom in the protein structure.
+
+    Only heavy atoms of protein residues count as a partner: an ion, a water or a ligand
+    that carries a chain identifier of its own is not a chain. Which chain is the closest is
+    not reported.
+
+    :param chain: (n,) chain identifier of every atom.
+    :param resname: (n,) residue name of every atom.
+    :param element: (n,) element symbol of every atom, used to leave out hydrogens.
+    :param occupancy: (n,) occupancy value for every atom within the protein structure, used
+        for identifying modelled atoms which have an occupancy of 0.
+    :param xyz: (n, 3) coordinates.
+    :param anchor: (n,) boolean mask of the atoms to measure from.
+    :param protein_resnames: residue names counted as protein.
+    :returns: (number of anchors,) distances in A, in the order of ``np.flatnonzero(anchor)``,
+        NaN for an anchor whose structure holds no other protein chain.
+    :rtype: numpy.ndarray
+    '''
+    chain = np.asarray(chain).astype(str)
+    resname = np.char.upper(np.char.strip(np.asarray(resname).astype(str)))
+    element = np.char.upper(np.char.strip(np.asarray(element).astype(str)))
+    occupancy = np.asarray(occupancy, dtype=float)
+    xyz = np.asarray(xyz, dtype=float)
+    anchor = np.asarray(anchor, dtype=bool)
+
+    anchor_idx = np.flatnonzero(anchor)
+    out = np.full(len(anchor_idx), np.nan)
+    if len(anchor_idx) == 0:
+        return out
+
+    partner = np.isin(resname, list(protein_resnames)) & ~np.isin(element, ['H', 'D'])
+    targets = partner & (occupancy == 0)
+    if not targets.any():
+        return out
+
+    out[:] = cKDTree(xyz[targets]).query(xyz[anchor_idx])[0]
+    return out
+
+
 def check_geometry(path, clash_cutoff=2.0, modelled_residues=(), report_cutoff=4.0,
                    min_occupancy=0.0):
     '''
