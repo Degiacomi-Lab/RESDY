@@ -80,7 +80,7 @@ While a range of features are already made available (see below), the code archi
 This class yields a pandas [@pandas] dataframe coupling the features extracted with relevant metadata (e.g., structure determination technique and resolution).
 *	*Analysis*. This class enables exploring and manipulating the data gathered as a pandas dataframe by the Measure class.
 TALK ABOUT DATA AGGREGATION.
-*	*Viewer*. TBD
+*	*Viewer*. This class enables visual exploration of the curated measurements dataset, with 2D, 3D graphs and feature histograms, it allows comparison within and between features for all or specific proteins with the ability to select subsets based on properties such as minimisation applied or GO term associated.
 
 The features currently available within `resdy`, with associated origin packages given in parentheses, are:
 
@@ -128,6 +128,6 @@ On a computer with … CPUs and a … GPU this terminates in ….
 
 # Acknowledgements
 
-We thank Hao Man, Breanna Voss, and Grace Carter for testing the code, and Martin Cann for sharing his expertise in the area of protein modifications.
+We thank Hao Man, Breanna Voss, and Grace Carter for testing the code.
 
 # References

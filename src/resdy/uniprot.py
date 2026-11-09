@@ -152,7 +152,8 @@ class Uniprot(object):
             try:
                 # get latest AF structure details for the uniprot code
                 try:
-                    af_details_response = requests.get(f'https://alphafold.ebi.ac.uk/api/prediction/{uniprot_code}?include_complexes=false',
+                    af_details_response = requests.get(f'https://alphafold.ebi.ac.uk/api/prediction/'
+                                                       f'{uniprot_code}?include_complexes=false',
                                                        timeout=10)
                     if not af_details_response.ok:
                         af_details_response.raise_for_status()

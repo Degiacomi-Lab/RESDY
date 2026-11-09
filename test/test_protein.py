@@ -59,8 +59,8 @@ class Test_Protein(unittest.TestCase):
                     max_nmr_conformers=3,
                     keep_modifications='KCX')
         PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
-        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb'))
-        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
+        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb')
         self.assertTrue(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
     '''
 
@@ -85,10 +85,10 @@ class Test_Protein(unittest.TestCase):
                     max_nmr_conformers=3,
                     keep_modifications=('SEC'))
         PDB.clean_and_split_pdb('1PAE', 'P22887')
-        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
-        M_1pae = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb'))
+        M_1pae = bb.Molecule(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb')
         self.assertTrue(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
-        self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
+        self._assert_sulfur_named(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
     '''
 
     def test_clean_split_rmv_MSEmut(self):
@@ -221,6 +221,52 @@ class Test_Protein(unittest.TestCase):
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         print(os.listdir(f'{self.outdir}{os.sep}curated'))
         self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,4,6,7]))
+
+    def test_rotamer_selection_all(self):
+        # test keeping all available rotamers from the pdb structure
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    rotamer_selection='all')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb'))
+
+    def test_rotamer_selection_first(self):
+        # test keeping only the first rotamer from the pdb structure
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    rotamer_selection='first')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
+        self.assertFalse(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb'))
+
+    def test_rotamer_selection_highest_occupancy(self):
+        # test keeping only the first rotamer from the pdb structure
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    rotamer_selection='highest_occupancy')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        print(os.listdir(f'{self.outdir}{os.sep}curated'))
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1HiOcc.pdb'))
+
 
 
     # ---- heteroatom retention policy -------------------------------------------
