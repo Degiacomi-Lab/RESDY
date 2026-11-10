@@ -1,4 +1,6 @@
 structure,biomolecule,determined,status,reason,n_operators,original_chains,chains,measured_chains,n_atoms,n_clashes
+13LD-alt1A,1,author,built,,1,A/B/C/D,A/B,A/B,6050,1.0
+13LD-alt1B,1,author,built,,1,A/B/C/D,A/B,A/B,6050,1.0
 1A6M-alt1A,1,author,identity,,1,A,A,A,1204,
 1A6M-alt1B,1,author,identity,,1,A,A,A,1204,
 1UPT-alt-1,1,author,built,,1,A/B/C/D/E/F/G/H,A/B/C/D,A/B/C/D,3561,0.0

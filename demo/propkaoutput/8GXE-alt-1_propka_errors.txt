@@ -1,6 +1,12 @@
 Missing atoms or failed protonation for GLN1098 A (BBN) -- please check the structure
-Group (BBN) for  1802-   N  1098-GLN (A) [ -25.027  -58.317   -6.200] N
+Group (BBN) for  1802-   N  1098-GLN (A) [ -25.045  -58.308   -6.233] N
 Expected 2 interaction atoms for acids, found:
-              1802-   N  1098-GLN (A) [ -25.027  -58.317   -6.200] N
+              1802-   N  1098-GLN (A) [ -25.045  -58.308   -6.233] N
 Expected 2 interaction atoms for bases, found:
-              1802-   N  1098-GLN (A) [ -25.027  -58.317   -6.200] N
+              1802-   N  1098-GLN (A) [ -25.045  -58.308   -6.233] N
+Missing atoms or failed protonation for C- 1171 A (COO) -- please check the structure
+Group (COO) for  2387- OXT  1171-SER (A) [  -2.618  -75.362   18.412] O
+Expected 2 interaction atoms for acids, found:
+              2387- OXT  1171-SER (A) [  -2.618  -75.362   18.412] O
+Expected 2 interaction atoms for bases, found:
+              2387- OXT  1171-SER (A) [  -2.618  -75.362   18.412] O

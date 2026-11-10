@@ -1,0 +1,31 @@
+Missing atoms or failed protonation for C-  179 B (COO) -- please check the structure
+Group (COO) for  2617- OXT   179-SER (B) [  20.800  -22.877  -14.201] O
+Expected 2 interaction atoms for acids, found:
+              2617- OXT   179-SER (B) [  20.800  -22.877  -14.201] O
+Expected 2 interaction atoms for bases, found:
+              2617- OXT   179-SER (B) [  20.800  -22.877  -14.201] O
+Missing atoms or failed protonation for ASN 195 C (AMD) -- please check the structure
+Group (AMD) for  3237-  CG   195-ASN (C) [ -21.250   13.866  -11.049] C
+Expected 3 interaction atoms for acids, found:
+              3239- ND2   195-ASN (C) [ -21.013   13.528   -9.783] N
+                 0- HD2   195-ASN (C) [ -20.057   13.275   -9.987] H
+Expected 1 interaction atoms for bases, found:
+              3238- OD1   195-ASN (C) [ -22.390   14.060  -11.486] O
+Missing atoms or failed protonation for C-  311 C (COO) -- please check the structure
+Group (COO) for  4165- OXT   311-GLY (C) [ -20.809   13.063   -7.861] O
+Expected 2 interaction atoms for acids, found:
+              4165- OXT   311-GLY (C) [ -20.809   13.063   -7.861] O
+Expected 2 interaction atoms for bases, found:
+              4165- OXT   311-GLY (C) [ -20.809   13.063   -7.861] O
+Missing atoms or failed protonation for GLN 315 D (BBN) -- please check the structure
+Group (BBN) for  5733-   N   315-GLN (D) [ -11.009   15.680    2.845] N
+Expected 2 interaction atoms for acids, found:
+              5733-   N   315-GLN (D) [ -11.009   15.680    2.845] N
+Expected 2 interaction atoms for bases, found:
+              5733-   N   315-GLN (D) [ -11.009   15.680    2.845] N
+Missing atoms or failed protonation for C-  315 D (COO) -- please check the structure
+Group (COO) for  5742- OXT   315-GLN (D) [ -11.301   16.905    1.440] O
+Expected 2 interaction atoms for acids, found:
+              5742- OXT   315-GLN (D) [ -11.301   16.905    1.440] O
+Expected 2 interaction atoms for bases, found:
+              5742- OXT   315-GLN (D) [ -11.301   16.905    1.440] O

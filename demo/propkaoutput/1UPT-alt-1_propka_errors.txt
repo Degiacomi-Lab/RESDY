@@ -1,0 +1,18 @@
+Missing atoms or failed protonation for C-  181 A (COO) -- please check the structure
+Group (COO) for  1346- OXT   181-GLN (A) [ -46.254  -14.797   58.145] O
+Expected 2 interaction atoms for acids, found:
+              1346- OXT   181-GLN (A) [ -46.254  -14.797   58.145] O
+Expected 2 interaction atoms for bases, found:
+              1346- OXT   181-GLN (A) [ -46.254  -14.797   58.145] O
+Missing atoms or failed protonation for SER2228 B (BBN) -- please check the structure
+Group (BBN) for  1829-   N  2228-SER (B) [ -63.132    9.807   44.636] N
+Expected 2 interaction atoms for acids, found:
+              1829-   N  2228-SER (B) [ -63.132    9.807   44.636] N
+Expected 2 interaction atoms for bases, found:
+              1829-   N  2228-SER (B) [ -63.132    9.807   44.636] N
+Missing atoms or failed protonation for ARG 180 C (BBN) -- please check the structure
+Group (BBN) for  3117-   N   180-ARG (C) [ -46.290   50.021   28.626] N
+Expected 2 interaction atoms for acids, found:
+              3117-   N   180-ARG (C) [ -46.290   50.021   28.626] N
+Expected 2 interaction atoms for bases, found:
+              3117-   N   180-ARG (C) [ -46.290   50.021   28.626] N

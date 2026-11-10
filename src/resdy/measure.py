@@ -1140,7 +1140,6 @@ class Measure(object):
                         'Min_Dist_Other_Chain': other_chain[key]}
 
                 data = data | dist_metadata[key]
-                print(data)
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]

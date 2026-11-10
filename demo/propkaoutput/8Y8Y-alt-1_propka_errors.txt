@@ -1,0 +1,6 @@
+Missing atoms or failed protonation for C-  304 A (COO) -- please check the structure
+Group (COO) for  2323- OXT   304-TYR (A) [  16.813   15.393   51.256] O
+Expected 2 interaction atoms for acids, found:
+              2323- OXT   304-TYR (A) [  16.813   15.393   51.256] O
+Expected 2 interaction atoms for bases, found:
+              2323- OXT   304-TYR (A) [  16.813   15.393   51.256] O

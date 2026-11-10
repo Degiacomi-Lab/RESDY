@@ -1,0 +1,22 @@
+{
+ "structure": "13LD-alt1B",
+ "status": "relaxed",
+ "reason": "",
+ "settings": {
+  "forcefield": [
+   "amber14-all.xml",
+   "implicit/gbn2.xml"
+  ],
+  "tolerance_kj_mol_nm": 10.0,
+  "max_iterations": 1000,
+  "restrain_heavy_atoms": false,
+  "restraint_k_kcal_mol_a2": null,
+  "platform": null
+ },
+ "openmm_version": "8.6.1",
+ "date": "2026-11-10T02:09:05",
+ "platform_used": "CPU",
+ "energy_initial_kj_mol": -18294.164967667733,
+ "energy_final_kj_mol": -116466.76094640701,
+ "heavy_atom_rmsd_a": 0.3924185973449905
+}

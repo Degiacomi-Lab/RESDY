@@ -1,4 +1,4 @@
-REMARK   1 CREATED WITH OPENMM 8.6.1, 2026-10-16
+MODEL        1
 ATOM      1  N   VAL A   1      -4.004  15.224  13.636  1.00  0.00           N  
 ATOM      2  CA  VAL A   1      -3.526  15.758  14.900  1.00  0.00           C  
 ATOM      3  C   VAL A   1      -2.662  14.733  15.628  1.00  0.00           C  
@@ -1203,5 +1203,6 @@ ATOM   1201  CE2 TYR A 151       6.178  28.389  -3.312  1.00  0.00           C
 ATOM   1202  CZ  TYR A 151       6.777  28.710  -4.502  1.00  0.00           C  
 ATOM   1203  OH  TYR A 151       7.987  28.116  -4.803  1.00  0.00           O  
 ATOM   1204  OXT TYR A 151       0.630  27.882  -3.781  1.00  0.00           O  
-TER    1205      TYR A 151
+TER    1205      TYR A 151 
+ENDMDL
 END
