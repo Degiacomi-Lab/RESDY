@@ -238,10 +238,14 @@ class PDB(object):
             otherwise defaults to conformer 1) or list of ints (pass directly a list of integers
             for which all possible integers up to the max_nmr_conformers will be taken).
         :type nmr_conformer_selection: str, list
-        :param rotamer_selection: Option to allow the user to select which of the rotamers to
-            keep during the curation process. Options are: 'all' (keep all possible rotamers),
-            'highest_occupancy' (keep the rotamer of a set which has the highest overall occupancy)
-            and 'first' (take the first available rotamer)
+        :param rotamer_selection: Option to allow the user to select which of the rotamers
+            (alternate locations) to keep during the curation process. Options are: 'all' (one
+            structure per alternate location letter of the file, e.g. '-alt1A' and '-alt1B'),
+            'highest_occupancy' (one structure, '-alt1HiOcc', in which every residue keeps the
+            alternate location whose atoms have the highest mean occupancy) and 'first' (one
+            structure, in which every residue keeps its first alternate location). The choice
+            is made residue by residue, so that a residue whose alternates are only B and C
+            still keeps one of them.
         :type rotamer_selection: str
         :param minimise_termini: Option for which method to use for patching the termini of the
             protein structure, this is done to ensure minimisation is able to occur on structures
@@ -1759,11 +1763,25 @@ class PDB(object):
 
     def split_struc_alt_aa(self, pdb):
         '''
-        Writes a new file for each alternative amino acid conformation present. Finds all pdb files
-        created previously for the given pdb file, for each of the files, open and search column 16
-        for any alternate structure codes present in the file. If there are codes present, for each
-        code identified goes over the file and splits it up to produce files of the format:
-        f'{pdb}-alt{i}{y}.pdb' where i is the nmr structure and y is the alternate code
+        Resolve the alternate locations (rotamers) of the conformation files of a pdb entry,
+        following ``rotamer_selection``.
+
+        .. rubric:: Method
+
+        Finds all pdb files created previously for the given pdb entry, and searches column 17
+        of each for alternate location letters. A file without any is left as it is. Otherwise
+        the file is replaced by:
+
+        - 'all': one file per letter, f'{pdb}-alt{i}{y}.pdb' where i is the nmr structure and
+          y is the letter. Each holds the atoms without a letter and those of its own letter.
+        - 'first': a single file, named after the first letter of the file, in which every
+          residue keeps the first of its own letters.
+        - 'highest_occupancy': a single file, f'{pdb}-alt{i}HiOcc.pdb', in which every residue
+          keeps the letter whose atoms have the highest mean occupancy (the first of them when
+          several are equal).
+
+        Atoms are written in the order of the file, with the letter removed, so chains, TER
+        records and atom order are those of the entry.
 
         :param pdb: pdb code of the protein to curate
         :type pdb: str
@@ -1771,18 +1789,16 @@ class PDB(object):
         #Get a list of all the .pdb files present in [outdir]/conformations
         #and select those that belong to the pdb we are interested in.
         list_of_files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*.pdb"))
-        rot_select = self.rotamer_selection
-        if self.rotamer_selection == 'highest_occupancy':
-            rot_select = 'all'
 
         for f in list_of_files:
 
+            with open(f, 'r') as read_file:
+                lines = read_file.readlines()
+
             # Next it checks if there are any alternate amino acid
             # conformations present (i.e. if line[16 == A, B or C]).
-            read_file = open(f, 'r')
-            alt_loc_vals = sorted({line[16] for line in read_file if
+            alt_loc_vals = sorted({line[16] for line in lines if
                                    line[:4] == 'ATOM' and line[16] != ' '})
-            read_file.close()
 
             # If there are none for this file it moves on to the next.
             if not alt_loc_vals:
@@ -1790,106 +1806,62 @@ class PDB(object):
             else:
                 print(">> Alternate amino acid conformations found. Splitting...")
 
-            if self.rotamer_selection == 'first':
-                alt_loc_vals = alt_loc_vals[0]
+            try:
+                prev_name, ext = os.path.splitext(f)
+                pdb_name, _, ver = prev_name.rpartition('-')
 
-            # If there are it rewrites a new file for all alternate conformations
-            if rot_select in ['first', 'all']:
-                for alt_loc_letter in alt_loc_vals:
-                    try:
-                        prev_name, ext = os.path.splitext(f)
-                        pdb_name, _, ver = prev_name.rpartition('-')
-                        write_path = f'{pdb_name}{ver}{alt_loc_letter}{ext}'
-                        f_write = open(write_path, 'w')
+                if self.rotamer_selection == 'all':
+                    # one file per letter; the letter each file keeps is the same for every
+                    # residue, and the letters given up are those of the other files
+                    outputs = [(f'{pdb_name}{ver}{letter}{ext}', letter,
+                                [a for a in alt_loc_vals if a != letter])
+                               for letter in alt_loc_vals]
+                else:
+                    # one file; the letter kept is chosen residue by residue
+                    occupancies = {}
+                    for line in lines:
+                        if line[:4] == 'ATOM' or line[:6] == 'HETATM':
+                            if line[16] != ' ':
+                                try:
+                                    occupancy = float(line[54:60])
+                                except ValueError:
+                                    occupancy = 0.0
+                                (occupancies.setdefault((line[21], line[22:27]), {})
+                                 .setdefault(line[16], []).append(occupancy))
 
-                        target_letter = alt_loc_letter
-                        non_target_letters = []
-                        for letter in alt_loc_vals:
-                            if letter != target_letter:
-                                non_target_letters.append(letter)
+                    if self.rotamer_selection == 'highest_occupancy':
+                        # sorted first, so that equal occupancies go to the first letter
+                        keep = {res: max(sorted(by_letter), key=lambda a, d=by_letter:
+                                         sum(d[a]) / len(d[a]))
+                                for res, by_letter in occupancies.items()}
+                        name = 'HiOcc'
+                    else:
+                        keep = {res: min(by_letter) for res, by_letter in occupancies.items()}
+                        name = alt_loc_vals[0]
+                    outputs = [(f'{pdb_name}{ver}{name}{ext}', keep, None)]
 
-                        read = open(f)
-                        for line in read:
-
-                            if ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
-                                (line[16] == target_letter)):
-
-                                newline = line[:16] + ' ' + line[17:]
-                                f_write.write(newline)
-                                continue
-
-                            if ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
-                                (line[16] in non_target_letters)):
-
-                                continue
-
-                            if ((line[:4] == 'ATOM') or
-                                (line[:6] == 'HETATM') or
-                                (line[:3] == 'TER')):
+                for write_path, keep, dropped in outputs:
+                    with open(write_path, 'w') as f_write:
+                        for line in lines:
+                            if line[:4] == 'ATOM' or line[:6] == 'HETATM':
+                                letter = line[16]
+                                if letter == ' ':
+                                    f_write.write(line)
+                                elif dropped is not None:
+                                    # 'all': the letter of this file, without its letter; a
+                                    # letter of no file (heteroatoms only) is written as it is
+                                    if letter == keep:
+                                        f_write.write(line[:16] + ' ' + line[17:])
+                                    elif letter not in dropped:
+                                        f_write.write(line)
+                                elif keep.get((line[21], line[22:27])) == letter:
+                                    f_write.write(line[:16] + ' ' + line[17:])
+                            elif line[:3] == 'TER':
                                 f_write.write(line)
 
-                        f_write.close()
-                        read.close()
-
-                    except Exception as e:
-
-                        if "read_file" in locals():
-                            read_file.close()
-
-                        if "f_write" in locals():
-                            f_write.close()
-
-                        raise Exception(f'>> Could not split out rotamers from the pdb file '
-                                        f'with error: {str(e)}') from e
-
-            if self.rotamer_selection == 'highest_occupancy':
-
-                try:
-                    prev_name, ext = os.path.splitext(f)
-                    pdb_name, _, ver = prev_name.rpartition('-')
-                    re_str_pdb = os.path.basename(f'{pdb_name}{ver}*[A-Z]{ext}')
-                    write_pdb = f'{pdb_name}{ver}HiOcc{ext}'
-
-                    prot_rots = [a for a in os.listdir(self.raw_dir) if re.match(re_str_pdb, a)]
-                    prot_rots_bb = {}
-                    for rot_f in prot_rots:
-                        M = bb.Molecule()
-                        M.import_pdb(os.path.join(os.path.dirname(f), rot_f),
-                                     include_hetatm=self.include_hetatm)
-                        prot_rots_bb[rot_f] = M
-
-                    M_df_new = pd.DataFrame()
-
-                    res_iters = list(prot_rots_bb[prot_rots[0]].data['resid'].unique())
-                    for res in res_iters:
-                        prot_rots_queries = {k:v.data[v.data['resid'] == int(res)] for
-                                             k,v in prot_rots_bb.items()}
-                        rot_res_avg = {k:v['occupancy'].mean() for
-                                       k,v in prot_rots_queries.items()}
-                        max_occ_f = max(rot_res_avg, key=rot_res_avg.get)
-                        M_df_new = pd.concat([M_df_new, prot_rots_queries[max_occ_f]],
-                                             ignore_index=True)
-
-                    M_n = bb.Molecule()
-                    M_n.import_pdb(os.path.join(os.path.dirname(f), prot_rots[0]),
-                                      include_hetatm=self.include_hetatm)
-
-                    M_n.data = M_n.data[['name',
-                                         'resname',
-                                         'resid']].merge(M_df_new,
-                                                        how='left',
-                                                        on=['name', 'resname', 'resid'])
-                    M_n.write_pdb(write_pdb)
-
-                    if os.path.isfile(write_pdb):
-                        for a in prot_rots:
-                            a_path = os.path.join(self.raw_dir, a)
-                            if os.path.isfile(a_path):
-                                os.remove(a_path)
-
-                except Exception as e:
-                    print(f'>> Could not collate the highest occupancy version of the rotamers, '
-                          f'keeping all rotamers already split out for file: {f}, error: {str(e)}')
+            except Exception as e:
+                raise Exception(f'>> Could not split out rotamers from the pdb file '
+                                f'with error: {str(e)}') from e
 
             #The original is then removed if it has been replaced.
             os.remove(f)
