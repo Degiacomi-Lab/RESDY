@@ -38,7 +38,7 @@ METAL_ELEMENTS = ('FE', 'ZN', 'CU', 'MG', 'MN', 'NI', 'CO', 'MO', 'CA', 'NA', 'K
                   'CD', 'HG', 'PT', 'AU', 'AG', 'W', 'V', 'CR', 'SR', 'BA', 'CS', 'RB')
 
 GEOMETRY_COLUMNS = ['structure', 'stage', 'n_atoms', 'n_clashes', 'min_contact', 'worst',
-                    'inter_chain', 'involves_hetatm', 'ivolved_modelled', 'involves_water',
+                    'inter_chain', 'involves_hetatm', 'involves_modelled', 'involves_water',
                     'n_modelled_residues', 'numbering', 'chains_author_numbering']
 
 

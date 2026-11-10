@@ -166,7 +166,7 @@ class Test_Protein(unittest.TestCase):
         M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
-    def test_nmr_confomer_selection_all(self):
+    def test_nmr_conformer_selection_all(self):
         PDB = RD.PDB(outdir=self.outdir,
             gap=self.gap,
             parallel=self.parallel,
@@ -179,7 +179,7 @@ class Test_Protein(unittest.TestCase):
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,9)))
 
-    def test_nmr_confomer_selection_first(self):
+    def test_nmr_conformer_selection_first(self):
         PDB = RD.PDB(outdir=self.outdir,
             gap=self.gap,
             parallel=self.parallel,
@@ -193,7 +193,7 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,6)))
         self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 5)
 
-    def test_nmr_confomer_selection_representative(self):
+    def test_nmr_conformer_selection_representative(self):
         PDB = RD.PDB(outdir=self.outdir,
             gap=self.gap,
             parallel=self.parallel,
@@ -207,7 +207,7 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
         self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 1)
 
-    def test_nmr_confomer_selection_list(self):
+    def test_nmr_conformer_selection_list(self):
         PDB = RD.PDB(outdir=self.outdir,
             gap=self.gap,
             parallel=self.parallel,
