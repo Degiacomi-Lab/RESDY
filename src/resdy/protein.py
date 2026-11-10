@@ -18,7 +18,7 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock
+from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock, mp_hide_main_from_children
 from . import alphafold as af
 from . import patcher
 from . import assembly
@@ -693,69 +693,71 @@ class PDB(object):
             print('>> Protein curation running in series')
             n_cores_to_use = 1
 
-        with get_worker_lock(self.parallel) as lock:
-            items = []
-            for i, r in uniprot_df.iterrows():
-                try:
-                    if not self.PDB_only:
-                        method_obtained = r.get('Method', '')
-                        resolution = r.get('Resolution', '')
-                        chains = r.get('Chains', '')
-                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained,
-                                      resolution, chains])
-                    else:
-                        items.append([r['PDB_Code']])
-                except Exception as e:
-                    print(f'>> In adding rows to the parallel pool, failed to add row {i} '
-                          f'and therefore will not be created; error: {e}')
-                    broken_prot = pd.DataFrame([{'Uniprot': r.get('Uniprot_Entry', ''),
-                                                 'PDB': r.get('PDB_Code', ''),
-                                                 'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
-                    broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
-                    broken_prot.to_csv(broken_path, mode='a', index=False,
-                                       header=not os.path.exists(broken_path))
+        with mp_hide_main_from_children():
+            with get_worker_lock(self.parallel) as lock:
+                items = []
+                for i, r in uniprot_df.iterrows():
+                    try:
+                        if not self.PDB_only:
+                            method_obtained = r.get('Method', '')
+                            resolution = r.get('Resolution', '')
+                            chains = r.get('Chains', '')
+                            items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained,
+                                        resolution, chains])
+                        else:
+                            items.append([r['PDB_Code']])
+                    except Exception as e:
+                        print(f'>> In adding rows to the parallel pool, failed to add row {i} '
+                            f'and therefore will not be created; error: {e}')
+                        broken_prot = pd.DataFrame([{'Uniprot': r.get('Uniprot_Entry', ''),
+                                                    'PDB': r.get('PDB_Code', ''),
+                                                    'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
+                        broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
+                        broken_prot.to_csv(broken_path, mode='a', index=False,
+                                        header=not os.path.exists(broken_path))
 
-            if self.parallel:
-                results = []
-                with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                    iterator = pool.imap(partial(self._curate_row, lock, skip_if_found),
-                                            [tuple(item) for item in items], chunksize=1)
-                    while True:
-                        try:
-                            result = iterator.next(timeout=self.parallel_timeout)
-                            if result is not None:
-                                results.append(result)
-                        except StopIteration:
-                            break
-                        except mp.TimeoutError:
-                            pool.terminate()
-                            raise RuntimeError(
-                                f'A parallel protein curation worker produced no result for '
-                                f'{self.parallel_timeout} s working on structures, so it is '
-                                f'treated as stalled and the run was stopped. Either raise '
-                                f'parallel_timeout if the features requested are simply '
-                                f'slow on these structures, or set parallel=False to measure in '
-                                f'series.') from None
-            else:
-                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
-                           if t is not None]
+                if self.parallel:
+                    results = []
+                    ctx = self._parallel_context()
+                    with ctx.Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                        iterator = pool.imap(partial(self._curate_row, lock, skip_if_found),
+                                                [tuple(item) for item in items], chunksize=1)
+                        while True:
+                            try:
+                                result = iterator.next(timeout=self.parallel_timeout)
+                                if result is not None:
+                                    results.append(result)
+                            except StopIteration:
+                                break
+                            except mp.TimeoutError:
+                                pool.terminate()
+                                raise RuntimeError(
+                                    f'A parallel protein curation worker produced no result for '
+                                    f'{self.parallel_timeout} s working on structures, so it is '
+                                    f'treated as stalled and the run was stopped. Either raise '
+                                    f'parallel_timeout if the features requested are simply '
+                                    f'slow on these structures, or set parallel=False to measure in '
+                                    f'series.') from None
+                else:
+                    results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
+                            if t is not None]
 
-            if self.biological_assembly:
-                self.collect_assembly_log()
+                if self.biological_assembly:
+                    self.collect_assembly_log()
 
-            if self.minimise_af or self.minimise_pdb:
-                self.collect_minimisation_log()
-                if self.minimisation_skipped:
-                    print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised '
-                          f'and will be measured unrelaxed; see minimisation_log.csv')
+                if self.minimise_af or self.minimise_pdb:
+                    self.collect_minimisation_log()
+                    if self.minimisation_skipped:
+                        print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised '
+                            f'and will be measured unrelaxed; see minimisation_log.csv')
 
-            if not results:
-                print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
-                      f'for more details, see uncuratable_pdb_files.csv')
-                return
-            df_tmp = pd.concat(results, ignore_index=True)
+                if not results:
+                    print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
+                        f'for more details, see uncuratable_pdb_files.csv')
+                    return
+                df_tmp = pd.concat(results, ignore_index=True)
 
-            self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
+                self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
 
 
     def _curate_row(self, lock, skip_if_found, row_details):

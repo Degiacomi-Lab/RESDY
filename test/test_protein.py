@@ -166,11 +166,8 @@ class Test_Protein(unittest.TestCase):
         M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
-<<<<<<< HEAD
     '''
-=======
     def test_nmr_conformer_selection_all(self):
->>>>>>> main
         PDB = RD.PDB(outdir=self.outdir,
             gap=self.gap,
             parallel=self.parallel,

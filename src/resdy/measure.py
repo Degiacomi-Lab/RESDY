@@ -815,17 +815,18 @@ class Measure(object):
         from final previous point rather than starting again. Raises a ValueError if the settings
         differ from those the measurement was started with.
         '''
-        self._check_settings()
-        self._write_settings()
-        match (self.PDB_only, self.parallel):
-            case (False, False) | (False, True):
-                # not PDB only and parallel or series
-                self.restart_measure()
-            case (True, True) | (True, False):
-                # PDB only and parallel or series
-                self.restart_measure_pdb_only()
+        with mp_hide_main_from_children():
+            self._check_settings()
+            self._write_settings()
+            match (self.PDB_only, self.parallel):
+                case (False, False) | (False, True):
+                    # not PDB only and parallel or series
+                    self.restart_measure()
+                case (True, True) | (True, False):
+                    # PDB only and parallel or series
+                    self.restart_measure_pdb_only()
 
-        self._cleanup_calculation_files()
+            self._cleanup_calculation_files()
 
 
     def _report_error_to_file(self, measurement_stage, path, error):
