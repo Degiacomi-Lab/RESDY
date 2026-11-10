@@ -1,11 +1,33 @@
 import os
+import json
 import numbers
+import warnings
 from ast import literal_eval
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from .preprocessing import Preprocessing
 from .helper import METADATA_COLUMNS, sort_residue_key
+
+
+def _parse_vector(value):
+    '''
+    Read a vector feature (AEV, evolution) stored in the measurements table as the text of a
+    list. The text of a list of numbers is valid JSON, which is read an order of magnitude
+    faster than through ``ast.literal_eval``. Anything JSON cannot read is passed to
+    ``literal_eval``, and a value that is already a sequence is returned as it is.
+
+    :param value: the cell of the measurements table.
+    :type value: str, list
+    :returns: the vector.
+    :rtype: list
+    '''
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except ValueError:
+        return literal_eval(value)
 
 
 class Aggregation:
@@ -365,7 +387,7 @@ class Aggregation:
         - 'null': Remove all the columns within the AEVs which are always zero
         '''
         if 'aev' in self.features_to_include:
-            df_aevs = pd.DataFrame(list([literal_eval(aev) for aev in self.df_measurements['aev']]))
+            df_aevs = pd.DataFrame([_parse_vector(aev) for aev in self.df_measurements['aev']])
             df_aevs = df_aevs.add_prefix('AEV_')
             self.df_measurements = pd.concat([self.df_measurements.reset_index(),
                                               df_aevs.reset_index()], axis=1)
@@ -386,8 +408,8 @@ class Aggregation:
                     self._prepare_pca()
 
         if 'evolution' in self.features_to_include:
-            df_evolution = pd.DataFrame(list([literal_eval(evol) for evol in
-                                              self.df_measurements['evolution']]))
+            df_evolution = pd.DataFrame([_parse_vector(evol) for evol in
+                                         self.df_measurements['evolution']])
             df_evolution = df_evolution.add_prefix('EVL_')
             self.df_measurements = pd.concat([self.df_measurements.reset_index(),
                                               df_evolution.reset_index()], axis=1)
@@ -483,80 +505,117 @@ class Aggregation:
         AEVs following the handling that was given in the class creation. Evolution vectors are
         treated as almost identical due to being a sequence effect, therefore take AF file which
         uses canonical sequence as the one for the aggregated dataframe.
+
+        .. rubric:: Method
+
+        Every statistic is computed for all residues at once, with one grouped reduction per
+        statistic over the residue key, and the columns are then laid out feature by feature.
+        Three quantities are a row of the group and not a reduction: the random draw (one
+        position per residue, drawn in the order of the residue keys from the generator seeded
+        by ``rand_state``), and, for the AEVs, the rows whose vector has the smallest and the
+        largest norm.
         '''
         print('>> Calculating statistics for measurements data provided...')
         if 'class' not in self.df_measurements.columns:
             self.df_measurements['class'] = -1  # set to -1 as unsure if pos or neg
 
         cols_key = self.res_key + ['class']
-        df_stats = pd.DataFrame(columns=cols_key)
 
         if 'aev' in self.features_to_include or 'evolution' in self.features_to_include:
             self._reduce_aev_dimensions()
 
-        for row_key, df_query in self.df_measurements.groupby(self.res_key):
-            if not isinstance(row_key, tuple):
-                row_key = (row_key,)
-            df_query = df_query.reset_index(drop=True)
+        df = self.df_measurements.reset_index(drop=True)
+        features = [a for a in self.features_to_include if a not in self.non_feature_cols]
+        if df.empty:
+            self.features_to_include = []
+            return pd.DataFrame(columns=cols_key)
 
-            if len(set(df_query['class'])) != 1:
-                print(f'>> Not all instances of resid assigned to same class (instances: '
-                      f'{list(set(df_query["class"]))}), using class -1 instead')
-                class_val = -1
+        grouped = df.groupby(self.res_key, sort=True)
+        group_id = grouped.ngroup().to_numpy()
+        # residues with a missing key belong to no group, as in an iteration over the groups
+        in_group = group_id >= 0
+        position = grouped.cumcount().to_numpy()
+        sizes = grouped.size()
+        n_groups = len(sizes)
+
+        # one row of each residue, drawn in the order of the residue keys
+        rand_position = np.array([int(self._rng.integers(0, n)) for n in sizes.to_numpy()])
+        rand_rows = np.empty(n_groups, dtype=int)
+        is_rand = in_group & (position == rand_position[np.where(in_group, group_id, 0)])
+        rand_rows[group_id[is_rand]] = np.flatnonzero(is_rand)
+
+        aev_cols = [a for a in df.columns if 'AEV_' in a]
+        evl_cols = [a for a in df.columns if 'EVL_' in a]
+        scalar_feats = [f for f in features if f not in ('aev', 'evolution')]
+        reduce_cols = scalar_feats + (aev_cols if 'aev' in features else [])
+
+        stats = {}
+        if reduce_cols:
+            selection = grouped[reduce_cols]
+            stats = {'min': selection.min(), 'max': selection.max(),
+                     'med': selection.median(), 'avg': selection.mean(),
+                     'sd': selection.std(ddof=0)}
+            stats = {k: v.astype(float) for k, v in stats.items()}
+
+        data = {k: sizes.index.get_level_values(k).to_numpy() for k in self.res_key}
+
+        # a residue keeps its class when all its rows agree on it, and is unlabelled otherwise
+        class_first = grouped['class'].first().to_numpy()
+        mixed = grouped['class'].nunique(dropna=False).to_numpy() != 1
+        if mixed.any():
+            warnings.warn(f'{int(mixed.sum())} residue(s) have rows assigned to more than one '
+                          f'class, and are given the class -1.', UserWarning, stacklevel=3)
+            class_first = class_first.astype(object)
+            class_first[mixed] = -1
+        data['class'] = class_first
+
+        for feature in features:
+            if feature == 'aev':
+                norms = pd.Series(np.linalg.norm(df[aev_cols].to_numpy(dtype=float), axis=1),
+                                  index=df.index)
+                norms_grouped = norms[in_group].groupby(group_id[in_group])
+                low_rows = norms_grouped.idxmin().to_numpy()
+                high_rows = norms_grouped.idxmax().to_numpy()
+
+                for feat in aev_cols:
+                    values = df[feat].to_numpy(dtype=float)
+                    data[feat + '_nearest'] = values[low_rows]
+                    data[feat + '_furthest'] = values[high_rows]
+                    data[feat + '_rand'] = values[rand_rows]
+
+                    data[feat + '_min'] = stats['min'][feat].to_numpy()
+                    data[feat + '_max'] = stats['max'][feat].to_numpy()
+                    data[feat + '_med'] = stats['med'][feat].to_numpy()
+                    data[feat + '_avg'] = stats['avg'][feat].to_numpy()
+                    data[feat + '_sd'] = stats['sd'][feat].to_numpy()
+                    data[feat + '_range'] = data[feat + '_max'] - data[feat + '_min']
+
+            elif feature == 'evolution':
+                # the vector of the predicted structure when the table says which one that
+                # is, and of the first structure of the residue otherwise
+                first_rows = np.empty(n_groups, dtype=int)
+                is_first = in_group & (position == 0)
+                first_rows[group_id[is_first]] = np.flatnonzero(is_first)
+                if 'Method' in df.columns:
+                    is_pred = in_group & (df['Method'].to_numpy() == 'Predicted')
+                    pred_rows = np.flatnonzero(is_pred)
+                    # the first predicted row of each residue: assign in reverse order
+                    first_rows[group_id[pred_rows][::-1]] = pred_rows[::-1]
+                for feat in evl_cols:
+                    data[feat] = df[feat].to_numpy()[first_rows]
+
             else:
-                # take first value of class as overall class for resid
-                class_val = df_query['class'].iloc[0]
+                data[feature + '_min'] = stats['min'][feature].to_numpy()
+                data[feature + '_max'] = stats['max'][feature].to_numpy()
+                data[feature + '_med'] = stats['med'][feature].to_numpy()
+                data[feature + '_avg'] = stats['avg'][feature].to_numpy()
+                data[feature + '_sd'] = stats['sd'][feature].to_numpy()
+                data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
+                data[feature + '_rand'] = df[feature].to_numpy()[rand_rows]
 
-            data = dict(zip(self.res_key, row_key))
-            data['class'] = class_val
-            features = [a for a in self.features_to_include if a not in self.non_feature_cols]
-            rand_row = int(self._rng.integers(0, len(df_query)))
+        data['num_structures'] = grouped['PDB_Code'].nunique().to_numpy()
 
-            for feature in features:
-                if feature == 'aev':
-                    aev_cols = [a for a in df_query.columns if 'AEV_' in a]
-
-                    norms = np.linalg.norm(df_query[aev_cols].to_numpy(dtype=float), axis=1)
-                    low_row = df_query.index[np.argmin(norms)]
-                    high_row = df_query.index[np.argmax(norms)]
-
-                    for feat in aev_cols:
-
-                        data[feat + '_nearest'] = float(df_query[feat].loc[low_row])
-                        data[feat + '_furthest'] = float(df_query[feat].loc[high_row])
-                        data[feat + '_rand'] = float(df_query[feat].loc[rand_row])
-
-                        data[feat + '_min'] = float(df_query[feat].min())
-                        data[feat + '_max'] = float(df_query[feat].max())
-                        data[feat + '_med'] = float(df_query[feat].median())
-                        data[feat + '_avg'] = float(df_query[feat].mean())
-                        data[feat + '_sd'] = float(df_query[feat].std(ddof=0))
-                        data[feat + '_range'] = (float(df_query[feat].max()) -
-                                                 float(df_query[feat].min()))
-
-                elif feature == 'evolution':
-                    pred_query = df_query[df_query.get('Method',
-                                            pd.Series(dtype=object)) == 'Predicted']
-
-                    if not pred_query.empty:
-                        for feat in [a for a in df_query.columns if 'EVL_' in a]:
-                            data[feat] = pred_query[feat].iloc[0]
-                    else:
-                        for feat in [a for a in df_query.columns if 'EVL_' in a]:
-                            data[feat] = df_query[feat].iloc[0]
-
-                else:
-                    data[feature + '_min'] = float(df_query[feature].min())
-                    data[feature + '_max'] = float(df_query[feature].max())
-                    data[feature + '_med'] = float(df_query[feature].median())
-                    data[feature + '_avg'] = float(df_query[feature].mean())
-                    data[feature + '_sd'] = float(df_query[feature].std(ddof=0))
-                    data[feature + '_range'] = data[feature + '_max'] - data[feature + '_min']
-                    data[feature + '_rand'] = df_query[feature].iloc[rand_row]
-
-            data['num_structures'] = df_query['PDB_Code'].nunique()
-
-            df_stats = pd.concat([df_stats, pd.DataFrame([data])], ignore_index=True)
+        df_stats = pd.DataFrame(data)
 
         self.features_to_include = [a for a in list(df_stats.columns) if a not in cols_key]
         return df_stats
