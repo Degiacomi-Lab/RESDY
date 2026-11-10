@@ -183,10 +183,11 @@ class Measure(object):
             to save the measures data to. If this is left as '', then struc_dir will default
             to the curated directory within outdir.
         :type struc_dir: str
-        :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
-            this is available. Options for this include 'auto' - recreate if propka output older
-            than curated pdb file, 'never' - always run propka, 'always' - always take previous
-            run if it exists
+        :param cache_policy: Policy for reusing the output of a previous PROPKA or LEGOLAS run
+            when one is available. 'auto' (default) reuses it unless it is older than the
+            curated pdb file, in which case it is recalculated. 'always' always runs the
+            calculation again. 'never' never runs it again when a previous output exists, and
+            takes that output whatever its age.
         :type cache_policy: str
         '''
 

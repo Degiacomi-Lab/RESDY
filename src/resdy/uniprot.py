@@ -1,6 +1,7 @@
 import os
 import re
 import threading
+import warnings
 import concurrent.futures
 import json
 import urllib.request
@@ -8,6 +9,14 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 import pandas as pd
 import numpy as np
+
+#: RCSB GraphQL endpoint, and the query returning the organisms of every polymer entity of an
+#: entry together with the UNIPROT codes each entity maps to.
+RCSB_GRAPHQL_URL = 'https://data.rcsb.org/graphql'
+RCSB_ORGANISM_QUERY = (
+    'query($id: String!) { entry(entry_id: $id) { polymer_entities { '
+    'rcsb_polymer_entity_container_identifiers { uniprot_ids } '
+    'rcsb_entity_source_organism { ncbi_scientific_name ncbi_taxonomy_id } } } }')
 
 
 class Uniprot(object):
@@ -190,8 +199,6 @@ class Uniprot(object):
                     words = messy_entry[0].split("; ")
                     pdb_code = words[1]
 
-                    pdb_org_dets = self.get_pdb_organism_details(pdb_code)
-
                     if pdb_code_target != '' and pdb_code != pdb_code_target:
                         continue
 
@@ -216,9 +223,8 @@ class Uniprot(object):
                                 'Method': method_obtained, 'Resolution': resolution,
                                 'Chains' : chains}
 
-                    data = data | pdb_org_dets
-
                     if data is not None:
+                        data = data | self.get_pdb_organism_details(pdb_code, uniprot_code)
                         self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
                                             ignore_index=True)
 
@@ -227,48 +233,64 @@ class Uniprot(object):
                 continue
 
 
-    def get_pdb_organism_details(self, pdb_code):
+    def get_pdb_organism_details(self, pdb_code, uniprot_code=None):
         '''
         Function which takes a pdb code, contacts the RCSB API to obtain information on the
-        organism name and taxonomy id (taxid) assocatied with it.
-        
-        :param pdb_code: PDB code to contact the RCSB API with to get infomormation on, 4
+        organism name and taxonomy id (taxid) associated with it.
+
+        :param pdb_code: PDB code to contact the RCSB API with to get information on, 4
             characters long.
         :type pdb_code: str
+        :param uniprot_code: UNIPROT code of the protein of interest. When given, only the
+            polymer entities of the entry that map to this code are read, so that a partner
+            protein of another organism is not reported. When None, or when no entity of the
+            entry maps to the code, every polymer entity of the entry is read.
+        :type uniprot_code: str, None
 
-        :returns org_out: Dictionary containing information on the organism name and taxid across
-            all entities associated with the PDB code.
+        :returns org_out: Dictionary with the keys 'Organism_Name' and 'Organism_TaxID'. Each
+            value is a string. Several organisms (a chimeric construct, or several entities)
+            are joined with '; ', and the value is '' when nothing could be obtained.
         :rtype: dict
         '''
 
         pdb_code = pdb_code.upper()
-        org_out = {'Organism_Name': [],
-                   'Organism_TaxID': []}
+        names, taxids = [], []
 
         try:
-            org_req = requests.get(f'https://data.rcsb.org/rest/v1/core/'
-                                   f'polymer_entity/{pdb_code}/1', timeout=10)
+            org_req = requests.post(RCSB_GRAPHQL_URL,
+                                    json={'query': RCSB_ORGANISM_QUERY,
+                                          'variables': {'id': pdb_code}},
+                                    timeout=10)
             org_req.raise_for_status()
 
-            for ent in org_req.json().get('rcsb_entity_source_organism', []):
-                org_name = str(ent['ncbi_scientific_name'])
-                taxid = str(ent['ncbi_taxonomy_id'])
+            entry = (org_req.json().get('data') or {}).get('entry')
+            if entry is None:
+                raise ValueError('the entry is not known to the RCSB')
 
-                if org_name not in org_out['Organism_Name']:
-                    org_out['Organism_Name'].append(org_name)
-                if taxid not in org_out['Organism_TaxID']:
-                    org_out['Organism_TaxID'].append(taxid)
+            entities = entry.get('polymer_entities') or []
+            if uniprot_code:
+                matched = [ent for ent in entities if uniprot_code in
+                           ((ent.get('rcsb_polymer_entity_container_identifiers') or {})
+                            .get('uniprot_ids') or [])]
+                if matched:
+                    entities = matched
 
-            if len(org_out['Organism_Name']) == 1:
-                org_out['Organism_Name'] = org_out['Organism_Name'][0]
-            if len(org_out['Organism_TaxID']) == 1:
-                org_out['Organism_TaxID'] = org_out['Organism_TaxID'][0]
+            for ent in entities:
+                for org in ent.get('rcsb_entity_source_organism') or []:
+                    org_name = org.get('ncbi_scientific_name')
+                    taxid = org.get('ncbi_taxonomy_id')
+
+                    if org_name is not None and str(org_name) not in names:
+                        names.append(str(org_name))
+                    if taxid is not None and str(taxid) not in taxids:
+                        taxids.append(str(taxid))
 
         except Exception as e:
-            print(f'>> Failed to get all information on the organism for pdb code: {pdb_code}. '
-                  f'Error: {str(e)}')
+            warnings.warn(f'Failed to get the organism for pdb code {pdb_code}, the organism '
+                          f'columns are left empty for it. Error: {str(e)}',
+                          UserWarning, stacklevel=2)
 
-        return org_out
+        return {'Organism_Name': '; '.join(names), 'Organism_TaxID': '; '.join(taxids)}
 
 
     def from_organism(self, code, reviewed_only=False):
@@ -388,7 +410,15 @@ class Uniprot(object):
             if code != self.name_to_code[name]:
                 return f'Unmatched GO term code and name, wrong input code {code}.'
 
-        uni_list = self.GO_dict.get(code)
+        uni_list = self.GO_dict.get(code, [])
+        if not uni_list:
+            warnings.warn(
+                f'GO term {code} is not among the {len(self.GO_dict)} GO terms collected for '
+                f'the proteins searched. An empty table is returned. Check the code, or call '
+                f'GO_get_data() on the proteins of interest.',
+                UserWarning, stacklevel=2)
+            return pd.DataFrame(columns=df.columns)
+
         df_out = pd.DataFrame()
         for uni in uni_list:
             cdf = df[df['Uniprot_Entry'] == uni]
