@@ -2011,7 +2011,7 @@ class PDB(object):
             numbering = 'uniprot'
 
         return {'numbering': numbering,
-                'nhains_author_numbering': ','.join(map(str, failed))}
+                'chains_author_numbering': ','.join(map(str, failed))}
 
 
     def get_chain_replacement(self, pdb_code):
