@@ -1,133 +1,4 @@
 {
-  "0005829": {
-    "uniprot": [
-      "P0CG48",
-      "P10724",
-      "P40616"
-    ],
-    "name": "cytosol"
-  },
-  "0022626": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "cytosolic ribosome"
-  },
-  "0030666": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "endocytic vesicle membrane"
-  },
-  "0005789": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "endoplasmic reticulum membrane"
-  },
-  "0010008": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "endosome membrane"
-  },
-  "0070062": {
-    "uniprot": [
-      "P0CG48",
-      "P02185"
-    ],
-    "name": "extracellular exosome"
-  },
-  "0005576": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "extracellular region"
-  },
-  "0005741": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "mitochondrial outer membrane"
-  },
-  "0005654": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "nucleoplasm"
-  },
-  "0005634": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "nucleus"
-  },
-  "0005886": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "plasma membrane"
-  },
-  "0031982": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "vesicle"
-  },
-  "0031386": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "protein tag activity"
-  },
-  "0003723": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "RNA binding"
-  },
-  "0003735": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "structural constituent of ribosome"
-  },
-  "0019941": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "modification-dependent protein catabolic process"
-  },
-  "0016567": {
-    "uniprot": [
-      "P0CG48"
-    ],
-    "name": "protein ubiquitination"
-  },
-  "0008784": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "alanine racemase activity"
-  },
-  "0030170": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "pyridoxal phosphate binding"
-  },
-  "0030632": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "D-alanine biosynthetic process"
-  },
-  "0009252": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "peptidoglycan biosynthetic process"
-  },
   "0005856": {
     "uniprot": [
       "Q16825"
@@ -157,6 +28,14 @@
       "P40616"
     ],
     "name": "cytoplasm"
+  },
+  "0005829": {
+    "uniprot": [
+      "P40616",
+      "P0CG48",
+      "P10724"
+    ],
+    "name": "cytosol"
   },
   "0005794": {
     "uniprot": [
@@ -248,6 +127,13 @@
     ],
     "name": "vesicle-mediated transport"
   },
+  "0070062": {
+    "uniprot": [
+      "P02185",
+      "P0CG48"
+    ],
+    "name": "extracellular exosome"
+  },
   "0016528": {
     "uniprot": [
       "P02185"
@@ -289,5 +175,119 @@
       "P02185"
     ],
     "name": "removal of superoxide radicals"
+  },
+  "0022626": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "cytosolic ribosome"
+  },
+  "0030666": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "endocytic vesicle membrane"
+  },
+  "0005789": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "endoplasmic reticulum membrane"
+  },
+  "0010008": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "endosome membrane"
+  },
+  "0005576": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "extracellular region"
+  },
+  "0005741": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "mitochondrial outer membrane"
+  },
+  "0005654": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "nucleoplasm"
+  },
+  "0005634": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "nucleus"
+  },
+  "0005886": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "plasma membrane"
+  },
+  "0031982": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "vesicle"
+  },
+  "0031386": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "protein tag activity"
+  },
+  "0003723": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "RNA binding"
+  },
+  "0003735": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "structural constituent of ribosome"
+  },
+  "0019941": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "modification-dependent protein catabolic process"
+  },
+  "0016567": {
+    "uniprot": [
+      "P0CG48"
+    ],
+    "name": "protein ubiquitination"
+  },
+  "0008784": {
+    "uniprot": [
+      "P10724"
+    ],
+    "name": "alanine racemase activity"
+  },
+  "0030170": {
+    "uniprot": [
+      "P10724"
+    ],
+    "name": "pyridoxal phosphate binding"
+  },
+  "0030632": {
+    "uniprot": [
+      "P10724"
+    ],
+    "name": "D-alanine biosynthetic process"
+  },
+  "0009252": {
+    "uniprot": [
+      "P10724"
+    ],
+    "name": "peptidoglycan biosynthetic process"
   }
 }

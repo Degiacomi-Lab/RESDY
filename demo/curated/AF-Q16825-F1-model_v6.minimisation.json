@@ -14,9 +14,9 @@
   "platform": null
  },
  "openmm_version": "8.6.1",
- "date": "2026-11-10T02:28:52",
+ "date": "2026-11-10T17:06:41",
  "platform_used": "CPU",
- "energy_initial_kj_mol": -149020.077110014,
- "energy_final_kj_mol": -171110.04336701054,
- "heavy_atom_rmsd_a": 1.391261600638572
+ "energy_initial_kj_mol": -149334.75719454276,
+ "energy_final_kj_mol": -171960.45842925867,
+ "heavy_atom_rmsd_a": 1.600526326003916
 }
