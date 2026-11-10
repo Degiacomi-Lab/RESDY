@@ -8,7 +8,8 @@ import seaborn as sns
 from scipy.stats import fisher_exact
 from .aggregation import Aggregation
 from .uniprot import Uniprot
-from .helper import METADATA_COLUMNS, sort_residue_key, FEATURE_LABELS, AGG_LABELS
+from .helper import (METADATA_COLUMNS, METADATA_PREFIXES, non_feature_columns,
+                     sort_residue_key, FEATURE_LABELS, AGG_LABELS)
 
 
 class Analysis(object):
@@ -48,7 +49,7 @@ class Analysis(object):
         else:
             self.df = df
 
-        standard_cols = METADATA_COLUMNS
+        standard_cols = non_feature_columns(self.df.columns)
 
         if features_to_analyse in ([], ['all']):
             self.features_to_analyse = [a for a in self.df.columns if a not in standard_cols]
@@ -447,7 +448,7 @@ class Analysis(object):
         else:
             df_plot = self.df
 
-        non_feat_cols = METADATA_COLUMNS
+        non_feat_cols = non_feature_columns(df_plot.columns)
 
         if features == '' or features == []:
             print('No features given as input, using all possible scalar features')
@@ -1134,7 +1135,7 @@ class Analysis(object):
 
         if 'features_to_include' not in list(kwargs):
             kwargs['features_to_include'] = [a for a in self.df.columns if
-                                             a not in METADATA_COLUMNS]
+                                             a not in non_feature_columns(self.df.columns)]
 
         agg = Aggregation(df_measurements=self.df,
                         outdir=self.outdir,
@@ -1202,7 +1203,7 @@ class Analysis(object):
             name_to_num = {n: start + i for i,n in enumerate(named)}
             df_in['class'] = labels.fillna((df_in['class'].astype(str).replace(name_to_num)))
 
-        metadata_cols = [a for a in df_in.columns if a in METADATA_COLUMNS]
+        metadata_cols = [a for a in df_in.columns if a in non_feature_columns(df_in.columns)]
         y = (df_in['class'].to_numpy(dtype=np.int8) if 'class' in df_in.columns else
              np.full(len(df_in), -1, dtype=np.int8))
         meta_data = df_in[[a for a in metadata_cols if a != 'class']].reset_index(drop=True)
@@ -1247,34 +1248,69 @@ class Analysis(object):
         :rtype: Pandas DataFrame
         '''
 
-        min_log_path = os.path.join(self.outdir, min_log)
-        cur_geom_path = os.path.join(self.outdir, curation_geometry)
-        ass_log_path = os.path.join(self.outdir, assembly_log)
+        logs = self._read_curation_logs(min_log, curation_geometry, assembly_log)
         out_path = os.path.join(self.outdir, outname)
 
-        df_collated = pd.DataFrame()
-
-        for n, p in (('geometry',cur_geom_path),
-                    ('minimisation', min_log_path),
-                    ('assembly', ass_log_path)):
-            if os.path.isfile(p):
-                log = pd.read_csv(p).drop_duplicates('structure', keep='last')
-                if df_collated.empty:
-                    df_collated = log
-                else:
-                    df_collated = df_collated.merge(log, how='left', on='structure',
-                                                    validate='many_to_one')
-            else:
-                print(f'>> Could not read in data for metadata file {n}, '
-                        f'please check the path given.')
-
-        if not df_collated.empty:
-            df_collated.to_csv(out_path)
-        else:
+        if not logs:
             print('>> No meta data found at any of the locations given, nothing to collate into '
                   'the collated metadata csv. File not written.')
+            return pd.DataFrame()
+
+        # one row per structure file. The geometry log has a record for every file, the
+        # relaxed copies included; without it the rows are the structures the other logs name
+        if 'geometry' in logs:
+            df_collated = logs.pop('geometry').rename(columns={'geometry_structure': 'structure'})
+        else:
+            names = sorted(set().union(*[set(log[f'{n}_structure']) for n, log in logs.items()]))
+            df_collated = pd.DataFrame({'structure': names})
+
+        # the minimisation and assembly records name the unrelaxed file and describe both copies
+        df_collated['_stem'] = df_collated['structure'].str.replace('_relaxed', '', regex=False)
+        for n, log in logs.items():
+            df_collated = df_collated.merge(log.rename(columns={f'{n}_structure': '_stem'}),
+                                            how='left', on='_stem', validate='many_to_one')
+        df_collated = df_collated.drop(columns='_stem')
+
+        # a column keeps the name it has in its log, unless several logs have a column of that
+        # name, in which case each keeps the prefix of its log
+        bare = [c.split('_', 1)[1] if c.startswith(METADATA_PREFIXES) else c
+                for c in df_collated.columns]
+        df_collated.columns = [b if bare.count(b) == 1 else c
+                               for b, c in zip(bare, df_collated.columns)]
+
+        df_collated.to_csv(out_path, index=False)
 
         return df_collated
+
+
+    def _read_curation_logs(self, min_log, curation_geometry, assembly_log):
+        '''
+        Read the three logs curation writes into the output directory, keeping the last record
+        of each structure and prefixing every column with the name of its log (see
+        :data:`resdy.helper.METADATA_PREFIXES`), so that columns the logs share stay apart.
+
+        :param min_log: Name of the minimisation log file.
+        :type min_log: str
+        :param curation_geometry: Name of the curation geometry file.
+        :type curation_geometry: str
+        :param assembly_log: Name of the assembly log file.
+        :type assembly_log: str
+        :returns: {'geometry' | 'minimisation' | 'assembly': dataframe}, holding the logs that
+            were found. The structure column of each is named '<log>_structure'.
+        :rtype: dict
+        '''
+        logs = {}
+        for n, filename in (('geometry', curation_geometry),
+                            ('minimisation', min_log),
+                            ('assembly', assembly_log)):
+            p = os.path.join(self.outdir, filename)
+            if os.path.isfile(p):
+                log = pd.read_csv(p).drop_duplicates('structure', keep='last')
+                logs[n] = log.add_prefix(f'{n}_')
+            else:
+                print(f'>> Could not read in data for metadata file {n}, '
+                      f'please check the path given.')
+        return logs
 
 
     def add_metadata_to_measures(self, measures='measures.csv',
@@ -1310,9 +1346,6 @@ class Analysis(object):
         '''
 
         meas_path = os.path.join(self.outdir, measures)
-        min_log_path = os.path.join(self.outdir, min_log)
-        cur_geom_path = os.path.join(self.outdir, curation_geometry)
-        ass_log_path = os.path.join(self.outdir, assembly_log)
         out_path = os.path.join(self.outdir, outname)
 
         df_meas_meta = pd.DataFrame()
@@ -1323,23 +1356,24 @@ class Analysis(object):
             return df_meas_meta
 
         df_meas_meta = pd.read_csv(meas_path)
-        stem = df_meas_meta['PDB_Code'].str.replace('_relaxed', '')
-        df_meas_meta['_stem'] = stem
-        for n, p in (('geometry',cur_geom_path),
-                     ('minimisation', min_log_path),
-                     ('assembly', ass_log_path)):
-            if os.path.isfile(p):
-                log = pd.read_csv(p).drop_duplicates('structure', keep='last')
-                log = log.add_prefix(f'{n}_').rename(columns={f'{n}_structure': '_stem'})
-                df_meas_meta = df_meas_meta.merge(log, how='left', on='_stem',
-                                                  validate='many_to_one')
-            else:
-                print(f'>> Could not read in data for metadata file {n}, '
-                      f'please check the path given.')
+        logs = self._read_curation_logs(min_log, curation_geometry, assembly_log)
+
+        # the geometry log has a record for each file, so a row takes the record of the file
+        # it was measured on
+        if 'geometry' in logs:
+            log = logs.pop('geometry').rename(columns={'geometry_structure': 'PDB_Code'})
+            df_meas_meta = df_meas_meta.merge(log, how='left', on='PDB_Code',
+                                              validate='many_to_one')
+
+        # the minimisation and assembly records name the unrelaxed file and describe both copies
+        df_meas_meta['_stem'] = df_meas_meta['PDB_Code'].str.replace('_relaxed', '', regex=False)
+        for n, log in logs.items():
+            df_meas_meta = df_meas_meta.merge(log.rename(columns={f'{n}_structure': '_stem'}),
+                                              how='left', on='_stem', validate='many_to_one')
         df_meas_meta = df_meas_meta.drop(columns='_stem')
 
         if not df_meas_meta.empty:
-            df_meas_meta.to_csv(out_path)
+            df_meas_meta.to_csv(out_path, index=False)
         else:
             print('>> No files found at any of the locations given, nothing to write. ')
 

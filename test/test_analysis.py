@@ -147,12 +147,36 @@ class Test_Analysis(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'collated_metadata.csv')))
         self.assertTrue(set(['structure', 'biomolecule', 'inter_chain', 'openmm_version'])
                         .issubset(df_collated.columns))
+        # columns the logs share are told apart by the name of their log, not by a suffix
+        self.assertFalse([c for c in df_collated.columns if c.endswith(('_x', '_y'))])
+        self.assertTrue(set(['geometry_n_atoms', 'assembly_n_atoms']).issubset(df_collated.columns))
+        # one row per structure file, and a relaxed copy carries the record of its minimisation
+        self.assertFalse(df_collated['structure'].duplicated().any())
+        relaxed = df_collated[df_collated['structure'].str.endswith('_relaxed')]
+        self.assertTrue(len(relaxed) > 0)
+        self.assertTrue(relaxed['heavy_atom_rmsd_a'].notna().all())
 
     def test_add_metadata_to_measures(self):
         df_meas_meta = self.A.add_metadata_to_measures()
         self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'measures_metadata.csv')))
         self.assertTrue(set(['PDB_Code', 'assembly_biomolecule', 'geometry_inter_chain',
                              'minimisation_openmm_version']).issubset(df_meas_meta.columns))
+        self.assertEqual(len(df_meas_meta), len(pd.read_csv(self.df_measures)))
+        # a row carries the geometry record of the file it was measured on
+        with_geometry = df_meas_meta[df_meas_meta['geometry_stage'].notna()]
+        relaxed = with_geometry['PDB_Code'].str.endswith('_relaxed')
+        self.assertTrue(relaxed.any())
+        self.assertEqual(set(with_geometry.loc[relaxed, 'geometry_stage']), {'relaxed'})
+        self.assertNotIn('relaxed', set(with_geometry.loc[~relaxed, 'geometry_stage']))
+        # the table written reads back without an index column and can be aggregated, the
+        # provenance columns not being taken for features
+        df_read = pd.read_csv(os.path.join(self.outdir, 'measures_metadata.csv'))
+        self.assertFalse([c for c in df_read.columns if c.startswith('Unnamed')])
+        A_meta = RD.Analysis(df=df_read, outdir=self.outdir)
+        self.assertFalse([c for c in A_meta.features_to_analyse
+                          if c.startswith(('geometry_', 'minimisation_', 'assembly_'))])
+        df_agg = A_meta.aggregate_data(agg_type='avg', features_to_include=['sasa', 'propka'])
+        self.assertTrue(len(df_agg) > 0)
 
 
 if __name__ == "__main__":

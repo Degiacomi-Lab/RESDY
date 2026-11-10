@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from .preprocessing import Preprocessing
-from .helper import METADATA_COLUMNS, sort_residue_key
+from .helper import non_feature_columns, sort_residue_key
 
 
 class Aggregation:
@@ -151,7 +151,7 @@ class Aggregation:
         self.rand_state = rand_state
         self._rng = np.random.default_rng(self.rand_state)
 
-        self.non_feature_cols = list(METADATA_COLUMNS)
+        self.non_feature_cols = non_feature_columns(self.df_measurements.columns)
 
         if self.features_to_include == ['all']:
             self.df_measurements = self.df_measurements.loc[:, ~self.df_measurements

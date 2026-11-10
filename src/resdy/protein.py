@@ -1166,6 +1166,15 @@ class PDB(object):
                 else:
                     align_details = {}
 
+                if geometry and geometry.get('worst'):
+                    # the report was made before the chains were renamed back and the residues
+                    # renumbered: name the closest contact as the file now names it
+                    try:
+                        geometry = dict(geometry, worst=check_geometry(fname)[0]['worst'])
+                    except Exception as e:
+                        print(f'>> Could not rename the closest contact of the geometry report '
+                              f'for {fname}: {str(e)}')
+
                 self._record_geometry(geometry, 'patched', align_details)
 
                 if self.biological_assembly:

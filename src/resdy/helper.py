@@ -18,6 +18,10 @@ METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Re
                     'Min_Dist_Other_Chain', 'num_structures', 'numbering', 'Dist_To_Modelled',
                     'Dist_To_Nearest_Terminus', 'In_Modelled_Region')
 
+#: Prefixes of the provenance columns that Analysis.add_metadata_to_measures joins onto the
+#: measurements table, one per curation log. A column carrying one of them is not a feature.
+METADATA_PREFIXES = ('geometry_', 'minimisation_', 'assembly_')
+
 RESIDUE_KEY = ['Uniprot_Entry', 'Resid']
 RESIDUE_KEY_CHAIN = ['Uniprot_Entry', 'Chain', 'Resid']
 
@@ -109,6 +113,21 @@ def mp_hide_main_from_children():
                 if _saved_main["__file__"] is not None:
                     main.__file__ = _saved_main["__file__"]
                 main.__spec__ = _saved_main["__spec__"]
+
+
+def non_feature_columns(columns):
+    '''
+    The names that are not features in a table with the given columns: every name of
+    :data:`METADATA_COLUMNS`, and the columns of the table that carry one of the
+    :data:`METADATA_PREFIXES`.
+
+    :param columns: column names of a measurements table.
+    :type columns: iterable
+    :returns: names that must not be treated as features.
+    :rtype: list
+    '''
+    return list(METADATA_COLUMNS) + [c for c in columns if c not in METADATA_COLUMNS
+                                     and str(c).startswith(METADATA_PREFIXES)]
 
 
 def require_biobox(biobox):
