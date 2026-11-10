@@ -38,9 +38,17 @@ try:
                              angstrom)
     OPENMM_AVAILABLE = True
 except Exception as e:
-    print('Could not import openmm modules for running minimisations, please ensure '
+    print('>> Could not import openmm modules for running minimisations, please ensure '
           'that openmm has been installed')
     OPENMM_AVAILABLE = False
+
+try:
+    from pdbfixer import PDBFixer
+    PDBFIXER_AVAILABLE = True
+except Exception as e:
+    print('>> Could not import PDBFixer, therefore will default to capping with charged atoms '
+          '(OXT) with Modeller to allow minimisation to occur.')
+    PDBFIXER_AVAILABLE = False
 
 
 #: The twenty standard residue names.
@@ -107,7 +115,8 @@ class PDB(object):
                  num_cores=0, max_nmr_conformers='',
                  biological_assembly=True, max_assembly_atoms=None,
                  keep_all_curated=True, parallel_timeout = 12000,
-                 nmr_conformer_selection='all', rotamer_selection='all'):
+                 nmr_conformer_selection='all', rotamer_selection='all',
+                 minimise_termini='capped'):
         '''
         Initialise the PDB class.
 
@@ -234,6 +243,12 @@ class PDB(object):
             'highest_occupancy' (keep the rotamer of a set which has the highest overall occupancy)
             and 'first' (take the first available rotamer)
         :type rotamer_selection: str
+        :param minimise_termini: Option for which method to use for patching the termini of the
+            protein structure, this is done to ensure minimisation is able to occur on structures
+            that are not the full protein. Options are 'charged' which will add any missing
+            C-terminal OXT atoms such that all chains start with carboxylate and end with an amine.
+            'capped' (default) uses PDBFixer to cap with ACE and NME for every chain that is not a
+            full sequence within the protein.
         '''
 
         self.outdir = outdir
@@ -371,6 +386,17 @@ class PDB(object):
             print('>> Value given to parameter rotamer_selection was not recognised, '
                     'using the default parameter of \'all\'')
             self.rotamer_selection = 'all'
+
+        if minimise_termini in ['capped', 'charged']:
+            self.minimise_termini = minimise_termini
+        else:
+            print(f'>> Option given for minimise termini is not recognised '
+                    f'({minimise_termini}), defaulting to \'capped\' if available')
+
+        if not PDBFIXER_AVAILABLE and self.minimise_termini == 'capped':
+            print('>> PDBFixer is not available and therefore not able to implement '
+                    'non-charged capping, reverting to \'charged\'')
+            self.minimise_termini = 'charged'
 
 
     def _setup_minimisation_settings(self, forcefield, tolerance, max_iterations,
@@ -1118,6 +1144,8 @@ class PDB(object):
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
 
             try:
+                if self.minimise_termini == 'capped' and PDBFIXER_AVAILABLE:
+                    self.add_missing_capping_atoms(pdb_path=f)
 
                 fname, largest_gap, geometry = patcher.curate(
                     f, fasta_loc, outdir=self.curated_dir,
@@ -2189,6 +2217,74 @@ class PDB(object):
         except Exception as e:
             os.remove(path)
             print(f'Failed rewriting pdb file with error: {str(e)}')
+
+
+    def add_missing_capping_atoms(self, pdb_path):
+        '''
+        Some structures may miss capping heavy atoms at termini regions of proteins. Utilise openmm
+        pdbfixer to add these in. This will automatically take note of any heteroatoms present
+        within the structure and add these back in after PDBFixer has completed patching on the
+        termini atoms.
+
+        :param pdb_path: Path of pdb file to check
+        :type pdb_path: str
+        '''
+
+        het = [l for l in open(pdb_path) if l.startswith('HETATM')]
+        M = bb.Molecule()
+        M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
+        df_keys = M.data.drop_duplicates(subset=['chain', 'resid'])[['chain', 'resid', 'resname']]
+        mod_res = {}
+        for i, r in df_keys.iterrows():
+            if r['resname'] not in STANDARD_RESIDUES:
+                mod_res[(r['chain'], r['resid'])] = r['resname']
+
+        fixer = PDBFixer(filename=pdb_path)
+        fixer.missingResidues = {}
+        fixer.findMissingAtoms()
+        ter_res = set()
+
+        for c in fixer.topology.chains():
+            res = list(c.residues())
+            if res:
+                ter_res.add(res[0])
+                ter_res.add(res[-1])
+
+        fixer.missingAtoms = {r: a for r, a in fixer.missingAtoms.items()
+                                if r in ter_res}
+        fixer.missingTerminals = {r: a for r, a in fixer.missingTerminals.items()
+                                if r in ter_res}
+        fixer.addMissingAtoms()
+
+        print('>> Patched terminal regions with PDBFixer')
+
+        PDBFile.writeFile(fixer.topology, fixer.positions, open(pdb_path, 'w'), keepIds=True)
+
+        M = bb.Molecule()
+        # include_hetatm set to True as PDBFixer renames non-standard residues to HETATM
+        M.import_pdb(pdb_path, include_hetatm=True)
+        new_resnames = [mod_res.get(k, v) for k, v in zip(zip(M.data['chain'],
+                                                              M.data['resid']),
+                                                          M.data['resname'])]
+        new_atoms = ['ATOM' if k in mod_res else v for k, v in zip(zip(M.data['chain'],
+                                                                       M.data['resid']),
+                                                                   M.data['atom'])]
+        M.data['resname'] = new_resnames
+        M.data['atom'] = new_atoms
+        M.write_pdb(pdb_path)
+
+        kept = [l for l in open(pdb_path) if not l.startswith('HETATM')]
+        out, inserted = [], False
+        for line in kept:
+            if not inserted and line.startswith('END') and not line.startswith('ENDMDL'):
+                out.extend(het)
+                inserted = True
+            out.append(line)
+        if not inserted:
+            out.extend(het)
+
+        with open(pdb_path, 'w') as fh:
+            fh.writelines(out)
 
 
     def apply_minimisation(self, pdb, max_iterations=None, align_details={}):

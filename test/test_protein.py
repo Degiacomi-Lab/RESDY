@@ -275,6 +275,19 @@ class Test_Protein(unittest.TestCase):
         expected_dets = {'organism_name': 'HOMO SAPIENS', 'organism_taxid': '9606'}
         self.assertTrue(org_dets == expected_dets)
 
+    def test_capped_vs_charged(self):
+        for meth in ['capped', 'charged']:
+            PDB = RD.PDB(outdir=self.outdir,
+                        gap=self.gap,
+                        parallel=self.parallel,
+                        PDB_only=self.PDB_only,
+                        include_hetatm=self.include_hetatm,
+                        resnames_of_interest=self.resnames_of_interest,
+                        minimise_strucs=None,
+                        max_nmr_conformers=1,
+                        minimise_termini=meth)
+            PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+
     # ---- heteroatom retention policy -------------------------------------------
 
     @staticmethod

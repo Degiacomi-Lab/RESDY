@@ -29,6 +29,7 @@ dependencies:
   - requests
   - plotly
   - dash
+  - pdbfixer
   - pip:
     - melodia-py==0.1.8
     - fair-esm
