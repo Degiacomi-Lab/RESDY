@@ -286,7 +286,7 @@ class Test_Protein(unittest.TestCase):
                         minimise_strucs=None,
                         max_nmr_conformers=1,
                         minimise_termini=meth)
-            PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+            PDB.clean_and_split_pdb('1PAE', 'P22887')
 
     # ---- heteroatom retention policy -------------------------------------------
 

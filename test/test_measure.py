@@ -631,7 +631,9 @@ class Test_Feature_Settings(unittest.TestCase):
             if line.startswith('ATOM') and float(line[54:60]) > 0:
                 b.setdefault((line[21], int(line[22:26])), []).append(float(line[60:66]))
         for _, row in raw.head(5).iterrows():
-            self.assertAlmostEqual(row['flexibility'], np.mean(b[(row['Chain'], row['Resid'])]), places=6)
+            self.assertAlmostEqual(row['flexibility'],
+                                   np.mean(b[(row['Chain'], row['Resid'])]),
+                                   places=6)
 
         # more than half of the B-factors equal: the median absolute deviation is zero
         flat = os.path.join(self.outdir, 'flat.pdb')

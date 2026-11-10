@@ -49,7 +49,7 @@ class Test_Analysis(unittest.TestCase):
     def test_remove_unimportant_resids(self):
         df_req_res = pd.read_csv(f'demo{os.sep}demo_input.csv')
         df_cut = self.A.remove_not_important_residues(df_req_res).drop_duplicates(subset=['Uniprot_Entry', 'Resid'])
-        self.assertEqual(len(df_cut), 4)
+        self.assertEqual(len(df_cut), 5)
 
     def test_add_extra_measures(self):
         responses = {'Enter old or new for data to keep: ': 'old'}
@@ -58,7 +58,7 @@ class Test_Analysis(unittest.TestCase):
         with patch('builtins.input', fake_input):
             self.A.add_extra_measures(extra_measures_filename=self.df_measures,
                                     write_new_file=False)
-            self.assertEqual(len(self.A.df.drop_duplicates(subset=['Uniprot_Entry'])), 4)
+            self.assertEqual(len(self.A.df.drop_duplicates(subset=['Uniprot_Entry'])), 5)
 
     def test_GO_enrichment(self):
         df_enrichment = self.A.enrichment_analysis(feature_one = ['propka', 7, 11],

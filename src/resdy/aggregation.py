@@ -207,7 +207,7 @@ class Aggregation:
         if always_na_cols:
             print(f'>> Columns {", ".join(always_na_cols)} are always na and provide '
                   f'no information, removing from dataframe')
-            self.df_measurements = self.df_measurements.drop(columns=always_na_cols, axis=1)
+            self.df_measurements = self.df_measurements.drop(columns=always_na_cols)
             self.features_to_include = [a for a in self.features_to_include if
                                         a not in always_na_cols]
 

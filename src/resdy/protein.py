@@ -2229,62 +2229,114 @@ class PDB(object):
         :param pdb_path: Path of pdb file to check
         :type pdb_path: str
         '''
+        pdb_path_new = f'{os.path.splitext(pdb_path)[0]}_relaxed.pdb'
 
-        het = [l for l in open(pdb_path) if l.startswith('HETATM')]
-        M = bb.Molecule()
-        M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
-        df_keys = M.data.drop_duplicates(subset=['chain', 'resid'])[['chain', 'resid', 'resname']]
-        mod_res = {}
-        for i, r in df_keys.iterrows():
-            if r['resname'] not in STANDARD_RESIDUES:
-                mod_res[(r['chain'], r['resid'])] = r['resname']
+        def _residues(path):
+            '''list of atom lines, and {residue index in file order: {atom name: columns 55-66}}'''
+            lines, by_res, ordinals = [], {}, {}
+            for line in open(path):
+                if line.startswith(('ATOM', 'HETATM')):
+                    res = (line[21], line[22:27])
+                    if res not in ordinals:
+                        ordinals[res] = len(ordinals)
+                    by_res.setdefault(ordinals[res], {})[line[12:16].strip()] = line[54:66]
+                    lines.append((line, ordinals[res]))
+                else:
+                    lines.append((line, None))
+            return lines, by_res
 
-        fixer = PDBFixer(filename=pdb_path)
-        fixer.missingResidues = {}
-        fixer.findMissingAtoms()
-        ter_res = set()
+        try:
+            het = [l for l in open(pdb_path) if l.startswith('HETATM')]
+            M = bb.Molecule()
+            M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
+            df_keys = M.data.drop_duplicates(subset=['chain', 'resid'])[['chain', 'resid', 'resname']]
+            mod_res = {}
+            for i, r in df_keys.iterrows():
+                if r['resname'] not in STANDARD_RESIDUES:
+                    key = (r['chain'], r['resid'])
+                    mod_res[key] = r['resname']
 
-        for c in fixer.topology.chains():
-            res = list(c.residues())
-            if res:
-                ter_res.add(res[0])
-                ter_res.add(res[-1])
+            fixer = PDBFixer(filename=pdb_path)
+            fixer.missingResidues = {}
+            fixer.findMissingAtoms()
+            ter_res = set()
 
-        fixer.missingAtoms = {r: a for r, a in fixer.missingAtoms.items()
-                                if r in ter_res}
-        fixer.missingTerminals = {r: a for r, a in fixer.missingTerminals.items()
-                                if r in ter_res}
-        fixer.addMissingAtoms()
+            for c in fixer.topology.chains():
+                res = list(c.residues())
+                if res:
+                    ter_res.add(res[0])
+                    ter_res.add(res[-1])
 
-        print('>> Patched terminal regions with PDBFixer')
+            fixer.missingAtoms = {r: a for r, a in fixer.missingAtoms.items()
+                                    if r in ter_res}
+            fixer.missingTerminals = {r: a for r, a in fixer.missingTerminals.items()
+                                    if r in ter_res}
+            fixer.addMissingAtoms()
 
-        PDBFile.writeFile(fixer.topology, fixer.positions, open(pdb_path, 'w'), keepIds=True)
+            if fixer.missingTerminals or fixer.missingAtoms:
+                atoms_to_patch = len(fixer.missingAtoms | fixer.missingTerminals)
+                print(f'>> Patching terminal regions with PDBFixer, {atoms_to_patch} atom(s) added.')
+            else:
+                return
 
-        M = bb.Molecule()
-        # include_hetatm set to True as PDBFixer renames non-standard residues to HETATM
-        M.import_pdb(pdb_path, include_hetatm=True)
-        new_resnames = [mod_res.get(k, v) for k, v in zip(zip(M.data['chain'],
-                                                              M.data['resid']),
-                                                          M.data['resname'])]
-        new_atoms = ['ATOM' if k in mod_res else v for k, v in zip(zip(M.data['chain'],
-                                                                       M.data['resid']),
-                                                                   M.data['atom'])]
-        M.data['resname'] = new_resnames
-        M.data['atom'] = new_atoms
-        M.write_pdb(pdb_path)
+            PDBFile.writeFile(fixer.topology, fixer.positions,
+                            open(pdb_path_new, 'w'), keepIds=True)
 
-        kept = [l for l in open(pdb_path) if not l.startswith('HETATM')]
-        out, inserted = [], False
-        for line in kept:
-            if not inserted and line.startswith('END') and not line.startswith('ENDMDL'):
+            M = bb.Molecule()
+            # include_hetatm set to True as PDBFixer renames non-standard residues to HETATM
+            M.import_pdb(pdb_path_new, include_hetatm=True)
+            new_resnames = [mod_res.get(k, v) for k, v in zip(zip(M.data['chain'],
+                                                                M.data['resid']),
+                                                            M.data['resname'])]
+            new_atoms = ['ATOM' if k in mod_res else v for k, v in zip(zip(M.data['chain'],
+                                                                        M.data['resid']),
+                                                                    M.data['atom'])]
+            M.data['resname'] = new_resnames
+            M.data['atom'] = new_atoms
+            M.write_pdb(pdb_path_new)
+
+            model_lines, model_by = _residues(pdb_path_new)
+            _, template_by = _residues(pdb_path)
+            pairs = [(i, i) for i in sorted(set(model_by) & set(template_by))]
+            template_of = dict(pairs)
+
+            n_template, n_built = 0, 0
+            with open(pdb_path_new, 'w') as fh:
+                for line, res_idx in model_lines:
+                    if res_idx is None:
+                        fh.write(line)
+                        continue
+                    columns = template_by.get(template_of.get(res_idx), {}).get(line[12:16].strip())
+                    if columns is None:
+                        columns = patcher.BUILT_ATOM_COLUMNS
+                        n_built += 1
+                    else:
+                        n_template += 1
+                    fh.write(f'{line[:54]}{columns}{line[66:]}')
+
+            kept = [l for l in open(pdb_path_new) if not l.startswith('HETATM')]
+            out, inserted = [], False
+            for line in kept:
+                if not inserted and line.startswith('END') and not line.startswith('ENDMDL'):
+                    out.extend(het)
+                    inserted = True
+                out.append(line)
+            if not inserted:
                 out.extend(het)
-                inserted = True
-            out.append(line)
-        if not inserted:
-            out.extend(het)
 
-        with open(pdb_path, 'w') as fh:
-            fh.writelines(out)
+            with open(pdb_path_new, 'w') as fh:
+                fh.writelines(out)
+
+            if os.path.isfile(pdb_path):
+                os.remove(pdb_path)
+
+            os.rename(pdb_path_new, pdb_path)
+
+        except Exception as e:
+            print(f'>> Failed to add capping atoms for given protein '
+                  f'{pdb_path}, not adding. Error: {str(e)}')
+            if os.path.isfile(pdb_path_new):
+                os.remove(pdb_path_new)
 
 
     def apply_minimisation(self, pdb, max_iterations=None, align_details={}):
