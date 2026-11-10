@@ -274,3 +274,11 @@ running on a large number of cores in parallel creates memory problems, please l
 using big_protein mode for featuristaion in :class:`Measures <resdy.measures.PDB>` where
 large proteins are sectioned off and measurements for these are done in series after the
 remaining proteins are done in parallel first.
+
+If the memory is becoming an issue while running measurements in parallel, think about enabling
+big_protein_mode. This is a specific flag to separate off large proteins (currently set to
+more than 10,000 atoms) and run these proteins in series after the parallel running has finished
+on all feasible proteins within this. This feature is potentially very useful if you are planning
+to add in memory intensive features to the codebase. To use, simply pass 
+``big_protein_mode=True`` to the initialisation of :class:`Measures <resdy.measures.PDB>`.
+

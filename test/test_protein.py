@@ -1,6 +1,7 @@
 import unittest
 import sys
 import os
+import re
 import shutil
 import tempfile
 import pandas as pd
@@ -38,14 +39,32 @@ class Test_Protein(unittest.TestCase):
         self.PDB.download_fasta('1PAE')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE.fasta'))
 
-    def test_clean_split_KCXmut(self):
+    def test_clean_split_rmv_KCXmut(self):
         # test KCX to LYS mutation
         self.PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb'))
         M_13ld = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}3Q7V-alt1A.pdb')
         self.assertFalse(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
 
-    def test_clean_split_SECmut(self):
+    '''
+    def test_clean_split_keep_KCXmut(self):
+        # test keeping the KCX mutation
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    keep_modifications='KCX')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
+        M_13ld = bb.Molecule(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb')
+        self.assertTrue(any(a in ['UNK', 'KCX'] for a in list(M_13ld.data['resname'].unique())))
+    '''
+
+    def test_clean_split_rmv_SECmut(self):
         # test SEC to CYS mutation
         self.PDB.clean_and_split_pdb('1PAE', 'P22887')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
@@ -53,13 +72,64 @@ class Test_Protein(unittest.TestCase):
         self.assertFalse(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
         self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
 
-    def test_clean_split_MSEmut(self):
+    '''
+    def test_clean_split_keep_SECmut(self):
+        # test keeping the SEC mutation
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    keep_modifications=('SEC'))
+        PDB.clean_and_split_pdb('1PAE', 'P22887')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb'))
+        M_1pae = bb.Molecule(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb')
+        self.assertTrue(any(a in ['UNK', 'SEC'] for a in list(M_1pae.data['resname'].unique())))
+        self._assert_sulfur_named(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb', 'CYS', 'SG')
+    '''
+
+    def test_clean_split_rmv_MSEmut(self):
         # test MSE to MET mutation
         self.PDB.clean_and_split_pdb('1A8O', 'P12497')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
         M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
         self._assert_sulfur_named(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb', 'MET', 'SD')
+
+    def test_clean_split_keep_MSEmut(self):
+        # test keeping the MSE mutation in the structure
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=3,
+            keep_modifications=('MSE'))
+        PDB.clean_and_split_pdb('1A8O', 'P12497')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
+        M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
+        self.assertTrue(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
+
+    def test_clean_split_keepallmod(self):
+        # test the 'all' flag in keep_modifications
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=3,
+            keep_modifications='all')
+        PDB.clean_and_split_pdb('1A8O', 'P12497')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
+        M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
+        self.assertTrue(any(a in ['UNK', 'MSE'] for a in list(M_1a8o.data['resname'].unique())))
 
     def _assert_sulfur_named(self, path, resname, sulfur):
         '''
@@ -95,6 +165,128 @@ class Test_Protein(unittest.TestCase):
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
         M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
+
+    def test_nmr_confomer_selection_all(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=5,
+            nmr_conformer_selection='all')
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,9)))
+
+    def test_nmr_confomer_selection_first(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=5,
+            nmr_conformer_selection='first')
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,6)))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 5)
+
+    def test_nmr_confomer_selection_representative(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=10,
+            nmr_conformer_selection='representative')
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 1)
+
+    def test_nmr_confomer_selection_list(self):
+        PDB = RD.PDB(outdir=self.outdir,
+            gap=self.gap,
+            parallel=self.parallel,
+            PDB_only=self.PDB_only,
+            include_hetatm=self.include_hetatm,
+            resnames_of_interest=self.resnames_of_interest,
+            minimise_strucs=None,
+            max_nmr_conformers=10,
+            nmr_conformer_selection=[1,4,6,7])
+        print(PDB.nmr_conformer_selection)
+        PDB.clean_and_split_pdb('2MWS', 'P0CG48')
+        print(os.listdir(f'{self.outdir}{os.sep}curated'))
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,4,6,7]))
+
+    def test_rotamer_selection_all(self):
+        # test keeping all available rotamers from the pdb structure
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    rotamer_selection='all')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb'))
+
+    def test_rotamer_selection_first(self):
+        # test keeping only the first rotamer from the pdb structure
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    rotamer_selection='first')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
+        self.assertFalse(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb'))
+
+    def test_rotamer_selection_highest_occupancy(self):
+        # test keeping only the first rotamer from the pdb structure
+        PDB = RD.PDB(outdir=self.outdir,
+                    gap=self.gap,
+                    parallel=self.parallel,
+                    PDB_only=self.PDB_only,
+                    include_hetatm=self.include_hetatm,
+                    resnames_of_interest=self.resnames_of_interest,
+                    minimise_strucs=None,
+                    max_nmr_conformers=3,
+                    rotamer_selection='highest_occupancy')
+        PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
+        print(os.listdir(f'{self.outdir}{os.sep}curated'))
+        self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1HiOcc.pdb'))
+
+    def test_get_prot_org(self):
+        shutil.copyfile(os.path.join('demo', 'curated', 'AF-P40616-F1-model_v6.pdb'),
+                        os.path.join(self.outdir, 'curated', 'AF-P40616-F1-model_v6.pdb'))
+        f = f'{self.outdir}{os.sep}curated{os.sep}AF-P40616-F1-model_v6.pdb'
+        org_dets = self.PDB._get_prot_org(f)
+        expected_dets = {'organism_name': 'HOMO SAPIENS', 'organism_taxid': '9606'}
+        self.assertTrue(org_dets == expected_dets)
+
+    def test_capped_vs_charged(self):
+        for meth in ['capped', 'charged']:
+            PDB = RD.PDB(outdir=self.outdir,
+                        gap=self.gap,
+                        parallel=self.parallel,
+                        PDB_only=self.PDB_only,
+                        include_hetatm=self.include_hetatm,
+                        resnames_of_interest=self.resnames_of_interest,
+                        minimise_strucs=None,
+                        max_nmr_conformers=1,
+                        minimise_termini=meth)
+            PDB.clean_and_split_pdb('1PAE', 'P22887')
 
     # ---- heteroatom retention policy -------------------------------------------
 

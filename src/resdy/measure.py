@@ -18,11 +18,11 @@ import pandas as pd
 import numpy as np
 import biobox as bb
 from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children
-require_biobox(bb)
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
-from .geometry import distance_to_other_chains
+from .geometry import distance_to_other_chains, distance_to_modified, distance_to_nearest_termini
 from .assembly import measured_chains
+require_biobox(bb)
 
 #: File, in the output directory, that records the settings a measurement was made with.
 MEASURE_SETTINGS_FILE = 'measure_settings.json'
@@ -109,11 +109,11 @@ class Measure(object):
             'aev', 'das', 'seqcharge', 'flexibility', 'legolas', 'melodia',
             'curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi', 'frustration',
             'density', 'evolution', 'rmsf', 'secondarystructure'. Any class defined in a script
-            added to the features folder can also be requested by its class name. 'all' is a shorthand
-            for the preset list defined in _setup_measures(). A dict should be given here with a
-            dict per feature included eg {'depth': {}, etc...}, inside the dict per feature should
-            house any optional arguments available for that specific feature class, if defaults are
-            okay, leave as {}.
+            added to the features folder can also be requested by its class name. 'all' is a
+            shorthand for the preset list defined in _setup_measures(). A dict should be given
+            here with a dict per feature included eg {'depth': {}, etc...}, inside the dict per
+            feature should house any optional arguments available for that specific feature class,
+            if defaults are okay, leave as {}.
         :type features_dict: dict
         :param residue_of_interest: The residue of interest to calculate measurements for. The
             three-letter code of any of the twenty standard amino acids can be given as a
@@ -149,11 +149,11 @@ class Measure(object):
             if there is a relaxed structure available for the structure. If set to False, measures
             will be calculated to both original and relaxed form. Default is False.
         :type only_relaxed: bool
-        :param only_relaxed: Option to only calculate measurements for structures that are relaxed.
-            If there is not a relaxed structure available for this structure, this structures are
-            skipped. To allow a fallback using the non-relaxed structure, see only_relaxed parameter.
-            Default is False.
-        :type only_relaxed: bool
+        :param require_relaxed: Option to only calculate measurements for structures that are
+            relaxed. If there is not a relaxed structure available for this structure, this
+            structures are skipped. To allow a fallback using the non-relaxed structure, see
+            only_relaxed parameter. Default is False.
+        :type require_relaxed: bool
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
             available will be used. Otherwise it will try and use the number of cores given
@@ -174,7 +174,8 @@ class Measure(object):
             curation_geometry.csv after protein curation through checking the number of atoms in
             the system. More than 10,000 atoms will take the protein into a separate list and
             this list will run in series after the parallel run over most proteins has been
-            completed.
+            completed. This option is only available when running in parallel and not running in
+            PDB_only mode.
         :type big_protein_mode: bool
         :param struc_dir: If you are running multiple sets of measurements on the same set of
             structures, you may wish to separate calculations into different folders. This allows
@@ -184,7 +185,7 @@ class Measure(object):
         :type struc_dir: str
         :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
             this is available. Options for this include 'auto' - recreate if propka output older
-            than curated pdb file, 'always' - always run propka, 'never' - always take previous
+            than curated pdb file, 'never' - always run propka, 'always' - always take previous
             run if it exists
         :type cache_policy: str
         '''
@@ -232,7 +233,7 @@ class Measure(object):
 
         self.cache_policy = cache_policy
         if self.cache_policy not in ['auto', 'always', 'never']:
-            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+            print(f'>> Cache policy ({self.cache_policy}) given to Measures class not recognised, '
                     f'using default setting of auto instead.')
             self.cache_policy = 'auto'
 
@@ -259,12 +260,13 @@ class Measure(object):
                     if self.num_cores <= os.cpu_count():
                         self.n_cores_to_use = self.num_cores
                     else:
-                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
-                                f'possible on current setup; defaulting to 0.75 times max possible')
+                        print(f'>> Given number of cores for parllel running ({self.num_cores}) '
+                              f'is not possible on current setup; defaulting to 0.75 times max '
+                              f'possible')
                         self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
             else:
-                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
-                        f'defaulting to 0.75 times max possible.')
+                print(f'>> Input given to number of cores is not an integer '
+                      f'({str(self.num_cores)}); defaulting to 0.75 times max possible.')
                 self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
         else:
             self.n_cores_to_use = 1
@@ -281,11 +283,13 @@ class Measure(object):
 
         if 'Uniprot_Entry' in self.df_input.columns:
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
-                       'Resid', 'Source', 'Min_Dist_Other_Chain']
+                       'Resid', 'Source', 'Min_Dist_Other_Chain', 'Dist_To_Nearest_Terminus',
+                       'In_Modelled_Region', 'Dist_To_Modelled']
             self.df = pd.DataFrame(columns=columns)
         else:
             self.PDB_only = True
-            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
+                       'Dist_To_Nearest_Terminus', 'In_Modelled_Region', 'Dist_To_Modelled']
             self.df = pd.DataFrame(columns = columns)
 
         files_af=[os.path.splitext(os.path.basename(c))[0] for c
@@ -302,7 +306,7 @@ class Measure(object):
                         if f.split('.')[0] not in files_af and f.split('.')[0] not in files_pdb:
                             print(f'WARNING: {f} not found in folder {self.folder}')
                             f_not_found.append(f)
-                    except Exception as e:
+                    except Exception:
                         print(f'WARNING: {f} not found in folder {self.folder}')
                         f_not_found.append(f)
                 else:
@@ -310,7 +314,7 @@ class Measure(object):
                     f_not_found.append(f)
 
         self.big_protein_mode = big_protein_mode
-        if not self.parallel or self.PDB_only == True:
+        if not self.parallel or self.PDB_only is True:
             self.big_protein_mode = False
         if self.big_protein_mode:
             self.prot_sizes = self._get_protein_sizes(cur_geom_filename='curation_geometry.csv')
@@ -348,10 +352,11 @@ class Measure(object):
         in the directory. Will return True if a match is given.
         '''
         pdb_code = os.path.basename(str(pdb_code)).lower()
-        name = os.path.basename(path).lower()
-        stem = os.path.splitext(name)[0]
+        name_part = os.path.basename(path).lower()
+        stem = os.path.splitext(name_part)[0].removesuffix('_relaxed')
+        code = os.path.splitext(pdb_code)[0].removesuffix('_relaxed')
 
-        return pdb_code in (name, stem) or pdb_code == stem.split('-')[0]
+        return code == stem or (not code.startswith('af-') and code == stem.split('alt-')[0])
 
 
     def _get_protein_sizes(self, cur_geom_filename='curation_geometry.csv'):
@@ -359,13 +364,22 @@ class Measure(object):
         Initial support function for enabling big protein mode where the size of a protein
         structure will determine whether this will join in the parallel queue or will run
         afterwards in a series queue.
+
+        :param cur_geom_filename: Filename of the curation_geometry.csv file which is
+            produced after a run through PDB to gather protein has been completed. By default
+            this will look in the 'outdir' given to the Measures class. This is matching the
+            behaviour of a default run.
+        :type cur_geom_filename: str
         '''
         cur_geom_path = os.path.join(self.outdir, cur_geom_filename)
 
         if os.path.isfile(cur_geom_path):
             try:
                 df_cur_geom = pd.read_csv(cur_geom_path)
-                struc_to_atoms = pd.Series(df_cur_geom['n_atoms'], index=df_cur_geom['structure']).to_dict()
+                sizes = df_cur_geom.dropna(subset=['structure', 'n_atoms'])
+                # take back to absolute pdb code to ensure matching later on
+                codes = sizes['structure'].str.replace('_relaxed', '').str.split('-alt')[0]
+                struc_to_atoms = sizes.groupby(codes)['n_atoms'].max().to_dict()
             except Exception as e_s:
                 print(f'>> Failed to extract protein sizes from the curation geometry csv '
                       f'file given. Please check the file. Error: {str(e_s)}')
@@ -374,7 +388,6 @@ class Measure(object):
             struc_to_atoms = {}
 
         return struc_to_atoms
-
 
 
     def _other_chain_distances(self, M):
@@ -416,6 +429,71 @@ class Measure(object):
         return out
 
 
+    # PUT OTHER METADATAMEASUREMENTS HERE
+    def _dist_to_mods(self, M):
+        '''
+        Get information on the distances of residues of interest to the nearest patched
+        section of the protein in different methods. This will gain information on the 3D
+        distance to the nearest modelled atom, the sequence length difference between the
+        residue of interest and the nearest terminus and a flag for if the residue of
+        interest is in the region of modelled atoms (or contains any modelled atoms).
+
+        A residue is featurised at its anchor atom, the ``atom_select_names_nonmod`` (or,
+        for a modified code, ``atom_select_names_modified``) entry of ``aa_properties``. A
+        residue whose anchor is absent cannot be featurised and is missing from the returned
+        dictionary. When a residue has more than one anchor atom the shortest distance is kept.
+
+        :param M: the structure being measured.
+        :type M: biobox.Molecule
+        :returns: {(chain, resid): distance in A}, NaN when the structure holds no other
+            protein chain.
+        :rtype: dict
+        '''
+        d = M.data
+        resname = d['resname'].astype(str).str.strip().to_numpy()
+        name = d['name'].astype(str).str.strip().to_numpy()
+        anchor = (np.isin(resname, self.aa_properties['non_modified_codes'])
+                    & np.isin(name, self.aa_properties['atom_select_names_nonmod']))
+        if self.include_mod:
+            anchor |= (np.isin(resname, self.aa_properties['modified_codes'])
+                        & np.isin(name, self.aa_properties['atom_select_names_modified']))
+        protein = (PROTEIN_RESNAMES | set(self.aa_properties['non_modified_codes'])
+                    | set(self.aa_properties['modified_codes']))
+
+        dist_modified = distance_to_modified(d['chain'].to_numpy(), resname,
+                                    d['atomtype'].to_numpy(), d['occupancy'].to_numpy(),
+                                    M.points, anchor, protein)
+        dist_termini = distance_to_nearest_termini(d['chain'].to_numpy(), resname,
+                                            d['atomtype'].to_numpy(), M.points, anchor,
+                                            d['resid'].to_numpy())
+
+        idx = np.flatnonzero(anchor)
+        out = {}
+        for cha, res, near_any, near_term in zip(d['chain'].to_numpy()[idx],
+                                                 d['resid'].to_numpy()[idx],
+                                                 dist_modified,
+                                                 dist_termini):
+            in_modelled = any(a == 0 for a in list(d.loc[(d['chain'] == cha) &
+                                                         (d['resid'] == res),
+                                                         'occupancy']))
+
+            key = (cha, int(res))
+            details = {}
+            if key in out:
+                details = out[key]
+                details['Dist_To_Modelled'] = np.fmin(details['Dist_To_Modelled'], near_any)
+                details['Dist_To_Nearest_Terminus'] = np.fmin(details['Dist_To_Nearest_Terminus'],
+                                                           near_term)
+                details['In_Modelled_Region'] = any(details['In_Modelled_Region'] + in_modelled)
+            else:
+                details['Dist_To_Modelled'] = near_any
+                details['Dist_To_Nearest_Terminus'] = near_term
+                details['In_Modelled_Region'] = in_modelled
+            out[key] = details
+
+        return out
+
+
     def _setup_measures(self, features_dict):
         '''
         Convert a dict of features into a measuring protocol. If ['all'] given as input for the
@@ -449,9 +527,9 @@ class Measure(object):
                         self.measures.append(['frustration', frustration.calculate])
                         self.feature_settings['frustration'] = _resolved_settings(FRUSTRATION, {})
                         frustration_added = True
-                except Exception as e:
+                except Exception as e_frust:
                     self.features.remove(m)
-                    print(f'>> Failed to add frustration/density for features calculation list; error: {e}')
+                    print(f'>> Failed to add frustration/density for features calculation list; error: {str(e_frust)}')
             elif m == 'melodia':
                 try:
                     structure = STRUCTURE(melodia_features=['all'],
@@ -464,9 +542,9 @@ class Measure(object):
                     melodia_added = True
                     self.features += ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
                     self.features.remove('melodia')
-                except Exception as e:
+                except Exception as e_struc:
                     self.features.remove(m)
-                    print(f'>> Failed to add melodia for features calculation list; error: {e}')
+                    print(f'>> Failed to add melodia for features calculation list; error: {str(e_struc)}')
             elif m in ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']:
                 melodia_features += [m]
             else:
@@ -501,22 +579,22 @@ class Measure(object):
 
                             self.measures.append([m, meas_dict[tmp_name].calculate])
                             self.feature_settings[tmp_name] = _resolved_settings(cls_dets, kwargs)
-                        except TypeError as e:
+                        except TypeError as e_args:
                             accepted_args = sorted(inspect.signature(cls_dets).parameters)
                             print(f'>> {m} does not accept one of the arguments given in '
-                                  f'features_dict with error {str(e)}. It accepts: {accepted_args}'
+                                  f'features_dict with error {str(e_args)}. It accepts: {accepted_args}'
                                   f'. {m} has been removed from features to calculate.')
                             if self.report_errors:
                                 self._report_error_to_file('Setup measures: custom measure failed to be added due to problem in the arguments passed',
                                                            'setup', f'Custom measure {m} failed to be added')
                             self.features.remove(m)
                             continue
-                        except Exception as e:
+                        except Exception as e_report:
                             if self.report_errors:
                                 self._report_error_to_file('Setup measures: custom measure failed to be added',
                                                            'setup', f'Custom measure {m} failed to be added')
                             self.features.remove(m)
-                            print(f'Failed to add measure feature {m}, please check new scripts follow the template correctly. Error: {e}')
+                            print(f'Failed to add measure feature {m}, please check new scripts follow the template correctly. Error: {str(e_report)}')
                             continue
                 else:
                     if self.report_errors:
@@ -535,11 +613,11 @@ class Measure(object):
                 self.feature_settings['melodia'] = _resolved_settings(
                     STRUCTURE, {'melodia_features': melodia_features})
                 melodia_added = True
-            except Exception as e:
+            except Exception as e_melodia:
                 for feat in melodia_features:
                     if feat in self.features:
                         self.features.remove(feat)
-                print(f'>> Failed to add melodia for features calculation list; error: {e}')
+                print(f'>> Failed to add melodia for features calculation list; error: {str(e_melodia)}')
 
 
     def _setup_aa_properties(self, res_details):
@@ -569,8 +647,8 @@ class Measure(object):
         aa_properties = resolve_residue(res_details)
         res_code = residue_key(aa_properties)
 
-        for name in list(self.features_dict):
-            cls = self._feature_class(name)
+        for feat_name in list(self.features_dict):
+            cls = self._feature_class(feat_name)
             if cls is None:
                 # an unknown feature, or one whose module failed to import; _setup_measures
                 # reports it and removes it
@@ -581,34 +659,34 @@ class Measure(object):
                 reason = getattr(cls, 'UNSUPPORTED_REASON', None)
                 if isinstance(reason, dict):
                     reason = reason.get(res_code)
-                print(f'>> {name} cannot be calculated for {res_code}'
+                print(f'>> {feat_name} cannot be calculated for {res_code}'
                       + (f', because {reason}' if reason else '')
-                      + f'; removing {name} from the features to calculate.')
-                self.features_dict.pop(name)
+                      + f'; removing {feat_name} from the features to calculate.')
+                self.features_dict.pop(feat_name)
                 continue
 
             defaults = getattr(cls, 'RESIDUE_KWARGS', {}).get(res_code)
             if defaults:
                 # take user's own settings over the default values for the residue,
                 # rebuild dictionary to ensure not writing to caller held one
-                self.features_dict[name] = {**copy.deepcopy(defaults),
-                                            **self.features_dict[name]}
+                self.features_dict[feat_name] = {**copy.deepcopy(defaults),
+                                            **self.features_dict[feat_name]}
 
         return aa_properties
 
 
-    def _feature_class(self, name):
+    def _feature_class(self, feat_name):
         '''
         The class implementing a feature, looked up the same way :meth:`_setup_measures` does.
 
-        :param name: Name of the feature as it appears in features_dict.
-        :type name: str
+        :param feat_name: Name of the feature as it appears in features_dict.
+        :type feat_name: str
         :returns: The class, or None when no class of that name is available, which covers both
             an unknown feature and one whose module failed to import for want of an optional
             dependency.
         :rtype: type
         '''
-        cls = globals().get(name.upper())
+        cls = globals().get(feat_name.upper())
         if inspect.isclass(cls) and callable(getattr(cls, 'calculate', None)):
             return cls
         return None
@@ -624,9 +702,12 @@ class Measure(object):
         while os.path.exists(new_file_name):
             if '_no' in new_file_name:
                 error_file_num = int(os.path.splitext(new_file_name)[0].split('_no')[-1])
-                new_file_name = os.path.join(self.outdir, f'measures_errors_{date.today()}_no{(error_file_num + 1)}.txt')
+                new_file_name = os.path.join(self.outdir,
+                                             f'measures_errors_{date.today()}_no'
+                                             f'{(error_file_num + 1)}.txt')
             else:
-                new_file_name = os.path.join(self.outdir, f'measures_errors_{date.today()}_no{1}.txt')
+                new_file_name = os.path.join(self.outdir,
+                                             f'measures_errors_{date.today()}_no{1}.txt')
         with open(new_file_name, 'w') as error_f1:
             error_f1.write(f'New measures errors file created at {datetime.datetime.now()}\n')
         return new_file_name
@@ -691,7 +772,7 @@ class Measure(object):
         directory, see :meth:`measurement_settings`.
         '''
         if not self.run_ready:
-            print(f'No pdb files available for measurements, see earlier error.')
+            print('No pdb files available for measurements, see earlier error.')
             return
 
         with mp_hide_main_from_children():
@@ -711,7 +792,8 @@ class Measure(object):
                     subset=['PDB_Code', 'Chain', 'Resid'], keep='last')
                 self.df['_plddt_key'] = self.df['PDB_Code'].str.replace('_relaxed', '', regex=False)
                 df_af_plddt = df_af_plddt.rename(columns={'PDB_Code': '_plddt_key'})
-                self.df = self.df.merge(df_af_plddt, how='left', on=['_plddt_key', 'Chain', 'Resid'])
+                self.df = self.df.merge(df_af_plddt, how='left',
+                                        on=['_plddt_key', 'Chain', 'Resid'])
                 self.df = self.df.drop(columns='_plddt_key')
                 n_af = int(self.df['PDB_Code'].str.contains('AF-').sum())
                 if n_af and not int(self.df['PLDDT'].notna().sum()):
@@ -727,9 +809,9 @@ class Measure(object):
     def restart_measure_data(self):
         '''
         Determine the appropriate measures function to call based on the combination of running
-        PDB_only and in parallel, reducing the number of individual functions that the user will have
-        to call themselves. Different to measure_data() as this will restart the measurements from
-        final previous point rather than starting again. Raises a ValueError if the settings
+        PDB_only and in parallel, reducing the number of individual functions that the user will
+        have to call themselves. Different to measure_data() as this will restart the measurements
+        from final previous point rather than starting again. Raises a ValueError if the settings
         differ from those the measurement was started with.
         '''
         self._check_settings()
@@ -869,6 +951,7 @@ class Measure(object):
                 res = r['Resolution']
                 uniprot_code = r["Uniprot_Entry"]
                 file_details = [uniprot_code, pdb_code, method, res, chains]
+
                 if self.big_protein_mode:
                     pdb_size = self.prot_sizes.get(pdb_code, 10)
                     if pdb_size <= 10000:
@@ -908,20 +991,23 @@ class Measure(object):
                                 pool.terminate()
                                 raise RuntimeError(
                                     f'A parallel measuring worker produced no result for '
-                                    f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
-                                    f'structures, so it is treated as stalled and the run was stopped. '
-                                    f'Either raise parallel_timeout if the features requested are simply '
-                                    f'slow on these structures, or set parallel=False to measure in '
-                                    f'series.') from None
+                                    f'{self.parallel_timeout} s after {len(results)} of '
+                                    f'{len(items)} structures, so it is treated as stalled and '
+                                    f'the run was stopped. Either raise parallel_timeout if the '
+                                    f'features requested are simply slow on these structures, or '
+                                    f'set parallel=False to measure in series.') from None
+
                     df_parallel = pd.concat(results, ignore_index=True)
 
-                    if self.big_protein_mode:
-                        df_parallel_extra = pd.concat([self._measure_file(lock, file_dets) for file_dets in big_items],
+                    if self.big_protein_mode and big_items:
+                        df_parallel_extra = pd.concat(
+                            [self._measure_file(lock, file_dets) for file_dets in big_items],
                                                 ignore_index=True)
                         df_parallel = pd.concat([df_parallel, df_parallel_extra], ignore_index=True)
 
                 else:
-                    df_parallel = pd.concat([self._measure_file(lock, file_dets) for file_dets in items],
+                    df_parallel = pd.concat(
+                        [self._measure_file(lock, file_dets) for file_dets in items],
                                             ignore_index=True)
 
             self.measures = gpu_measurements
@@ -932,8 +1018,10 @@ class Measure(object):
                 if df_parallel.empty:
                     df_parallel = df_gpu
                 else:
-                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in df_parallel.columns and a not in base_cols])
-                    df_parallel = df_parallel.merge(df_gpu, how='left', on=[a for a in base_cols if a in df_gpu.columns])
+                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if
+                                                  a in df_parallel.columns and a not in base_cols])
+                    df_parallel = df_parallel.merge(df_gpu, how='left',
+                                                on=[a for a in base_cols if a in df_gpu.columns])
 
             if not cpu_measurements and not gpu_measurements:
                 print('>> No measurements are registered, nothing to calculate')
@@ -947,10 +1035,11 @@ class Measure(object):
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
             print('\n>> Removed duplicates from measurement dataframe.')
-        except Exception as e:
-            print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
+        except Exception as e_dups:
+            print(f'\n>> Failed to remove duplicates from measurement dataframe: {str(e_dups)}')
             if self.report_errors:
-                self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
+                self._report_error_to_file('Failed to remove duplicates from measurement dataframe',
+                                           'parallel measures', str(e_dups))
 
 
     def _measure_file(self, lock, file_details):
@@ -978,7 +1067,8 @@ class Measure(object):
         for f in self.files_to_analyse:
             if pdb_code.lower() != os.path.basename(f).split("-")[0].lower():
                 if 'AF-' in f and 'AF-' in pdb_code:
-                    if pdb_code.split("-")[1].lower() != os.path.splitext(os.path.basename(f))[0].split("-")[1].lower():
+                    if (pdb_code.split("-")[1].lower() !=
+                        os.path.splitext(os.path.basename(f))[0].split("-")[1].lower()):
                         continue
                 else:
                     continue
@@ -988,21 +1078,20 @@ class Measure(object):
 
             if self.only_relaxed:
                 if ('_relaxed' not in f and
-                    os.path.exists(os.path.join(self.folder, f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
+                    os.path.exists(os.path.join(self.folder,
+                                                f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb'))):
                     continue
 
-            if self.require_relaxed:
-                if '_relaxed' not in f:
-                    if not os.path.exists(os.path.join(self.folder,
-                                        f'{os.path.splitext(os.path.basename(f))[0]}_relaxed.pdb')):
-                        continue
+            if self.require_relaxed and '_relaxed' not in f:
+                continue
 
             terminal_out_statements = []
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
             columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain',
-                       'Resid', 'Source', 'Min_Dist_Other_Chain']
+                       'Resid', 'Source', 'Min_Dist_Other_Chain', 'Dist_To_Modelled',
+                       'Dist_To_Nearest_Terminus', 'In_Modelled_Region']
             if self.include_mod:
                 columns.append('Modified')
             records = []
@@ -1010,11 +1099,11 @@ class Measure(object):
             try:
                 M = bb.Molecule()
                 M.import_pdb(f, include_hetatm=True)
-            except Exception as e:
+            except Exception as e_m:
                 self.wrong_pdb_file.append(f)
                 if self.report_errors:
-                    self._report_error_to_file('Failed to produce bb for pdb file', 'measure file parallel', str(e))
-                terminal_out_statements.append(f'Failed to produce bb for pdb file with error: {e}')
+                    self._report_error_to_file('Failed to produce bb for pdb file', 'measure file parallel', str(e_m))
+                terminal_out_statements.append(f'Failed to produce bb for pdb file with error: {e_m}')
                 continue
 
             resnames_to_explore = list(self.aa_properties['non_modified_codes'])
@@ -1024,6 +1113,7 @@ class Measure(object):
                                    get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
+            dist_metadata = self._dist_to_mods(M)
             # copies made by the assembly operators are environment only
             reported = measured_chains(f)
             no_anchor = 0
@@ -1040,14 +1130,16 @@ class Measure(object):
                     no_anchor += 1
                     continue
 
-                data = ({'Uniprot_Entry': uniprot_code,
-                    'PDB_Code':os.path.splitext(os.path.basename(f))[0],
-                    'Method': method,
-                    'Resolution': res,
-                    'Chain': M.data['chain'].values[i],
-                    'Resid': M.data['resid'].values[i],
-                    'Source': self._source_of(f),
-                    'Min_Dist_Other_Chain': other_chain[key]})
+                data = {'Uniprot_Entry': uniprot_code,
+                        'PDB_Code':os.path.splitext(os.path.basename(f))[0],
+                        'Method': method,
+                        'Resolution': res,
+                        'Chain': M.data['chain'].values[i],
+                        'Resid': M.data['resid'].values[i],
+                        'Source': self._source_of(f),
+                        'Min_Dist_Other_Chain': other_chain[key]}
+
+                data = data | dist_metadata[key]
 
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]
@@ -1056,7 +1148,7 @@ class Measure(object):
                 records.append(data)
 
             df_currentfile = pd.DataFrame.from_records(records, columns=columns)
-            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest found")
             if no_anchor:
                 terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
                                                f"anchor atom missing, cannot be featurised")
@@ -1070,10 +1162,12 @@ class Measure(object):
                     terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
-                except Exception as e:
+                except Exception as e_meas:
                     if self.report_errors:
-                        self._report_error_to_file('Meas feat error', f'measure file parallel; feature {meas[0]}', str(e))
-                    terminal_out_statements.append(f"ERROR: {e}")
+                        self._report_error_to_file('Meas feat error',
+                                                   f'measure file parallel; feature {meas[0]}',
+                                                   str(e_meas))
+                    terminal_out_statements.append(f"ERROR: {e_meas}")
                     continue
 
             processing_time = round((time.time()-tstart), 2)
@@ -1092,11 +1186,13 @@ class Measure(object):
                                       "display.max_rows", None)
                         try:
                             self.logger.info(df_currentfile)
-                            self.logger.info('--------------------------------------------------------------------------')
-                        except Exception as e:
+                            self.logger.info('-------------------------------------------'
+                                             '-------------------------------')
+                        except Exception as e_log:
                             if self.report_errors:
-                                self._report_error_to_file('logging', 'measure file parallel', str(e))
-                            print(f'Error in logging: {e}')
+                                self._report_error_to_file('logging', 'measure file parallel',
+                                                           str(e_log))
+                            print(f'Error in logging: {e_log}')
 
                         pd.reset_option('display.max_colwidth')
                         pd.reset_option('display.width')
@@ -1108,7 +1204,9 @@ class Measure(object):
 
         if not frames_df_list:
             return pd.DataFrame(columns=['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution',
-                                         'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
+                                         'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
+                                         'Dist_To_Modelled','Dist_To_Nearest_Terminus',
+                                         'In_Modelled_Region'])
 
         return pd.concat(frames_df_list, ignore_index=True)
 
@@ -1137,7 +1235,8 @@ class Measure(object):
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
         print(f'Recovering measured data from file: {log_path}')
-        print('WARNING: could take up to a few minutes depending on the number of measurements completed.')
+        print('WARNING: could take up to a few minutes depending on '
+              'the number of measurements completed.')
 
         test_lines = 0
         columns_all_set = False
@@ -1161,7 +1260,8 @@ class Measure(object):
                         print(f'The first 6 columns are assumed to be: {base_columns}')
                         continue
                     elif len(parts) >= 6 and not columns_all_set:
-                        # if all seems correct with the writing check that all the columns can be found in the current columns, if not, add in
+                        # if all seems correct with the writing check that all the columns
+                        # can be found in the current columns, if not, add in
                         for part in parts:
                             if part not in base_columns:
                                 base_columns.append(part)
@@ -1187,7 +1287,9 @@ class Measure(object):
                     while num_parts != len(base_columns):
                         print('Need to set a column header')
                         print(f'Options for columns are: {potential_col_names}')
-                        print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
+                        print(f'Please enter the number corresponding to the header required for '
+                              f'the column which contains the following value: '
+                              f'{parts[len(base_columns)]}')
                         new_header_val = input('Enter the number for the new column header: ')
                         while True:
                             if not new_header_val.isnumeric():
@@ -1199,7 +1301,8 @@ class Measure(object):
                         base_columns.append(potential_col_names[new_header_val])
                     columns_all_set = True
                 data = dict(zip(base_columns, parts))
-                log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])],
+                                      ignore_index=True)
                 test_lines += 1
                 last_reported = 0
                 percent_prog = round((curr_line/num_lines)*100, 2)
@@ -1279,7 +1382,8 @@ class Measure(object):
         to_merge = to_merge.reset_index(drop=True)
 
         if self.include_mod and 'Modified' not in to_merge.columns:
-            raise KeyError(f'>> Running include modified but Modified column not present for feature: {col_name}')
+            raise KeyError(f'>> Running include modified but Modified column not '
+                           f'present for feature: {col_name}')
 
         for i, r in target.iterrows():
 
@@ -1298,13 +1402,14 @@ class Measure(object):
 
             if len(idx[0]) == 0:
                 continue
-            
+
             if len(idx[0]) > 1:
                 out_print = (f'{col_name}: {len(idx[0])} rows match Chain {chain_value}, Resid '
                              f'{resid_value}; an insertion code has been not managed properly, '
                              f'no guess employed; continuing')
                 if self.report_errors:
-                    self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes', col_name, out_print)
+                    self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes',
+                                               col_name, out_print)
                 print('>> ' + out_print)
                 continue
 
@@ -1347,7 +1452,7 @@ class Measure(object):
 
         with get_worker_lock(self.parallel, self._parallel_context()) as lock:
             items = []
-            for i, r in self.df_input.iterrows():
+            for _, r in self.df_input.iterrows():
 
                 if r['completed']:
                     continue
@@ -1372,6 +1477,7 @@ class Measure(object):
                 if self.parallel:
                     ctx = self._parallel_context()
                     results = []
+
                     with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
                         iterator = pool.imap(partial(self._measure_file_pdbonly, lock),
                                                 items, chunksize=1)
@@ -1384,14 +1490,16 @@ class Measure(object):
                                 pool.terminate()
                                 raise RuntimeError(
                                     f'A parallel measuring worker produced no result for '
-                                    f'{self.parallel_timeout} s after {len(results)} of {len(items)} '
-                                    f'structures, so it is treated as stalled and the run was stopped. '
-                                    f'Either raise parallel_timeout if the features requested are simply '
-                                    f'slow on these structures, or set parallel=False to measure in '
-                                    f'series.') from None
+                                    f'{self.parallel_timeout} s after {len(results)} of '
+                                    f'{len(items)} structures, so it is treated as stalled and '
+                                    f'the run was stopped. Either raise parallel_timeout if the '
+                                    f'features requested are simply slow on these structures, or '
+                                    f'set parallel=False to measure in series.') from None
+
                     df_parallel = pd.concat(results, ignore_index=True)
                 else:
-                    df_parallel = pd.concat([self._measure_file_pdbonly(lock, pdb_code) for pdb_code in items],
+                    df_parallel = pd.concat([self._measure_file_pdbonly(lock, pdb_code)
+                                             for pdb_code in items],
                                             ignore_index=True)
 
             self.measures = gpu_measurements
@@ -1402,8 +1510,10 @@ class Measure(object):
                 if df_parallel.empty:
                     df_parallel = df_gpu
                 else:
-                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in df_parallel.columns and a not in base_cols])
-                    df_parallel = df_parallel.merge(df_gpu, how='left', on=[a for a in base_cols if a in df_gpu.columns])
+                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if a in
+                                                  df_parallel.columns and a not in base_cols])
+                    df_parallel = df_parallel.merge(df_gpu, how='left',
+                                                    on=[a for a in base_cols if a in df_gpu.columns])
 
             if not cpu_measurements and not gpu_measurements:
                 print('>> No measurements are registered, nothing to calculate')
@@ -1417,10 +1527,11 @@ class Measure(object):
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
             print('\n>> Removed duplicates from measurement dataframe.')
-        except Exception as e:
-            print(f'\n>> Failed to remove duplicates from measurement dataframe: {e}')
+        except Exception as e_du:
+            print(f'\n>> Failed to remove duplicates from measurement dataframe: {str(e_du)}')
             if self.report_errors:
-                self._report_error_to_file('Failed to remove duplicates from measurement dataframe', 'parallel measures', str(e))
+                self._report_error_to_file('Failed to remove duplicates from measurement dataframe',
+                                           'parallel measures', str(e_du))
 
 
     def _measure_file_pdbonly(self, lock, pdb_code):
@@ -1447,11 +1558,8 @@ class Measure(object):
                     os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb'))):
                     continue
 
-            if self.require_relaxed:
-                f_stem = os.path.splitext(os.path.basename(f))[0]
-                if '_relaxed' not in f:
-                    if not os.path.exists(os.path.join(self.folder, f'{f_stem}_relaxed.pdb')):
-                        continue
+            if self.require_relaxed and '_relaxed' not in f:
+                continue
 
             if f in self.pdb_only_files_to_ignore:
                 continue
@@ -1460,7 +1568,8 @@ class Measure(object):
             tstart = time.time()
             terminal_out_statements.append(f"\n> File: {f}")
 
-            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain']
+            columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
+                       'In_Modelled_Region', 'Dist_To_Nearest_Terminus', 'Dist_To_Modelled']
             if self.include_mod:
                 columns.append('Modified')
             records = []
@@ -1468,12 +1577,12 @@ class Measure(object):
             try:
                 M = bb.Molecule()
                 M.import_pdb(f, include_hetatm=True)
-            except Exception as e:
+            except Exception as e_bb:
                 terminal_out_statements.append(f'Failed to create biobox molecule for file '
-                                               f'{f} with error: {e}')
+                                               f'{f} with error: {str(e_bb)}')
                 if self.report_errors:
                     self._report_error_to_file(f'Failed to create bb molecule for file: {f}',
-                                               'measure pdb only', str(e))
+                                               'measure pdb only', str(e_bb))
                 self.wrong_pdb_file.append(f)
                 continue
 
@@ -1484,6 +1593,7 @@ class Measure(object):
                                    ['CA'], get_index=True, use_resname=True)
 
             other_chain = self._other_chain_distances(M)
+            dist_metadata = self._dist_to_mods(M)
             # copies made by the assembly operators are environment only
             reported = measured_chains(f)
             no_anchor = 0
@@ -1501,6 +1611,8 @@ class Measure(object):
                     'Source': self._source_of(f),
                     'Min_Dist_Other_Chain': other_chain[key]})
 
+                data = data | dist_metadata[key]
+
                 if self.include_mod:
                     data['Modified'] = (M.data['resname'].values[i]
                                         in self.aa_properties['modified_codes'])
@@ -1508,7 +1620,7 @@ class Measure(object):
                 records.append(data)
 
             df_currentfile = pd.DataFrame.from_records(records, columns=columns)
-            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest of interest found")
+            terminal_out_statements.append(f">> {len(df_currentfile)} residues of interest found")
             if no_anchor:
                 terminal_out_statements.append(f">> {no_anchor} residue(s) of interest left out: "
                                                f"anchor atom missing, cannot be featurised")
@@ -1522,10 +1634,12 @@ class Measure(object):
                     terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
-                except Exception as e:
+                except Exception as e_m:
                     if self.report_errors:
-                        self._report_error_to_file('Meas feat error', f'measure file parallel; feature {meas[0]}', str(e))
-                    terminal_out_statements.append(f"ERROR: {e}")
+                        self._report_error_to_file('Meas feat error',
+                                                   f'measure file parallel; feature {meas[0]}',
+                                                   str(e_m))
+                    terminal_out_statements.append(f"ERROR: {str(e_m)}")
                     continue
 
             processing_time = round((time.time()-tstart), 2)
@@ -1546,10 +1660,12 @@ class Measure(object):
                         try:
                             self.logger.info(df_currentfile)
                             self.logger.info('--------------------------------------------------------------------------')
-                        except Exception as e:
+                        except Exception as e_log:
                             if self.report_errors:
-                                self._report_error_to_file('logging error', 'measure pdb only', str(e))
-                            print(f'Error in logging measurement: {e}')
+                                self._report_error_to_file('logging error', 
+                                                           'measure pdb only',
+                                                           str(e_log))
+                            print(f'Error in logging measurement: {str(e_log)}')
 
                         pd.reset_option('display.max_colwidth')
                         pd.reset_option('display.width')
@@ -1560,7 +1676,9 @@ class Measure(object):
                 file_df_list.append(df_currentfile)
 
         if not file_df_list:
-            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain'])
+            return pd.DataFrame(columns=['PDB_Code', 'Chain', 'Resid', 'Source',
+                                         'Min_Dist_Other_Chain', 'Dist_To_Modelled',
+                                         'Dist_To_Nearest_Terminus', 'In_Modelled_Region'])
 
         return pd.concat(file_df_list, ignore_index=True)
 
@@ -1597,7 +1715,8 @@ class Measure(object):
             num_lines = sum(1 for _ in f)
 
         if num_lines == 0:
-            print('>> No previous measures data is found in the specified log file. Make sure the log file stated is correct or run measure_pdb_only() from start.')
+            print('>> No previous measures data is found in the specified log file. Make sure '
+                  'the log file stated is correct or run measure_pdb_only() from start.')
             return
 
         curr_line = 0
@@ -1619,7 +1738,7 @@ class Measure(object):
         print('>> Measured proteins recovered from log file')
 
         if final_prot_start_line is None:
-            print(f'>> No complete measurement sets found in the log')
+            print('>> No complete measurement sets found in the log')
         else:
             curr_line = 0
             with open(file=log_path, mode='r') as lpf, open(file=tmp_log_path, mode='w') as npf:
@@ -1628,7 +1747,6 @@ class Measure(object):
                     if curr_line < final_prot_start_line:
                         npf.write(line)
             os.replace(src=tmp_log_path, dst=log_path)
-
 
         # 2. remove the last protein from list incase it wasn't completed fully
         final_protein = proteins_completed[-1]
@@ -1694,7 +1812,8 @@ class Measure(object):
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
         print(f'Recovering measured data from file: {log_path}')
-        print('WARNING: could take up to a few minutes depending on the number of measurements completed.')
+        print('WARNING: could take up to a few minutes depending on the number '
+              'of measurements completed.')
 
         test_lines = 0
         columns_all_set = False
@@ -1752,7 +1871,9 @@ class Measure(object):
                         print('Need to set a column header')
                         if len(potential_col_names) != 0:
                             print(f'Options for columns are: {potential_col_names}')
-                            print(f'Please enter the number corresponding to the header required for the column which contains the following value: {parts[len(base_columns)]}')
+                            print(f'Please enter the number corresponding to the header required '
+                                  f'for the column which contains the following value: '
+                                  f'{parts[len(base_columns)]}')
                             new_header_val = input('Enter the number for the new column header: ')
                             while True:
                                 if not new_header_val.isnumeric():
@@ -1768,7 +1889,9 @@ class Measure(object):
                                 base_columns.append(potential_col_names[new_header_val])
                                 del potential_col_names[new_header_val]
                         else:
-                            new_header = input(f'No more suggested columns available, please enter your column name for the column containing this value:  {parts[len(base_columns)]}')
+                            new_header = input(f'No more suggested columns available, please enter '
+                                               f'your column name for the column containing this '
+                                               f'value:  {parts[len(base_columns)]}')
                             base_columns.append(new_header)
                     columns_all_set = True
                 data = dict(zip(base_columns, parts))
@@ -1776,7 +1899,8 @@ class Measure(object):
                     if col not in data:
                         data[col] = None
 
-                log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])], ignore_index=True)
+                log_to_df = pd.concat([log_to_df, pd.DataFrame.from_records(data, index=[0])],
+                                      ignore_index=True)
                 test_lines += 1
                 last_reported = 0
                 percent_prog = round((curr_line/num_lines)*100, 2)
@@ -1808,8 +1932,8 @@ class Measure(object):
             for f in files:
                 try:
                     os.rename(f, os.path.join(dest_path, f))
-                except Exception as e:
-                    print(f'> Failed to move {f} to destination {dest_path} with error: {e}')
+                except Exception as e_mv:
+                    print(f'> Failed to move {f} to destination {dest_path} with error: {str(e_mv)}')
 
         print('\n>> Cleaning up leftover files from measures calculations...')
         dir_files = [f for f in os.listdir() if os.path.isfile(os.path.join(os.getcwd(),f))]
@@ -1838,9 +1962,9 @@ class Measure(object):
                     num_lines = sum(1 for _ in f)
                 if num_lines <= 2:
                     os.remove(self.error_filename)
-            except Exception as e:
+            except Exception as e_c:
                 print(f'>> Failed to cleanup the error file ({self.error_filename}) '
-                      f'for the measurements run with error: {e}')
+                      f'for the measurements run with error: {str(e_c)}')
         print('>> Unused file cleanup complete.')
 
 

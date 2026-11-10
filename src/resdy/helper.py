@@ -12,15 +12,47 @@ import threading
 #: too small.
 MIN_BIOBOX_VERSION = (2, 0, 0)
 
-#: Columns of the measurements table that are not features: the row key, the structure it
-#: came from, and the metadata recorded beside the features.
+#: Columns of the measurements table that are not features
 METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Resolution',
                     'Source', 'Modified', 'class', 'Class', 'PLDDT', 'Largest_Gap',
-                    'Min_Dist_Other_Chain', 'num_structures')
-
+                    'Min_Dist_Other_Chain', 'num_structures', 'numbering', 'Dist_To_Modelled',
+                    'Dist_To_Nearest_Terminus', 'In_Modelled_Region')
 
 RESIDUE_KEY = ['Uniprot_Entry', 'Resid']
 RESIDUE_KEY_CHAIN = ['Uniprot_Entry', 'Chain', 'Resid']
+
+FEATURE_LABELS = {'depth': 'Depth (Å)',
+                'sasa': 'Solvent Accessible Surface Area (Å\u00b2)',
+                'propka': 'pKa (PROPKA3)',
+                'pkaani': 'pKa (pKaANI)',
+                'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
+                'curvature': 'Curvature',
+                'arc_length': 'Arc Length',
+                'das': 'Dynamically Accessible Surface Area',
+                'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
+                'phi': 'Phi',
+                'psi': 'Psi',
+                'seqcharge': 'Sequence Charge',
+                'torsion': 'Torsion Angle',
+                'writhing': 'Writhing',
+                'frustration': 'Frustration',
+                'rmsf': 'Root Mean Square Fluctuation',
+                'density': 'Density',
+                'aev': 'Atomic Environment Vector',
+                'secondarystructure': 'Secondary Structure'}
+
+AGG_LABELS = {'avg': 'Average',
+            'med': 'Median',
+            'min': 'Minimum',
+            'max': 'Maximum',
+            'rand': 'Random',
+            'sd': 'Standard Deviation',
+            'range': 'Range'}
+
+STANDARD_RESIDS = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q',
+                    'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
+                    'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
+                    'TYR': 'Y', 'VAL': 'V'}
 
 
 @contextlib.contextmanager

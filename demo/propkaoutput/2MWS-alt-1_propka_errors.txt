@@ -1,0 +1,6 @@
+Missing atoms or failed protonation for C-   80 B (COO) -- please check the structure
+Group (COO) for  1220- OXT    80-SER (B) [  11.470  -17.873    3.704] O
+Expected 2 interaction atoms for acids, found:
+              1220- OXT    80-SER (B) [  11.470  -17.873    3.704] O
+Expected 2 interaction atoms for bases, found:
+              1220- OXT    80-SER (B) [  11.470  -17.873    3.704] O

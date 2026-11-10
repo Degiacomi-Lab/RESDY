@@ -1,0 +1,6 @@
+Missing atoms or failed protonation for C-  382 B (COO) -- please check the structure
+Group (COO) for  6051- OXT   382-GLY (B) [ -10.458   -8.432  -20.479] O
+Expected 2 interaction atoms for acids, found:
+              6051- OXT   382-GLY (B) [ -10.458   -8.432  -20.479] O
+Expected 2 interaction atoms for bases, found:
+              6051- OXT   382-GLY (B) [ -10.458   -8.432  -20.479] O

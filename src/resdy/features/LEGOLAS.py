@@ -82,7 +82,7 @@ class LEGOLAS():
 
         self.cache_policy = cache_policy
         if self.cache_policy not in ['auto', 'always', 'never']:
-            print(f'>> Cache policy ({self.cache_policy}) given to PROPKA class not recognised, '
+            print(f'>> Cache policy ({self.cache_policy}) given to LEGOLAS class not recognised, '
                     f'using default setting of auto instead.')
             self.cache_policy = 'auto'
 

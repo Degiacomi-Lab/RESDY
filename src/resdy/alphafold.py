@@ -13,10 +13,11 @@ def download_AF_struc(pdb, outfolder="result"):
     - Check that curated directory exists in outdir, otherwise create one
     - Use the appropriate download tool to download the AF structure for the code given
 
-    :param pdb: The AF code for the structure to extract the PLDDT values from
+    :param pdb: The AF code for the structure to extract the PLDDT values from.
     :type pdb: str
     :param outfolder: The output directory used to know where the downloaded files should be
-        written to
+        written to. This will then write to a folder named 'curated' inside this.
+    :type outfolder: str
     '''
 
     download_path = os.path.join(outfolder, "curated")
@@ -30,7 +31,8 @@ def download_AF_struc(pdb, outfolder="result"):
     print(f"> downloading AlphaFold structure {pdb}")
 
     try:
-        response = requests.get(url=f'https://alphafold.ebi.ac.uk/files/{pdb}.pdb', timeout=20)
+        response = requests.get(url=f'https://alphafold.ebi.ac.uk/files/{pdb}.pdb',
+                                timeout=20)
         response.raise_for_status()
         open(os.path.join(download_path, f'{pdb}.pdb'), 'wb').write(response.content)
 
@@ -68,7 +70,8 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
     os.makedirs(os.path.join(outfolder, 'curated'), exist_ok=True)
     if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
-        with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w', newline='') as plddt_out_file:
+        with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w',
+                  newline='') as plddt_out_file:
             plddt_writer = csv.writer(plddt_out_file)
             plddt_writer.writerow(['PDB_Code', 'Chain', 'Resid', 'PLDDT'])
 
@@ -77,7 +80,8 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
     if os.path.isfile(plddt_file_path):
         df_plddt_already = pd.read_csv(plddt_file_path)
         if (df_plddt_already['PDB_Code'] == af_code_full).any():
-            print(f'>> AF PLDDT values for {af_code_full} have already been recorded to {plddt_file_path}, not repeating')
+            print(f'>> AF PLDDT values for {af_code_full} have already been recorded '
+                  f'to {plddt_file_path}, not repeating')
             return dict(zip(df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Chain'].astype(str) +
                             df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Resid'].astype(str),
                             df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'PLDDT']))
@@ -102,8 +106,13 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
 
                         dict_plddt.update({chain_resid: plddt})
 
-                        print(af_code_full + "; Chain: " + str(chain_resid[0]) + "; Resid: " + str(chain_resid[1:]) + "; PLDDT: " + plddt)
-                        plddt_writer.writerow({'PDB_Code': af_code_full, 'Chain': chain_resid[0], 'Resid': chain_resid[1:], 'PLDDT': plddt})
+                        print(af_code_full + "; Chain: " + str(chain_resid[0]) +
+                              "; Resid: " + str(chain_resid[1:]) +
+                              "; PLDDT: " + plddt)
+                        plddt_writer.writerow({'PDB_Code': af_code_full,
+                                               'Chain': chain_resid[0],
+                                               'Resid': chain_resid[1:],
+                                               'PLDDT': plddt})
                         chain, resid, plddt = '', '', ''
 
                 except Exception as e:

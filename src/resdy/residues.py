@@ -161,15 +161,19 @@ def _as_list(value, field):
     '''
     if value is None or (isinstance(value, str) and value == ''):
         return []
+
     if isinstance(value, str):
         return [value]
+
     try:
         out = list(value)
-    except TypeError:
+    except TypeError as exc:
         raise TypeError(f'aa_properties["{field}"] should be a list of three-letter codes '
-                        f'or atom names, got {type(value).__name__}')
+                        f'or atom names, got {type(value).__name__}') from exc
+
     if not all(isinstance(v, str) for v in out):
         raise TypeError(f'aa_properties["{field}"] should contain only strings, got {out}')
+
     return out
 
 

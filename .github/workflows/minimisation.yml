@@ -51,7 +51,7 @@ jobs:
       # the tests skip themselves without openmm, which here would pass having tested nothing
       - name: Check OpenMM
         run: |
-          PYTHONPATH=src python -c "from resdy import protein; assert protein.openmm_available, 'openmm could not be imported'"
+          PYTHONPATH=src python -c "from resdy import protein; assert protein.OPENMM_AVAILABLE, 'openmm could not be imported'"
 
       - name: Test Minimisation
         run: |

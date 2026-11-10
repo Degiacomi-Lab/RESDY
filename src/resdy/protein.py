@@ -18,13 +18,13 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox, get_worker_lock
-require_biobox(bb)
+from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock
 from . import alphafold as af
 from . import patcher
 from . import assembly
 from .residues import AA_PRESETS
-from .geometry import check_geometry
+from .geometry import check_geometry, GEOMETRY_COLUMNS
+require_biobox(bb)
 
 try:
     import openmm
@@ -36,16 +36,23 @@ try:
     from openmm.app.simulation import Simulation
     from openmm.unit import (nanometer, picosecond, picoseconds, kilojoule_per_mole, kelvin,
                              angstrom)
-    openmm_available = True
+    OPENMM_AVAILABLE = True
 except Exception as e:
-    print('Could not import openmm modules for running minimisations, please ensure '
+    print('>> Could not import openmm modules for running minimisations, please ensure '
           'that openmm has been installed')
-    openmm_available = False
+    OPENMM_AVAILABLE = False
+
+try:
+    from pdbfixer import PDBFixer
+    PDBFIXER_AVAILABLE = True
+except Exception as e:
+    print('>> Could not import PDBFixer, therefore will default to capping with charged atoms '
+          '(OXT) with Modeller to allow minimisation to occur.')
+    PDBFIXER_AVAILABLE = False
 
 
 #: The twenty standard residue names.
-STANDARD_RESIDUES = ('ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE',
-                     'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL')
+STANDARD_RESIDUES = list(STANDARD_RESIDS.keys())
 
 #: Residue names treated as solvent.
 WATER_RESNAMES = ('HOH', 'WAT', 'DOD', 'H2O')
@@ -104,10 +111,12 @@ class PDB(object):
                  forcefield=DEFAULT_FORCEFIELD, minimise_tolerance=10.0,
                  minimise_max_iterations=1000, restrain_heavy_atoms=False,
                  restraint_k=10.0, minimisation_platform=None,
-                 remove_all_modifications=False,
+                 keep_modifications=(),
                  num_cores=0, max_nmr_conformers='',
                  biological_assembly=True, max_assembly_atoms=None,
-                 keep_all_curated=True, parallel_timeout = 12000):
+                 keep_all_curated=True, parallel_timeout = 12000,
+                 nmr_conformer_selection='all', rotamer_selection='all',
+                 minimise_termini='capped'):
         '''
         Initialise the PDB class.
 
@@ -182,12 +191,13 @@ class PDB(object):
             'CUDA', 'OpenCL'). None lets OpenMM pick the fastest, which on a GPU platform does
             not give identical coordinates from one run to the next.
         :type minimisation_platform: str
-        :param remove_all_modifications: Option to remove all other modifications from curated
-            protein structures. By default, modifications on the residue of interest will be
-            removed. Default for other removal of mutations is set to False, in this case only
-            residues which have unknown amino residue codes to allow for downstream pipelines
-            to work.
-        :type remove_all_modifications: bool
+        :param keep_modifications: Residue names of other heteroatom groups to keep as their
+            modified versions, for example ``('KCX', 'MSE')``, or the string 'all' to keep
+            every modified residue as it is. Reverting the amino acids back to their non-modified
+            form increases the likelihood that the structure can be minimised and features can
+            be calculated on the structure. The default setting is () which will remove all
+            modifications within the structure.
+        :type keep_modifications: tuple, str
         :param num_cores: Number of cores to use when running parallel, if this is not set (or
             equal to 0) and parallel set to true, then 0.75 times the maximum number of cores
             available will be used. Otherwise it will try and use the number of cores given
@@ -220,6 +230,25 @@ class PDB(object):
             and stops curation getting stuck. Default is 12000 (2 hours) to allow for large
             protein assemblies to pass curation.
         :type parallel_timeout: int
+        :param nmr_conformer_selection: Option for the method for how to select the n models
+            of the nmr conformers which are available from the structure. Available options are
+            'first' (take the first n from each protein up to max_nmr_conformers), 'all' (take
+            all possible structures ignoring anything set by max_nmr_conformers ,this the default),
+            'representative' (takes the representative if denoted in the pdb file REMARKS,
+            otherwise defaults to conformer 1) or list of ints (pass directly a list of integers
+            for which all possible integers up to the max_nmr_conformers will be taken).
+        :type nmr_conformer_selection: str, list
+        :param rotamer_selection: Option to allow the user to select which of the rotamers to
+            keep during the curation process. Options are: 'all' (keep all possible rotamers),
+            'highest_occupancy' (keep the rotamer of a set which has the highest overall occupancy)
+            and 'first' (take the first available rotamer)
+        :type rotamer_selection: str
+        :param minimise_termini: Option for which method to use for patching the termini of the
+            protein structure, this is done to ensure minimisation is able to occur on structures
+            that are not the full protein. Options are 'charged' which will add any missing
+            C-terminal OXT atoms such that all chains start with carboxylate and end with an amine.
+            'capped' (default) uses PDBFixer to cap with ACE and NME for every chain that is not a
+            full sequence within the protein.
         '''
 
         self.outdir = outdir
@@ -246,7 +275,15 @@ class PDB(object):
             resnames_of_interest = (list(preset['non_modified_codes']) if preset is not None
                                     else [resnames_of_interest])
         self.resnames_of_interest = list(resnames_of_interest)
-        self.remove_all_modifications = remove_all_modifications
+
+        if keep_modifications == 'all':
+            self.keep_modifications = keep_modifications
+        elif isinstance(keep_modifications, str):
+            self.keep_modifications = keep_modifications
+        elif len(keep_modifications) == 1:
+            self.keep_modifications = tuple([keep_modifications])
+        else:
+            self.keep_modifications = tuple(a.upper() for a in keep_modifications)
 
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
@@ -272,7 +309,7 @@ class PDB(object):
             self.minimise_af = False
             self.minimise_pdb = False
 
-        if (self.minimise_af or self.minimise_pdb) and not openmm_available:
+        if (self.minimise_af or self.minimise_pdb) and not OPENMM_AVAILABLE:
             raise ImportError(f'Minimisation of structures requested (minimise_strucs='
                               f'{minimise_strucs!r}) but openmm not available, either install '
                               f'openmm or change minimise_strucs parameter to None to skip '
@@ -282,25 +319,6 @@ class PDB(object):
             forcefield, minimise_tolerance, minimise_max_iterations,
             restrain_heavy_atoms, restraint_k, minimisation_platform)
         self.keep_all_curated = keep_all_curated
-
-        if isinstance(max_nmr_conformers, int):
-            self.max_nmr_conformers = max_nmr_conformers
-        elif isinstance(max_nmr_conformers, str):
-            if max_nmr_conformers == '':
-                self.max_nmr_conformers = None
-            else:
-                try:
-                    self.max_nmr_conformers = int(max_nmr_conformers)
-                except Exception as e:
-                    print(f'>> Could not infer the max number of nmr conformers desired with '
-                          f'input value {max_nmr_conformers}, taking all conformers as '
-                          f'default; Error: {e}')
-                    self.max_nmr_conformers = None
-        else:
-            if max_nmr_conformers != None:
-                print(f'>> Unknown option given as input for max_nmr_conformers '
-                      f'({max_nmr_conformers}), taking all conformers as default.')
-            self.max_nmr_conformers = None
 
         self.curated_dir = os.path.join(outdir, "curated")
         if not os.path.exists(self.curated_dir):
@@ -320,6 +338,65 @@ class PDB(object):
         self.gap = gap
         self.biological_assembly = biological_assembly
         self.max_assembly_atoms = max_assembly_atoms
+
+        if isinstance(max_nmr_conformers, int):
+            self.max_nmr_conformers = max_nmr_conformers
+        elif isinstance(max_nmr_conformers, str):
+            if max_nmr_conformers == '':
+                self.max_nmr_conformers = None
+            else:
+                try:
+                    self.max_nmr_conformers = int(max_nmr_conformers)
+                except Exception as e:
+                    print(f'>> Could not infer the max number of nmr conformers desired with '
+                          f'input value {max_nmr_conformers}, taking all conformers as '
+                          f'default; Error: {e}')
+                    self.max_nmr_conformers = None
+        else:
+            if max_nmr_conformers is not None:
+                print(f'>> Unknown option given as input for max_nmr_conformers '
+                      f'({max_nmr_conformers}), taking all conformers as default.')
+            self.max_nmr_conformers = None
+
+        if isinstance(nmr_conformer_selection, list):
+            self.nmr_conformer_selection = [int(a) for a in nmr_conformer_selection if
+                                            int(a) < self.max_nmr_conformers]
+        elif isinstance(nmr_conformer_selection, str):
+            if nmr_conformer_selection not in ['all', 'first', 'representative']:
+                print('>> Input given to nmr_conformer_selection is not an available option. '
+                      'Available options are all, first, representative or pass a list of '
+                      'integers. Setting to the default of \'all\'')
+                self.nmr_conformer_selection = 'all'
+            else:
+                self.nmr_conformer_selection = nmr_conformer_selection
+        else:
+            print('>> Input given to nmr_conformer_selection could not be inferred, setting '
+                  'it to the default of \'all\'')
+            self.nmr_conformer_selection = 'all'
+        self.nmr_conformer_selection = nmr_conformer_selection
+
+        if isinstance(rotamer_selection, str):
+            if rotamer_selection in ['all', 'first', 'highest_occupancy']:
+                self.rotamer_selection = rotamer_selection
+            else:
+                print('>> Value given to parameter rotamer_selection was not recognised, '
+                      'using the default parameter of \'all\'')
+                self.rotamer_selection = 'all'
+        else:
+            print('>> Value given to parameter rotamer_selection was not recognised, '
+                    'using the default parameter of \'all\'')
+            self.rotamer_selection = 'all'
+
+        if minimise_termini in ['capped', 'charged']:
+            self.minimise_termini = minimise_termini
+        else:
+            print(f'>> Option given for minimise termini is not recognised '
+                    f'({minimise_termini}), defaulting to \'capped\' if available')
+
+        if not PDBFIXER_AVAILABLE and self.minimise_termini == 'capped':
+            print('>> PDBFixer is not available and therefore not able to implement '
+                    'non-charged capping, reverting to \'charged\'')
+            self.minimise_termini = 'charged'
 
 
     def _setup_minimisation_settings(self, forcefield, tolerance, max_iterations,
@@ -342,14 +419,16 @@ class PDB(object):
         if not forcefield or not all(isinstance(f, str) and f for f in forcefield):
             raise ValueError(f'forcefield must be a file name or a sequence of file names, '
                              f'got {forcefield!r}')
-        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or tolerance <= 0:
+        if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+                or tolerance <= 0):
             raise ValueError(f'minimise_tolerance must be a positive number (kJ/mol/nm), '
                              f'got {tolerance!r}')
         if (isinstance(max_iterations, bool) or not isinstance(max_iterations, (int, np.integer))
                 or max_iterations < 0):
             raise ValueError(f'minimise_max_iterations must be an integer >= 0 (0 means until '
                              f'the tolerance is reached), got {max_iterations!r}')
-        if isinstance(restraint_k, bool) or not isinstance(restraint_k, (int, float)) or restraint_k < 0:
+        if (isinstance(restraint_k, bool) or not isinstance(restraint_k, (int, float))
+                or restraint_k < 0):
             raise ValueError(f'restraint_k must be a number >= 0 (kcal/mol/A^2), '
                              f'got {restraint_k!r}')
         if platform is not None and not isinstance(platform, str):
@@ -363,7 +442,7 @@ class PDB(object):
                     'restraint_k_kcal_mol_a2': float(restraint_k) if restrain_heavy_atoms else None,
                     'platform': platform}
 
-        if (self.minimise_af or self.minimise_pdb) and openmm_available:
+        if (self.minimise_af or self.minimise_pdb) and OPENMM_AVAILABLE:
             try:
                 ForceField(*forcefield)
             except Exception as e:
@@ -422,7 +501,7 @@ class PDB(object):
             self.minimisation_skipped[pdb] = reason
         record = {'structure': pdb, 'status': status, 'reason': reason,
                   'settings': settings if settings is not None else self.minimisation_settings,
-                  'openmm_version': openmm.__version__ if openmm_available else None,
+                  'openmm_version': openmm.__version__ if OPENMM_AVAILABLE else None,
                   'date': datetime.datetime.now().isoformat(timespec='seconds')}
         record.update(details)
         try:
@@ -547,7 +626,7 @@ class PDB(object):
                 self.df = pd.read_csv(fname)
 
             except Exception as e:
-                raise Exception(f"Could not read csv file, error: {str(e)}")
+                raise Exception(f"Could not read csv file, error: {str(e)}") from e
 
         else:
             self.df = fname
@@ -602,12 +681,13 @@ class PDB(object):
                     if self.num_cores <= os.cpu_count():
                         n_cores_to_use = self.num_cores
                     else:
-                        print(f'>> Given number of cores for parllel running ({self.num_cores}) is not '
-                              f'possible on current setup; defaulting to 0.75 times max possible')
+                        print(f'>> Given number of cores for parllel running '
+                              f'({self.num_cores}) is not possible on current setup; '
+                              f'defaulting to 0.75 times max possible')
                         n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
             else:
-                print(f'>> Input given to number of cores is not an integer ({str(self.num_cores)}); '
-                      f'defaulting to 0.75 times max possible.')
+                print(f'>> Input given to number of cores is not an integer '
+                      f'({str(self.num_cores)}); defaulting to 0.75 times max possible.')
                 n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
         else:
             print('>> Protein curation running in series')
@@ -621,7 +701,8 @@ class PDB(object):
                         method_obtained = r.get('Method', '')
                         resolution = r.get('Resolution', '')
                         chains = r.get('Chains', '')
-                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained, resolution, chains])
+                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained,
+                                      resolution, chains])
                     else:
                         items.append([r['PDB_Code']])
                 except Exception as e:
@@ -631,7 +712,8 @@ class PDB(object):
                                                  'PDB': r.get('PDB_Code', ''),
                                                  'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
                     broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
-                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
+                    broken_prot.to_csv(broken_path, mode='a', index=False,
+                                       header=not os.path.exists(broken_path))
 
             if self.parallel:
                 results = []
@@ -649,13 +731,14 @@ class PDB(object):
                             pool.terminate()
                             raise RuntimeError(
                                 f'A parallel protein curation worker produced no result for '
-                                f'{self.parallel_timeout} s working on '
-                                f'structures, so it is treated as stalled and the run was stopped. '
-                                f'Either raise parallel_timeout if the features requested are simply '
+                                f'{self.parallel_timeout} s working on structures, so it is '
+                                f'treated as stalled and the run was stopped. Either raise '
+                                f'parallel_timeout if the features requested are simply '
                                 f'slow on these structures, or set parallel=False to measure in '
                                 f'series.') from None
             else:
-                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items) if t is not None]
+                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
+                           if t is not None]
 
             if self.biological_assembly:
                 self.collect_assembly_log()
@@ -704,7 +787,8 @@ class PDB(object):
             uniprot_code = 'Running PDB only'
             method_obtained, resolution, chains = '', '', ''
 
-        print_statements.append(f'>> Start file curation for uniprot: {uniprot_code}, pdb code: {pdb_code}')
+        print_statements.append(f'>> Start file curation for uniprot: '
+                                f'{uniprot_code}, pdb code: {pdb_code}')
 
         if not self.PDB_only:
             print_statements.append(f"UNIPROT: {uniprot_code}, PDB: {pdb_code}")
@@ -724,9 +808,12 @@ class PDB(object):
 
             time_taken = round((time.time() - start_time), 2)
             if not failed:
-                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; file curated in {time_taken}s\n\n')
+                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; '
+                                        f'file curated in {time_taken}s\n\n')
             else:
-                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; file attempted curation in {time_taken}s\n\n')
+                print_statements.append(f'>> Finished; Uniprot: {uniprot_code}, PDB: {pdb_code}; '
+                                        f'file attempted curation in {time_taken}s\n\n')
+
             with lock:
                 for statement in print_statements:
                     print(statement)
@@ -734,11 +821,13 @@ class PDB(object):
         if pdb_code[:2] == "AF":
 
             if skip_if_found:
-                files=[os.path.basename(c).split(".")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
+                files=[os.path.basename(c).split(".")[0] for c in
+                       glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
                     if not self.PDB_only:
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
                     else:
                         data = {'PDB_Code': pdb_code}
 
@@ -757,8 +846,10 @@ class PDB(object):
                     try:
                         af.download_AF_struc(pdb_code,outfolder=self.outdir)
                     except Exception as e:
-                        print_statements.append(f'>> Failed to download AF structure calling af.download_AF_struc() with error: {str(e)}')
+                        print_statements.append(f'>> Failed to download AF structure calling '
+                                                f'af.download_AF_struc() with error: {str(e)}')
                 print_statements.append(out_print_trap_af_download.getvalue())
+
             except Exception as e:
                 print_statements.append(f">> FAILED on calling download_AF_struc: {str(e)}")
                 finish_curate_jobs(failed=True)
@@ -781,7 +872,8 @@ class PDB(object):
 
             if pdb_data_present:
                 if not self.PDB_only:
-                    data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': 'Predicted', 'Resolution': np.nan, 'Chains': "A"}
+                    data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                            'Method': 'Predicted', 'Resolution': np.nan, 'Chains': 'A'}
                 else:
                     data = {'PDB_Code': pdb_code}
 
@@ -790,10 +882,12 @@ class PDB(object):
                     out_print_trap_af_plddt = io.StringIO()
                     with redirect_stdout(out_print_trap_af_plddt):
                         with lock:
-                            af.find_af_plddt(pdb_code,outfolder=self.outdir, resnames=self.resnames_of_interest)
+                            af.find_af_plddt(pdb_code,outfolder=self.outdir,
+                                             resnames=self.resnames_of_interest)
                     print_statements.append(out_print_trap_af_plddt.getvalue())
                 except Exception as e:
-                    print(f'> Failed to calculate PLDDT values for Af structure: {pdb_code}; Error: {str(e)}')
+                    print(f'> Failed to calculate PLDDT values for Af structure: '
+                          f'{pdb_code}; Error: {str(e)}')
 
                 try:
                     if self.minimise_af:
@@ -802,7 +896,8 @@ class PDB(object):
                             self.apply_minimisation(pdb_code)
                         print_statements.append(out_print_trap_af_minimisation.getvalue())
                 except Exception as e:
-                    print(f'>> Failed on af.apply_minimisation() for AF {pdb_code} with error: {str(e)}')
+                    print(f'>> Failed on af.apply_minimisation() for AF {pdb_code} '
+                          f'with error: {str(e)}')
                     finish_curate_jobs(failed=True)
                     return None
 
@@ -821,21 +916,27 @@ class PDB(object):
             if isinstance(chains, str):
                 chains = [c for c in chains.split('/') if c]
             if skip_if_found:
-                files=[os.path.basename(c).split("-")[0] for c in glob.glob(os.path.join(self.curated_dir, "*pdb"))]
+                files=[os.path.basename(c).split("-")[0] for c in
+                       glob.glob(os.path.join(self.curated_dir, "*pdb"))]
                 if pdb_code in files:
                     print_statements.append(f">> curated {pdb_code} PDB found, continuing...")
                     if not self.PDB_only:
-                        matched_curated_files = [os.path.basename(a) for a in glob.glob(os.path.join(self.curated_dir, "*pdb")) if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]]
+                        matched_curated_files = [os.path.basename(a) for a in glob.glob(os.path.join(self.curated_dir, "*pdb"))
+                                                 if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]]
                         for file in matched_curated_files:
                             out_print_trap_check = io.StringIO()
                             with redirect_stdout(out_print_trap_check):
                                 try:
-                                    self._check_curated_structure(os.path.join(self.curated_dir, file), uniprot_code, chains)
+                                    self._check_curated_structure(os.path.join(self.curated_dir, file),
+                                                                  uniprot_code, chains)
                                 except Exception as e:
-                                    print_statements.append(f'>> Failed checking structure on previously curated structure with error {str(e)}')
+                                    print_statements.append(f'>> Failed checking structure on '
+                                                            f'previously curated structure with '
+                                                            f'error {str(e)}')
                             print_statements.append(out_print_trap_check.getvalue())
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
-                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': np.nan}
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': method_obtained, 'Resolution': resolution,
+                                'Chains': '/'.join(chains), 'Largest_Gap': np.nan}
                     else:
                         data = {'PDB_Code': pdb_code}
 
@@ -845,6 +946,7 @@ class PDB(object):
                             for a in glob.glob(os.path.join(self.curated_dir, "*pdb"))
                             if pdb_code.upper() == os.path.splitext(os.path.basename(a))[0].split('-')[0]
                             and not os.path.splitext(a)[0].endswith('_relaxed'))
+
                         reuse_print_trap = io.StringIO()
                         with redirect_stdout(reuse_print_trap):
                             for stem in stems:
@@ -860,19 +962,25 @@ class PDB(object):
             try:
                 with redirect_stdout(clean_split_print_trap):
                     if not self.PDB_only:
-                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code, uniprot_code, chains)
-                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code, 'Method': method_obtained,
-                                'Resolution': resolution, 'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
+                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code,
+                                                                           uniprot_code,
+                                                                           chains)
+                        data = {'Uniprot_Entry': uniprot_code, 'PDB_Code': pdb_code,
+                                'Method': method_obtained, 'Resolution': resolution,
+                                'Chains': '/'.join(chains), 'Largest_Gap': largest_gap}
                         data = data | align_dets
                     else:
-                        largest_gap, _ = self.clean_and_split_pdb(pdb_code)
+                        largest_gap, align_dets = self.clean_and_split_pdb(pdb_code)
                         data = {'PDB_Code': pdb_code, 'Largest_Gap': largest_gap}
+                        data = data | align_dets
             except Exception as e:
                 print_statements.append(clean_split_print_trap.getvalue())
-                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code, 'Error': f'{type(e).__name__}: {str(e)}'}])
+                broken_prot = pd.DataFrame([{'Uniprot': uniprot_code, 'PDB': pdb_code,
+                                             'Error': f'{type(e).__name__}: {str(e)}'}])
                 broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
                 with lock:
-                    broken_prot.to_csv(broken_path, mode='a', index=False, header=not os.path.exists(broken_path))
+                    broken_prot.to_csv(broken_path, mode='a', index=False,
+                                       header=not os.path.exists(broken_path))
                 print_statements.append(f'>> Failed clean_and_split_pdb() with error: {str(e)}')
                 finish_curate_jobs(failed=True)
                 return None
@@ -882,7 +990,42 @@ class PDB(object):
             return pd.DataFrame.from_records(data, index=[0])
 
 
-    def _record_geometry(self, geometry):
+    def _get_prot_org(self, fname_path):
+        '''
+        For any downloaded pdb file, search over the source remarks to extract both the scientific
+        name of the organism and the taxid. These are available in both initial downloads of PDB
+        files from RCSB and AF structures. The function will return a dictionary with this
+        information to be included in the proteins.csv file in the overall process.
+
+        :param fname_path: Path of the pdb file to extract the information on the organism on
+        :type fname_path: str
+
+        :returns 
+        :rtype: dict
+        '''
+        org_dets = {'organism_name': '',
+                    'organism_taxid': ''}
+
+        try:
+            with open(file=fname_path, mode='r') as f1:
+                for line in f1:
+                    if line[:6] == 'SOURCE' and 'ORGANISM_SCIENTIFIC' in line:
+                        org_dets['organism_name'] = line.split(':')[-1].strip().replace(';', '')
+                    if line[:6] == 'SOURCE' and 'ORGANISM_TAXID' in line:
+                        org_dets['organism_taxid'] = line.split(':')[-1].strip()
+                    if line[:4] == 'ATOM':
+                        break
+
+        except Exception as e:
+            print(f'>> Failed to extract organism information from the given PDB file, left blank '
+                  f' for file: {fname_path} with error: {str(e)}')
+
+        return org_dets
+
+
+
+
+    def _record_geometry(self, geometry, stage, align_details={}):
         '''
         Write a geometry report given from a specific structure to the ``curation_geometry.csv``
         file. This appends on to any other geometry data already in this file. This is written
@@ -893,15 +1036,23 @@ class PDB(object):
         :param geometry: report as returned by resdy.geometry.check_geometry, with
             n_modelled_residues added by patcher.curate.
         :type geometry: dict
+        :param stage: Option to record whether the structure is 'patched', 'relaxed' or 'assembly'
+        :type stage: str
+        :param align_details: report given from the attempted alignment of the chains to the
+            canonical uniprot sequence done through _align_resnum_uniprot() in protein.py
+        :type align_details: dict
         '''
         if not geometry:
             return
-        record = dict(geometry)
-        record['structure'] = os.path.splitext(os.path.basename(str(record.get('file', ''))))[0]
+        record = {k: geometry.get(k, '') for k in GEOMETRY_COLUMNS}
+        record['structure'] = os.path.splitext(os.path.basename(str(geometry.get('file', ''))))[0]
+        record['stage'] = stage
+        if align_details:
+            record = record | align_details
         path = os.path.join(self.outdir, 'curation_geometry.csv')
         try:
             with open(path, 'a', newline='') as fh:
-                writer = csv.DictWriter(fh, fieldnames=sorted(record))
+                writer = csv.DictWriter(fh, fieldnames=GEOMETRY_COLUMNS)
                 if fh.tell() == 0:
                     writer.writeheader()
                 writer.writerow(record)
@@ -975,9 +1126,9 @@ class PDB(object):
                 except Exception as e:
                     print(f'>> Could not read the REMARK 350 records of {pdb}, the asymmetric '
                           f'unit will be measured; error: {e}')
-            replacement_dict = self.clean(pdb, uniprot_code=uniprot_code)
+            replacement_dict, rep_struc = self.clean(pdb, uniprot_code=uniprot_code)
 
-            self.split_struc_nmr(pdb)
+            self.split_struc_nmr(pdb, rep_struc)
             self.split_struc_alt_aa(pdb)
 
         except Exception as e:
@@ -986,19 +1137,21 @@ class PDB(object):
 
         files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*pdb"))
         test_patch = False
-        largest_gap = np.nan
-        align_details = {}
         for cnt, f in enumerate(files):
+            largest_gap = np.nan
+            align_details = {}
             mypath = os.path.split(f)[0]
             fasta_loc = os.path.join(mypath, f"{pdb}.fasta")
 
             try:
+                if self.minimise_termini == 'capped' and PDBFIXER_AVAILABLE:
+                    self.add_missing_capping_atoms(pdb_path=f)
 
                 fname, largest_gap, geometry = patcher.curate(
                     f, fasta_loc, outdir=self.curated_dir,
                     gap=self.gap, include_hetatm=self.include_hetatm,
                     block_bulk_modeller_output=block_bulk_modeller_output)
-                self._record_geometry(geometry)
+
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
                     self.replace_chains(fname, reverse_replacement_dict)
@@ -1007,11 +1160,21 @@ class PDB(object):
                     try:
                         align_details = self._align_resnum_uniprot(uniprot_code, fname, chains)
                     except Exception as e:
+                        align_details = {'numbering': 'author',
+                                        'chains_author_numbering': 'all'}
                         print(f'>> Renumbering skipped for conformer {cnt} with error: {str(e)}')
+                else:
+                    align_details = {}
+
+                self._record_geometry(geometry, 'patched', align_details)
 
                 if self.biological_assembly:
-                    self._build_assembly(fname, biomatrix, determined)
-                    self._record_geometry(check_geometry(fname)[0])
+                    try:
+                        self._build_assembly(fname, biomatrix, determined)
+                        self._record_geometry(check_geometry(fname)[0], 'assembly', align_details)
+                    except Exception as e:
+                        print(f'>> Failed to build assembly for file {fname} with error: {str(e)}')
+                        continue
 
                 test_patch = True
 
@@ -1023,7 +1186,8 @@ class PDB(object):
 
             try:
                 if self.minimise_pdb:
-                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0])
+                    self.apply_minimisation(os.path.splitext(os.path.basename(f))[0],
+                                            align_details=align_details)
             except Exception as e:
                 print(f'Failed to apply minimisation to file {f}')
 
@@ -1031,6 +1195,20 @@ class PDB(object):
             raise Exception("Patching failed for all conformers")
 
         return largest_gap, align_details
+
+
+    def _rename_charged_termini(self, fname):
+        '''
+        Little script to change the capping atoms added with modeller to stop these being charged
+        which may not be the natural state for this protein unless it is at the true end of the
+        chain. To utilise minimisation on partial structures, capping atoms are needed and non-
+        charged capping atoms are more realistic for this purpose.
+        
+        :param fname: Name of the pdb file of interest to check the capping atoms and change to
+            non-charged if these aren't at the true terminus of the protein chain.
+        :type fname: str
+        '''
+        i = 1
 
 
     def _build_assembly(self, path, biomatrix, determined):
@@ -1109,7 +1287,8 @@ class PDB(object):
         if test_file not in files:
             print(f">> Downloading PDB {pdb}")
             try:
-                response = requests.get(url=f'https://files.rcsb.org/download/{pdb}.pdb', timeout=20)
+                response = requests.get(url=f'https://files.rcsb.org/download/{pdb}.pdb',
+                                        timeout=20)
                 response.raise_for_status()
                 open(os.path.join(self.raw_dir, f'{pdb}.pdb'), 'wb').write(response.content)
 
@@ -1133,13 +1312,16 @@ class PDB(object):
             try:
                 print(f">> downloading FASTA for {pdb}")
 
-                response = requests.get(url=f'https://www.rcsb.org/fasta/entry/{pdb}/download', timeout=20)
+                response = requests.get(url=f'https://www.rcsb.org/fasta/entry/{pdb}/download',
+                                        timeout=20)
                 response.raise_for_status()
                 open(os.path.join(self.raw_dir, f'{pdb}.fasta'), 'wb').write(response.content)
 
             except Exception as e:
-                print(f'>> Failed downloading FASTA sequence for chain name comparison for {pdb}, error: {str(e)}')
-                raise Exception(f'Failed downloading FASTA sequence for chain name comparison.{str(e)}') from e
+                print(f'>> Failed downloading FASTA sequence for chain name comparison for {pdb}'
+                      f', error: {str(e)}')
+                raise Exception(f'Failed downloading FASTA sequence for chain name '
+                                f'comparison.{str(e)}') from e
         files=[c.split(os.sep)[-1][:4] for c in glob.glob(os.path.join(self.raw_dir, "*.fasta"))]
         if pdb not in files:
             get_data()
@@ -1159,12 +1341,20 @@ class PDB(object):
         Iterates over the lines of the file performing checks:
 
         - insertion codes -> make note and not patch structure if present
-        - modified lysines (KCX) -> remove CO2 and rename to LYS
-        - modified cysteines (SEC) -> rename the selenium SE to SG (element S) and the residue to CYS
-        - modified methionine (MSE) -> rename the selenium SE to SD (element S) and the residue to MET
+        - modified lysines (KCX) -> remove CO2 and rename to LYS if remove_all_modifications_set
+            set to True
+        - modified cysteines (SEC) -> rename the selenium SE to SG (element S) and the residue
+            to CYS if remove_all_modifications_set set to True
+        - modified methionine (MSE) -> rename the selenium SE to SD (element S) and the residue
+            to MET if remove_all_modifications_set set to True
         - element codes -> if not present in pdb file, add these in based on guess from atomtype col
         - neglect HETATMs unless metal ions and hydrogens
-        - check for modified residues in structure, convert back to backbone for patching
+        - check for modified residues in structure, convert back to backbone for patching if
+            remove_all_modifications_set set to True
+
+        WARNING: if you choose to not remove modifications on the structure, it is likely that many
+        feature calculations will fail due to inability of other packages to handle modified
+        residues.
 
         :param pdb: pdb code for the structure of interest
         :type pdb: str
@@ -1184,12 +1374,9 @@ class PDB(object):
         except Exception as e:
             raise Exception(f'Error renaming chains. {str(e)}')
 
-        #Next it opens and starts reading the .pdb file and starts writing a new file with the ending '-clean.pdb'.
-        standard_resids = {'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'GLN': 'Q',
-                           'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LEU': 'L', 'LYS': 'K',
-                           'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
-                           'TYR': 'Y', 'VAL': 'V'}
-        standard_resids_inv = {v: k for k, v in standard_resids.items()}
+        # Next it opens and starts reading the .pdb file and starts writing
+        # a new file with the ending '-clean.pdb'.
+        standard_resids_inv = {v: k for k, v in STANDARD_RESIDS.items()}
         uniprot_fasta = ''
         list_prev_mod_resids = {}
 
@@ -1199,76 +1386,110 @@ class PDB(object):
         write_file_path = os.path.join(self.raw_dir, f"{pdb}-clean.pdb")
         write_file = open(write_file_path, 'w')
 
-        # Write the clean file, including HETATMs (if they are metal ions), all atoms and lines starting with TER and END.
-        test_MSE = False
-        test_SEC = False
-        test_KCX = False
+        # Write the clean file, including HETATMs (if they are metal ions),
+        # all atoms and lines starting with TER and END.
+        test_mse = False
+        test_sec = False
+        test_kcx = False
+        representative_struc = 1
 
         res_insertion_codes = []
         modres_sites = {}
 
         for line in read_file:
 
+            # check for a representative struc REMARK
+            if line[:6] == 'REMARK' and 'BEST REPRESENTATIVE CONFORMER' in line:
+                try:
+                    representative_struc = int(line.split(':')[-1].strip())
+                except Exception as e:
+                    if self.nmr_conformer_selection == 'representative':
+                        print('>> Failed to get representative structure from the pdb file, '
+                              'keeping the representative structure as 1.')
+                    representative_struc = 1
+
             # check for modified residues
             if line[:6] == 'MODRES':
-                if self.remove_all_modifications:
-                    chain = line[16]
-                    res_num = line[18:22].strip()
-                    modres_sites[chain + res_num] = line[24:27]
-                elif line[12:15] != line[24:27]:
-                    # if not by default removing all residues with mutations, only modify ones with unkown resid codes
-                    chain = line[16]
-                    res_num = line[18:22].strip()
-                    modres_sites[chain + res_num] = line[24:27]
+                chain = line[16]
+                res_num = line[18:22].strip()
+                mod_code = line[12:15]
+                norm_code = line[24:27]
+                if self.keep_modifications == ():
+                    modres_sites[chain + res_num] = norm_code
+                elif ((mod_code not in self.keep_modifications or
+                      mod_code != self.keep_modifications) and
+                      self.keep_modifications != 'all'):
+                    modres_sites[chain + res_num] = norm_code
 
             # check for resid insertion code in position 26 on ATOM records
             if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
                 res_insertion_codes.append(line[26])
 
-            # replace selenomethionine with methionine
-            if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
-                line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
-                test_MSE = True
+            if self.keep_modifications != 'all' and 'MSE' not in self.keep_modifications:
+                # replace selenomethionine with methionine
+                if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
+                    line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
+                    test_mse = True
 
-            # replace selenocysteine with cysteine
-            if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
-                line = selenium_to_sulfur(line, 'CYS', 'SG')
-                test_SEC = True
+            if self.keep_modifications != 'all' and 'SEC' not in self.keep_modifications and 'SEC' != self.keep_modifications:
+                # replace selenocysteine with cysteine
+                if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
+                    line = selenium_to_sulfur(line, 'CYS', 'SG')
+                    test_sec = True
 
-            #transform carboxylated lysine into a normal lysine
-            if line[17:20] == 'KCX':
+            if self.keep_modifications != 'all' and 'KCX' not in self.keep_modifications:
+                #transform carboxylated lysine into a normal lysine
+                if line[17:20] == 'KCX':
 
-                if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
-                    continue
+                    if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
+                        continue
 
-                else:
-                    line = line.replace('HETATM', 'ATOM  ')
-                    line = line.replace('KCX', 'LYS')
+                    else:
+                        line = line.replace('HETATM', 'ATOM  ')
+                        line = line.replace('KCX', 'LYS')
 
-                test_KCX = True
+                    test_kcx = True
 
             element_col = line[76:78].strip().upper()
             if not element_col:
                 # guess element based on atom type name
                 element_col = line[12:16].strip().lstrip('0123456789')[:2].upper()
 
+            if line[:4] == 'ATOM' and line[17:20].strip().upper() not in STANDARD_RESIDS:
+                het_key = line[21] + line[22:26].strip()
+                if het_key not in modres_sites and het_key not in list_prev_mod_resids:
+                    if (self.keep_modifications == 'all' or
+                        line[17:20].strip().upper() in self.keep_modifications or
+                        line[17:20].strip().upper() == self.keep_modifications):
+                        write_file.write(line)
+                    continue
+
             # Identify HETATM records and go to _keep_hetatm() to work out whether to keep or not.
             if (line[:6] == 'HETATM' and len(line) > 26
-                    and line[17:20].strip().upper() not in standard_resids):
+                    and line[17:20].strip().upper() not in STANDARD_RESIDS):
                 het_key = line[21] + line[22:26].strip()
 
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
                     if self._keep_hetatm(line, element_col):
                         write_file.write(line)
+                    elif (self.keep_modifications == 'all' or
+                          line[17:20].strip().upper() in self.keep_modifications or
+                          line[17:20].strip().upper() == self.keep_modifications):
+                        line = line.replace('HETATM', 'ATOM  ')
+                        write_file.write(line)
                     continue
 
             #check that amino acid is one of the 20 standard amino acids
-            if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and (line[21] + line[22:26].strip()) in list(list_prev_mod_resids):
+            if ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
+                (line[21] + line[22:26].strip()) in list(list_prev_mod_resids)):
                 if line[12:16].strip() not in ['C', 'N', 'O', 'CA']:
                     continue
                 line = line.replace('HETATM', 'ATOM  ')
-                line = line.replace(line[17:20], list_prev_mod_resids[line[21] + line[22:26].strip()])
-            elif (line[:4] == 'ATOM' or line[:6] == 'HETATM') and line[17:20].upper() not in standard_resids:
+                line = line.replace(line[17:20],
+                                    list_prev_mod_resids[line[21] + line[22:26].strip()])
+
+            elif ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
+                  line[17:20].upper() not in STANDARD_RESIDS):
 
                 if (line[21] + line[22:26].strip()) not in modres_sites:
                     continue
@@ -1286,13 +1507,20 @@ class PDB(object):
 
                     M = bb.Molecule()
                     M.import_pdb(filename=read_file_path, include_hetatm=True)
-                    M = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                    M = M.get_subset(M.atomselect('*', '*', 'CA',
+                                                  use_resname=True,
+                                                  get_index=True)[1])
+                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA',
+                                                           use_resname=True,
+                                                           get_index=True)[1]]
                     pdb_seqs = {}
                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                         tmp_data = subset_data[subset_data['chain'] == chain]
-                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
-                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                   list(STANDARD_RESIDS.keys())
+                                                   else 'X' for a in list(tmp_data['resname'])])
+                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                 'resid']))
                     aligner = PairwiseAligner()
                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                     aligner.open_gap_score = -11
@@ -1307,7 +1535,7 @@ class PDB(object):
                             res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
                     aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
-                    if aa_interest in list(standard_resids.values()):
+                    if aa_interest in list(STANDARD_RESIDS.values()):
                         line = line.replace('HETATM', 'ATOM  ')
                         line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
                         list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
@@ -1337,16 +1565,18 @@ class PDB(object):
 
                                 else:
                                     fasta_seq.append(fasta_line)
-    
+
                             fasta_seqs.append(fasta_seq)
                             f.close()
 
                             new_fasta = open(fasta_name, 'w')
-                            for header, chain, seq in zip(fasta_headers, fasta_chain_letters, fasta_seqs):
+                            for header, chain, seq in zip(fasta_headers,
+                                                          fasta_chain_letters,
+                                                          fasta_seqs):
                                 new_fasta.write(header)
                                 seq = seq[0].strip()
                                 if chain[0] == line[21]:
-                                    
+
                                     F = bb.Molecule()
                                     F.import_pdb(filename=read_file_path, include_hetatm=True)
                                     F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
@@ -1354,7 +1584,8 @@ class PDB(object):
                                     pdb_seqs = {}
                                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                         tmp_data = subset_data[subset_data['chain'] == chain]
-                                        pdb_seqs[chain] = ''.join([standard_resids[a] if a in list(standard_resids.keys()) else 'X' for a in list(tmp_data['resname'])])
+                                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in list(STANDARD_RESIDS.keys())
+                                                                   else 'X' for a in list(tmp_data['resname'])])
                                     chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
                                     aligner = PairwiseAligner()
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
@@ -1365,7 +1596,7 @@ class PDB(object):
 
                                     for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
                                         fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
-                                    
+
                                     seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:]
                                 seq = seq + '\n'
                                 new_fasta.write(seq)
@@ -1392,11 +1623,13 @@ class PDB(object):
                 write_file.write(line)
                 continue
 
-        if test_MSE: print(">> mutated MSE to MET")
-        if test_SEC:
+        if test_mse:
+            print(">> mutated MSE to MET")
+        if test_sec:
             print('>> mutated SEC to CYS')
             self._adapt_fasta(pdb=pdb)
-        if test_KCX: print(">> mutation added to remove a lysine carboxylation")
+        if test_kcx:
+            print(">> mutation added to remove a lysine carboxylation")
 
         write_file.close()
         read_file.close()
@@ -1405,14 +1638,15 @@ class PDB(object):
             os.remove(write_file_path)
             os.remove(read_file_path)
             raise Exception(f'>> Residue insertion codes found for pdb {pdb}, '
-                            f'insertion codes found: {res_insertion_codes}, residue numbering therefore not unique')
+                            f'insertion codes found: {res_insertion_codes}, '
+                            f'residue numbering therefore not unique')
 
         os.remove(read_file_path)
 
-        return replacement_dict
+        return replacement_dict, representative_struc
 
 
-    def split_struc_nmr(self, pdb):
+    def split_struc_nmr(self, pdb, rep_struc=1):
         '''
         Write a new file for each alternate NMR structure. Takes the clean pdb file produced
         previously and identifies statements in the pdb file indicating different conformations, for
@@ -1420,14 +1654,19 @@ class PDB(object):
 
         :param pdb: pdb name for the protein to split
         :type pdb: str
+        :param rep_struc: the number of the representative structure to be used if this method of
+            selecting nmr structures is chosen. Set by default to 1.
+        :type rep_struc: int
         '''
 
+        rep_struc_written = False
         number = 1
         name = f'{pdb}-alt-{str(number)}.pdb'
 
         path = os.path.join(self.raw_dir, f"{pdb}-clean.pdb")
 
-        # Open the cleaned file, search over the data to find 'ENDMDL' statements to work out the number of structures available
+        # Open the cleaned file, search over the data to find 'ENDMDL' statements to work
+        # out the number of structures available
         f = open(path)
         endmdl_instances = []
 
@@ -1466,16 +1705,42 @@ class PDB(object):
                         break
 
                     elif re.search('ENDMDL', line):
-                        f_write.write(line)
-                        f_write.close()
-                        number = number + 1
+                        if isinstance(self.nmr_conformer_selection, list):
+                            print(number)
+                            if number in self.nmr_conformer_selection:
+                                print(number)
+                                f_write.write(line)
+                                f_write.close()
 
-                        if (self.max_nmr_conformers is not None and
-                            number > self.max_nmr_conformers):
+                        elif self.nmr_conformer_selection == 'first':
+                            if number < self.max_nmr_conformers:
+                                f_write.write(line)
+                                f_write.close()
+
+                            else:
+                                f_write.close()
+                                f.close()
+                                os.remove(path)
+                                break
+
+                        elif self.nmr_conformer_selection == 'representative':
+                            if number == rep_struc:
+                                f_write.write(line)
+                                f_write.close()
+                                rep_struc_written = True
+
+                            if rep_struc_written:
+                                f_write.close()
+                                f.close()
+                                os.remove(path)
+                                break
+
+                        else:
+                            # 'all' or default track
+                            f_write.write(line)
                             f_write.close()
-                            f.close()
-                            os.remove(path)
-                            break
+
+                        number += 1
 
                         name = pdb + '-alt-' + str(number) + '.pdb'
                         path_rename = os.path.join(self.raw_dir, name)
@@ -1506,12 +1771,17 @@ class PDB(object):
         #Get a list of all the .pdb files present in [outdir]/conformations
         #and select those that belong to the pdb we are interested in.
         list_of_files = glob.glob(os.path.join(self.raw_dir, f"*{pdb}*.pdb"))
+        rot_select = self.rotamer_selection
+        if self.rotamer_selection == 'highest_occupancy':
+            rot_select = 'all'
 
         for f in list_of_files:
 
-            #Next it checks if there are any alternate amino acid conformations present (i.e. if line[16 == A, B or C]).
+            # Next it checks if there are any alternate amino acid
+            # conformations present (i.e. if line[16 == A, B or C]).
             read_file = open(f, 'r')
-            alt_loc_vals = sorted({line[16] for line in read_file if line[:4] == 'ATOM' and line[16] != ' '})
+            alt_loc_vals = sorted({line[16] for line in read_file if
+                                   line[:4] == 'ATOM' and line[16] != ' '})
             read_file.close()
 
             # If there are none for this file it moves on to the next.
@@ -1520,46 +1790,106 @@ class PDB(object):
             else:
                 print(">> Alternate amino acid conformations found. Splitting...")
 
+            if self.rotamer_selection == 'first':
+                alt_loc_vals = alt_loc_vals[0]
+
             # If there are it rewrites a new file for all alternate conformations
-            for i, alt_loc_letter in enumerate(alt_loc_vals):
+            if rot_select in ['first', 'all']:
+                for alt_loc_letter in alt_loc_vals:
+                    try:
+                        prev_name, ext = os.path.splitext(f)
+                        pdb_name, _, ver = prev_name.rpartition('-')
+                        write_path = f'{pdb_name}{ver}{alt_loc_letter}{ext}'
+                        f_write = open(write_path, 'w')
+
+                        target_letter = alt_loc_letter
+                        non_target_letters = []
+                        for letter in alt_loc_vals:
+                            if letter != target_letter:
+                                non_target_letters.append(letter)
+
+                        read = open(f)
+                        for line in read:
+
+                            if ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
+                                (line[16] == target_letter)):
+
+                                newline = line[:16] + ' ' + line[17:]
+                                f_write.write(newline)
+                                continue
+
+                            if ((line[:4] == 'ATOM' or line[:6] == 'HETATM') and
+                                (line[16] in non_target_letters)):
+
+                                continue
+
+                            if ((line[:4] == 'ATOM') or
+                                (line[:6] == 'HETATM') or
+                                (line[:3] == 'TER')):
+                                f_write.write(line)
+
+                        f_write.close()
+                        read.close()
+
+                    except Exception as e:
+
+                        if "read_file" in locals():
+                            read_file.close()
+
+                        if "f_write" in locals():
+                            f_write.close()
+
+                        raise Exception(f'>> Could not split out rotamers from the pdb file '
+                                        f'with error: {str(e)}') from e
+
+            if self.rotamer_selection == 'highest_occupancy':
+
                 try:
                     prev_name, ext = os.path.splitext(f)
                     pdb_name, _, ver = prev_name.rpartition('-')
-                    write_path = f'{pdb_name}{ver}{alt_loc_letter}{ext}'
-                    f_write = open(write_path, 'w')
+                    re_str_pdb = os.path.basename(f'{pdb_name}{ver}*[A-Z]{ext}')
+                    write_pdb = f'{pdb_name}{ver}HiOcc{ext}'
 
-                    target_letter = alt_loc_letter
-                    non_target_letters = []
-                    for letter in alt_loc_vals:
-                        if letter != target_letter:
-                            non_target_letters.append(letter)
+                    prot_rots = [a for a in os.listdir(self.raw_dir) if re.match(re_str_pdb, a)]
+                    prot_rots_bb = {}
+                    for rot_f in prot_rots:
+                        M = bb.Molecule()
+                        M.import_pdb(os.path.join(os.path.dirname(f), rot_f),
+                                     include_hetatm=self.include_hetatm)
+                        prot_rots_bb[rot_f] = M
 
-                    read = open(f)
-                    for line in read:
+                    M_df_new = pd.DataFrame()
 
-                        if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and (line[16] == target_letter):
-                            newline = line[:16] + ' ' + line[17:]
-                            f_write.write(newline)
-                            continue
+                    res_iters = list(prot_rots_bb[prot_rots[0]].data['resid'].unique())
+                    for res in res_iters:
+                        prot_rots_queries = {k:v.data[v.data['resid'] == int(res)] for
+                                             k,v in prot_rots_bb.items()}
+                        rot_res_avg = {k:v['occupancy'].mean() for
+                                       k,v in prot_rots_queries.items()}
+                        max_occ_f = max(rot_res_avg, key=rot_res_avg.get)
+                        M_df_new = pd.concat([M_df_new, prot_rots_queries[max_occ_f]],
+                                             ignore_index=True)
 
-                        if (line[:4] == 'ATOM' or line[:6] == 'HETATM') and (line[16] in non_target_letters):
-                            continue
+                    M_n = bb.Molecule()
+                    M_n.import_pdb(os.path.join(os.path.dirname(f), prot_rots[0]),
+                                      include_hetatm=self.include_hetatm)
 
-                        if (line[:4] == 'ATOM') or (line[:6] == 'HETATM') or (line[:3] == 'TER'):
-                            f_write.write(line)
+                    M_n.data = M_n.data[['name',
+                                         'resname',
+                                         'resid']].merge(M_df_new,
+                                                        how='left',
+                                                        on=['name', 'resname', 'resid'])
+                    M_n.write_pdb(write_pdb)
 
-                    f_write.close()
-                    read.close()
+                    if os.path.isfile(write_pdb):
+                        for a in prot_rots:
+                            a_path = os.path.join(self.raw_dir, a)
+                            if os.path.isfile(a_path):
+                                os.remove(a_path)
 
                 except Exception as e:
-
-                    if "read_file" in locals():
-                        read_file.close()
-
-                    if "f_write" in locals():
-                        f_write.close()
-
-                    raise Exception(f'{str(e)}')
+                    print(f'>> Could not collate the highest occupancy version of the rotamers, '
+                          f'keeping all rotamers already split out for file: {f}, error: {str(e)}')
 
             #The original is then removed if it has been replaced.
             os.remove(f)
@@ -1605,7 +1935,9 @@ class PDB(object):
         pdb_seqs = {}
         for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
             tmp_data = subset_data[subset_data['chain'] == chain]
-            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in list(protein_letters_dict.keys()) else 'X' for a in list(tmp_data['resname'])])
+            pdb_seqs[chain] = ''.join([protein_letters_dict[a] if a in
+                                       list(protein_letters_dict.keys()) else
+                                       'X' for a in list(tmp_data['resname'])])
 
         if isinstance(chains, str):
             chains = [c for c in chains.split('/') if c]
@@ -1613,7 +1945,8 @@ class PDB(object):
         if not chains:
             # no chain was declared for this Uniprot entry, so there is nothing to place
             # in the canonical sequence and nothing to report
-            return
+            return {'numbering': 'author',
+                    'chains_author_numbering': ''}
 
         failed = []
         for chain in chains:
@@ -1626,16 +1959,20 @@ class PDB(object):
                 alignment = aligner.align(uniprot_fasta, pdb_seqs[chain])[0]
 
                 res_mapper = {}
-                chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == chain, 'resid']))
+                chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == chain,
+                                                             'resid']))
 
-                for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                    for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
+                for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                      alignment.aligned[1]):
+                    for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1),
+                                                range(pdb_start, pdb_end)):
                         res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
                 mapped_res = M.data['resid'].map(res_mapper)
                 sel_chain = M.data['chain'] == chain
 
-                # Only the polymer is renumbered. Retained waters, ions and ligands are numbered in their own range
+                # Only the polymer is renumbered. Retained waters, ions and
+                # ligands are numbered in their own range
                 is_polymer = M.data['resname'].astype(str).str.upper().isin(STANDARD_RESIDUES)
                 sel_poly = sel_chain & is_polymer
 
@@ -1673,8 +2010,8 @@ class PDB(object):
         else:
             numbering = 'uniprot'
 
-        return {'Numbering': numbering,
-                'Chains_Author_Numbering': ','.join(map(str, failed))}
+        return {'numbering': numbering,
+                'chains_author_numbering': ','.join(map(str, failed))}
 
 
     def get_chain_replacement(self, pdb_code):
@@ -1805,7 +2142,8 @@ class PDB(object):
             lines = open(path, 'r').readlines()
             first_lines = []
             for line in lines:
-                if line[:4]  == "ATOM" or line[:6] == 'HETATM' or line[:3] == 'TER' or line[:5] == 'MODEL':
+                if (line[:4]  == "ATOM" or line[:6] == 'HETATM' or
+                    line[:3] == 'TER' or line[:5] == 'MODEL'):
                     break
                 first_lines.append(line)
 
@@ -1881,7 +2219,127 @@ class PDB(object):
             print(f'Failed rewriting pdb file with error: {str(e)}')
 
 
-    def apply_minimisation(self, pdb, max_iterations=None):
+    def add_missing_capping_atoms(self, pdb_path):
+        '''
+        Some structures may miss capping heavy atoms at termini regions of proteins. Utilise openmm
+        pdbfixer to add these in. This will automatically take note of any heteroatoms present
+        within the structure and add these back in after PDBFixer has completed patching on the
+        termini atoms.
+
+        :param pdb_path: Path of pdb file to check
+        :type pdb_path: str
+        '''
+        pdb_path_new = f'{os.path.splitext(pdb_path)[0]}_relaxed.pdb'
+
+        def _residues(path):
+            '''list of atom lines, and {residue index in file order: {atom name: columns 55-66}}'''
+            lines, by_res, ordinals = [], {}, {}
+            for line in open(path):
+                if line.startswith(('ATOM', 'HETATM')):
+                    res = (line[21], line[22:27])
+                    if res not in ordinals:
+                        ordinals[res] = len(ordinals)
+                    by_res.setdefault(ordinals[res], {})[line[12:16].strip()] = line[54:66]
+                    lines.append((line, ordinals[res]))
+                else:
+                    lines.append((line, None))
+            return lines, by_res
+
+        try:
+            het = [l for l in open(pdb_path) if l.startswith('HETATM')]
+            M = bb.Molecule()
+            M.import_pdb(pdb_path, include_hetatm=self.include_hetatm)
+            df_keys = M.data.drop_duplicates(subset=['chain', 'resid'])[['chain', 'resid', 'resname']]
+            mod_res = {}
+            for i, r in df_keys.iterrows():
+                if r['resname'] not in STANDARD_RESIDUES:
+                    key = (r['chain'], r['resid'])
+                    mod_res[key] = r['resname']
+
+            fixer = PDBFixer(filename=pdb_path)
+            fixer.missingResidues = {}
+            fixer.findMissingAtoms()
+            ter_res = set()
+
+            for c in fixer.topology.chains():
+                res = list(c.residues())
+                if res:
+                    ter_res.add(res[0])
+                    ter_res.add(res[-1])
+
+            fixer.missingAtoms = {r: a for r, a in fixer.missingAtoms.items()
+                                    if r in ter_res}
+            fixer.missingTerminals = {r: a for r, a in fixer.missingTerminals.items()
+                                    if r in ter_res}
+            fixer.addMissingAtoms()
+
+            if fixer.missingTerminals or fixer.missingAtoms:
+                atoms_to_patch = len(fixer.missingAtoms | fixer.missingTerminals)
+                print(f'>> Patching terminal regions with PDBFixer, {atoms_to_patch} atom(s) added.')
+            else:
+                return
+
+            PDBFile.writeFile(fixer.topology, fixer.positions,
+                            open(pdb_path_new, 'w'), keepIds=True)
+
+            M = bb.Molecule()
+            # include_hetatm set to True as PDBFixer renames non-standard residues to HETATM
+            M.import_pdb(pdb_path_new, include_hetatm=True)
+            new_resnames = [mod_res.get(k, v) for k, v in zip(zip(M.data['chain'],
+                                                                M.data['resid']),
+                                                            M.data['resname'])]
+            new_atoms = ['ATOM' if k in mod_res else v for k, v in zip(zip(M.data['chain'],
+                                                                        M.data['resid']),
+                                                                    M.data['atom'])]
+            M.data['resname'] = new_resnames
+            M.data['atom'] = new_atoms
+            M.write_pdb(pdb_path_new)
+
+            model_lines, model_by = _residues(pdb_path_new)
+            _, template_by = _residues(pdb_path)
+            pairs = [(i, i) for i in sorted(set(model_by) & set(template_by))]
+            template_of = dict(pairs)
+
+            n_template, n_built = 0, 0
+            with open(pdb_path_new, 'w') as fh:
+                for line, res_idx in model_lines:
+                    if res_idx is None:
+                        fh.write(line)
+                        continue
+                    columns = template_by.get(template_of.get(res_idx), {}).get(line[12:16].strip())
+                    if columns is None:
+                        columns = patcher.BUILT_ATOM_COLUMNS
+                        n_built += 1
+                    else:
+                        n_template += 1
+                    fh.write(f'{line[:54]}{columns}{line[66:]}')
+
+            kept = [l for l in open(pdb_path_new) if not l.startswith('HETATM')]
+            out, inserted = [], False
+            for line in kept:
+                if not inserted and line.startswith('END') and not line.startswith('ENDMDL'):
+                    out.extend(het)
+                    inserted = True
+                out.append(line)
+            if not inserted:
+                out.extend(het)
+
+            with open(pdb_path_new, 'w') as fh:
+                fh.writelines(out)
+
+            if os.path.isfile(pdb_path):
+                os.remove(pdb_path)
+
+            os.rename(pdb_path_new, pdb_path)
+
+        except Exception as e:
+            print(f'>> Failed to add capping atoms for given protein '
+                  f'{pdb_path}, not adding. Error: {str(e)}')
+            if os.path.isfile(pdb_path_new):
+                os.remove(pdb_path_new)
+
+
+    def apply_minimisation(self, pdb, max_iterations=None, align_details={}):
         '''
         Utilise openmm to apply an energy minimisation to relax the structure, by default
         in implicit solvent. The force field, tolerance, iteration cap, heavy-atom restraints
@@ -1901,6 +2359,12 @@ class PDB(object):
             constructor's minimise_max_iterations for this call only (0 runs until the
             tolerance is reached). None uses the constructor's value.
         :type max_iterations: int
+        :param align_details: report given from the attempted alignment of the chains to the
+            canonical uniprot sequence done through _align_resnum_uniprot() in protein.py. This
+            is carried through in the protein curation and has no affect on the actual minimisation
+            being done, it is solely for reporting the curated geometry to curation_geometry.csv
+            afterwards.
+        :type align_details: dict
         '''
         settings = dict(self.minimisation_settings)
         if max_iterations is not None:
@@ -1912,7 +2376,8 @@ class PDB(object):
             os.remove(relaxed_path)
 
         if self.keep_waters and self._uses_implicit_solvent(settings['forcefield']):
-            # the implicit solvent model already accounts for solvation, so minimising explicit waters would count it twice
+            # the implicit solvent model already accounts for solvation, so
+            # minimising explicit waters would count it twice
             reason = 'explicit waters are being kept'
             print(f'>> Not minimising {pdb}: explicit waters are being kept, which the '
                   f'implicit solvent model would double-count. The unminimised structure '
@@ -2007,15 +2472,17 @@ class PDB(object):
                            .merge(df_columns, how='left',
                                   on=['chain', 'resid', 'name'],
                                   validate='one_to_one'))
+
             if len(merged) != len(N.data):
                 raise Exception(f'Occupancy and B-factor restoration after minimisation failed '
                                 f'for pdb: {pdb}, Lengths before ({len(N.data)}) and length '
                                 f'merged ({len(merged)}) are different.')
+
             N.data = merged
             N.write_pdb(relaxed_path)
 
             relaxed_geometry, _ = check_geometry(relaxed_path)
-            self._record_geometry(relaxed_geometry)
+            self._record_geometry(relaxed_geometry, 'relaxed', align_details)
 
             details = {'platform_used': simulation.context.getPlatform().getName(),
                        'energy_initial_kj_mol': energy_initial.value_in_unit(kilojoule_per_mole),
@@ -2032,13 +2499,15 @@ class PDB(object):
                 try:
                     os.remove(pdb_path)
                 except Exception as e:
-                    print('>> Failed to remove original curated structure, structure remains.')
+                    print(f'>> Failed to remove original curated structure, '
+                          f'structure remains. Error: {str(e)}')
 
         except Exception as e:
             print(f'Failed to minimise the structure for {pdb}; Error: {e}')
             if os.path.exists(relaxed_path):
                 os.remove(relaxed_path)
-            self._write_minimisation_record(pdb, 'failed', f'{type(e).__name__}: {e}',
+            self._write_minimisation_record(pdb, 'failed',
+                                            f'{type(e).__name__}: {e}',
                                             settings)
 
 

@@ -26,8 +26,12 @@
   },
   "include_modified": false,
   "only_relaxed": false,
+  "require_relaxed": false,
+  "cache_policy": "auto",
   "features": {
-    "propka": {},
+    "propka": {
+      "cache_policy": "auto"
+    },
     "sasa": {
       "probe": 1.4,
       "n_sphere_point": 960,
@@ -36,7 +40,9 @@
     "depth": {
       "calculation_type": "ResidDepth"
     },
-    "seqcharge": {},
+    "seqcharge": {
+      "num_add_aa": 10
+    },
     "melodia": {
       "melodia_features": [
         "all"

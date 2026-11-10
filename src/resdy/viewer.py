@@ -1,12 +1,11 @@
 import os
 import io
-import numpy as np
+from contextlib import redirect_stdout
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, ctx, callback, no_update
-from contextlib import redirect_stdout
 from .aggregation import Aggregation
-from .helper import METADATA_COLUMNS
+from .helper import METADATA_COLUMNS, FEATURE_LABELS, AGG_LABELS
 from .analysis import Analysis
 from .uniprot import Uniprot
 
@@ -46,7 +45,7 @@ class Viewer(object):
         self.outdir = outdir
         self.render_mode = render_mode
         if self.render_mode not in ['auto', 'svg', 'webgl']:
-            print(f'>> Given render mode is not one accepted, setting render_mode to auto')
+            print('>> Given render mode is not one accepted, setting render_mode to auto')
             self.render_mode = 'auto'
         self.suppress_unimportant_output = suppress_unimportant_output
 
@@ -59,16 +58,11 @@ class Viewer(object):
         for feat in self.vector_features:
             if feat in self.df_scalar_measures.columns:
                 self.df_scalar_measures = self.df_scalar_measures.drop(columns=feat)
-                print(f'>> This analysis can only investigate scalar features, removing {feat} from dataframe')
+                print(f'>> This analysis can only investigate scalar features, '
+                      f'removing {feat} from dataframe')
         self.features = [a for a in self.features if a not in self.vector_features]
 
-        self.aggregation_types = {'Average': 'avg',
-                                  'Standard Deviation': 'sd',
-                                  'Median': 'med',
-                                  'Minimum': 'min',
-                                  'Maximum': 'max',
-                                  'Range': 'range',
-                                  'Random': 'rand'}
+        self.aggregation_types = {v:k for k,v in AGG_LABELS.items()}
 
         self.feature_labels = {'pKa (PROPKA3)': 'propka',
                                'pKa (pKaANI)': 'pkaani',
@@ -90,30 +84,13 @@ class Viewer(object):
                                'Density': 'density',
                                'Secondary Structure': 'secondarystructure'}
 
-        self.axis_labels = {'depth': 'Depth (Å)',
-                        'sasa': 'Solvent Accessible Surface Area (Å\u00b2)',
-                        'propka': 'pKa (PROPKA3)',
-                        'pkaani': 'pKa (pKaANI)',
-                        'flexibility': 'Flexibility (B-factor) (Å\u00b2)',
-                        'curvature': 'Curvature',
-                        'arc_length': 'Arc Length',
-                        'das': 'Dynamically Accessible Surface Area',
-                        'legolas': '15N NMR Backbone Shift (ppm) (LEGOLAS)',
-                        'phi': 'Phi',
-                        'psi': 'Psi',
-                        'seqcharge': 'Sequence Charge',
-                        'torsion': 'Torsion Angle',
-                        'writhing': 'Writhing',
-                        'frustration': 'Frustration',
-                        'rmsf': 'Root Mean Square Fluctuation',
-                        'density': 'Density',
-                        'aev': 'Atomic Environment Vector',
-                        'secondarystructure': 'Secondary Structure'}
+        self.axis_labels = FEATURE_LABELS
 
         self.feature_labels_reverse = {v: k for k, v in self.feature_labels.items()}
         self.feature_labels_list = [self.feature_labels_reverse.get(a, a) for a in self.features]
 
-        self.colour_cols = [a for a in ['PLDDT', 'Method', 'Source', 'class'] if a in self.df_scalar_measures.columns]
+        self.colour_cols = [a for a in ['PLDDT', 'Method', 'Source', 'class'] if
+                            a in self.df_scalar_measures.columns]
 
         with redirect_stdout(io.StringIO()) as f:
             self.A = Aggregation(df_measurements=self.df_scalar_measures,
@@ -124,7 +101,7 @@ class Viewer(object):
             self.df_agg.columns.name = 'Feature'
             self.res_key = [a for a in ['Uniprot_Entry', 'Chain', 'Resid']
                             if a in self.df_agg.columns]
-            
+
             self.Analysis = Analysis(df=self.df_scalar_measures,
                                     outdir=self.outdir,
                                     features_to_analyse=self.features)
@@ -304,7 +281,8 @@ class Viewer(object):
                             html.H5('Subset By:', style={'text-align': 'center'}),
 
                             dcc.Dropdown(
-                                ['Uniprot Code', 'Uniprot Code + Resid', 'Uniprot Code + Chain + Resid'],
+                                ['Uniprot Code', 'Uniprot Code + Resid',
+                                 'Uniprot Code + Chain + Resid'],
                                 'Uniprot Code',
                                 id='2d-little_hist_subset_dropdown'
                             ),
@@ -413,7 +391,8 @@ class Viewer(object):
 
                     html.Div(id='mainhist-warningtext',
                              children=[
-                        html.H4('WARNING: Plotting data without an aggregation type may be biased due to the number of available structures for each protein.')
+                        html.H4('WARNING: Plotting data without an aggregation type may be biased '
+                                'due to the number of available structures for each protein.')
                     ], style={'width': '100%', 'display': 'inline-block', 'float': 'center',
                               'text-align': 'center', 'padding': '0 20'}),
 
@@ -424,7 +403,8 @@ class Viewer(object):
                     ], style={'width': '100%', 'display': 'inline-block', 'padding': '0 20'}),
 
                     html.Div([
-                        html.H4('Number of Bins (Fits to Nearest Neat Splitting Bin Size)', style={'text-align': 'center'}),
+                        html.H4('Number of Bins (Fits to Nearest Neat Splitting Bin Size)',
+                                style={'text-align': 'center'}),
                         dcc.Slider(
                         min=0,
                         max=100,
@@ -441,8 +421,10 @@ class Viewer(object):
                         max=round(self.df_scalar_measures['propka'].max(), 1),
                         step=0.1,
                         id='main-hist-feature-slider',
-                        value=[round(self.df_scalar_measures['propka'].min(), 1), round(self.df_scalar_measures['propka'].max(), 1)],
-                        marks=int(((self.df_scalar_measures['propka'].max() - self.df_scalar_measures['propka'].min())/ 5)) or 1),
+                        value=[round(self.df_scalar_measures['propka'].min(), 1),
+                               round(self.df_scalar_measures['propka'].max(), 1)],
+                        marks=int(((self.df_scalar_measures['propka'].max() -
+                                    self.df_scalar_measures['propka'].min())/ 5)) or 1),
                     ], style={'width': '95%', 'horizontal-align': 'center'}),
 
                     html.Div([
@@ -493,8 +475,10 @@ class Viewer(object):
                                 max=round(self.df_scalar_measures['propka'].max(), 1),
                                 step=0.1,
                                 id='3d-xaxis-slider',
-                                value=[round(self.df_scalar_measures['propka'].min(), 1), round(self.df_scalar_measures['propka'].max(), 1)],
-                                marks=(int(((self.df_scalar_measures['propka'].max() - self.df_scalar_measures['propka'].min())/ 7)) or 1)),
+                                value=[round(self.df_scalar_measures['propka'].min(), 1),
+                                       round(self.df_scalar_measures['propka'].max(), 1)],
+                                marks=(int(((self.df_scalar_measures['propka'].max() - 
+                                             elf.df_scalar_measures['propka'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
                         style={'width': '32%', 'display': 'inline-block'}),
@@ -525,11 +509,15 @@ class Viewer(object):
                                 max=round(self.df_scalar_measures['sasa'].max(), 1),
                                 step=0.1,
                                 id='3d-yaxis-slider',
-                                value=[round(self.df_scalar_measures['sasa'].min(), 1), round(self.df_scalar_measures['sasa'].max(), 1)],
-                                marks=(int(((self.df_scalar_measures['sasa'].max() - self.df_scalar_measures['sasa'].min())/ 7)) or 1)),
+                                value=[round(self.df_scalar_measures['sasa'].min(), 1),
+                                       round(self.df_scalar_measures['sasa'].max(), 1)],
+                                marks=(int(((self.df_scalar_measures['sasa'].max() -
+                                             self.df_scalar_measures['sasa'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
-                        style={'width': '32%', 'horizontal-align': 'center', 'display': 'inline-block', 'justify-content': 'center', 'align-items': 'center'}),
+                        style={'width': '32%', 'horizontal-align': 'center',
+                               'display': 'inline-block', 'justify-content': 'center',
+                               'align-items': 'center'}),
 
                         html.Div([
                             html.H4('Z-Axis Feature', style={'text-align': 'center'}),
@@ -556,11 +544,14 @@ class Viewer(object):
                                 max=round(self.df_scalar_measures['depth'].max(), 1),
                                 step=0.1,
                                 id='3d-zaxis-slider',
-                                value=[round(self.df_scalar_measures['depth'].min(), 1), round(self.df_scalar_measures['depth'].max(), 1)],
-                                marks=(int(((self.df_scalar_measures['depth'].max() - self.df_scalar_measures['depth'].min())/ 7)) or 1)),
+                                value=[round(self.df_scalar_measures['depth'].min(), 1),
+                                       round(self.df_scalar_measures['depth'].max(), 1)],
+                                marks=(int(((self.df_scalar_measures['depth'].max() -
+                                             self.df_scalar_measures['depth'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
-                        style={'width': '32%', 'display': 'inline-block', 'horizontal-align': 'right'}),
+                        style={'width': '32%', 'display': 'inline-block',
+                               'horizontal-align': 'right'}),
                     ],),
 
                     html.Div([
@@ -610,7 +601,8 @@ class Viewer(object):
                                 style={'text-align': 'center'}),
 
                         dcc.Dropdown(
-                            ['Uniprot Code', 'Uniprot Code + Resid', 'Uniprot Code + Chain + Resid'],
+                            ['Uniprot Code', 'Uniprot Code + Resid',
+                             'Uniprot Code + Chain + Resid'],
                             'Uniprot Code',
                             id='3d-little_hist_subset_dropdown'
                         ),
@@ -641,7 +633,7 @@ class Viewer(object):
                 ])
 
 
-        @callback(
+        @app.callback(
             Output('2d-indicator-scatter', 'figure'),
             Output('2d-axis-column', 'value'),
             Output('2d-yaxis-column', 'value'),
@@ -668,8 +660,9 @@ class Viewer(object):
             Input('2d-GOterm-dropdown', 'value'),
             Input('2d-stdev-toggle', 'value')
             )
-        def update_graph_2d(xaxis_column_name, yaxis_column_name, xaxis_type, yaxis_type,
-                         agg_type, agg_on, xaxis_range, yaxis_range, colour_col, go_term, st_dev_tog):
+        def update_graph_2d(xaxis_column_name, yaxis_column_name, xaxis_type,
+                            yaxis_type, agg_type, agg_on, xaxis_range, yaxis_range,
+                            colour_col, go_term, st_dev_tog):
             trig_id = ctx.triggered_id
 
             x_low, x_high = xaxis_range
@@ -858,38 +851,44 @@ class Viewer(object):
 
             axis_name = self.feature_labels[col_name]
             custom_hover_data = hoverData['points'][0]['customdata']
+
             if len(custom_hover_data) == 3:
                 uniprot_entry = custom_hover_data[0]
                 chain = custom_hover_data['customdata'][1]
                 resid = custom_hover_data['customdata'][2]
+
                 if subset == 'Uniprot Code + Chain + Resid':
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
                                                   (self.df_scalar_measures['Chain'] == chain) &
                                                   (self.df_scalar_measures['Resid'] == resid)]
-                    title = '<b>{} {} {}</b><br>{}'.format(uniprot_entry, chain, resid, col_name)
+                    title = f'<b>{uniprot_entry} {chain} {str(resid)}</b><br>{col_name}'
+
                 elif subset == 'Uniprot Code + Resid':
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
                                                     (self.df_scalar_measures['Resid'] == resid)]
-                    title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, col_name)
+                    title = f'<b>{uniprot_entry} {str(resid)}</b><br>{col_name}'
+
                 else:
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry)]
-                    title = '<b>{}</b><br>{}'.format(uniprot_entry, col_name)
+                    title = f'<b>{uniprot_entry}</b><br>{col_name}'
 
             else:
                 uniprot_entry = custom_hover_data[0]
                 resid = custom_hover_data[1]
+
                 if subset == 'Uniprot Code + Resid':
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
                                                   (self.df_scalar_measures['Resid'] == resid)]
-                    title = '<b>{} {}</b><br>{}'.format(uniprot_entry, resid, col_name)
+                    title = f'<b>{uniprot_entry} {str(resid)}</b><br>{col_name}'
+
                 else:
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry)]
-                    title = '<b>{}</b><br>{}'.format(uniprot_entry, col_name)
+                    title = f'<b>{uniprot_entry}</b><br>{col_name}'
 
             return dff, axis_name, title, subset, colour
 
 
-        @callback(
+        @app.callback(
             Output('x-feat-hist', 'figure'),
             Output('2d-little_hist_subset_dropdown', 'value'),
             Output('2d-little_hist_colour_dropdown', 'value'),
@@ -903,7 +902,7 @@ class Viewer(object):
             return create_feature_hist(dff, xaxis, title, axis_type, subset, colour), subset, colour
 
 
-        @callback(
+        @app.callback(
             Output('y-feat-hist', 'figure'),
             Input('2d-indicator-scatter', 'hoverData'),
             Input('2d-yaxis-column', 'value'),
@@ -940,7 +939,8 @@ class Viewer(object):
                     fig = px.histogram(dff, x=feature, marginal='rug',
                                         nbins=nbins, color_discrete_sequence=['#682860'])
             elif chain_split == 'Together' and resid_split == 'Together':
-                fig = px.histogram(dff, x=feature, marginal='rug', color_discrete_sequence=['#682860'], nbins=nbins)
+                fig = px.histogram(dff, x=feature, marginal='rug',
+                                   color_discrete_sequence=['#682860'], nbins=nbins)
             elif chain_split == 'Together' and resid_split == 'Seperate':
                 fig = px.histogram(dff, x=feature, marginal='rug',
                                    nbins=nbins, color='Resid')
@@ -961,12 +961,13 @@ class Viewer(object):
             fig.update_yaxes(showgrid=False)
 
             fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10},
-                              xaxis_title_text=self.axis_labels[self.feature_labels[title]], yaxis_title_text='Count')
+                              xaxis_title_text=self.axis_labels[self.feature_labels[title]],
+                              yaxis_title_text='Count')
 
             return fig
 
 
-        @callback(
+        @app.callback(
             Output('histogram-main', 'figure'),
             Output('crossfilter-feature-hist', 'value'),
             Output('2d-agg-type-hist', 'value'),
@@ -1026,7 +1027,8 @@ class Viewer(object):
 
                 feat = self.feature_labels[feature]
 
-                cols_remain = [a for a in self.non_feat_cols if a in self.df_scalar_measures.columns] + [feat]
+                cols_remain = [a for a in self.non_feat_cols if
+                               a in self.df_scalar_measures.columns] + [feat]
                 dff = self.df_scalar_measures[cols_remain]
 
                 feat_min = round(self.df_scalar_measures[feat].min(), 1)
@@ -1052,8 +1054,6 @@ class Viewer(object):
                     associated_uniprots = self.GO_dict[self.GO_codes_reverse[go_term]]
                     dff = dff[dff['Uniprot_Entry'].isin(associated_uniprots)]
 
-                
-
                 return create_main_hist(dff, feat, feature, nbins, chain_split, resid_split, colour_col), feature, agg_type, uniprot, chain, pot_chains, resid, pot_resids, header, feat_range, feat_min, feat_max, warning_label
 
             else:
@@ -1061,7 +1061,8 @@ class Viewer(object):
                 feat = self.feature_labels[feature]
                 agg = self.aggregation_types[agg_type]
                 feat_col = f'{feat}_{agg}'
-                cols_remain = [a for a in self.non_feat_cols if a in self.df_agg.columns] + [feat_col]
+                cols_remain = [a for a in self.non_feat_cols if
+                               a in self.df_agg.columns] + [feat_col]
                 dff = self.df_agg[cols_remain]
 
                 feat_min = round(self.df_agg[feat_col].min(), 1)
@@ -1091,7 +1092,7 @@ class Viewer(object):
 
 
 
-        @callback(
+        @app.callback(
             Output('3d-indicator-scatter', 'figure'),
             Output('3d-xaxis-column', 'value'),
             Output('3d-yaxis-column', 'value'),
@@ -1122,9 +1123,9 @@ class Viewer(object):
             Input('3d-colour-col', 'value'),
             Input('3d-GOterm-dropdown', 'value')
             )
-        def update_graph_3d(xaxis_column_name, yaxis_column_name, zaxis_column_name, xaxis_type,
-                            yaxis_type, zaxis_type, agg_type, xaxis_range, yaxis_range,
-                            zaxis_range, colour_col, go_term):
+        def update_graph_3d(xaxis_column_name, yaxis_column_name, zaxis_column_name,
+                            xaxis_type, yaxis_type, zaxis_type, agg_type, xaxis_range,
+                            yaxis_range, zaxis_range, colour_col, go_term):
             trig_id = ctx.triggered_id
 
             x_low, x_high = xaxis_range
@@ -1239,7 +1240,7 @@ class Viewer(object):
             return fig, xaxis_column_name, yaxis_column_name, zaxis_column_name, agg_type, xaxis_range_header, yaxis_range_header, zaxis_range_header, xaxis_min, xaxis_max, yaxis_min, yaxis_max, zaxis_min, zaxis_max, xaxis_range, yaxis_range, zaxis_range
 
 
-        @callback(
+        @app.callback(
             Output('3d-x-feat-hist', 'figure'),
             Output('3d-little_hist_subset_dropdown', 'value'),
             Output('3d-little_hist_colour_dropdown', 'value'),
@@ -1252,7 +1253,7 @@ class Viewer(object):
             dff, xaxis, title, subset, colour = update_little_hist(hoverData, xaxis_column_name, subset, colour)
             return create_feature_hist(dff, xaxis, title, axis_type, subset, colour), subset, colour
 
-        @callback(
+        @app.callback(
             Output('3d-y-feat-hist', 'figure'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-yaxis-column', 'value'),
@@ -1263,7 +1264,7 @@ class Viewer(object):
             dff, yaxis, title, subset, colour = update_little_hist(hoverData, yaxis_column_name, subset, colour)
             return create_feature_hist(dff, yaxis, title, axis_type, subset, colour)
 
-        @callback(
+        @app.callback(
             Output('3d-z-feat-hist', 'figure'),
             Input('3d-indicator-scatter', 'hoverData'),
             Input('3d-zaxis-column', 'value'),

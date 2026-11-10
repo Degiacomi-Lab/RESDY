@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - salilab
 dependencies:
-  - python==3.12.16
+  - python>=3.12.16
   - pip>=26.2.2
   - biobox>=2.0
   - biopython
@@ -29,6 +29,7 @@ dependencies:
   - requests
   - plotly
   - dash
+  - pdbfixer
   - pip:
     - melodia-py==0.1.8
     - fair-esm

@@ -37,6 +37,18 @@ class Test_Uniprot(unittest.TestCase):
 
         self.UP.from_csv_file(csv_file=self.demo_csv)
 
+    def test_get_org_details(self):
+        org_out = self.UP.get_pdb_organism_details('1UBQ')
+        expected_org_dets = {'Organism_Name': 'Homo sapiens', 'Organism_TaxID': '9606'}
+        self.assertTrue(org_out == expected_org_dets)
+
+        self.UP.df = pd.DataFrame()
+        self.UP.get_protein_data('P09167')
+        print(self.UP.df)
+        self.assertTrue(all(a in self.UP.df.columns for a in ['Organism_Name', 'Organism_TaxID']))
+        self.assertEqual(list(self.UP.df['Organism_Name'].unique()), ['Aeromonas hydrophila'])
+        self.assertEqual(list(self.UP.df['Organism_TaxID'].unique()), ['644'])
+
     def test_auxiliary(self):
         self.UP.from_csv_file(csv_file=self.demo_csv)
 

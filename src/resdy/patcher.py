@@ -2,6 +2,7 @@
 Provide patching functions which are called from protein.py
 These interact with Modeller to perform patching on protein structures.
 '''
+
 import fileinput
 import glob
 import os
@@ -24,7 +25,7 @@ except Exception as e:
     modeller_available = False
     _modeller_error = e
 
-from .helper import ShutUp, require_biobox
+from .helper import require_biobox
 from .geometry import check_geometry
 
 require_biobox(bb)
@@ -441,7 +442,8 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
         :param fbasename: Name of the working pdb file to find incomplete residues for
         :type fbasename: str
         
-        :returns: Incomplete dictionary of format {residue_index (0-based): [missing heavy-atom names]}
+        :returns: Incomplete dictionary of format
+            {residue_index (0-based): [missing heavy-atom names]}
         :rtype: dict
         '''
         modeller_print_trap_b = io.StringIO()
@@ -491,7 +493,6 @@ def _patch_model(tmp_folder, fbasename, seq_name, block_bulk_modeller_output=Tru
               f"everything else remains fixed; starting patching...")
 
     class _GapModel(AutoModel):
-        '''Optimise only the residues the template does not provide.'''
         '''
         Custom AutoModel created with select_atoms which allows the programme to find only the
         residues which the template does not provide and also side chains and capping atoms of
@@ -671,7 +672,8 @@ def analyze_protein(M):
         zero if the chain holds no polymer residue at all.
     :rtype: list
     '''
-    # as biobox may include an alternate location indicator with the residue, compare on first whitespace-separated token.
+    # as biobox may include an alternate location indicator with the residue,
+    # compare on first whitespace-separated token.
     names = M.data['name'].astype(str).str.split().str[0]
     res = np.unique(M.data.loc[names == 'CA', 'resid'].values)
 
@@ -922,19 +924,27 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
     M.import_pdb(pdb, include_hetatm=include_hetatm)
     chains = np.unique(M.data["chain"].values)
 
-    # Catch cases which have more than 62 chains which are not able to be worked with using PDB files
+    # Catch cases which have more than 62 chains which are not able to be
+    # worked with using PDB files
     if len(chains) > 62:
-        with open(os.path.join(os.path.split(outfolder)[0], 'excessive_chains_files.txt'), 'a') as f1:
+        with open(os.path.join(os.path.split(outfolder)[0],
+                               'excessive_chains_files.txt'), 'a') as f1:
             f1.write(f'PDB: {pdb}; Num Chains: {len(chains)}; Chains: {str(chains)}')
+
         raise Exception(f'>> More than 62 individual chains present in the structure, not '
                         f'possible to curate a file for this number of chain names. File: {pdb}')
 
-    # Catch cases which have double letter chain names, used to work out if worth including more functionality for these, have left future double letter functionality in incase this is useful in future.
+    # Catch cases which have double letter chain names, used to work out if worth including
+    # more functionality for these, have left future double letter functionality in incase
+    # this is useful in future.
     if any(len(chain) > 1 for chain in chains):
-        with open(os.path.join(os.path.split(outfolder)[0], 'double_letter_file_count.txt'), 'a') as f1:
+        with open(os.path.join(os.path.split(outfolder)[0],
+                               'double_letter_file_count.txt'), 'a') as f1:
             f1.write(f'PDB: {pdb}; Num Chains: {len(chains)}; Chains: {", ".join(chains)}\n')
-        raise Exception(f'>> Double letter chain names are present within the structure, currently ignoring '
-                        f'these, tally updated in \'double_letter_file_count.txt\'. File: {pdb}')
+
+        raise Exception(f'>> Double letter chain names are present within the structure, '
+                        f'currently ignoring these, tally updated in \'double_letter_file_'
+                        f'count.txt\'. File: {pdb}')
 
     gap_count = []
     for c in chains:
@@ -990,9 +1000,11 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
             fout.close()
 
     # This next section is a replacement for the conversion to iodata.two_char_chain Modeller format
-    # Instead convert the chain names back to single character chain names so Modeller can read this properly and doesn't convert all double letter chain names to A
-    # A new function is added at the end of patching to convert the single chain names back to the corresponding double chain names - call protein.py function which does this already?
-    # find the double chain name files and store in list to iterate through when converting the single character names
+    # Instead convert the chain names back to single character chain names so Modeller can read
+    # this properly and doesn't convert all double letter chain names to A. A new function is added
+    # at the end of patching to convert the single chain names back to the corresponding double chain
+    # names - call protein.py function which does this already? find the double chain name files and
+    # store in list to iterate through when converting the single character names
     all_files = os.listdir(outfolder)
     doubleletter_pdb_files = []
     for file in all_files:
@@ -1000,13 +1012,15 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
         if file[0:5] == 'chain' and temp_parts[1] == 'pdb' and len(temp_parts[0][5:]) == 2:
             doubleletter_pdb_files.append(file)
 
-    # iterate through the files and for each one replace the chain name with a single letter lowercase version of the chain name: eg. CA would go to c
+    # iterate through the files and for each one replace the chain name with a single letter
+    # lowercase version of the chain name: eg. CA would go to c
     used_sl_chain_names = []
     sl_to_dl_chain_map = {}
     for file in doubleletter_pdb_files:
         db_chain_name = file.split('.')[0][5:]
 
-        candidate_names = [db_chain_name.lower()[0], db_chain_name.lower()[1]] + [str(a) for a in range(10)]
+        candidate_names = ([db_chain_name.lower()[0], db_chain_name.lower()[1]] +
+                           [str(a) for a in range(10)])
         sl_chain_name = next((c for c in candidate_names if c not in used_sl_chain_names), None)
 
         if sl_chain_name is None:
@@ -1021,8 +1035,9 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
             with fileinput.FileInput(temp_file_path, inplace = True) as f:
                 for line in f:
                     try:
-                        #On lines with 'ATOM', 'TER' or 'HETATM' the current chain name is replaced with the
-                        #new single letter chain name and adjusted to match the correct pdb file format
+                        # On lines with 'ATOM', 'TER' or 'HETATM' the current chain name is
+                        # replaced with the new single letter chain name and adjusted to
+                        # match the correct pdb file format
                         if (line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'):
                             if len(line) > 22:
                                 line = line[:21] + sl_chain_name + ' ' + line[23:]  # space needed here as double letter previously used and so without it you will get an artefact leaving a double letter chain name anyway eg AA would go to aA otherwise
@@ -1036,7 +1051,8 @@ def fragment(pdb, fasta, outfolder=".", include_hetatm=False):
 
         #If the protein fails, print error message with the error
         except Exception as e:
-            raise Exception(f'Failed replacing chains for file {file}. Could not convert double letter chain names while fragmenting. {e}')
+            raise Exception(f'Failed replacing chains for file {file}. Could not convert double '
+                            f'letter chain names while fragmenting. {e}')
 
     return np.array(gap_count), list(chains)
 
@@ -1060,7 +1076,8 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
     :type include_hetatm: bool
     '''
     for pdb_file in pdbs:
-        # take pdb_file and extract the chain name - need to find the exact format it needs to go back into that the code is expecting to reconvert it from
+        # take pdb_file and extract the chain name - need to find the exact format it needs
+        # to go back into that the code is expecting to reconvert it from
         dbletter = False
         chainname = os.path.splitext(os.path.basename(pdb_file))[0].split('_')[0][5:]
         if len(chainname) > 1:
@@ -1077,23 +1094,30 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
                 for line in f:
                     try:
                         #On lines with 'ATOM', 'TER' or 'HETATM'
-                        #the current chain name is replaced with the new single letter chain name and adjusted to match the correct pdb file format
-                        if ((line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM')) and len(line) > 26:
+                        #the current chain name is replaced with the new single letter chain name
+                        # and adjusted to match the correct pdb file format
+                        if (((line[:4] == 'ATOM') or (line[:3] == 'TER') or (line[:6] == 'HETATM'))
+                                and len(line) > 26):
+
                             if dbletter:
-                                raise Exception(f'>> Double letter chain names not currently supported in '
-                                                f'carbamylation codebase. Protein will not be curated.')
+                                raise Exception('>> Double letter chain names not currently '
+                                                'supported in carbamylation codebase. Protein '
+                                                'will not be curated.')
+
                             else:
-                                # thousand_chain doesn't actually matter here as double letter chain names aren't being curated, treat as normal pdb
+                                # thousand_chain doesn't actually matter here as double letter chain
+                                # names aren't being curated, treat as normal pdb
                                 resid = line[22:26].strip()
                                 line = line[:21] + chainname + '%4s' % resid + line[26:]
 
                         print(line, end ='')
 
-                    except:
+                    except Exception:
                         print(line, end='')
 
         except Exception as e:
-            raise Exception(f'Failed replacing chains for file {pdb_file}. Could not reassemble chains. Error: {e}')
+            raise Exception(f'Failed replacing chains for file {pdb_file}. Could not '
+                            f'reassemble chains. Error: {e}')
 
     # Take all the files in pdbs and turn each into a biobox Molecule object and append this to a list of monomers
     # create a biobox multimer from the list of monomors and write a new pdb file combining all these
@@ -1106,18 +1130,19 @@ def reassemble(pdbs, labels, outname, outdir, include_hetatm=True):
             T.write_pdb(f)
             with open(f, 'rb') as f_new:
                 for line in f_new:
-                    if (line[:3] == 'TER'.encode() or line[:4] == 'ATOM'.encode() or line[:6] == 'HETATM'.encode()):
+                    if (line[:3] == 'TER'.encode() or line[:4] == 'ATOM'.encode() or
+                            line[:6] == 'HETATM'.encode()):
                         f_outname.write(line)
                     elif i == 0 and line.startswith('MODEL'.encode()):
                         f_outname.write(line)
 
-    # The following commented section is preferred for writing files, however without resetting the chain
-    # names will reset them all, and if you reset the chains the double letters dont print correctly
+    # The following commented section is preferred for writing files, however
+    # without resetting the chain names will reset them all, and if you reset
+    # the chains the double letters dont print correctly
     '''
     monomers = []
     for f in pdbs:
         monomers.append(bb.Molecule(f))
-
     M_multi = bb.Multimer()
     #print(labels)
     M_multi.load_list(monomers, labels)
@@ -1168,7 +1193,8 @@ def curate(pdb, fasta, outdir="result", gap=10, include_hetatm=False,
     os.makedirs(tmp_folder, exist_ok=True)
 
     # divide structure in individual chains
-    # heteroatoms ignored, if required are added back after the curation has been completed and reassembled.
+    # heteroatoms ignored, if required are added back after the curation
+    # has been completed and reassembled.
     gap_count, chain_order = fragment(pdb, fasta, tmp_folder, include_hetatm=False)
     gaps_by_chain = {c: int(g[0]) for c, g in zip(chain_order, gap_count)}
 
