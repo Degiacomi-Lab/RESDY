@@ -1660,6 +1660,8 @@ class PDB(object):
         '''
 
         rep_struc_written = False
+        if isinstance(self.nmr_conformer_selection, list):
+            nmr_conf_list_written = {k: False for k in self.nmr_conformer_selection}
         number = 1
         name = f'{pdb}-alt-{str(number)}.pdb'
 
@@ -1706,11 +1708,13 @@ class PDB(object):
 
                     elif re.search('ENDMDL', line):
                         if isinstance(self.nmr_conformer_selection, list):
-                            print(number)
                             if number in self.nmr_conformer_selection:
-                                print(number)
                                 f_write.write(line)
                                 f_write.close()
+                                nmr_conf_list_written[number] = True
+
+                            if all(nmr_conf_list_written.values()):
+                                break
 
                         elif self.nmr_conformer_selection == 'first':
                             if number < self.max_nmr_conformers:

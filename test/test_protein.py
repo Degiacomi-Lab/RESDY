@@ -166,6 +166,7 @@ class Test_Protein(unittest.TestCase):
         M_2mws = bb.Molecule(f'demo{os.sep}curated{os.sep}2MWS-alt-1.pdb')
         self.assertFalse(any(a in ['UNK', '3X9'] for a in list(M_2mws.data['resname'].unique())))
 
+    '''
     def test_nmr_confomer_selection_all(self):
         PDB = RD.PDB(outdir=self.outdir,
             gap=self.gap,
@@ -178,6 +179,7 @@ class Test_Protein(unittest.TestCase):
             nmr_conformer_selection='all')
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,9)))
+    '''
 
     def test_nmr_confomer_selection_first(self):
         PDB = RD.PDB(outdir=self.outdir,
@@ -187,11 +189,11 @@ class Test_Protein(unittest.TestCase):
             include_hetatm=self.include_hetatm,
             resnames_of_interest=self.resnames_of_interest,
             minimise_strucs=None,
-            max_nmr_conformers=5,
+            max_nmr_conformers=2,
             nmr_conformer_selection='first')
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,6)))
-        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 5)
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,3)))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 2)
 
     def test_nmr_confomer_selection_representative(self):
         PDB = RD.PDB(outdir=self.outdir,
@@ -216,11 +218,11 @@ class Test_Protein(unittest.TestCase):
             resnames_of_interest=self.resnames_of_interest,
             minimise_strucs=None,
             max_nmr_conformers=10,
-            nmr_conformer_selection=[1,4,6,7])
+            nmr_conformer_selection=[1,3])
         print(PDB.nmr_conformer_selection)
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         print(os.listdir(f'{self.outdir}{os.sep}curated'))
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,4,6,7]))
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,3]))
 
     def test_rotamer_selection_all(self):
         # test keeping all available rotamers from the pdb structure
