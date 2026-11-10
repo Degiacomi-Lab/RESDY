@@ -627,7 +627,7 @@ class Analysis(object):
                                 self.df[column] = self.df[column].astype('object')
 
                             self.df = self.df.drop(columns=[column])
-                            self.df = self.df.merge(new_df['PDB_Code', 'Chain', 'Resid', column],
+                            self.df = self.df.merge(new_df[['PDB_Code', 'Chain', 'Resid', column]],
                                                     how='left', on=['PDB_Code', 'Chain', 'Resid'])
 
                             proper_answer = True
@@ -638,7 +638,7 @@ class Analysis(object):
                             print(f'{col_to_keep} was not recognised')
 
             if new_nonoverlap_columns:
-                if column == 'aev':
+                if 'aev' in new_nonoverlap_columns:
                     new_df['aev'] = new_df['aev'].astype('object')
 
                 cols_to_use = ['PDB_Code', 'Chain', 'Resid'] + new_nonoverlap_columns

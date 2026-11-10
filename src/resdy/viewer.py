@@ -478,7 +478,7 @@ class Viewer(object):
                                 value=[round(self.df_scalar_measures['propka'].min(), 1),
                                        round(self.df_scalar_measures['propka'].max(), 1)],
                                 marks=(int(((self.df_scalar_measures['propka'].max() - 
-                                             elf.df_scalar_measures['propka'].min())/ 7)) or 1)),
+                                             self.df_scalar_measures['propka'].min())/ 7)) or 1)),
                             ], style={'width': '95%', 'horizontal-align': 'center'})
                         ],
                         style={'width': '32%', 'display': 'inline-block'}),
@@ -1176,13 +1176,13 @@ class Viewer(object):
 
             if trig_id == '3d-yaxis-column':
                 yaxis_range = [yaxis_min, yaxis_max]
-                y_low, y_high = xaxis_range
+                y_low, y_high = yaxis_range
             else:
                 yaxis_range = no_update
 
             if trig_id == '3d-zaxis-column':
                 zaxis_range = [zaxis_min, zaxis_max]
-                z_low, z_high = xaxis_range
+                z_low, z_high = zaxis_range
             else:
                 zaxis_range = no_update
 

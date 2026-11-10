@@ -681,7 +681,7 @@ class PDB(object):
                     if self.num_cores <= os.cpu_count():
                         n_cores_to_use = self.num_cores
                     else:
-                        print(f'>> Given number of cores for parllel running '
+                        print(f'>> Given number of cores for parallel running '
                               f'({self.num_cores}) is not possible on current setup; '
                               f'defaulting to 0.75 times max possible')
                         n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))

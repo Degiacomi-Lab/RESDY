@@ -183,10 +183,11 @@ class Measure(object):
             to save the measures data to. If this is left as '', then struc_dir will default
             to the curated directory within outdir.
         :type struc_dir: str
-        :param cache_policy: Detail policy for whether to use the previous run of PROPKA data if
-            this is available. Options for this include 'auto' - recreate if propka output older
-            than curated pdb file, 'never' - always run propka, 'always' - always take previous
-            run if it exists
+        :param cache_policy: Policy for reusing the output of a previous PROPKA or LEGOLAS run
+            when one is available. 'auto' (default) reuses it unless it is older than the
+            curated pdb file, in which case it is recalculated. 'always' always runs the
+            calculation again. 'never' never runs it again when a previous output exists, and
+            takes that output whatever its age.
         :type cache_policy: str
         '''
 
@@ -260,7 +261,7 @@ class Measure(object):
                     if self.num_cores <= os.cpu_count():
                         self.n_cores_to_use = self.num_cores
                     else:
-                        print(f'>> Given number of cores for parllel running ({self.num_cores}) '
+                        print(f'>> Given number of cores for parallel running ({self.num_cores}) '
                               f'is not possible on current setup; defaulting to 0.75 times max '
                               f'possible')
                         self.n_cores_to_use = max(1, int(round(cpu_count() * 0.75)))
@@ -356,7 +357,7 @@ class Measure(object):
         stem = os.path.splitext(name_part)[0].removesuffix('_relaxed')
         code = os.path.splitext(pdb_code)[0].removesuffix('_relaxed')
 
-        return code == stem or (not code.startswith('af-') and code == stem.split('alt-')[0])
+        return code == stem or (not code.startswith('af-') and code == stem.split('-alt')[0])
 
 
     def _get_protein_sizes(self, cur_geom_filename='curation_geometry.csv'):
@@ -378,7 +379,7 @@ class Measure(object):
                 df_cur_geom = pd.read_csv(cur_geom_path)
                 sizes = df_cur_geom.dropna(subset=['structure', 'n_atoms'])
                 # take back to absolute pdb code to ensure matching later on
-                codes = sizes['structure'].str.replace('_relaxed', '').str.split('-alt')[0]
+                codes = sizes['structure'].str.replace('_relaxed', '').str.split('-alt').str[0]
                 struc_to_atoms = sizes.groupby(codes)['n_atoms'].max().to_dict()
             except Exception as e_s:
                 print(f'>> Failed to extract protein sizes from the curation geometry csv '
@@ -484,7 +485,7 @@ class Measure(object):
                 details['Dist_To_Modelled'] = np.fmin(details['Dist_To_Modelled'], near_any)
                 details['Dist_To_Nearest_Terminus'] = np.fmin(details['Dist_To_Nearest_Terminus'],
                                                            near_term)
-                details['In_Modelled_Region'] = any(details['In_Modelled_Region'] + in_modelled)
+                details['In_Modelled_Region'] = details['In_Modelled_Region'] or in_modelled
             else:
                 details['Dist_To_Modelled'] = near_any
                 details['Dist_To_Nearest_Terminus'] = near_term
@@ -552,7 +553,7 @@ class Measure(object):
                     cls_dets = globals()[m.upper()]
                     if not (inspect.isclass(cls_dets) and callable(getattr(cls_dets, 'calculate', None))):
                         self.features.remove(m)
-                        print(f'>> Feauture class {m} has no callable attribute called calculate()'
+                        print(f'>> Feature class {m} has no callable attribute called calculate()'
                               f', so {m} cannot be measured, please ensure the feature class has a'
                               f'calculate() function. This feature has been removed from the list '
                               f'to calculate.')
@@ -1312,7 +1313,7 @@ class Measure(object):
 
         self.df = log_to_df
         print('Data recovered from log file')
-        print(f'Numer of measurements read: {len(log_to_df)}')
+        print(f'Number of measurements read: {len(log_to_df)}')
         return log_to_df
 
 
@@ -1910,7 +1911,7 @@ class Measure(object):
 
         self.df = log_to_df
         print('Data recovered from log file')
-        print(f'Numer of measurements read: {len(log_to_df)}')
+        print(f'Number of measurements read: {len(log_to_df)}')
         return log_to_df
 
 
