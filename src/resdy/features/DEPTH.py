@@ -64,7 +64,7 @@ class DEPTH():
             self.record_errors = False
 
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the depth of the lysine from the surface of the protein within the overall protein
         structure.
@@ -79,6 +79,9 @@ class DEPTH():
         :param path: The path of the pdb file that the depth of the lysines are being calculated
             for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and depth output. Outline::
 
@@ -87,8 +90,9 @@ class DEPTH():
         :rtype: pandas.DataFrame
         '''
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
 
             if self.include_modified:
                 idx_nz = M.atomselect('*',

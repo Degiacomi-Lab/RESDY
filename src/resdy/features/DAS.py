@@ -122,7 +122,7 @@ class DAS():
         else:
             self.record_errors = False
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the Dynamically Accessible Surface (DAS) of the anchor atom of the residue of
         interest (NZ for lysine). This is effectively the number of positions that the anchor
@@ -139,6 +139,9 @@ class DAS():
 
         :param path: The path of the pdb file that DAS is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and DAS output. Outline::
 
@@ -147,8 +150,9 @@ class DAS():
         :rtype: pandas.DataFrame
         '''
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
 
             if self.include_modified:
                 idx_nz = M.atomselect('*',

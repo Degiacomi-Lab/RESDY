@@ -108,13 +108,16 @@ class EVOLUTION():
         self.model_loaded = True
 
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the ESM LLM output for subset protein sequences obtained through searching over
         the path of the protein structure given.
 
         :param path: Path of the pdb file of interest
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
 
         :returns:
             Dataframe with information on chain, residue number and ESM output.
@@ -132,8 +135,9 @@ class EVOLUTION():
 
         # 1: Extract the sequence sections from the given protein structure
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
 
             if self.include_modified:
                 idx_nz = M.atomselect('*',

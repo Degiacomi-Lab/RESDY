@@ -53,6 +53,23 @@ def _resolved_settings(cls, kwargs):
     return json.loads(json.dumps(settings, default=str))
 
 
+def _accepts_molecule(calculate):
+    """
+    Whether the ``calculate`` method of a feature takes the loaded structure as ``M``.
+
+    A feature class written for ``calculate(path)`` alone keeps working: it is called with
+    the path and reads the file itself.
+
+    :param calculate: bound ``calculate`` method of a feature.
+    :returns: True when ``calculate`` has a parameter named ``M``.
+    :rtype: bool
+    """
+    try:
+        return 'M' in inspect.signature(calculate).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 #: Features requested by the 'all' shorthand in ``features_dict``.
 ALL_FEATURES = ['propka', 'pkaANI', 'sasa', 'depth', 'aev', 'seqcharge', 'legolas',
                 'melodia', 'frustration', 'density', 'das', 'flexibility', 'evolution',
@@ -1043,6 +1060,27 @@ class Measure(object):
                                            'parallel measures', str(e_dups))
 
 
+    @staticmethod
+    def _run_feature(calculate, path, M):
+        '''
+        Call a feature on a file. The file has already been loaded to list the residues of
+        interest, so a feature that accepts the structure is given a copy of it and does not
+        read the file again. Each feature gets a copy of its own, so that nothing one feature
+        does to the structure is seen by the next.
+
+        :param calculate: bound ``calculate`` method of the feature.
+        :param path: path of the pdb file being measured.
+        :type path: str
+        :param M: the structure of ``path``, loaded with its heteroatoms.
+        :type M: biobox.Molecule
+        :returns: the dataframe the feature returns.
+        :rtype: pandas.DataFrame
+        '''
+        if _accepts_molecule(calculate):
+            return calculate(path, M=copy.deepcopy(M))
+        return calculate(path)
+
+
     def _measure_file(self, lock, file_details):
         '''
         Take a file and calculate the required measurements for this. Return the dataframe of the
@@ -1159,7 +1197,7 @@ class Measure(object):
                 try:
                     out_print_trap = io.StringIO()
                     with redirect_stdout(out_print_trap):
-                        result = meas[1](f)
+                        result = self._run_feature(meas[1], f, M)
                     terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 
@@ -1631,7 +1669,7 @@ class Measure(object):
                 try:
                     out_print_trap = io.StringIO()
                     with redirect_stdout(out_print_trap):
-                        result = meas[1](f)
+                        result = self._run_feature(meas[1], f, M)
                     terminal_out_statements.append(out_print_trap.getvalue())
                     df_currentfile = self._combine_dataframes(df_currentfile, result, meas[0])
 

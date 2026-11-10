@@ -39,12 +39,15 @@ class FEATURE():
         if self.error_filename != 'no_record': self.record_errors = True
         else: self.record_errors = False
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the feature
 
         :param path: The path of the pdb file that the feature is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and feature output. Outline::
 
@@ -54,8 +57,9 @@ class FEATURE():
         '''
 
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
             df_feature = M.data.loc[M.data['name'] == 'CA', ['resname', 'chain', 'resid']]
 
             if self.include_modified:

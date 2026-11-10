@@ -16,10 +16,18 @@ is free, so ``my_neighbour_count.py`` holding ``class NEIGHBOURS`` is picked up 
 ``features_dict={'neighbours': {}}``. Naming the file after the class is a sensible habit,
 not a requirement.
 
-``calculate`` receives the path of one curated PDB file and returns a
+``calculate`` receives the path of one curated PDB file and, as ``M``, the structure of that
+file already loaded as a :class:`biobox.Molecule` with its heteroatoms. It returns a
 :class:`pandas.DataFrame` with a ``Chain`` column, a ``Resid`` column, and one column named
 exactly as the feature was requested. Those three columns are the whole contract: the values
 are merged into the output table on chain and residue number.
+
+``Measure`` has already read the file to list the residues of interest, so it hands each
+feature a copy of that structure, and the file is read once however many features are
+requested. The copy belongs to the feature, which may modify it freely. Give ``M`` a default
+of ``None`` and read the file when it is absent, as below, so that the feature can also be
+called on its own. A ``calculate`` that takes ``path`` alone still works: it is called with
+the path and reads the file itself.
 
 The constructor is given ``include_modified``, ``aa_properties`` and ``error_filename`` by
 ``Measure``, so it has to accept all three. ``aa_properties`` is what tells the feature which
@@ -48,10 +56,11 @@ residue to look at and at which atom.
             self.record_errors = error_filename != 'no_record'
             self.cutoff = cutoff
 
-        def calculate(self, path):
+        def calculate(self, path, M=None):
             try:
-                M = bb.Molecule()
-                M.import_pdb(path, include_hetatm=True)
+                if M is None:
+                    M = bb.Molecule()
+                    M.import_pdb(path, include_hetatm=True)
 
                 # the anchor atom of every residue of interest, one index per residue
                 idx = M.atomselect('*',

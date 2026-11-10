@@ -157,7 +157,7 @@ class RMSF():
                 tuple(self.aa_properties['atom_select_names_nonmod']))
 
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the root mean square fluctuation of the lysines within the protein over all the
         structures which have been curated for the Uniprot code. This method uses biobox but doesn't
@@ -173,6 +173,9 @@ class RMSF():
 
         :param path: The path of the pdb file that the RMSF is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and rmsf output.
             Outline::
@@ -207,11 +210,11 @@ class RMSF():
             prot_match_exists = [a for a in files if (os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info)
                                     or (os.path.basename(a).split('.')[0] in prot_info)]
 
-            # the file is read here only when its ensemble is not known yet
-            M = None
+            # the file is read here only when it was not handed over and its ensemble is not
+            # known yet
             cached = _CA_SIGNATURES.get(path)
             info = os.stat(path)
-            if cached is None or cached[:2] != (info.st_mtime_ns, info.st_size):
+            if M is None and (cached is None or cached[:2] != (info.st_mtime_ns, info.st_size)):
                 M = bb.Molecule()
                 M.import_pdb(path, include_hetatm=True)
             signature = _ca_signature(path, M)
