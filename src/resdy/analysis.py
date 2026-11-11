@@ -1256,7 +1256,7 @@ class Analysis(object):
                   'the collated metadata csv. File not written.')
             return pd.DataFrame()
 
-        # one row per structure file. The geometry log has a record for every file, the
+        # Make one row per structure file. The geometry log has a record for every file, the
         # relaxed copies included; without it the rows are the structures the other logs name
         if 'geometry' in logs:
             df_collated = logs.pop('geometry').rename(columns={'geometry_structure': 'structure'})
@@ -1271,8 +1271,8 @@ class Analysis(object):
                                             how='left', on='_stem', validate='many_to_one')
         df_collated = df_collated.drop(columns='_stem')
 
-        # a column keeps the name it has in its log, unless several logs have a column of that
-        # name, in which case each keeps the prefix of its log
+        # checks over all columns, if another column has the same name when the prefixes are
+        # removed the prefix are kept, otherwise prefixes are removed.
         bare = [c.split('_', 1)[1] if c.startswith(METADATA_PREFIXES) else c
                 for c in df_collated.columns]
         df_collated.columns = [b if bare.count(b) == 1 else c
@@ -1287,7 +1287,8 @@ class Analysis(object):
         '''
         Read the three logs curation writes into the output directory, keeping the last record
         of each structure and prefixing every column with the name of its log (see
-        :data:`resdy.helper.METADATA_PREFIXES`), so that columns the logs share stay apart.
+        :data:`resdy.helper.METADATA_PREFIXES`), allowing the user to tell which parts of the
+        metadata come from which log file.
 
         :param min_log: Name of the minimisation log file.
         :type min_log: str
@@ -1299,17 +1300,21 @@ class Analysis(object):
             were found. The structure column of each is named '<log>_structure'.
         :rtype: dict
         '''
+
         logs = {}
         for n, filename in (('geometry', curation_geometry),
                             ('minimisation', min_log),
                             ('assembly', assembly_log)):
             p = os.path.join(self.outdir, filename)
+
             if os.path.isfile(p):
                 log = pd.read_csv(p).drop_duplicates('structure', keep='last')
                 logs[n] = log.add_prefix(f'{n}_')
+
             else:
                 print(f'>> Could not read in data for metadata file {n}, '
                       f'please check the path given.')
+
         return logs
 
 

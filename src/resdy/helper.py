@@ -6,10 +6,10 @@ import multiprocessing as mp
 import threading
 
 
-#: Oldest biobox RESDY works with. Earlier versions lack ``Xlink.get_half_sphere``, which the
-#: DAS feature calls. Versions before 1.1.5 also wrote the occupancy and B-factor columns of a
-#: pdb file into each other's places, and computed solvent accessible surface areas that were
-#: too small.
+# Oldest biobox RESDY works with. Earlier versions lack ``Xlink.get_half_sphere``, which the
+# DAS feature calls. Versions before 1.1.5 also wrote the occupancy and B-factor columns of a
+# pdb file into each other's places, and computed solvent accessible surface areas that were
+# too small.
 MIN_BIOBOX_VERSION = (2, 0, 0)
 
 #: Columns of the measurements table that are not features
@@ -18,8 +18,9 @@ METADATA_COLUMNS = ('Uniprot_Entry', 'PDB_Code', 'Chain', 'Resid', 'Method', 'Re
                     'Min_Dist_Other_Chain', 'num_structures', 'numbering', 'Dist_To_Modelled',
                     'Dist_To_Nearest_Terminus', 'In_Modelled_Region')
 
-#: Prefixes of the provenance columns that Analysis.add_metadata_to_measures joins onto the
-#: measurements table, one per curation log. A column carrying one of them is not a feature.
+# Prefixes of the provenance columns that Analysis.add_metadata_to_measures joins onto the
+# measurements table, one per curation log. Any column which carries one of these prefixes
+# is not considered a feature in analysis.
 METADATA_PREFIXES = ('geometry_', 'minimisation_', 'assembly_')
 
 RESIDUE_KEY = ['Uniprot_Entry', 'Resid']
