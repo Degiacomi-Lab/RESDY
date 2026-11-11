@@ -13,9 +13,9 @@ from .helper import METADATA_COLUMNS, sort_residue_key
 def _parse_vector(value):
     '''
     Read a vector feature (AEV, evolution) stored in the measurements table as the text of a
-    list. The text of a list of numbers is valid JSON, which is read an order of magnitude
-    faster than through ``ast.literal_eval``. Anything JSON cannot read is passed to
-    ``literal_eval``, and a value that is already a sequence is returned as it is.
+    list. This can be read by using JSON, if this is not possible, it will attempt to use
+    ``literal_eval`` to get the information of the vector from the table. If the value given
+    is already in list format it will return this as normal.
 
     :param value: the cell of the measurements table.
     :type value: str, list
@@ -368,7 +368,8 @@ class Aggregation:
         '''
         df_suspicious = self.df_measurements[(self.df_measurements[feature] < lower) |
                                              (self.df_measurements[feature] > upper)]
-        self.df_measurements = self.df_measurements[self.df_measurements[feature].between(lower, upper)]
+        self.df_measurements = (self.df_measurements[self.df_measurements[feature]
+                                                     .between(lower, upper)])
         print(f'>> Removed {len(df_suspicious)} rows which contain out of bounds '
               f'entries for {feature} from the measurements data.')
 
@@ -509,8 +510,8 @@ class Aggregation:
         .. rubric:: Method
 
         Every statistic is computed for all residues at once, with one grouped reduction per
-        statistic over the residue key, and the columns are then laid out feature by feature.
-        Three quantities are a row of the group and not a reduction: the random draw (one
+        statistic over the residue key, leaving the statistic feature columns.
+        Three quantities are a single row of the query data: the random draw (one
         position per residue, drawn in the order of the residue keys from the generator seeded
         by ``rand_state``), and, for the AEVs, the rows whose vector has the smallest and the
         largest norm.
@@ -532,13 +533,13 @@ class Aggregation:
 
         grouped = df.groupby(self.res_key, sort=True)
         group_id = grouped.ngroup().to_numpy()
-        # residues with a missing key belong to no group, as in an iteration over the groups
+        # residues with a missing key belong to no group
         in_group = group_id >= 0
         position = grouped.cumcount().to_numpy()
         sizes = grouped.size()
         n_groups = len(sizes)
 
-        # one row of each residue, drawn in the order of the residue keys
+        # get random row for each resid key set, rand nums drawn in order of keys
         rand_position = np.array([int(self._rng.integers(0, n)) for n in sizes.to_numpy()])
         rand_rows = np.empty(n_groups, dtype=int)
         is_rand = in_group & (position == rand_position[np.where(in_group, group_id, 0)])
@@ -559,7 +560,7 @@ class Aggregation:
 
         data = {k: sizes.index.get_level_values(k).to_numpy() for k in self.res_key}
 
-        # a residue keeps its class when all its rows agree on it, and is unlabelled otherwise
+        # class values for resid key set are only kept when all instances of the key agree
         class_first = grouped['class'].first().to_numpy()
         mixed = grouped['class'].nunique(dropna=False).to_numpy() != 1
         if mixed.any():
@@ -591,8 +592,8 @@ class Aggregation:
                     data[feat + '_range'] = data[feat + '_max'] - data[feat + '_min']
 
             elif feature == 'evolution':
-                # the vector of the predicted structure when the table says which one that
-                # is, and of the first structure of the residue otherwise
+                # utilises the vector of predicted structure due to being sequence based metric
+                # otherwise uses the first structure for the available for the resid
                 first_rows = np.empty(n_groups, dtype=int)
                 is_first = in_group & (position == 0)
                 first_rows[group_id[is_first]] = np.flatnonzero(is_first)

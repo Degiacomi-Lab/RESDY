@@ -14,24 +14,26 @@ Two naming rules apply. The class name must be the name you will ask for in
 ``features_dict``, upper-cased, because that is how the feature is looked up. The file name
 is free, so ``my_neighbour_count.py`` holding ``class NEIGHBOURS`` is picked up by
 ``features_dict={'neighbours': {}}``. Naming the file after the class is a sensible habit,
-not a requirement.
+but not required.
 
 ``calculate`` receives the path of one curated PDB file and, as ``M``, the structure of that
 file already loaded as a :class:`biobox.Molecule` with its heteroatoms. It returns a
 :class:`pandas.DataFrame` with a ``Chain`` column, a ``Resid`` column, and one column named
-exactly as the feature was requested. Those three columns are the whole contract: the values
-are merged into the output table on chain and residue number.
+exactly as the feature was requested. Those three columns are everything that is needed and
+only these three will be read when combining into the wider dataframe through the key of chain
+and resid pairs.
 
 ``Measure`` has already read the file to list the residues of interest, so it hands each
 feature a copy of that structure, and the file is read once however many features are
-requested. The copy belongs to the feature, which may modify it freely. Give ``M`` a default
-of ``None`` and read the file when it is absent, as below, so that the feature can also be
-called on its own. A ``calculate`` that takes ``path`` alone still works: it is called with
-the path and reads the file itself.
+requested. The copy belongs to the feature, which allows you to modify it as you please.
+Give ``M`` a default of ``None`` and read the file when it is absent, as below, so that the
+feature can also be called on its own. Therefore, a ``calculate`` that takes ``path`` alone
+still works: the structure is called with the path and reads the file itself.
 
 The constructor is given ``include_modified``, ``aa_properties`` and ``error_filename`` by
-``Measure``, so it has to accept all three. ``aa_properties`` is what tells the feature which
-residue to look at and at which atom.
+``Measure``, so the class for the new function should accept all of these. ``aa_properties``
+is what tells the feature which residue to look at and at which atom in particular (this is
+usually the site of modification if you are interesting in PTMs)
 
 .. code-block:: python
 
