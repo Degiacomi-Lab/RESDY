@@ -210,8 +210,8 @@ class Test_Protein(unittest.TestCase):
             max_nmr_conformers=2,
             nmr_conformer_selection='first')
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,6)))
-        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 5)
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,3)))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 2)
 
     def test_nmr_conformer_selection_representative(self):
         PDB = RD.PDB(outdir=self.outdir,
@@ -238,10 +238,8 @@ class Test_Protein(unittest.TestCase):
             minimise_strucs=None,
             max_nmr_conformers=10,
             nmr_conformer_selection=[1,3])
-        print(PDB.nmr_conformer_selection)
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
-        print(os.listdir(f'{self.outdir}{os.sep}curated'))
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,4,6,7]))
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,3]))
 
     def test_rotamer_selection_all(self):
         # test keeping all available rotamers from the pdb structure

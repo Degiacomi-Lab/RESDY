@@ -846,48 +846,48 @@ class Analysis:
         :rtype: pandas.DataFrame
         '''
         # go over the weights to make sure the values are good and then matches the number of features
-        weights = weights.copy()
+        feat_weights = weights
         try:
-            if isinstance(weights, float) or isinstance(weights, int):
-                if weights == 0.5:
+            if isinstance(feat_weights, float) or isinstance(feat_weights, int):
+                if feat_weights == 0.5:
                     print('>> Weight remains as default and equal for all metrics')
                     if len(features) == 1:
-                        weights = [1]
+                        feat_weights = [1]
                     else:
-                        weights = [1/len(features)] * len(features)
+                        feat_weights = [1/len(features)] * len(features)
 
                 elif len(features) == 2:
-                    print(f'>> 1 weight given, 2 features, assigning given weight ({weights}) to '
+                    print(f'>> 1 weight given, 2 features, assigning given weight ({feat_weights}) to '
                           f'first feature ({features[0]}), second feature ({features[1]}) will '
-                          f'take {1-weights} for weighting.')
-                    weights = [weights, 1-weights]
+                          f'take {1-feat_weights} for weighting.')
+                    feat_weights = [feat_weights, 1-feat_weights]
 
                 else:
                     print('>> Not enough weights entered to work out weightings for features. '
                           'Assuming equal weight for all metrics')
-                    weights = [1/len(features)] * len(features)
+                    feat_weights = [1/len(features)] * len(features)
 
-            elif isinstance(weights, list):
-                if len(set(weights)) == 1:
+            elif isinstance(feat_weights, list):
+                if len(set(feat_weights)) == 1:
                     print('>> Weight remains as default and equal for all metrics')
-                    weights = [1/len(features)] * len(features)
+                    feat_weights = [1/len(features)] * len(features)
 
-                elif len(weights) < len(features):
+                elif len(feat_weights) < len(features):
                     print('>> Number of weights given is lower than the number of features. '
                           'Adjusting weights to include')
-                    while len(weights) != len(features):
-                        weights.append(1/len(features))
-                    weights = [round((i/sum(weights)), 2) for i in weights]
+                    while len(feat_weights) != len(features):
+                        feat_weights.append(1/len(features))
+                    feat_weights = [round((i/sum(feat_weights)), 2) for i in feat_weights]
 
-                elif len(weights) > len(features):
+                elif len(feat_weights) > len(features):
                     print(f'>> Number of weights given is greater than the number of features. '
                           f'Taking first {len(features)} through')
-                    weights = weights[:len(features)]
-                    weights = [round((i/sum(weights)), 2) for i in weights]
+                    feat_weights = feat_weights[:len(features)]
+                    feat_weights = [round((i/sum(feat_weights)), 2) for i in feat_weights]
 
-                elif sum(weights) != 1:
+                elif sum(feat_weights) != 1:
                     print('>> Weights do not sum to 1. Adjusting weights as required.')
-                    weights = [round((i/sum(weights)), 2) for i in weights]
+                    feat_weights = [round((i/sum(feat_weights)), 2) for i in feat_weights]
 
                 else:
                     print('>> Weights fit, taking through as given')
@@ -925,7 +925,7 @@ class Analysis:
                 df_query = df_query.reset_index(drop=True)
 
                 try:
-                    features_and_weights = zip(features, weights)
+                    features_and_weights = zip(features, feat_weights)
                 except Exception as e:
                     print(f'Failed to link metrics with weights, were the metrics '
                           f'entered correctly? {e}')
@@ -1190,7 +1190,11 @@ class Analysis:
         key = ['Uniprot_Entry', 'Resid']
 
         data_aggregated_bool = not df_in.duplicated(subset=key).any()
-        data_agg_source_pool_bool = not df_in.duplicated(subset=key+['Source']).any()
+        if 'Source' in df_in.columns:
+            data_agg_source_pool_bool = not df_in.duplicated(subset=key+['Source']).any()
+        else:
+            data_agg_source_pool_bool = True
+
         if not data_aggregated_bool and not data_agg_source_pool_bool:
             print('>> Data to convert to numpy array is not aggregated. Training ML models on '
                   'data that is not aggregated may lead to inflated prediction metrics. Be careful'
@@ -1400,5 +1404,5 @@ class Analysis:
 if __name__ == '__main__':
     df_test = pd.read_csv(f'data{os.sep}measures_CannData_all_12.05.25.csv')
     analysis = Analysis(df_test, outdir='result')
-    analysis.relative_best(weights=0.5, features=['depth', 'sasa', 'phi', 'das'])
+    analysis.relative_best(feat_weights=0.5, features=['depth', 'sasa', 'phi', 'das'])
     print(analysis.df_sub)
