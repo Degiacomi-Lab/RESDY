@@ -1,9 +1,105 @@
 import os
 import glob
+import hashlib
 import pandas as pd
 import numpy as np
 import biobox as bb
 from .error_reporting import report_error_to_file
+
+# The RMSF of a residue is a property of an ensemble of structures, so every file of an
+# ensemble has the same result. The three caches below allow for storing of the information
+# in the module such that a worker process keeps them from one structure to the next, reducing
+# computation time.
+
+#: {folder: (modification time of the folder, the pdb files it holds)}
+_FOLDER_FILES = {}
+#: {file: (modification time, size, digest of its CA table)}
+_CA_SIGNATURES = {}
+#: {(files considered, digest of the CA table, settings): (result, True when the ensemble
+#: holds a single structure)}
+_ENSEMBLE_RESULTS = {}
+
+
+def clear_cache():
+    '''
+    Forget every folder listing, CA signature and ensemble result held by this module.
+    '''
+    _FOLDER_FILES.clear()
+    _CA_SIGNATURES.clear()
+    _ENSEMBLE_RESULTS.clear()
+
+
+def _folder_files(folder):
+    '''
+    The pdb files of a folder, listed again only when the folder has changed.
+
+    :param folder: folder holding the curated structures.
+    :type folder: str
+    :returns: paths of the pdb files, as ``glob`` lists them.
+    :rtype: list
+    '''
+    stamp = os.stat(folder or '.').st_mtime_ns
+    cached = _FOLDER_FILES.get(folder)
+    if cached is None or cached[0] != stamp:
+        cached = (stamp, glob.glob(os.path.join(folder, "*pdb")))
+        _FOLDER_FILES[folder] = cached
+    return cached[1]
+
+
+def _ca_table(M):
+    '''
+    Residue name, chain and residue number of every CA atom of a structure. Two files belong to
+    the same ensemble when their tables are equal. This is important as not all structures of the
+    same protein will be of the same length due to differences in the proportion of the structure
+    that data is available for (ie some proteins are missing terminal sections).
+
+    :param M: the structure.
+    :type M: biobox.Molecule
+    :rtype: pandas.DataFrame
+    '''
+    return M.data[M.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
+
+
+def _digest(ca_table):
+    '''
+    A digest that is equal for two CA tables exactly when the tables are equal.
+
+    :param ca_table: output of :func:`_ca_table`.
+    :type ca_table: pandas.DataFrame
+    :rtype: str
+    '''
+    h = hashlib.sha1()
+    h.update(repr((ca_table.shape, [str(t) for t in ca_table.dtypes])).encode())
+    h.update(pd.util.hash_pandas_object(ca_table, index=False).to_numpy().tobytes())
+    return h.hexdigest()
+
+
+def _ca_signature(path, M=None):
+    '''
+    Digest of the CA table of a file. The file is read only if it has not been read before, or
+    has changed since.
+
+    :param path: pdb file.
+    :type path: str
+    :param M: the file already loaded with its heteroatoms, to save reading it.
+    :type M: biobox.Molecule, None
+    :rtype: str
+    '''
+    info = os.stat(path)
+    stamp = (info.st_mtime_ns, info.st_size)
+    cached = _CA_SIGNATURES.get(path)
+
+    if cached is not None and cached[:2] == stamp:
+        return cached[2]
+
+    if M is None:
+        M = bb.Molecule()
+        M.import_pdb(path, include_hetatm=True)
+
+    signature = _digest(_ca_table(M))
+    _CA_SIGNATURES[path] = stamp + (signature,)
+
+    return signature
 
 
 class RMSF():
@@ -57,7 +153,18 @@ class RMSF():
         self.model_loaded = False
 
 
-    def calculate(self, path):
+    def _settings_key(self):
+        '''
+        The settings an RMSF result depends on, in a form that can key a dictionary for easy use
+        by the calculate function.
+        '''
+        return (self.align_type, bool(self.include_modified),
+                tuple(self.aa_properties['non_modified_codes']),
+                tuple(self.aa_properties['modified_codes']),
+                tuple(self.aa_properties['atom_select_names_nonmod']))
+
+
+    def calculate(self, path, M=None):
         '''
         Calculate the root mean square fluctuation of the lysines within the protein over all the
         structures which have been curated for the Uniprot code. This method uses biobox but doesn't
@@ -65,11 +172,17 @@ class RMSF():
 
         .. rubric:: Method
 
-        Find all structures, loop over structures aligning and calculating deviations, calculate
-        RMSF and return values as dataframe
+        Find all structures of the Uniprot code, keep those whose CA atoms carry the same residue
+        names, chains and residue numbers as the file given (the ensemble), superpose them,
+        calculate the RMSF and return the values as a dataframe. The result is the same for every
+        file of an ensemble, so it is calculated for the first of them and returned from memory
+        for the others, and each file is read once to establish which ensemble it belongs to.
 
         :param path: The path of the pdb file that the RMSF is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and rmsf output.
             Outline::
@@ -79,15 +192,10 @@ class RMSF():
         :rtype: pandas.DataFrame
         '''
         try:
-            # check over measures to see if this has already been calculated as can just copy values due to being the same calculation each time
             file_loc = os.path.dirname(path)
-            files = glob.glob(os.path.join(file_loc, "*pdb"))
+            files = _folder_files(file_loc)
             code = os.path.splitext(os.path.basename(path))[0]
-            # The minimised copy of a structure is "<stem>_relaxed.pdb", and only the stem is
-            # listed in the proteins dataframe. Splitting on '-' happens to drop the suffix of a
-            # PDB code ('1UPT-alt-1_relaxed' -> '1UPT'), but an AlphaFold code keeps its hyphens
-            # and so has to have the suffix removed explicitly, otherwise every relaxed AlphaFold
-            # structure fails the lookup below and the feature returns nothing for it.
+
             if code.endswith('_relaxed'):
                 code = code[:-len('_relaxed')]
             if 'AF-' not in code:
@@ -102,96 +210,137 @@ class RMSF():
                 uniprot_interest = matches.iloc[0]
                 prot_info = list(self.df_proteins[self.df_proteins['Uniprot_Entry'] == uniprot_interest]['PDB_Code'])
 
-            prot_match_exists = [a for a in files if (os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info)
-                                    or (os.path.basename(a).split('.')[0] in prot_info)]
+            prot_match_exists = [a for a in files if
+                                 (os.path.splitext(os.path.basename(a))[0].split('-')[0] in prot_info)
+                                 or (os.path.basename(a).split('.')[0] in prot_info)]
 
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
 
-            M_ca = M.get_subset(M.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-            if self.include_modified: _, idx_n_res_interest = M.atomselect('*', (self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']), 'CA', use_resname=True, get_index=True)
-            else: _, idx_n_res_interest = M.atomselect('*', self.aa_properties['non_modified_codes'], 'CA', use_resname=True, get_index=True)
-            list_modified = list(a in self.aa_properties['modified_codes'] for a in list(M.get_subset(idx_n_res_interest).data['resname']))
-            df_rmsf = M.data.loc[idx_n_res_interest, ['chain', 'resid']].rename(columns={'chain': 'Chain', 'resid': 'Resid'}).reset_index(drop=True)
-            if self.include_modified: df_rmsf = df_rmsf.assign(**{'Modified': list_modified})
+            # file only read if not known (not previously handed over)
+            cached = _CA_SIGNATURES.get(path)
+            info = os.stat(path)
+            if M is None and (cached is None or cached[:2] != (info.st_mtime_ns, info.st_size)):
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
+            signature = _ca_signature(path, M)
 
-            M_df_compare = M.data[M.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
+            ensemble_key = (tuple(prot_match_exists), signature, self._settings_key())
+            known = _ENSEMBLE_RESULTS.get(ensemble_key)
+
+            if known is not None:
+                df_known, single_structure = known
+                if single_structure:
+                    print('>> The only matching structure is itself, therefore '
+                          'rmsf cannot be calculated')
+                return df_known.copy()
+
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
+
+            if self.include_modified:
+                _, idx_n_res_interest = M.atomselect('*',
+                                                     (self.aa_properties['non_modified_codes'] +
+                                                      self.aa_properties['modified_codes']),
+                                                     'CA', use_resname=True, get_index=True)
+            else:
+                _, idx_n_res_interest = M.atomselect('*',
+                                                     self.aa_properties['non_modified_codes'],
+                                                     'CA', use_resname=True, get_index=True)
+
+            list_modified = list(a in self.aa_properties['modified_codes'] for a in
+                                 list(M.get_subset(idx_n_res_interest).data['resname']))
+
+            df_rmsf = (M.data.loc[idx_n_res_interest, ['chain', 'resid']]
+                       .rename(columns={'chain': 'Chain', 'resid': 'Resid'})
+                       .reset_index(drop=True))
+
+            if self.include_modified:
+                df_rmsf = df_rmsf.assign(**{'Modified': list_modified})
+
         except Exception as e:
-            if self.record_errors: report_error_to_file('RMSF 1', path, str(e), self.error_filename)
-            print(f'RMSF Calculation 1: Failed to find other protein structures and get reference for uniprot: {path}, error: {e}')
+            if self.record_errors:
+                report_error_to_file('RMSF 1', path, str(e), self.error_filename)
+            print(f'RMSF Calculation 1: Failed to find other protein structures and get '
+                  f'reference for uniprot: {path}, error: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
         try:
-            P = bb.Molecule()
-            prot_matches = []
-            for file in prot_match_exists:
-                T = bb.Molecule()
-                T.import_pdb(file, include_hetatm=True)
-                T_df_compare = T.data[T.data['name'] == 'CA'][['resname', 'chain', 'resid']].reset_index(drop=True)
-                if M_df_compare.equals(T_df_compare):
-                    prot_matches.append(file)
+            # the ensemble: the files considered whose CA table is that of the file given
+            prot_matches = [file for file in prot_match_exists if _ca_signature(file) == signature]
+            single_structure = len(prot_matches) <= 1
 
-            if len(prot_matches) > 1:
+            if not single_structure:
                 P = bb.Molecule()
                 P.import_pdb(prot_matches[0])
                 for f in prot_matches[1:]:
-                    P2 = bb.Molecule()
-                    P2.import_pdb(f)
-                    P2_xyz = P2.get_xyz()
-                    P.add_xyz(P2_xyz)
+                    P_extra = bb.Molecule()
+                    P_extra.import_pdb(f)
+                    P_extra_xyz = P_extra.get_xyz()
+                    P.add_xyz(P_extra_xyz)
 
-                df_out = pd.DataFrame()
-                res_interest = self.aa_properties['non_modified_codes'] + self.aa_properties['modified_codes']
+                rows = []
+                res_of_interest = (self.aa_properties['non_modified_codes'] +
+                                   self.aa_properties['modified_codes'])
 
                 # A 'backbone' alignment is on the whole structure, so neither the reference
                 # atoms nor the superposition they drive depend on the residue being measured.
-                # Both are therefore done once here rather than once per residue. Note that
-                # rmsd_one_vs_all(align=True) rewrites the coordinates in place, so repeating it
-                # was superposing an already superposed ensemble. A 'local' alignment is on the
-                # backbone of the residue itself and does stay inside the loop.
+                # Therefore both are just done once before as rmsd_one_vs_all(align=True) rewrites
+                # the coordinates in place. A 'local' alignment is done with in the loop per residue
                 align_once = self.align_type != 'local'
                 alignment_failed = False
                 if align_once:
                     try:
-                        _, idx_ref = P.atomselect('*', '*', ["C", "CA", "N", "O"], get_index=True)
+                        _, idx_ref = P.atomselect('*', '*', ["C", "CA", "N", "O"],
+                                                  get_index=True)
                         P.rmsd_one_vs_all(0, indices=idx_ref, align=True)
                     except Exception:
-                        # The superposition used to be attempted inside the residue loop, where a
-                        # failure left every residue with a NaN rather than discarding the whole
-                        # structure. That is preserved by flagging it here and letting each
-                        # residue take the same path it did before.
+                        # If the superposition fails, this is noted in alignment_failed which
+                        # means that it will not try and calculate RMSF for the strutcure through
+                        # a runtimeerror which leads to NaN for all residues.
                         alignment_failed = True
 
-                for i, r in P.data.drop_duplicates(subset=['chain', 'resid']).loc[P.data['resname'].isin(res_interest), ['chain', 'resid']].iterrows():
+                for i, r in (P.data.drop_duplicates(subset=['chain', 'resid'])
+                             .loc[P.data['resname'].isin(res_of_interest),
+                                    ['chain', 'resid']].iterrows()):
                     chain = r['chain']
                     resid = r['resid']
                     try:
                         if alignment_failed:
                             raise RuntimeError('the whole-structure superposition failed')
                         if not align_once:
-                            _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"], get_index=True)
+                            _, idx_ref = P.atomselect('*', resid, ["C", "CA", "N", "O"],
+                                                      get_index=True)
                             P.rmsd_one_vs_all(0, indices=idx_ref, align=True)
-                        _, idx_target = P.atomselect(chain, resid, self.aa_properties['atom_select_names_nonmod'], get_index=True)
+                        _, idx_target = P.atomselect(chain,
+                                                     resid,
+                                                     self.aa_properties['atom_select_names_nonmod'],
+                                                     get_index=True)
 
                         rmsf = P.rmsf(indices=idx_target)[0]
 
-                        df_out = pd.concat([df_out, pd.DataFrame([{'Chain': chain, 'Resid': resid, 'rmsf': rmsf}])])
+                        rows.append({'Chain': chain, 'Resid': resid, 'rmsf': rmsf})
                     except Exception:
-                        df_out = pd.concat([df_out, pd.DataFrame([{'Chain': chain, 'Resid': resid, 'rmsf': np.nan}])])
-                        pass
+                        rows.append({'Chain': chain, 'Resid': resid, 'rmsf': np.nan})
 
+                df_out = (pd.concat([pd.DataFrame([row]) for row in rows])
+                          if rows else pd.DataFrame())
                 df_rmsf = df_rmsf.merge(df_out, how='left', on=['Chain', 'Resid'])
 
             else:
-                print('>> The only matching structure is itself, therefore rmsf cannot be calculated')
+                print('>> The only matching structure is itself, '
+                      'therefore rmsf cannot be calculated')
                 df_rmsf = df_rmsf.assign(**{'rmsf': np.nan})
 
         except Exception as e:
-            if self.record_errors: report_error_to_file('RMSF 2', path, str(e), self.error_filename)
+            if self.record_errors:
+                report_error_to_file('RMSF 2', path, str(e), self.error_filename)
             print(f'RMSF Calculation 2: Failed to calculate RMSF for uniprot: {path}, error: {e}')
             return pd.DataFrame(columns=['Chain', 'Resid', 'rmsf'])
 
-        return df_rmsf.reset_index(drop=True).rename(columns={'resid': 'Resid', 'chain': 'Chain'})
+        df_rmsf = df_rmsf.reset_index(drop=True).rename(columns={'resid': 'Resid',
+                                                                 'chain': 'Chain'})
+        _ENSEMBLE_RESULTS[ensemble_key] = (df_rmsf, single_structure)
+        return df_rmsf.copy()
 
 
 if __name__ == '__main__':

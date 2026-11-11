@@ -87,7 +87,7 @@ class LEGOLAS():
             self.cache_policy = 'auto'
 
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate 15N nmr data using legolas
 
@@ -99,11 +99,15 @@ class LEGOLAS():
 
         :param path: The path of the pdb file that legolas is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         '''
         # 1: Load in the structure and locate all the NZ atoms within the lysines, calculate the list of chains and list of resids to go with this
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
 
             result_filename = os.path.join(self.legolas_output_path, path.split(f'{os.sep}')[-1].split('.')[0] + '_cs.csv')
 

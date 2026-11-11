@@ -32,6 +32,23 @@ class Test_Protein(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
 
+    def _check_single_conformer(self, path):
+        '''
+        A conformation file written by the rotamer split holds one conformer: no alternate
+        location letter is left, no atom is written twice, and every chain is one contiguous
+        block followed by one TER record.
+        '''
+        lines = open(path).read().splitlines()
+        atoms = [l for l in lines if l.startswith(('ATOM', 'HETATM'))]
+        self.assertTrue(len(atoms) > 0)
+        self.assertEqual({l[16] for l in atoms}, {' '})
+        keys = [(l[21], l[22:27], l[12:16]) for l in atoms]
+        self.assertEqual(len(keys), len(set(keys)))
+        chains = [l[21] for l in atoms]
+        n_chains = len(set(chains))
+        self.assertEqual(sum(a != b for a, b in zip(chains, chains[1:])), n_chains - 1)
+        self.assertEqual(sum(l.startswith('TER') for l in lines), n_chains)
+
     def test_downloads(self):
         self.PDB.download_pdb('1PAE')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE.pdb'))
@@ -178,7 +195,8 @@ class Test_Protein(unittest.TestCase):
             max_nmr_conformers=5,
             nmr_conformer_selection='all')
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,9)))
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb')
+                            for a in range(1,9)))
     '''
 
     def test_nmr_conformer_selection_first(self):
@@ -192,8 +210,8 @@ class Test_Protein(unittest.TestCase):
             max_nmr_conformers=2,
             nmr_conformer_selection='first')
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,3)))
-        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 2)
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in range(1,6)))
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 5)
 
     def test_nmr_conformer_selection_representative(self):
         PDB = RD.PDB(outdir=self.outdir,
@@ -207,7 +225,8 @@ class Test_Protein(unittest.TestCase):
             nmr_conformer_selection='representative')
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-1.pdb'))
-        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated') if re.match('2MWS-alt-*..pdb', a)]), 1)
+        self.assertEqual(len([a for a in os.listdir(f'{self.outdir}{os.sep}curated')
+                              if re.match('2MWS-alt-*..pdb', a)]), 1)
 
     def test_nmr_conformer_selection_list(self):
         PDB = RD.PDB(outdir=self.outdir,
@@ -222,7 +241,7 @@ class Test_Protein(unittest.TestCase):
         print(PDB.nmr_conformer_selection)
         PDB.clean_and_split_pdb('2MWS', 'P0CG48')
         print(os.listdir(f'{self.outdir}{os.sep}curated'))
-        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,3]))
+        self.assertTrue(all(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}2MWS-alt-{str(a)}.pdb') for a in [1,4,6,7]))
 
     def test_rotamer_selection_all(self):
         # test keeping all available rotamers from the pdb structure
@@ -238,6 +257,8 @@ class Test_Protein(unittest.TestCase):
         PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb'))
+        self._check_single_conformer(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb')
+        self._check_single_conformer(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb')
 
     def test_rotamer_selection_first(self):
         # test keeping only the first rotamer from the pdb structure
@@ -253,6 +274,7 @@ class Test_Protein(unittest.TestCase):
         PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb'))
         self.assertFalse(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1B.pdb'))
+        self._check_single_conformer(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1A.pdb')
 
     def test_rotamer_selection_highest_occupancy(self):
         # test keeping only the first rotamer from the pdb structure
@@ -268,6 +290,54 @@ class Test_Protein(unittest.TestCase):
         PDB.clean_and_split_pdb('3Q7V', 'Q7WU28')
         print(os.listdir(f'{self.outdir}{os.sep}curated'))
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1HiOcc.pdb'))
+        self._check_single_conformer(f'{self.outdir}{os.sep}conformations{os.sep}3Q7V-alt1HiOcc.pdb')
+        # the structure that was curated from it is free of clashes
+        df_geometry = pd.read_csv(f'{self.outdir}{os.sep}curation_geometry.csv')
+        self.assertEqual(int(df_geometry['n_clashes'].max()), 0)
+
+    def test_rotamer_selection_is_per_residue(self):
+        # a file with two chains: A1 has alternates A (0.30) and B (0.70), A2 has none, B1 has
+        # alternates B (0.60) and C (0.40) only, B2 has A (0.50) and B (0.50)
+        def atom(serial, name, alt, chain, resid, x, occ):
+            return (f'ATOM  {serial:5d}  {name:<3s}{alt}ALA {chain}{resid:4d}    '
+                    f'{x:8.3f}{0.0:8.3f}{0.0:8.3f}{occ:6.2f}{10.0:6.2f}           C\n')
+        text = ''.join([
+            atom(1, 'N', ' ', 'A', 1, 0.0, 1.0),
+            atom(2, 'CA', 'A', 'A', 1, 1.0, 0.30), atom(3, 'CA', 'B', 'A', 1, 2.0, 0.70),
+            atom(4, 'CA', ' ', 'A', 2, 3.0, 1.0),
+            'TER\n',
+            atom(5, 'CA', 'B', 'B', 1, 4.0, 0.60), atom(6, 'CA', 'C', 'B', 1, 5.0, 0.40),
+            atom(7, 'CA', 'A', 'B', 2, 6.0, 0.50), atom(8, 'CA', 'B', 'B', 2, 7.0, 0.50),
+            'TER\n'])
+        # x coordinate of the CA kept for A1, A2, B1 and B2
+        expected = {'first': ('TEST-alt1A.pdb', [1.0, 3.0, 4.0, 6.0]),
+                    'highest_occupancy': ('TEST-alt1HiOcc.pdb', [2.0, 3.0, 4.0, 6.0])}
+        for selection, (name, xs) in expected.items():
+            outdir = os.path.join(self.outdir, selection)
+            PDB = RD.PDB(outdir=outdir, minimise_strucs=None, rotamer_selection=selection)
+            with open(os.path.join(PDB.raw_dir, 'TEST-alt-1.pdb'), 'w') as fh:
+                fh.write(text)
+            PDB.split_struc_alt_aa('TEST')
+            self.assertEqual(sorted(os.listdir(PDB.raw_dir)), [name])
+            path = os.path.join(PDB.raw_dir, name)
+            self._check_single_conformer(path)
+            ca = [float(l[30:38]) for l in open(path) if l.startswith('ATOM') and l[12:16].strip() == 'CA']
+            self.assertEqual(ca, xs)
+
+        # 'all' writes one file per letter of the file, each with the atoms of its own letter
+        outdir = os.path.join(self.outdir, 'all')
+        PDB = RD.PDB(outdir=outdir, minimise_strucs=None, rotamer_selection='all')
+        with open(os.path.join(PDB.raw_dir, 'TEST-alt-1.pdb'), 'w') as fh:
+            fh.write(text)
+        PDB.split_struc_alt_aa('TEST')
+        self.assertEqual(sorted(os.listdir(PDB.raw_dir)),
+                         ['TEST-alt1A.pdb', 'TEST-alt1B.pdb', 'TEST-alt1C.pdb'])
+        ca = {name: [float(l[30:38]) for l in open(os.path.join(PDB.raw_dir, name))
+                     if l.startswith('ATOM') and l[12:16].strip() == 'CA']
+              for name in os.listdir(PDB.raw_dir)}
+        self.assertEqual(ca, {'TEST-alt1A.pdb': [1.0, 3.0, 6.0],
+                              'TEST-alt1B.pdb': [2.0, 3.0, 4.0, 7.0],
+                              'TEST-alt1C.pdb': [3.0, 5.0]})
 
     def test_get_prot_org(self):
         shutil.copyfile(os.path.join('demo', 'curated', 'AF-P40616-F1-model_v6.pdb'),
@@ -303,7 +373,8 @@ class Test_Protein(unittest.TestCase):
         out = tempfile.mkdtemp(prefix='resdy_het_')
         P = RD.PDB(outdir=out, gap=10, parallel=False, minimise_strucs=None, **kwargs)
         P.clean_and_split_pdb('1A6M', 'P02185', chains=[])
-        f = sorted(a for a in os.listdir(os.path.join(out, 'curated')) if '1A6M' in a and a.endswith('.pdb'))[0]
+        f = sorted(a for a in os.listdir(os.path.join(out, 'curated'))
+                   if '1A6M' in a and a.endswith('.pdb'))[0]
         return P, out, os.path.join(out, 'curated', f)
 
     def test_hetatm_default_keeps_nothing(self):
