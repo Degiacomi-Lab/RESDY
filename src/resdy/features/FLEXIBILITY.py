@@ -61,7 +61,7 @@ class FLEXIBILITY():
         else:
             self.record_errors = False
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the flexibility of the lysine of interest within the protein structure. This uses
         B-factor values for atoms within the lysine and reports the average of all atoms within the
@@ -79,6 +79,9 @@ class FLEXIBILITY():
 
         :param path: The path of the pdb file that the flexibility is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and flexibility output.
             Outline::
@@ -89,8 +92,9 @@ class FLEXIBILITY():
         '''
 
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
             M.atomselect('*', '*', ['C', 'CA', 'N', 'O'], get_index=True)
 
             if self.include_modified:

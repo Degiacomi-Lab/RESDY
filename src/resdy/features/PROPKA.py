@@ -73,7 +73,7 @@ class PROPKA():
             self.cache_policy = 'auto'
 
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Call PROPKA to calculate the pKa of a file, parse the .pka file to extract lysine data parse
         errors, and return a dataframe containing all measurements not yielding an error.
@@ -87,6 +87,9 @@ class PROPKA():
 
         :param path: The path of the pdb file that pKa is being calculated for with PROPKA3.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and propka output. Outline::
 
@@ -97,8 +100,9 @@ class PROPKA():
         if self.include_modified:
             df_mod = pd.DataFrame()
             try:
-                M = bb.Molecule()
-                M.import_pdb(path, include_hetatm=True)
+                if M is None:
+                    M = bb.Molecule()
+                    M.import_pdb(path, include_hetatm=True)
     
                 idx_mod_res = M.atomselect('*', self.aa_properties['modified_codes'],
                                            'CA', use_resname=True, get_index=True)[1]

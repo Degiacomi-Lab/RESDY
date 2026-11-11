@@ -61,7 +61,7 @@ class SASA():
         else:
             self.record_errors = False
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the solvent accessible surface area of the side chain of each residue of
         interest, i.e. of all its atoms except N, CA, C and O.
@@ -78,6 +78,9 @@ class SASA():
 
         :param path: The path of the pdb file that SASA is being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and sasa output. Outline::
 
@@ -87,8 +90,9 @@ class SASA():
         '''
 
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
 
             if self.include_modified:
                 lys_coords, lys_idx = M.atomselect('*',

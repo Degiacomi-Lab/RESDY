@@ -106,7 +106,7 @@ class AEV():
                       f'environment')
 
 
-    def calculate(self, path):
+    def calculate(self, path, M=None):
         '''
         Calculate the Atomic Environment Vectors (AEVs) of the NZ atom within the lysine structure
 
@@ -122,6 +122,9 @@ class AEV():
 
         :param path: The path of the pdb file that the AEVs are being calculated for.
         :type path: str
+        :param M: The structure of ``path`` already loaded with its heteroatoms, which saves
+            reading the file again. It is read from ``path`` when None.
+        :type M: biobox.Molecule, None
         :returns:
             Dataframe with information on chain, residue number and AEV output. Outline::
 
@@ -136,8 +139,9 @@ class AEV():
 
         # 1: prepare the biobox structure, take the species and coordinates and convert to Atoms structure, find the locations of the NZ atoms within the lysines in the strucure
         try:
-            M = bb.Molecule()
-            M.import_pdb(path, include_hetatm=True)
+            if M is None:
+                M = bb.Molecule()
+                M.import_pdb(path, include_hetatm=True)
 
             if self.include_modified:
                 coords_nz, idx_nz = M.atomselect('*',
