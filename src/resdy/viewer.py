@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, ctx, callback, no_update
 from .aggregation import Aggregation
-from .helper import METADATA_COLUMNS, FEATURE_LABELS, AGG_LABELS
+from .helper import non_feature_columns, FEATURE_LABELS, AGG_LABELS
 from .analysis import Analysis
 from .uniprot import Uniprot
 
@@ -49,7 +49,7 @@ class Viewer(object):
             self.render_mode = 'auto'
         self.suppress_unimportant_output = suppress_unimportant_output
 
-        self.non_feat_cols = list(METADATA_COLUMNS)
+        self.non_feat_cols = non_feature_columns(self.df_measures.columns)
         self.features = [a for a in self.df_measures.columns if a not in self.non_feat_cols]
 
         self.vector_features = ['aev', 'evolution']
