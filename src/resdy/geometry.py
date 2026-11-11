@@ -201,7 +201,8 @@ def distance_to_other_chains(chain, resname, element, xyz, anchor,
     return out
 
 
-def distance_to_nearest_termini(chain, resname, element, xyz, anchor, resid):
+def distance_to_nearest_termini(chain, resname, element, xyz, anchor, resid,
+                                protein_resnames=PROTEIN_RESNAMES):
     '''
     Distance from each anchor atom to the closest termini in the structure.
 
@@ -215,6 +216,7 @@ def distance_to_nearest_termini(chain, resname, element, xyz, anchor, resid):
     :param xyz: (n, 3) coordinates.
     :param anchor: (n,) boolean mask of the atoms to measure from.
     :param resid: (n,) Indexes of the residues within the protein.
+    :param protein_resnames: residue names counted as protein.
     :returns: (number of anchors,) distances in A, in the order of ``np.flatnonzero(anchor)``,
         NaN for an anchor whose structure holds no other protein chain.
     :rtype: numpy.ndarray
@@ -233,10 +235,14 @@ def distance_to_nearest_termini(chain, resname, element, xyz, anchor, resid):
         return out
 
     term_idx = []
-    for c in np.unique(chain):
-        idx = np.flatnonzero(chain == c)
-        r = np.asarray(resid)[idx]
+    partner = np.isin(resname, list(protein_resnames)) & ~np.isin(element, ['H', 'D'])
+    for c in np.unique(chain[partner]):
+        idx = np.flatnonzero((chain == c) & partner)
+        r = resid[idx]
         term_idx.extend(idx[(r == r[0]) | (r == r[-1])])
+
+    if not len(term_idx):
+        return out
 
     term_idx = np.unique(term_idx)
     out[:] = cKDTree(xyz[term_idx]).query(xyz[anchor_idx])[0]

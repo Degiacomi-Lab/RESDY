@@ -125,10 +125,26 @@ class Test_Analysis(unittest.TestCase):
             self.assertEqual(len(self.A.df[(self.A.df['Uniprot_Entry'] == r['Uniprot_Entry']) &
                                            (self.A.df['Resid'] == r['Resid'])]), 0)
 
-    def test_data_to_ml(self):
+    def test_data_to_ml_measures(self):
         X, y, metadata, feature_names, go_terms = self.A.data_to_ml(self.A.df, output_goterms=True)
         self.assertEqual(len(X), len(y))
         self.assertEqual(set(feature_names), set(self.features_to_analyse))
+        unis_in_go_terms = []
+        for v in go_terms.values():
+            for u in v:
+                if u not in unis_in_go_terms:
+                    unis_in_go_terms.append(u)
+        self.assertEqual(set(metadata['Uniprot_Entry']), set(unis_in_go_terms))
+
+    def test_data_to_ml_aggregated(self):
+        df_agg = self.A.aggregate_data()
+        agg_suffixes = ['min', 'max']
+        feat_agg_names = []
+        for suff in agg_suffixes:
+            feat_agg_names = feat_agg_names + [f'{a}_{suff}' for a in self.features_to_analyse]
+        X, y, metadata, feature_names, go_terms = self.A.data_to_ml(df_agg, output_goterms=True)
+        self.assertEqual(len(X), len(y))
+        self.assertEqual(set(feature_names), set(feat_agg_names))
         unis_in_go_terms = []
         for v in go_terms.values():
             for u in v:

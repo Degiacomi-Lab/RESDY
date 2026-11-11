@@ -11,7 +11,7 @@ from .uniprot import Uniprot
 from .helper import METADATA_COLUMNS, sort_residue_key, FEATURE_LABELS, AGG_LABELS
 
 
-class Analysis(object):
+class Analysis:
     '''
     Class to handle nalysis of a measurements dataframe. GO term analysis, 
     '''
@@ -208,7 +208,8 @@ class Analysis(object):
                     print('No aggregation type given, using avg')
                     agg_type = 'avg'
 
-                agg_feature = f'{feature}_{agg_type}'
+                suffix = {'median': 'med', 'random': 'rand'}.get(agg_type, agg_type)
+                agg_feature = f'{feature}_{suffix}'
 
                 agg = Aggregation(df_measurements=df_plot,
                                   outdir=self.outdir,
@@ -260,7 +261,7 @@ class Analysis(object):
                                 features_to_include=feat_cols)
                 df_plot = agg.aggregate_data()
                 new_feat_cols = [a.split('_')[0] for a in df_plot.columns if a not in non_feat_cols]
-                print(new_feat_cols)
+
                 if 'arc' in new_feat_cols:
                     new_feat_cols.remove('arc')
                     new_feat_cols.append('arc_length')
@@ -524,7 +525,7 @@ class Analysis(object):
 
 
         if save_name != '':
-            plt.savefig(save_name)
+            plt.savefig(os.path.join(self.outdir, save_name))
 
         if show_graph:
             plt.show()
@@ -559,7 +560,7 @@ class Analysis(object):
         return df_outlier
 
 
-    def get_extreme_values(self, feature, lower = 1, upper = 14):
+    def get_extreme_values(self, feature, lower = 1.0, upper = 14.0):
         '''
         Retrieve data from the given dataframe which are outside the lower and upper
         boundaries for that feature of interest.
@@ -567,14 +568,14 @@ class Analysis(object):
         :param feature: Feature of interest to examine
         :type feature: str
         :param lower: Lower boundary for a value for the feature to not be considered extreme
-        :type lower: int
+        :type lower: float
         :param upper: Upper boundary for a value for the feature to not be considered extreme
-        :type upper: int
+        :type upper: float
 
         :returns: Dataframe containing only information from an alphafold structure
         :rtype: pandas.DataFrame
         '''
-        df_query = self.df[(self.df[feature] < int(lower)) | (self.df[feature] > int(upper))]
+        df_query = self.df[(self.df[feature] < float(lower)) | (self.df[feature] > float(upper))]
         return df_query
 
 
@@ -746,7 +747,6 @@ class Analysis(object):
         :returns: Measurements dataframe with a class column attached
         :rtype: Pandas DataFrame
         '''
-        df_class_set = df_class_set.copy()
 
         if isinstance(df_class_set, str):
             if os.path.isfile(df_class_set):
@@ -754,6 +754,8 @@ class Analysis(object):
             else:
                 raise NameError(f'>> No file available for class labels at the location given '
                                 f'{df_class_set}, please check the file name is correct.')
+        else:
+            df_class_set = df_class_set.copy()
 
         if not isinstance(label, str):
             label = str(label)
@@ -819,7 +821,7 @@ class Analysis(object):
         if class_label not in df['class'].unique():
             print(f'>> old label given: {class_label}, was not found in the \'class\' column,'
                     f'nothing to remove.')
-            return
+            return df
 
         df = df[df['class'] != class_label]
         return df
@@ -843,6 +845,7 @@ class Analysis(object):
         :rtype: pandas.DataFrame
         '''
         # go over the weights to make sure the values are good and then matches the number of features
+        weights = weights.copy()
         try:
             if isinstance(weights, float) or isinstance(weights, int):
                 if weights == 0.5:
@@ -957,7 +960,8 @@ class Analysis(object):
                             metric_calculated_values_list_temp.append(feat_list_weighted)
 
                         except Exception as e:
-                            print(f'>> Failed to load the data for the metric: {feature} with error: {e}')
+                            print(f'>> Failed to load the data for the metric: '
+                                  f'{feature} with error: {e}')
 
                 except Exception as e:
                     print(f'Error loading data for the metrics provided: {e}')
@@ -1131,6 +1135,11 @@ class Analysis(object):
         agg_init_param_names = [a.name for a in agg_init_params.parameters.values()]
 
         kwargs = {k:v for (k,v) in kwargs.items() if k in agg_init_param_names}
+        unknown_kwargs = [k for k,_ in kwargs.items() if k not in agg_init_param_names]
+
+        if unknown_kwargs:
+            raise ValueError(f'>> Values given as arguments were not recognised as inputs for '
+                             f'aggregation: {', '.join(unknown_kwargs)}. Please check the input.')
 
         if 'features_to_include' not in list(kwargs):
             kwargs['features_to_include'] = [a for a in self.df.columns if
@@ -1176,10 +1185,12 @@ class Analysis(object):
             column was not provided it sets these all to -1.
         :rtype: numpy arrays
         '''
+        df_in = df_in.copy()
         key = ['Uniprot_Entry', 'Resid']
 
         data_aggregated_bool = not df_in.duplicated(subset=key).any()
-        if not data_aggregated_bool:
+        data_agg_source_pool_bool = not df_in.duplicated(subset=key+['Source']).any()
+        if not data_aggregated_bool and not data_agg_source_pool_bool:
             print('>> Data to convert to numpy array is not aggregated. Training ML models on '
                   'data that is not aggregated may lead to inflated prediction metrics. Be careful'
                   'splitting data downstream in models.')

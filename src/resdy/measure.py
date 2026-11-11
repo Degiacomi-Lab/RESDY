@@ -1571,7 +1571,8 @@ class Measure(object):
             terminal_out_statements.append(f"\n> File: {f}")
 
             columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
-                       'In_Modelled_Region', 'Dist_To_Nearest_Terminus', 'Dist_To_Modelled']
+                       'Dist_To_Modelled', 'Dist_To_Nearest_Terminus', 'In_Modelled_Region']
+
             if self.include_mod:
                 columns.append('Modified')
             records = []

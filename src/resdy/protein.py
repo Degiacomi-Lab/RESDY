@@ -206,7 +206,9 @@ class PDB(object):
         :param max_nmr_conformers: The maximum number of conformers you would like splitting out
             from the original pdb file. This will take the first n conformers through to curated
             structures. Default is no cap and will curate all. '' or None will also take all
-            while an integer will limit.
+            while an integer will limit. This is only used when ``nmr_conformer_selection``
+            is set to 'first', or a list passsed to this. If ``nmr_conformer_selection`` is set
+            to 'all', all nmr conformers will be curated regardless of what this is set to.
         :type max_nmr_conformers: int
         :param biological_assembly: Build the biological assembly of each curated PDB
             structure from the BIOMT operators of REMARK 350, choosing the first
@@ -360,7 +362,8 @@ class PDB(object):
 
         if isinstance(nmr_conformer_selection, list):
             self.nmr_conformer_selection = [int(a) for a in nmr_conformer_selection if
-                                            int(a) < self.max_nmr_conformers]
+                                            self.max_nmr_conformers is None or
+                                            int(a) <= self.max_nmr_conformers]
         elif isinstance(nmr_conformer_selection, str):
             if nmr_conformer_selection not in ['all', 'first', 'representative']:
                 print('>> Input given to nmr_conformer_selection is not an available option. '
@@ -373,7 +376,6 @@ class PDB(object):
             print('>> Input given to nmr_conformer_selection could not be inferred, setting '
                   'it to the default of \'all\'')
             self.nmr_conformer_selection = 'all'
-        self.nmr_conformer_selection = nmr_conformer_selection
 
         if isinstance(rotamer_selection, str):
             if rotamer_selection in ['all', 'first', 'highest_occupancy']:
@@ -392,6 +394,7 @@ class PDB(object):
         else:
             print(f'>> Option given for minimise termini is not recognised '
                     f'({minimise_termini}), defaulting to \'capped\' if available')
+            self.minimise_termini = 'capped'
 
         if not PDBFIXER_AVAILABLE and self.minimise_termini == 'capped':
             print('>> PDBFixer is not available and therefore not able to implement '
@@ -1581,8 +1584,12 @@ class PDB(object):
 
                                     F = bb.Molecule()
                                     F.import_pdb(filename=read_file_path, include_hetatm=True)
-                                    F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-                                    subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                                    F = F.get_subset(F.atomselect('*', '*', 'CA',
+                                                                  use_resname=True,
+                                                                  get_index=True)[1])
+                                    subset_data = F.data.iloc[F.atomselect('*', '*', 'CA',
+                                                                           use_resname=True,
+                                                                           get_index=True)[1]]
                                     pdb_seqs = {}
                                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                         tmp_data = subset_data[subset_data['chain'] == chain]
@@ -1661,7 +1668,6 @@ class PDB(object):
         :type rep_struc: int
         '''
 
-        rep_struc_written = False
         if isinstance(self.nmr_conformer_selection, list):
             nmr_conf_list_written = {k: False for k in self.nmr_conformer_selection}
         number = 1
@@ -1709,42 +1715,31 @@ class PDB(object):
                         break
 
                     elif re.search('ENDMDL', line):
+                        selec_nmr_conf = self.nmr_conformer_selection
+                        max_conf = self.max_nmr_conformers
+                        keep_conf = (number in selec_nmr_conf if isinstance(selec_nmr_conf, list)
+                                     else number == rep_struc if selec_nmr_conf == 'representative'
+                                     else max_conf is None or number <= max_conf)
+                        f_write.write(line)
+                        f_write.close()
+                        if not keep_conf:
+                            os.remove(path_rename)
+
                         if isinstance(self.nmr_conformer_selection, list):
                             if number in self.nmr_conformer_selection:
-                                f_write.write(line)
-                                f_write.close()
                                 nmr_conf_list_written[number] = True
 
                             if all(nmr_conf_list_written.values()):
                                 break
 
                         elif self.nmr_conformer_selection == 'first':
-                            if number < self.max_nmr_conformers:
-                                f_write.write(line)
-                                f_write.close()
-
-                            else:
-                                f_write.close()
-                                f.close()
-                                os.remove(path)
+                            if number > self.max_nmr_conformers:
                                 break
 
                         elif self.nmr_conformer_selection == 'representative':
                             if number == rep_struc:
-                                f_write.write(line)
-                                f_write.close()
-                                rep_struc_written = True
-
-                            if rep_struc_written:
-                                f_write.close()
-                                f.close()
-                                os.remove(path)
                                 break
 
-                        else:
-                            # 'all' or default track
-                            f_write.write(line)
-                            f_write.close()
 
                         number += 1
 
