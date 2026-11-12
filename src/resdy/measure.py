@@ -965,9 +965,9 @@ class Measure(object):
             gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
             cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
 
-            self.measures = cpu_measurements
-            if cpu_measurements:
-                if self.parallel:
+            if self.parallel:
+                self.measures = cpu_measurements
+                if cpu_measurements:
                     ctx = parallel_context()
                     results = []
                     if self.big_protein_mode:
@@ -998,34 +998,36 @@ class Measure(object):
                         df_parallel_extra = pd.concat(
                             [self._measure_file(lock, file_dets) for file_dets in big_items],
                                                 ignore_index=True)
-                        df_parallel = pd.concat([df_parallel, df_parallel_extra], ignore_index=True)
+                        df_parallel = pd.concat([df_parallel, df_parallel_extra],
+                                                ignore_index=True)
 
-                else:
-                    df_parallel = pd.concat(
-                        [self._measure_file(lock, file_dets) for file_dets in items],
-                                            ignore_index=True)
+                self.measures = gpu_measurements
+                if gpu_measurements:
+                    df_gpu = pd.concat([self._measure_file(lock, d) for d in items],
+                                    ignore_index=True)
 
-            self.measures = gpu_measurements
-            if gpu_measurements:
-                df_gpu = pd.concat([self._measure_file(lock, d) for d in items],
-                                   ignore_index=True)
-
-                if df_parallel.empty:
-                    df_parallel = df_gpu
-                else:
-                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if
-                                                  a in df_parallel.columns and a not in base_cols])
-                    df_parallel = df_parallel.merge(df_gpu, how='left',
+                    if df_parallel.empty:
+                        df_parallel = df_gpu
+                    else:
+                        df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if
+                                                a in df_parallel.columns and a not in base_cols])
+                        df_parallel = df_parallel.merge(df_gpu, how='left',
                                                 on=[a for a in base_cols if a in df_gpu.columns])
 
-            if not cpu_measurements and not gpu_measurements:
-                print('>> No measurements are registered, nothing to calculate')
+                if not cpu_measurements and not gpu_measurements:
+                    print('>> No measurements are registered, nothing to calculate')
 
-            self.measures = cpu_measurements + gpu_measurements
+                self.measures = cpu_measurements + gpu_measurements
 
-            frames = [f for f in (self.df, df_parallel) if not f.empty]
-            if frames:
-                self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
+                frames = [f for f in (self.df, df_parallel) if not f.empty]
+                if frames:
+                    self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
+
+            else:
+                df_measures = pd.concat(
+                    [self._measure_file(lock, file_dets) for file_dets in items],
+                                        ignore_index=True)
+                self.df = df_measures
 
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
@@ -1401,47 +1403,20 @@ class Measure(object):
             raise KeyError(f'>> Running include modified but Modified column not '
                            f'present for feature: {col_name}')
 
-        for i, r in target.iterrows():
+        merge_key = ['Chain', 'Resid', 'Modified'] if self.include_mod else ['Chain', 'Resid']
 
-            chain_value = r["Chain"]
-            resid_value = r["Resid"]
-            if self.include_mod:
-                modified_value = r['Modified']
+        if len(to_merge.drop_duplicates(subset=merge_key)) != len(to_merge):
+            out_print = (f'{col_name}: {to_merge.drop_duplicates(subset=merge_key)} rows on the '
+                         f'new feature dataframe match  {len(to_merge)} rows on the dataframe to '
+                         f'merge into. An insertion code has been not managed properly, no guess '
+                         f'employed; continuing')
+            if self.report_errors:
+                self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes',
+                                            col_name, out_print)
+            print('>> ' + out_print)
 
-            if self.include_mod:
-                idx = np.where((to_merge["Chain"] == chain_value) &
-                               (to_merge["Resid"].astype(int) == resid_value) &
-                               (to_merge["Modified"].astype(bool) == modified_value))
-            else:
-                idx = np.where((to_merge["Chain"] == chain_value) &
-                               (to_merge["Resid"].astype(int) == resid_value))
+        target = target.merge(to_merge, on=merge_key)
 
-            if len(idx[0]) == 0:
-                continue
-
-            if len(idx[0]) > 1:
-                out_print = (f'{col_name}: {len(idx[0])} rows match Chain {chain_value}, Resid '
-                             f'{resid_value}; an insertion code has been not managed properly, '
-                             f'no guess employed; continuing')
-                if self.report_errors:
-                    self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes',
-                                               col_name, out_print)
-                print('>> ' + out_print)
-                continue
-
-
-            # account for measurements that have special cases
-            if col_name == 'melodia':
-                melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
-                for feature in melodia_features:
-                    if feature in self.features and feature in to_merge.columns:
-                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
-            elif col_name == 'frustration':
-                for feature in ('frustration', 'density'):
-                    if feature in self.features and feature in to_merge.columns:
-                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
-            else:
-                target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
         return target
 
 
