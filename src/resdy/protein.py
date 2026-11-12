@@ -282,14 +282,11 @@ class PDB(object):
                                     else [resnames_of_interest])
         self.resnames_of_interest = list(resnames_of_interest)
 
-        if keep_modifications == 'all':
-            self.keep_modifications = keep_modifications
-        elif isinstance(keep_modifications, str):
-            self.keep_modifications = keep_modifications
-        elif len(keep_modifications) == 1:
-            self.keep_modifications = tuple([keep_modifications])
-        else:
-            self.keep_modifications = tuple(a.upper() for a in keep_modifications)
+        if isinstance(keep_modifications, str):
+            keep_modifications = ('all' if keep_modifications.strip().lower() == 'all'
+                                  else (keep_modifications,))
+        self.keep_modifications = (keep_modifications if keep_modifications == 'all'
+                                   else tuple(str(a).strip().upper() for a in keep_modifications))
 
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
@@ -1033,6 +1030,16 @@ class PDB(object):
         return org_dets
 
 
+    def _keeps_modification(self, resname):
+        '''
+        Return True or False based on if the resname fits the criteria setup in the class
+        within ``keep_modifications``.
+
+        :param resname: Resname of interest to check against keep criteria
+        :type resname: str
+        '''
+        return (self.keep_modifications == 'all'
+                or resname.strip().upper() in self.keep_modifications)
 
 
     def _record_geometry(self, geometry, stage, align_details={}):
@@ -1435,30 +1442,35 @@ class PDB(object):
                 norm_code = line[24:27]
                 if self.keep_modifications == ():
                     modres_sites[chain + res_num] = norm_code
-                elif ((mod_code not in self.keep_modifications or
-                      mod_code != self.keep_modifications) and
-                      self.keep_modifications != 'all'):
+                elif not self._keeps_modification(mod_code):
                     modres_sites[chain + res_num] = norm_code
 
             # check for resid insertion code in position 26 on ATOM records
             if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
                 res_insertion_codes.append(line[26])
 
-            if self.keep_modifications != 'all' and 'MSE' not in self.keep_modifications:
+            if not self._keeps_modification('MSE'):
                 # replace selenomethionine with methionine
                 if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
+                    print(f'>> MSE found in structure at chain: {line[16]}; '
+                          f'resid {line[18:22].strip()}, removing...')
                     line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
                     test_mse = True
 
-            if self.keep_modifications != 'all' and 'SEC' not in self.keep_modifications and 'SEC' != self.keep_modifications:
+            if not self._keeps_modification('SEC'):
                 # replace selenocysteine with cysteine
                 if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
+                    print(f'>> SEC found in structure at chain: {line[16]}; '
+                          f'resid {line[18:22].strip()}, removing...')
                     line = selenium_to_sulfur(line, 'CYS', 'SG')
                     test_sec = True
 
-            if self.keep_modifications != 'all' and 'KCX' not in self.keep_modifications:
+            if not self._keeps_modification('KCX'):
                 #transform carboxylated lysine into a normal lysine
                 if line[17:20] == 'KCX':
+
+                    print(f'>> KCX found in structure at chain: {line[16]}; '
+                          f'resid {line[18:22].strip()}, removing...')
 
                     if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
                         continue
@@ -1491,9 +1503,7 @@ class PDB(object):
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
                     if self._keep_hetatm(line, element_col):
                         write_file.write(line)
-                    elif (self.keep_modifications == 'all' or
-                          line[17:20].strip().upper() in self.keep_modifications or
-                          line[17:20].strip().upper() == self.keep_modifications):
+                    elif self._keeps_modification(line[17:20].strip().upper()):
                         line = line.replace('HETATM', 'ATOM  ')
                         write_file.write(line)
                     continue
@@ -1518,12 +1528,13 @@ class PDB(object):
                 aa_num = int(line[22:26].strip())
                 old_mod_aa_code = line[17:20]
 
-                if (self.keep_modifications != 'all' and
-                    old_mod_aa_code not in self.keep_modifications and
-                    old_mod_aa_code != self.keep_modifications):
+                if not self._keeps_modification(old_mod_aa_code):
+                    print(f'>> {old_mod_aa_code} found in structure at chain: {line[16]}; '
+                          f'resid {line[18:22].strip()}, removing...')
                     parent_aa_code = modres_sites[(line[21] + line[22:26].strip())].strip().upper()
                     if parent_aa_code in STANDARD_RESIDUES:
-                        line = line.replace('HETATM', 'ATOM  ').replace(old_mod_aa_code, parent_aa_code)
+                        line = line.replace('HETATM', 'ATOM  ').replace(old_mod_aa_code,
+                                                                        parent_aa_code)
                         list_prev_mod_resids[line[21] + str(aa_num)] = parent_aa_code
                         print(f'replaced modification {old_mod_aa_code} with {parent_aa_code}')
 
@@ -1576,9 +1587,12 @@ class PDB(object):
                                     pdb_seqs = {}
                                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                         tmp_data = subset_data[subset_data['chain'] == chain]
-                                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in list(STANDARD_RESIDS.keys())
-                                                                else 'X' for a in list(tmp_data['resname'])])
-                                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                                   list(STANDARD_RESIDS.keys())
+                                                                else 'X' for a in
+                                                                list(tmp_data['resname'])])
+                                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                                 'resid']))
                                     aligner = PairwiseAligner()
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                                     aligner.open_gap_score = -11
@@ -1586,8 +1600,10 @@ class PDB(object):
                                     aligner.end_gap_score = 0.0
                                     alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
 
-                                    for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                                        fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
+                                    for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                                          alignment.aligned[1]):
+                                        fasta_mapper = dict(zip(range(pdb_start, pdb_end),
+                                                                range(seq_start, seq_end)))
 
                                     seq = (seq[:(fasta_mapper[aa_num] - 1)] +
                                            STANDARD_RESIDS[parent_aa_code] +
@@ -1637,18 +1653,22 @@ class PDB(object):
 
                             res_mapper = {}
 
-                            for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                                for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
+                            for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                                  alignment.aligned[1]):
+                                for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1),
+                                                            range(pdb_start, pdb_end)):
                                     res_mapper[chain_res_list[pdb_pos]] = uni_pos
 
                             aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
                             if aa_interest in list(STANDARD_RESIDS.values()):
                                 line = line.replace('HETATM', 'ATOM  ')
-                                line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
+                                line = line.replace(old_mod_aa_code,
+                                                    standard_resids_inv[aa_interest])
                                 list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
 
                                 # edit the fasta file to change the code at desired position
-                                fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
+                                fasta_name = os.path.join(self.raw_dir,
+                                                          f'{pdb.split("-")[0]}.fasta')
                                 if os.path.getsize(fasta_name) == 0:
                                     self.download_fasta(pdb=pdb)
                                 try:
@@ -1685,7 +1705,8 @@ class PDB(object):
                                         if chain[0] == line[21]:
 
                                             F = bb.Molecule()
-                                            F.import_pdb(filename=read_file_path, include_hetatm=True)
+                                            F.import_pdb(filename=read_file_path,
+                                                         include_hetatm=True)
                                             F = F.get_subset(F.atomselect('*', '*', 'CA',
                                                                         use_resname=True,
                                                                         get_index=True)[1])
@@ -1695,9 +1716,12 @@ class PDB(object):
                                             pdb_seqs = {}
                                             for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                                 tmp_data = subset_data[subset_data['chain'] == chain]
-                                                pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in list(STANDARD_RESIDS.keys())
-                                                                        else 'X' for a in list(tmp_data['resname'])])
-                                            chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                                                pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                                           list(STANDARD_RESIDS.keys())
+                                                                        else 'X' for a in
+                                                                        list(tmp_data['resname'])])
+                                            chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                                         'resid']))
                                             aligner = PairwiseAligner()
                                             aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                                             aligner.open_gap_score = -11
@@ -1705,10 +1729,15 @@ class PDB(object):
                                             aligner.end_gap_score = 0.0
                                             alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
 
-                                            for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                                                fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
+                                            for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                                                  alignment.aligned[1]):
+                                                fasta_mapper = dict(zip(range(pdb_start, pdb_end),
+                                                                        range(seq_start, seq_end)))
 
-                                            seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:]
+                                            seq = (seq[:(fasta_mapper[aa_num] - 1)] +
+                                                   aa_interest +
+                                                   seq[fasta_mapper[aa_num]:])
+
                                         seq = seq + '\n'
                                         new_fasta.write(seq)
                                     new_fasta.close()

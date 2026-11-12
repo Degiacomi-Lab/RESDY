@@ -100,7 +100,7 @@ class Test_Protein(unittest.TestCase):
                     resnames_of_interest=self.resnames_of_interest,
                     minimise_strucs=None,
                     max_nmr_conformers=3,
-                    keep_modifications=('SEC'))
+                    keep_modifications='SEC')
         PDB.clean_and_split_pdb('1PAE', 'P22887')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb'))
         M_1pae = bb.Molecule(f'{self.outdir}{os.sep}conformations{os.sep}1PAE-alt-1.pdb')
@@ -126,7 +126,7 @@ class Test_Protein(unittest.TestCase):
             resnames_of_interest=self.resnames_of_interest,
             minimise_strucs=None,
             max_nmr_conformers=3,
-            keep_modifications=('MSE'))
+            keep_modifications='MSE')
         PDB.clean_and_split_pdb('1A8O', 'P12497')
         self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb'))
         M_1a8o = bb.Molecule(f'{self.outdir}{os.sep}curated{os.sep}1A8O-alt-1.pdb')
