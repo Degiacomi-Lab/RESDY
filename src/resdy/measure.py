@@ -17,7 +17,7 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children
+from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children, parallel_context
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains, distance_to_modified, distance_to_nearest_termini
@@ -884,37 +884,12 @@ class Measure(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
-    @staticmethod
-    def _parallel_context():
-        '''
-        Return the multiprocessing context the worker pool is built from. This function is used
-        to get the available context and if possible prefer 'forkserver' method first and then
-        'spawn' if this is not available. If neither preferred option is available, it will fall
-        back onto whatever multiprocessing context is available. 
-
-        With several features importing torch, and torch leaving its thread pools running in the
-        parent for the rest of the session. Forking a multi-threaded parent gives the child a copy
-        of those pools with none of their threads, so the first call that reaches the inherited
-        OpenMP or BLAS runtime can block forever.
-
-        :returns: A multiprocessing context whose start method is not 'fork', where one is
-            available.
-        '''
-        available = mp.get_all_start_methods()
-        for method in ('forkserver', 'spawn'):
-            if method in available:
-                return mp.get_context(method)
-        print(">> Could not get 'forkserver' or 'spawn' multiprocessing context," \
-            "defaulting to 'fork'")
-        return mp.get_context()
-
-
     def _ensure_logger(self):
         '''
         Reattach the log file handler if the current process does not have it.
 
         A ``logging.Logger`` pickles as a lookup of its name, so a worker started by one of
-        the non-forking methods (see :meth:`_parallel_context`) receives the logger without
+        the non-forking methods (see :meth:`parallel_context`) receives the logger without
         the handler that was added to it in the parent, and anything it logs would go nowhere.
         The handler is therefore recreated on first use inside the worker. Records stay
         serialised by the lock that is held around the logging calls, so the processes do not
@@ -956,7 +931,7 @@ class Measure(object):
         files = [file for file in files if 'pkaani' not in file]
         self.files_to_analyse = files
 
-        with get_worker_lock(self.parallel, self._parallel_context()) as lock:
+        with get_worker_lock(self.parallel, parallel_context()) as lock:
             items = []
             small_items = []
             big_items = []
@@ -993,7 +968,7 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    ctx = self._parallel_context()
+                    ctx = parallel_context()
                     results = []
                     if self.big_protein_mode:
                         parallel_items = small_items.copy()
@@ -1491,7 +1466,7 @@ class Measure(object):
         if 'completed' not in self.df_input.columns:
             self.df_input['completed'] = False
 
-        with get_worker_lock(self.parallel, self._parallel_context()) as lock:
+        with get_worker_lock(self.parallel, parallel_context()) as lock:
             items = []
             for _, r in self.df_input.iterrows():
 
@@ -1516,7 +1491,7 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    ctx = self._parallel_context()
+                    ctx = parallel_context()
                     results = []
 
                     with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:

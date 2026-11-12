@@ -184,6 +184,30 @@ def sort_residue_key(df, include_chain=False):
     return [k for k in key if k in df.columns]
 
 
+@staticmethod
+def parallel_context():
+    '''
+    Return the multiprocessing context the worker pool is built from. This function is used
+    to get the available context and if possible prefer 'forkserver' method first and then
+    'spawn' if this is not available. If neither preferred option is available, it will fall
+    back onto whatever multiprocessing context is available. 
+
+    With several features importing torch, and torch leaving its thread pools running in the
+    parent for the rest of the session. Forking a multi-threaded parent gives the child a copy
+    of those pools with none of their threads, so the first call that reaches the inherited
+    OpenMP or BLAS runtime can block forever.
+
+    :returns: A multiprocessing context whose start method is not 'fork', where one is
+        available.
+    '''
+    available = mp.get_all_start_methods()
+    for method in ('forkserver', 'spawn'):
+        if method in available:
+            return mp.get_context(method)
+    print(">> Could not get 'forkserver' or 'spawn' multiprocessing context," \
+        "defaulting to 'fork'")
+    return mp.get_context()
+
 
 
 class ShutUp(object):

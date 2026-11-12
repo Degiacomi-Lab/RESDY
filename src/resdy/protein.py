@@ -18,7 +18,7 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock, mp_hide_main_from_children
+from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock, mp_hide_main_from_children, parallel_context
 from . import alphafold as af
 from . import patcher
 from . import assembly
@@ -725,7 +725,7 @@ class PDB(object):
 
                 if self.parallel:
                     results = []
-                    ctx = self._parallel_context()
+                    ctx = parallel_context()
                     with ctx.Pool(n_cores_to_use, maxtasksperchild=20) as pool:
                         iterator = pool.imap(partial(self._curate_row, lock, skip_if_found),
                                                 [tuple(item) for item in items], chunksize=1)
@@ -765,6 +765,8 @@ class PDB(object):
                 df_tmp = pd.concat(results, ignore_index=True)
 
                 self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
+
+                af.report_af_plddt(outfolder=self.outdir)
 
 
     def _curate_row(self, lock, skip_if_found, row_details):
@@ -890,9 +892,8 @@ class PDB(object):
                     # find the PLDDT codes for AF structures
                     out_print_trap_af_plddt = io.StringIO()
                     with redirect_stdout(out_print_trap_af_plddt):
-                        with lock:
-                            af.find_af_plddt(pdb_code,outfolder=self.outdir,
-                                             resnames=self.resnames_of_interest)
+                        af.find_af_plddt(pdb_code, outfolder=self.outdir,
+                                        resnames=self.resnames_of_interest)
                     print_statements.append(out_print_trap_af_plddt.getvalue())
                 except Exception as e:
                     print(f'> Failed to calculate PLDDT values for Af structure: '
