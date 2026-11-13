@@ -1452,16 +1452,16 @@ class PDB(object):
             if not self._keeps_modification('MSE'):
                 # replace selenomethionine with methionine
                 if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
-                    print(f'>> MSE found in structure at chain: {line[16]}; '
-                          f'resid {line[18:22].strip()}, removing...')
+                    print(f'>> MSE found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
                     line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
                     test_mse = True
 
             if not self._keeps_modification('SEC'):
                 # replace selenocysteine with cysteine
                 if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
-                    print(f'>> SEC found in structure at chain: {line[16]}; '
-                          f'resid {line[18:22].strip()}, removing...')
+                    print(f'>> SEC found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
                     line = selenium_to_sulfur(line, 'CYS', 'SG')
                     test_sec = True
 
@@ -1469,8 +1469,8 @@ class PDB(object):
                 #transform carboxylated lysine into a normal lysine
                 if line[17:20] == 'KCX':
 
-                    print(f'>> KCX found in structure at chain: {line[16]}; '
-                          f'resid {line[18:22].strip()}, removing...')
+                    print(f'>> KCX found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
 
                     if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
                         continue
@@ -1489,9 +1489,7 @@ class PDB(object):
             if line[:4] == 'ATOM' and line[17:20].strip().upper() not in STANDARD_RESIDS:
                 het_key = line[21] + line[22:26].strip()
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
-                    if (self.keep_modifications == 'all' or
-                        line[17:20].strip().upper() in self.keep_modifications or
-                        line[17:20].strip().upper() == self.keep_modifications):
+                    if self._keeps_modification(line[17:20].strip().upper()):
                         write_file.write(line)
                     continue
 
@@ -1529,8 +1527,8 @@ class PDB(object):
                 old_mod_aa_code = line[17:20]
 
                 if not self._keeps_modification(old_mod_aa_code):
-                    print(f'>> {old_mod_aa_code} found in structure at chain: {line[16]}; '
-                          f'resid {line[18:22].strip()}, removing...')
+                    print(f'>> {old_mod_aa_code} found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
                     parent_aa_code = modres_sites[(line[21] + line[22:26].strip())].strip().upper()
                     if parent_aa_code in STANDARD_RESIDUES:
                         line = line.replace('HETATM', 'ATOM  ').replace(old_mod_aa_code,

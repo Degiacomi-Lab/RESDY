@@ -357,6 +357,7 @@ class Test_Protein(unittest.TestCase):
                         max_nmr_conformers=1,
                         minimise_termini=meth)
             PDB.clean_and_split_pdb('1PAE', 'P22887')
+            self.assertTrue(os.path.isfile(f'{self.outdir}{os.sep}curated{os.sep}1PAE-alt-1.pdb'))
 
     # ---- heteroatom retention policy -------------------------------------------
 

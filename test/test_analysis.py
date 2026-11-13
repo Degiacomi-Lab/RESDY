@@ -64,18 +64,29 @@ class Test_Analysis(unittest.TestCase):
         df_enrichment = self.A.enrichment_analysis(feature_one = ['propka', 7, 11],
                                                    feature_two = ['sasa', 0, 10],
                                                    uniprot_cnt_cutoff=1)
+        self.assertTrue(len(df_enrichment) > 0)
 
     def test_relative_best(self):
         resp_base = 'Enter bias towards min or max for '
         resp_end = ' (enter "min" or "max"): '
         responses = {f'{resp_base}curvature{resp_end}': 'min'}
         fake_input = Mock(side_effect=responses.get)
+        df_m = pd.read_csv(self.df_measures)
 
         with patch('builtins.input', fake_input):
-            self.A.relative_best(weights=0.5,
+            df_sub = self.A.relative_best(weights=0.5,
                                 features=['depth', 'sasa', 'propka', 'das', 'curvature'])
-            self.A.relative_best(weights=[0.5, 0.3, 0.1, 0.4],
+            self.assertTrue(len(df_sub) > 0)
+            self.assertEqual(set(list(df_sub['Uniprot_Entry'].unique())),
+                             set(list(df_m['Uniprot_Entry'].unique())))
+            self.assertTrue(all(a in df_sub.columns for a in self.features_to_analyse))
+
+            df_sub = self.A.relative_best(weights=[0.5, 0.3, 0.1, 0.4],
                                 features=['depth', 'sasa', 'propka', 'das', 'curvature'])
+            self.assertTrue(len(df_sub) > 0)
+            self.assertEqual(set(list(df_sub['Uniprot_Entry'].unique())),
+                            set(list(df_m['Uniprot_Entry'].unique())))
+            self.assertTrue(all(a in df_sub.columns for a in self.features_to_analyse))
 
     def test_plotting(self):
         self.A.plot_feature_histogram(plot_type='single',

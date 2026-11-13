@@ -31,7 +31,7 @@ class Test_Uniprot(unittest.TestCase):
         self.UP.from_organism(code='UP000007445', reviewed_only=False)
         self.assertEqual(len(self.UP.df), 5)
 
-    def test_protein(self):
+    def test_get_protein_data(self):
         self.UP.get_protein_data('P09167')
         self.UP.get_protein_data('P0CG48', '2MWS')
 

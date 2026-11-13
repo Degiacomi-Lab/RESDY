@@ -192,12 +192,20 @@ class Test_Aggregation(unittest.TestCase):
 
     def test_source_pooling(self):
         for sp in ['together', 'separate', 'unrelaxed', 'relaxed']:
-            RD.Aggregation(df_measurements=self.demo_measure,
+            AGG = RD.Aggregation(df_measurements=self.demo_measure,
                              outdir=self.outdir,
                             aggregation_method='avg',
                             features_to_include=['sasa'],
                             aev_red_method='null',
-                            source_pooling=sp).aggregate_data()
+                            source_pooling=sp)
+            df_agg = AGG.aggregate_data()
+            self.assertTrue(len(df_agg) > 0)
+            self.assertEqual(set(list(df_agg['Uniprot_Entry'].unique())),
+                             set(list(self.demo_measure['Uniprot_Entry'].unique())))
+            self.assertEqual(set(list(df_agg['Resid'].unique())),
+                            set(list(self.demo_measure['Resid'].unique())))
+            if sp == 'separate':
+                self.assertTrue('Source' in df_agg.columns)
 
 
 class Test_Aggregation_Settings(unittest.TestCase):
