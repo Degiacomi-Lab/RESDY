@@ -68,5 +68,9 @@
     "aev": {
       "cutoff": null
     }
-  }
+  },
+  "run_in_parallel": true,
+  "parallel_worker_timeout": 2,
+  "num_cores_requested": 0,
+  "use_big_protein_mode": false
 }

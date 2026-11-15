@@ -56,7 +56,8 @@ class Test_Uniprot(unittest.TestCase):
         self.UP.filter_by_technique(list_of_techniques=['NMR'])
         self.UP.filter_by_technique(list_of_techniques=['Predicted'])
 
-        #self.UP.save_state()
+        self.UP.save_state()
+        self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'potential_proteins.csv')))
 
     def test_GO_data(self):
         test_uniprots = ['P40616', 'P02185', 'Q16825', 'P0CG48', 'P10724']

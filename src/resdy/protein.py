@@ -740,8 +740,8 @@ class PDB(object):
                                     f'{self.parallel_timeout} s working on structures, so it is '
                                     f'treated as stalled and the run was stopped. Either raise '
                                     f'parallel_timeout if the features requested are simply '
-                                    f'slow on these structures, or set parallel=False to measure in '
-                                    f'series.') from None
+                                    f'slow on these structures, or set parallel=False to measure '
+                                    f'in series.') from None
                 else:
                     results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
                             if t is not None]
@@ -752,12 +752,12 @@ class PDB(object):
                 if self.minimise_af or self.minimise_pdb:
                     self.collect_minimisation_log()
                     if self.minimisation_skipped:
-                        print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised '
-                            f'and will be measured unrelaxed; see minimisation_log.csv')
+                        print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised'
+                            f' and will be measured unrelaxed; see minimisation_log.csv')
 
                 if not results:
-                    print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
-                        f'for more details, see uncuratable_pdb_files.csv')
+                    print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be '
+                          f'curated, for more details, see uncuratable_pdb_files.csv')
                     return
                 df_tmp = pd.concat(results, ignore_index=True)
 
@@ -2583,6 +2583,9 @@ class PDB(object):
             N.write_pdb(relaxed_path)
 
             relaxed_geometry, _ = check_geometry(relaxed_path)
+            if not align_details and 'AF-' in pdb:
+                align_details = {'numbering': 'AF',
+                                 'chains_author_numbering': ''}
             self._record_geometry(relaxed_geometry, 'relaxed', align_details)
 
             details = {'platform_used': simulation.context.getPlatform().getName(),

@@ -88,7 +88,7 @@ class Measure(object):
                                 'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
                  report_errors= True, only_relaxed=False, require_relaxed=False, num_cores=0,
-                 parallel_timeout=600, big_protein_mode=False, struc_dir='',
+                 parallel_timeout=1800, big_protein_mode=False, struc_dir='',
                  cache_policy='auto'):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
@@ -749,6 +749,10 @@ class Measure(object):
             'require_relaxed': self.require_relaxed,
             'cache_policy': self.cache_policy,
             'features': self.feature_settings,
+            'run_in_parallel': self.parallel,
+            'parallel_worker_timeout': self.parallel_timeout,
+            'num_cores_requested': self.num_cores,
+            'use_big_protein_mode': self.big_protein_mode,
         }, default=str))
 
     def _write_settings(self):

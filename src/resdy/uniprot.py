@@ -9,6 +9,7 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 import pandas as pd
 import numpy as np
+from multiprocessing import cpu_count
 
 #: RCSB GraphQL endpoint, and the query returning the organisms of every polymer entity of an
 #: entry together with the UNIPROT codes each entity maps to.
@@ -35,6 +36,7 @@ class Uniprot(object):
         
         :param outdir: The name of the output directory. Note this is currently only used for the
             GO term work here.
+        :type outdir: str
         '''
         columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chains']
         self.df = pd.DataFrame(columns=columns)
@@ -42,6 +44,7 @@ class Uniprot(object):
         pd.reset_option('display.max_rows')
         pd.set_option("display.max_columns", None)
 
+        self.parallel = False
         self.GO_dict = {}  # code as the key
         self.uniprot_to_GO = {}  # uniprot as key
         self.name_to_code = {}
@@ -128,9 +131,11 @@ class Uniprot(object):
         return codes
 
 
-
     def get_protein_data(self, uniprot_code, pdb_code_target="", chain_target=""):
         '''
+        Worker function for get_protein_data to allow for parallel processing of this data and also
+        single run calling of this function if you are just interested in one singular one.
+
         Download protein structures associated with a given UNIPROT code. If a PDB code is also
         provided, only that PDB will be downloaded (e.g. useful for consistency check between
         UNIPROT and PDB) If a DataFrame df is provided, extracted structures will be appended to it.
@@ -145,7 +150,12 @@ class Uniprot(object):
         :param chain_target: If a specific chain is required, can be specified here, else all chains
             will be obtained
         :type chain_target: str
+        :returns: Dataframe containing information on the structures available for the given
+            combination of uniprot code, pdb target, chain target.
+        :rtype: Pandas DataFrame
         '''
+
+        prot_data = pd.DataFrame()
 
         #check if there is uniprot information available for the protein
         try:
@@ -183,7 +193,7 @@ class Uniprot(object):
                          'Method': 'Predicted', 'Resolution': np.nan, 'Chains': np.nan,
                          'Organism_Name': org_name, 'Organism_TaxID': org_taxid})
 
-                self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
+                prot_data = pd.concat([prot_data, pd.DataFrame.from_records(data, index=[0])],
                                     ignore_index=True)
 
             except Exception as e:
@@ -225,12 +235,17 @@ class Uniprot(object):
 
                     if data is not None:
                         data = data | self.get_pdb_organism_details(pdb_code, uniprot_code)
-                        self.df = pd.concat([self.df, pd.DataFrame.from_records(data, index=[0])],
+                        prot_data = pd.concat([prot_data, pd.DataFrame.from_records(data, index=[0])],
                                             ignore_index=True)
 
             except Exception as e:
                 print(f'Error {e}')
                 continue
+
+        if not self.parallel:
+            self.df = pd.concat([self.df, prot_data], ignore_index=True)
+
+        return prot_data
 
 
     def get_pdb_organism_details(self, pdb_code, uniprot_code=None):
@@ -306,11 +321,16 @@ class Uniprot(object):
         :type reviewed_only: bool
         '''
         prot_list = self.get_organism_proteins(code=code, reviewed_only=reviewed_only)
-        for i, prot in enumerate(prot_list):
-            print(f'Extracting protein information for protein {prot} in organism '
-                  f'{code}; {i}/{len(prot_list)}')
-            self.get_protein_data(uniprot_code=prot)
+        print(f'Extracting protein information for {len(prot_list)} proteins from {code}.')
+
+        self.parallel = True
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for result in executor.map(self.get_protein_data, prot_list, timeout=60):
+                self.df = pd.concat([self.df, result], ignore_index=True)
+
         self.df = self.df.drop_duplicates()
+        self.parallel = False
 
 
     def from_csv_file(self, csv_file):
@@ -335,13 +355,18 @@ class Uniprot(object):
         except Exception as e:
             raise Exception(f'Failed to get data from .csv file. {e}') from e
 
+        self.parallel = True
+        stan_prots = []
+        multi_prots = {'uniprot_code': [],
+                       'pdb_code': []}
+
         for i, r in csv_df.iterrows():
             try:
                 uniprot_code = r['Uniprot_Entry']
                 pdb_code = r['PDB_Code']
 
                 if pdb_code == 0:
-                    self.get_protein_data(uniprot_code)
+                    stan_prots.append(uniprot_code)
 
                 elif pdb_code == 'AF':
                     pdb_code = f'AF-{uniprot_code}-F1-model_v6'
@@ -352,13 +377,29 @@ class Uniprot(object):
                                         ignore_index=True)
 
                 else:
-                    self.get_protein_data(uniprot_code, pdb_code)
+                    multi_prots['uniprot_code'].append(uniprot_code)
+                    multi_prots['pdb_code'].append(pdb_code)
 
             except Exception as e:
-                print(f'> Error {e}')
+                print(f'>> Error {e}')
                 continue
 
-        self.df = self.df.drop_duplicates()
+        print(multi_prots['uniprot_code'])
+        print(multi_prots['pdb_code'])
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for result in executor.map(self.get_protein_data, stan_prots, timeout=60):
+                self.df = pd.concat([self.df, result], ignore_index=True)
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for result in executor.map(self.get_protein_data,
+                                       multi_prots['uniprot_code'],
+                                       multi_prots['pdb_code'],
+                                       timeout=60):
+                self.df = pd.concat([self.df, result], ignore_index=True)
+
+        self.df = self.df.drop_duplicates().sort_values(by='Uniprot_Entry')
+        self.parallel = False
 
 
     def filter_by_technique(self, list_of_techniques):
@@ -381,7 +422,8 @@ class Uniprot(object):
         :param outname: Name of the file to write the UP.df dataframe to
         :type outname: str
         '''
-        self.df.to_csv(outname, index_label=False, index=False)
+        o_p = os.path.join(self.outdir, outname)
+        self.df.to_csv(o_p, index_label=False, index=False)
 
 
     def GO_search_term(self, df, code = '', name = ''):
