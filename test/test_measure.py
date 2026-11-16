@@ -1,10 +1,10 @@
 import unittest
-import sys
 import os
+import sys
 import shutil
 import tempfile
-import pandas as pd
 import importlib
+import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
@@ -72,6 +72,22 @@ class Test_Measure(unittest.TestCase):
                         features_dict=self.features_dict,
                         parallel=True,
                         parallel_timeout=40)
+        expected = {f for f in self.features_dict if
+                    _backend_available(BACKENDS.get(f, 'biobox'))}
+        self.assertEqual({m[0] for m in M.measures}, expected)
+        M.measure_data()
+        self.assertTrue(len(M.df) > 0)
+
+    def test_full_standardtrack_parallel_big_prot_mode(self):
+        # test full setup of measures class
+        # standard track, big protein mode
+        print('-> Testing full setup')
+        M = RD.Measure(df_input=self.df_prot[:2],
+                        outdir=self.outdir,
+                        features_dict=self.features_dict,
+                        parallel=True,
+                        parallel_timeout=40,
+                        big_protein_mode=True)
         expected = {f for f in self.features_dict if
                     _backend_available(BACKENDS.get(f, 'biobox'))}
         self.assertEqual({m[0] for m in M.measures}, expected)

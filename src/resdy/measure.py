@@ -17,7 +17,7 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children
+from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children, parallel_context, METADATA_COLUMNS
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains, distance_to_modified, distance_to_nearest_termini
@@ -88,7 +88,7 @@ class Measure(object):
                                 'seqcharge': {}, 'depth': {'calculation_type': 'ResidDepth'}},
                  residue_of_interest='LYS', parallel=False, include_modified=False,
                  report_errors= True, only_relaxed=False, require_relaxed=False, num_cores=0,
-                 parallel_timeout=600, big_protein_mode=False, struc_dir='',
+                 parallel_timeout=1800, big_protein_mode=False, struc_dir='',
                  cache_policy='auto'):
         '''
         Initialisation of the Measure class. This class provides all the resources to measure
@@ -749,6 +749,10 @@ class Measure(object):
             'require_relaxed': self.require_relaxed,
             'cache_policy': self.cache_policy,
             'features': self.feature_settings,
+            'run_in_parallel': self.parallel,
+            'parallel_worker_timeout': self.parallel_timeout,
+            'num_cores_requested': self.num_cores,
+            'use_big_protein_mode': self.big_protein_mode,
         }, default=str))
 
     def _write_settings(self):
@@ -833,17 +837,18 @@ class Measure(object):
         from final previous point rather than starting again. Raises a ValueError if the settings
         differ from those the measurement was started with.
         '''
-        self._check_settings()
-        self._write_settings()
-        match (self.PDB_only, self.parallel):
-            case (False, False) | (False, True):
-                # not PDB only and parallel or series
-                self.restart_measure()
-            case (True, True) | (True, False):
-                # PDB only and parallel or series
-                self.restart_measure_pdb_only()
+        with mp_hide_main_from_children():
+            self._check_settings()
+            self._write_settings()
+            match (self.PDB_only, self.parallel):
+                case (False, False) | (False, True):
+                    # not PDB only and parallel or series
+                    self.restart_measure()
+                case (True, True) | (True, False):
+                    # PDB only and parallel or series
+                    self.restart_measure_pdb_only()
 
-        self._cleanup_calculation_files()
+            self._cleanup_calculation_files()
 
 
     def _report_error_to_file(self, measurement_stage, path, error):
@@ -883,37 +888,12 @@ class Measure(object):
         self.df.to_csv(os.path.join(self.outdir, outname), index_label=False, index=False)
 
 
-    @staticmethod
-    def _parallel_context():
-        '''
-        Return the multiprocessing context the worker pool is built from. This function is used
-        to get the available context and if possible prefer 'forkserver' method first and then
-        'spawn' if this is not available. If neither preferred option is available, it will fall
-        back onto whatever multiprocessing context is available. 
-
-        With several features importing torch, and torch leaving its thread pools running in the
-        parent for the rest of the session. Forking a multi-threaded parent gives the child a copy
-        of those pools with none of their threads, so the first call that reaches the inherited
-        OpenMP or BLAS runtime can block forever.
-
-        :returns: A multiprocessing context whose start method is not 'fork', where one is
-            available.
-        '''
-        available = mp.get_all_start_methods()
-        for method in ('forkserver', 'spawn'):
-            if method in available:
-                return mp.get_context(method)
-        print(">> Could not get 'forkserver' or 'spawn' multiprocessing context," \
-            "defaulting to 'fork'")
-        return mp.get_context()
-
-
     def _ensure_logger(self):
         '''
         Reattach the log file handler if the current process does not have it.
 
         A ``logging.Logger`` pickles as a lookup of its name, so a worker started by one of
-        the non-forking methods (see :meth:`_parallel_context`) receives the logger without
+        the non-forking methods (see :meth:`parallel_context`) receives the logger without
         the handler that was added to it in the parent, and anything it logs would go nowhere.
         The handler is therefore recreated on first use inside the worker. Records stay
         serialised by the lock that is held around the logging calls, so the processes do not
@@ -955,7 +935,7 @@ class Measure(object):
         files = [file for file in files if 'pkaani' not in file]
         self.files_to_analyse = files
 
-        with get_worker_lock(self.parallel, self._parallel_context()) as lock:
+        with get_worker_lock(self.parallel, parallel_context()) as lock:
             items = []
             small_items = []
             big_items = []
@@ -989,10 +969,10 @@ class Measure(object):
             gpu_measurements = [a for a in self.measures if a[0] in gpu_feats]
             cpu_measurements = [a for a in self.measures if a[0] not in gpu_feats]
 
-            self.measures = cpu_measurements
-            if cpu_measurements:
-                if self.parallel:
-                    ctx = self._parallel_context()
+            if self.parallel:
+                self.measures = cpu_measurements
+                if cpu_measurements:
+                    ctx = parallel_context()
                     results = []
                     if self.big_protein_mode:
                         parallel_items = small_items.copy()
@@ -1022,34 +1002,36 @@ class Measure(object):
                         df_parallel_extra = pd.concat(
                             [self._measure_file(lock, file_dets) for file_dets in big_items],
                                                 ignore_index=True)
-                        df_parallel = pd.concat([df_parallel, df_parallel_extra], ignore_index=True)
+                        df_parallel = pd.concat([df_parallel, df_parallel_extra],
+                                                ignore_index=True)
 
-                else:
-                    df_parallel = pd.concat(
-                        [self._measure_file(lock, file_dets) for file_dets in items],
-                                            ignore_index=True)
+                self.measures = gpu_measurements
+                if gpu_measurements:
+                    df_gpu = pd.concat([self._measure_file(lock, d) for d in items],
+                                    ignore_index=True)
 
-            self.measures = gpu_measurements
-            if gpu_measurements:
-                df_gpu = pd.concat([self._measure_file(lock, d) for d in items],
-                                   ignore_index=True)
-
-                if df_parallel.empty:
-                    df_parallel = df_gpu
-                else:
-                    df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if
-                                                  a in df_parallel.columns and a not in base_cols])
-                    df_parallel = df_parallel.merge(df_gpu, how='left',
+                    if df_parallel.empty:
+                        df_parallel = df_gpu
+                    else:
+                        df_gpu = df_gpu.drop(columns=[a for a in df_gpu.columns if
+                                                a in df_parallel.columns and a not in base_cols])
+                        df_parallel = df_parallel.merge(df_gpu, how='left',
                                                 on=[a for a in base_cols if a in df_gpu.columns])
 
-            if not cpu_measurements and not gpu_measurements:
-                print('>> No measurements are registered, nothing to calculate')
+                if not cpu_measurements and not gpu_measurements:
+                    print('>> No measurements are registered, nothing to calculate')
 
-            self.measures = cpu_measurements + gpu_measurements
+                self.measures = cpu_measurements + gpu_measurements
 
-            frames = [f for f in (self.df, df_parallel) if not f.empty]
-            if frames:
-                self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
+                frames = [f for f in (self.df, df_parallel) if not f.empty]
+                if frames:
+                    self.df = pd.concat(frames, ignore_index=True).reset_index(drop=True)
+
+            else:
+                df_measures = pd.concat(
+                    [self._measure_file(lock, file_dets) for file_dets in items],
+                                        ignore_index=True)
+                self.df = df_measures
 
         try:
             self.df.drop_duplicates(subset=None, keep='first', inplace=True, ignore_index=True)
@@ -1251,7 +1233,7 @@ class Measure(object):
         return pd.concat(frames_df_list, ignore_index=True)
 
 
-    def recover_from_log(self, log_path):
+    def recover_from_log(self, log_path='measure_log.txt'):
         '''
         Take the log file produced through running measure_dataframe() and convert this to a csv
 
@@ -1271,7 +1253,8 @@ class Measure(object):
         if self.PDB_only:
             return 'Function not callable.'
 
-        base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+        base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
+        metadata_cols = [a for a in METADATA_COLUMNS if a not in base_columns]
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
         print(f'Recovering measured data from file: {log_path}')
@@ -1280,8 +1263,7 @@ class Measure(object):
 
         test_lines = 0
         columns_all_set = False
-        potential_col_names = {'1': 'propka', '2': 'pkaANI', '3': 'sasa',
-                               '4': 'depth', '5': 'aev', '6': 'das'}
+        potential_col_names = {str(i+1): m for i,m in enumerate(ALL_FEATURES)}
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
         curr_line = 0
@@ -1292,14 +1274,15 @@ class Measure(object):
                 # check if it is a header line, check if doesn't start with number or -
                 if line[0].isalpha() or line[0] == ' ':
                     parts = line.split()
+                    print(parts, len(parts))
                     # check that columns have been written to the log file correctly
                     if columns_all_set:
                         continue
-                    elif len(parts) <= 6 and not columns_all_set:
+                    elif len(parts) <= 7 and not columns_all_set:
                         print('Columns were not set correctly in the log file.')
-                        print(f'The first 6 columns are assumed to be: {base_columns}')
+                        print(f'The first 7 columns are assumed to be: {base_columns}')
                         continue
-                    elif len(parts) >= 6 and not columns_all_set:
+                    elif len(parts) >= 7 and not columns_all_set:
                         # if all seems correct with the writing check that all the columns
                         # can be found in the current columns, if not, add in
                         for part in parts:
@@ -1425,47 +1408,20 @@ class Measure(object):
             raise KeyError(f'>> Running include modified but Modified column not '
                            f'present for feature: {col_name}')
 
-        for i, r in target.iterrows():
+        merge_key = ['Chain', 'Resid', 'Modified'] if self.include_mod else ['Chain', 'Resid']
 
-            chain_value = r["Chain"]
-            resid_value = r["Resid"]
-            if self.include_mod:
-                modified_value = r['Modified']
+        if len(to_merge.drop_duplicates(subset=merge_key)) != len(to_merge):
+            out_print = (f'{col_name}: {to_merge.drop_duplicates(subset=merge_key)} rows on the '
+                         f'new feature dataframe match  {len(to_merge)} rows on the dataframe to '
+                         f'merge into. An insertion code has been not managed properly, no guess '
+                         f'employed; continuing')
+            if self.report_errors:
+                self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes',
+                                            col_name, out_print)
+            print('>> ' + out_print)
 
-            if self.include_mod:
-                idx = np.where((to_merge["Chain"] == chain_value) &
-                               (to_merge["Resid"].astype(int) == resid_value) &
-                               (to_merge["Modified"].astype(bool) == modified_value))
-            else:
-                idx = np.where((to_merge["Chain"] == chain_value) &
-                               (to_merge["Resid"].astype(int) == resid_value))
+        target = target.merge(to_merge, on=merge_key)
 
-            if len(idx[0]) == 0:
-                continue
-
-            if len(idx[0]) > 1:
-                out_print = (f'{col_name}: {len(idx[0])} rows match Chain {chain_value}, Resid '
-                             f'{resid_value}; an insertion code has been not managed properly, '
-                             f'no guess employed; continuing')
-                if self.report_errors:
-                    self._report_error_to_file('ambiguous resid insertion key in combining measurse dataframes',
-                                               col_name, out_print)
-                print('>> ' + out_print)
-                continue
-
-
-            # account for measurements that have special cases
-            if col_name == 'melodia':
-                melodia_features = ['curvature', 'writhing', 'torsion', 'arc_length', 'phi', 'psi']
-                for feature in melodia_features:
-                    if feature in self.features and feature in to_merge.columns:
-                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
-            elif col_name == 'frustration':
-                for feature in ('frustration', 'density'):
-                    if feature in self.features and feature in to_merge.columns:
-                        target.at[i, feature] = to_merge.loc[idx[0][0], feature]
-            else:
-                target.at[i, col_name] = to_merge.loc[idx[0][0], col_name]
         return target
 
 
@@ -1490,7 +1446,7 @@ class Measure(object):
         if 'completed' not in self.df_input.columns:
             self.df_input['completed'] = False
 
-        with get_worker_lock(self.parallel, self._parallel_context()) as lock:
+        with get_worker_lock(self.parallel, parallel_context()) as lock:
             items = []
             for _, r in self.df_input.iterrows():
 
@@ -1515,7 +1471,7 @@ class Measure(object):
             self.measures = cpu_measurements
             if cpu_measurements:
                 if self.parallel:
-                    ctx = self._parallel_context()
+                    ctx = parallel_context()
                     results = []
 
                     with ctx.Pool(self.n_cores_to_use, maxtasksperchild=20) as pool:
@@ -1609,7 +1565,8 @@ class Measure(object):
             terminal_out_statements.append(f"\n> File: {f}")
 
             columns = ['PDB_Code', 'Chain', 'Resid', 'Source', 'Min_Dist_Other_Chain',
-                       'In_Modelled_Region', 'Dist_To_Nearest_Terminus', 'Dist_To_Modelled']
+                       'Dist_To_Modelled', 'Dist_To_Nearest_Terminus', 'In_Modelled_Region']
+
             if self.include_mod:
                 columns.append('Modified')
             records = []

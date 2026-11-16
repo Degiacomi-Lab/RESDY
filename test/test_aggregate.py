@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
-import sys
 import os
+import sys
 import shutil
 import tempfile
 import pandas as pd
@@ -13,7 +13,8 @@ import resdy as RD
 class Test_Aggregation(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
-        shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        shutil.copyfile(os.path.join('demo', 'measures.csv'),
+                        os.path.join(self.outdir, 'measures.csv'))
         self.demo_measure = pd.read_csv(f'{self.outdir}{os.sep}measures.csv')
 
     def tearDown(self):
@@ -149,7 +150,7 @@ class Test_Aggregation(unittest.TestCase):
                                         max_feature_nan_fraction=1.0)
             df_agg = Agg.aggregate_data()
             self.assertTrue(len(df_agg) > 0)
-            self.assertListEqual(expected_columns, list(df_agg.columns))
+            self.assertEqual(set(expected_columns), set(list(df_agg.columns)))
 
     def test_unknown(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
@@ -192,12 +193,20 @@ class Test_Aggregation(unittest.TestCase):
 
     def test_source_pooling(self):
         for sp in ['together', 'separate', 'unrelaxed', 'relaxed']:
-            RD.Aggregation(df_measurements=self.demo_measure,
+            AGG = RD.Aggregation(df_measurements=self.demo_measure,
                              outdir=self.outdir,
                             aggregation_method='avg',
                             features_to_include=['sasa'],
                             aev_red_method='null',
-                            source_pooling=sp).aggregate_data()
+                            source_pooling=sp)
+            df_agg = AGG.aggregate_data()
+            self.assertTrue(len(df_agg) > 0)
+            self.assertEqual(set(list(df_agg['Uniprot_Entry'].unique())),
+                             set(list(self.demo_measure['Uniprot_Entry'].unique())))
+            self.assertEqual(set(list(df_agg['Resid'].unique())),
+                            set(list(self.demo_measure['Resid'].unique())))
+            if sp == 'separate':
+                self.assertTrue('Source' in df_agg.columns)
 
 
 class Test_Aggregation_Settings(unittest.TestCase):

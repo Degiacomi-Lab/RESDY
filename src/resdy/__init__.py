@@ -28,6 +28,7 @@ __version__ = '1.0'
 _EXPORTS = {
     'Uniprot': '.uniprot',
     'PDB': '.protein',
+    'Patcher': '.patcher',
     'Measure': '.measure',
     'Analysis': '.analysis',
     'Preprocessing': '.preprocessing',

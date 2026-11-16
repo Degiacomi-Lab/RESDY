@@ -11,7 +11,8 @@ import resdy as RD
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
-        shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        shutil.copyfile(os.path.join('demo', 'measures.csv'),
+                        os.path.join(self.outdir, 'measures.csv'))
         self.UP = RD.Uniprot(outdir=self.outdir)
         self.demo_csv = f'demo{os.sep}demo_input.csv'
 
@@ -31,7 +32,7 @@ class Test_Uniprot(unittest.TestCase):
         self.UP.from_organism(code='UP000007445', reviewed_only=False)
         self.assertEqual(len(self.UP.df), 5)
 
-    def test_protein(self):
+    def test_get_protein_data(self):
         self.UP.get_protein_data('P09167')
         self.UP.get_protein_data('P0CG48', '2MWS')
 
@@ -44,7 +45,7 @@ class Test_Uniprot(unittest.TestCase):
 
         self.UP.df = pd.DataFrame()
         self.UP.get_protein_data('P09167')
-        print(self.UP.df)
+
         self.assertTrue(all(a in self.UP.df.columns for a in ['Organism_Name', 'Organism_TaxID']))
         self.assertEqual(list(self.UP.df['Organism_Name'].unique()), ['Aeromonas hydrophila'])
         self.assertEqual(list(self.UP.df['Organism_TaxID'].unique()), ['644'])
@@ -56,7 +57,8 @@ class Test_Uniprot(unittest.TestCase):
         self.UP.filter_by_technique(list_of_techniques=['NMR'])
         self.UP.filter_by_technique(list_of_techniques=['Predicted'])
 
-        #self.UP.save_state()
+        self.UP.save_state()
+        self.assertTrue(os.path.isfile(os.path.join(self.outdir, 'potential_proteins.csv')))
 
     def test_GO_data(self):
         test_uniprots = ['P40616', 'P02185', 'Q16825', 'P0CG48', 'P10724']

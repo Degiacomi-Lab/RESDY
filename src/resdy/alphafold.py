@@ -1,5 +1,6 @@
 import csv
 import os
+import json
 import requests
 import pandas as pd
 
@@ -43,17 +44,17 @@ def download_AF_struc(pdb, outfolder="result"):
     return
 
 
-def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
+def find_af_plddt(af_code_full, outfolder='result', resnames=['LYS']):
     '''
     Obtain PLDDT (a measure of certainty where 100 is high and 70 low) value for each residue
-    of interest in an alphafold structure.
+    of interest in an alphafold structure. This will be reported into a json file per structure.
+    After the curation has been completed, all af_plddt json files will be extracted and collated
+    into the overall AF_PLDDT_Output.csv file.
 
     .. rubric:: Method
 
-    - If the PLDDT output file hasn't been created yet, create and add column headings
-    - Open the PLDDT output file for appending data.
     - Search the curated AF structure pdb file to extract the PLDDT values.
-    - Append the PLDDT value to the output file and write to the console log.
+    - Write a .json file for the af_code that is PLDDT data is extracted from
 
     :param af_code_full: The AF code for the structure to extract the PLDDT values from
     :type af_code_full: str
@@ -67,31 +68,11 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
         PLDDT values for the given AF structure.
     :rtype: dict
     '''
-    cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
-    os.makedirs(os.path.join(outfolder, 'curated'), exist_ok=True)
-    if not os.path.isfile(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")):
-        with open(os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv"), 'w',
-                  newline='') as plddt_out_file:
-            plddt_writer = csv.writer(plddt_out_file)
-            plddt_writer.writerow(['PDB_Code', 'Chain', 'Resid', 'PLDDT'])
-
-    plddt_file_path = os.path.join(outfolder, "curated", "AF_PLDDT_Output.csv")
-
-    if os.path.isfile(plddt_file_path):
-        df_plddt_already = pd.read_csv(plddt_file_path)
-        if (df_plddt_already['PDB_Code'] == af_code_full).any():
-            print(f'>> AF PLDDT values for {af_code_full} have already been recorded '
-                  f'to {plddt_file_path}, not repeating')
-            return dict(zip(df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Chain'].astype(str) +
-                            df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'Resid'].astype(str),
-                            df_plddt_already.loc[df_plddt_already['PDB_Code'] == af_code_full, 'PLDDT']))
-
-    plddt_out_file = open(plddt_file_path, 'a', newline='')
-    plddt_writer = csv.DictWriter(plddt_out_file, fieldnames=cols)
-
     print(f'>> Finding plddt for AF structure {af_code_full}')
 
     dict_plddt = dict()
+    os.makedirs(os.path.join(outfolder, 'curated'), exist_ok=True)
+    af_plddt_json_path = os.path.join(outfolder, 'curated', f'{af_code_full}_PLDDT.json')
 
     try:
         with open(os.path.join(outfolder, "curated", af_code_full + ".pdb"), "r") as f:
@@ -102,35 +83,96 @@ def find_af_plddt(af_code_full, outfolder="result", resnames=['LYS']):
                         chain = line[21]
                         resid = line[22:26].strip()
                         plddt = line[60:66].strip()
-                        chain_resid = chain + resid
+                        chain_res_key = f'{chain}_{str(resid)}'
 
-                        dict_plddt.update({chain_resid: plddt})
+                        dict_plddt.update({chain_res_key: plddt})
 
-                        print(af_code_full + "; Chain: " + str(chain_resid[0]) +
-                              "; Resid: " + str(chain_resid[1:]) +
-                              "; PLDDT: " + plddt)
-                        plddt_writer.writerow({'PDB_Code': af_code_full,
-                                               'Chain': chain_resid[0],
-                                               'Resid': chain_resid[1:],
-                                               'PLDDT': plddt})
+                        print(af_code_full + "; Chain: " + str(chain) +
+                                "; Resid: " + str(resid) +
+                                "; PLDDT: " + plddt)
                         chain, resid, plddt = '', '', ''
 
                 except Exception as e:
-                    print(f"Error {e}")
-                    plddt_writer.writerow({'PDB_Code': af_code_full,
-                                           'Chain': line[21:22],
-                                           'Resid': line[22:26].strip(),
-                                           'PLDDT': f'Error {str(e)}'})
+                    chain = line[21]
+                    resid = line[22:26].strip()
+                    chain_res_key = f'{chain}_{str(resid)}'
+                    plddt = f'Error {str(e)}'
+                    dict_plddt.update({chain_res_key: plddt})
+                    print(f'Error with AF PLDDT value for PDB code: {af_code_full}, chain: '
+                          f'{chain}, resid: {resid}; Error: {str(e)}')
+
                     continue
 
     except Exception as e:
         print(f'Failed to obtain PLDDT data for {af_code_full}; error: {e}')
-        plddt_writer.writerow({'PDB_Code': af_code_full, 'Chain': '', 'Resid': '',
-                               'PLDDT': f'Error {str(e)}'})
+        dict_plddt = {('', ''): f'Error {str(e)}'}
 
-    finally:
-        plddt_out_file.close()
-    return dict_plddt
+    plddt_out = {af_code_full: dict_plddt}
+
+    with open(af_plddt_json_path, 'w') as fout:
+        json.dump(plddt_out, fout, indent=2, )
+
+    print(f'>> Written file {af_plddt_json_path} for PLDDT values for {af_code_full}')
+
+    return plddt_out
+
+
+def report_af_plddt(outfolder='result'):
+    '''
+    Collate all PLDDT report json files from structures together into one overall csv file.
+
+    .. rubric:: Method
+
+    - If the PLDDT output file hasn't been created yet, create and add column headings
+    - Open the PLDDT output file for appending data.
+    - For each json PLDDT report available in the curated folder within the given outfolder
+
+    :param outfolder: The output directory used to check that the PLDDT out file is in the correct
+        place and allow appending to this
+    :type outfolder: str
+    '''
+    cols = ['PDB_Code', 'Chain', 'Resid', 'PLDDT']
+    os.makedirs(os.path.join(outfolder, 'curated'), exist_ok=True)
+    plddt_file_path = os.path.join(outfolder, 'curated', 'AF_PLDDT_Output.csv')
+
+    if not os.path.isfile(plddt_file_path):
+        with open(plddt_file_path, 'w', newline='') as plddt_out_file:
+            plddt_writer = csv.writer(plddt_out_file)
+            plddt_writer.writerow(['PDB_Code', 'Chain', 'Resid', 'PLDDT'])
+
+    plddt_json_files = [f for f in os.listdir(os.path.join(outfolder, 'curated'))
+                        if '_PLDDT.json' in f]
+
+    plddt_out_file = open(plddt_file_path, 'a', newline='')
+    plddt_writer = csv.DictWriter(plddt_out_file, fieldnames=cols)
+    for file in plddt_json_files:
+        f_p = os.path.join(outfolder, 'curated', file)
+        if os.path.isfile(f_p):
+            with open(f_p) as fh:
+                plddt_data = json.load(fh)
+
+            af_code = list(plddt_data)[0]
+            plddts = plddt_data[af_code]
+
+            for k, plddt in plddts.items():
+                if '_' in k:
+                    chain = k.split('_')[0]
+                    resid = k.split('_')[1]
+                else:
+                    chain = ''
+                    resid = ''
+                plddt_writer.writerow({'PDB_Code': af_code,
+                                    'Chain': chain,
+                                    'Resid': resid,
+                                    'PLDDT': plddt})
+
+    df_plddt = pd.read_csv(plddt_file_path)
+    if len(df_plddt.drop_duplicates()) != len(df_plddt):
+        print('>> Duplicates found in the PLDDT report entries, keeping the newest entries.')
+        df_plddt = df_plddt.drop_duplicates(keep='last')
+
+    plddt_out_file.close()
+
 
 
 if __name__ == '__main__':

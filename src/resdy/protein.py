@@ -18,12 +18,13 @@ import pandas as pd
 import numpy as np
 from Bio.Align import PairwiseAligner, substitution_matrices
 import biobox as bb
-from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock
+from .helper import require_biobox, STANDARD_RESIDS, get_worker_lock, mp_hide_main_from_children, parallel_context
 from . import alphafold as af
 from . import patcher
 from . import assembly
 from .residues import AA_PRESETS
 from .geometry import check_geometry, GEOMETRY_COLUMNS
+from .patcher import Patcher
 require_biobox(bb)
 
 try:
@@ -206,7 +207,9 @@ class PDB(object):
         :param max_nmr_conformers: The maximum number of conformers you would like splitting out
             from the original pdb file. This will take the first n conformers through to curated
             structures. Default is no cap and will curate all. '' or None will also take all
-            while an integer will limit.
+            while an integer will limit. This is only used when ``nmr_conformer_selection``
+            is set to 'first', or a list passsed to this. If ``nmr_conformer_selection`` is set
+            to 'all', all nmr conformers will be curated regardless of what this is set to.
         :type max_nmr_conformers: int
         :param biological_assembly: Build the biological assembly of each curated PDB
             structure from the BIOMT operators of REMARK 350, choosing the first
@@ -280,14 +283,11 @@ class PDB(object):
                                     else [resnames_of_interest])
         self.resnames_of_interest = list(resnames_of_interest)
 
-        if keep_modifications == 'all':
-            self.keep_modifications = keep_modifications
-        elif isinstance(keep_modifications, str):
-            self.keep_modifications = keep_modifications
-        elif len(keep_modifications) == 1:
-            self.keep_modifications = tuple([keep_modifications])
-        else:
-            self.keep_modifications = tuple(a.upper() for a in keep_modifications)
+        if isinstance(keep_modifications, str):
+            keep_modifications = ('all' if keep_modifications.strip().lower() == 'all'
+                                  else (keep_modifications,))
+        self.keep_modifications = (keep_modifications if keep_modifications == 'all'
+                                   else tuple(str(a).strip().upper() for a in keep_modifications))
 
         if isinstance(minimise_strucs, str):
             match minimise_strucs:
@@ -364,7 +364,8 @@ class PDB(object):
 
         if isinstance(nmr_conformer_selection, list):
             self.nmr_conformer_selection = [int(a) for a in nmr_conformer_selection if
-                                            int(a) < self.max_nmr_conformers]
+                                            self.max_nmr_conformers is None or
+                                            int(a) <= self.max_nmr_conformers]
         elif isinstance(nmr_conformer_selection, str):
             if nmr_conformer_selection not in ['all', 'first', 'representative']:
                 print('>> Input given to nmr_conformer_selection is not an available option. '
@@ -377,7 +378,6 @@ class PDB(object):
             print('>> Input given to nmr_conformer_selection could not be inferred, setting '
                   'it to the default of \'all\'')
             self.nmr_conformer_selection = 'all'
-        self.nmr_conformer_selection = nmr_conformer_selection
 
         if isinstance(rotamer_selection, str):
             if rotamer_selection in ['all', 'first', 'highest_occupancy']:
@@ -396,6 +396,7 @@ class PDB(object):
         else:
             print(f'>> Option given for minimise termini is not recognised '
                     f'({minimise_termini}), defaulting to \'capped\' if available')
+            self.minimise_termini = 'capped'
 
         if not PDBFIXER_AVAILABLE and self.minimise_termini == 'capped':
             print('>> PDBFixer is not available and therefore not able to implement '
@@ -697,69 +698,73 @@ class PDB(object):
             print('>> Protein curation running in series')
             n_cores_to_use = 1
 
-        with get_worker_lock(self.parallel) as lock:
-            items = []
-            for i, r in uniprot_df.iterrows():
-                try:
-                    if not self.PDB_only:
-                        method_obtained = r.get('Method', '')
-                        resolution = r.get('Resolution', '')
-                        chains = r.get('Chains', '')
-                        items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained,
-                                      resolution, chains])
-                    else:
-                        items.append([r['PDB_Code']])
-                except Exception as e:
-                    print(f'>> In adding rows to the parallel pool, failed to add row {i} '
-                          f'and therefore will not be created; error: {e}')
-                    broken_prot = pd.DataFrame([{'Uniprot': r.get('Uniprot_Entry', ''),
-                                                 'PDB': r.get('PDB_Code', ''),
-                                                 'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
-                    broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
-                    broken_prot.to_csv(broken_path, mode='a', index=False,
-                                       header=not os.path.exists(broken_path))
+        with mp_hide_main_from_children():
+            with get_worker_lock(self.parallel) as lock:
+                items = []
+                for i, r in uniprot_df.iterrows():
+                    try:
+                        if not self.PDB_only:
+                            method_obtained = r.get('Method', '')
+                            resolution = r.get('Resolution', '')
+                            chains = r.get('Chains', '')
+                            items.append([r['Uniprot_Entry'], r['PDB_Code'], method_obtained,
+                                        resolution, chains])
+                        else:
+                            items.append([r['PDB_Code']])
+                    except Exception as e:
+                        print(f'>> In adding rows to the parallel pool, failed to add row {i} '
+                            f'and therefore will not be created; error: {e}')
+                        broken_prot = pd.DataFrame([{'Uniprot': r.get('Uniprot_Entry', ''),
+                                                    'PDB': r.get('PDB_Code', ''),
+                                                    'Error': f'unreadable file row setting parallel list; error: {str(e)}'}])
+                        broken_path = os.path.join(self.outdir, 'uncuratable_pdb_files.csv')
+                        broken_prot.to_csv(broken_path, mode='a', index=False,
+                                        header=not os.path.exists(broken_path))
 
-            if self.parallel:
-                results = []
-                with Pool(n_cores_to_use, maxtasksperchild=20) as pool:
-                    iterator = pool.imap(partial(self._curate_row, lock, skip_if_found),
-                                            [tuple(item) for item in items], chunksize=1)
-                    while True:
-                        try:
-                            result = iterator.next(timeout=self.parallel_timeout)
-                            if result is not None:
-                                results.append(result)
-                        except StopIteration:
-                            break
-                        except mp.TimeoutError:
-                            pool.terminate()
-                            raise RuntimeError(
-                                f'A parallel protein curation worker produced no result for '
-                                f'{self.parallel_timeout} s working on structures, so it is '
-                                f'treated as stalled and the run was stopped. Either raise '
-                                f'parallel_timeout if the features requested are simply '
-                                f'slow on these structures, or set parallel=False to measure in '
-                                f'series.') from None
-            else:
-                results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
-                           if t is not None]
+                if self.parallel:
+                    results = []
+                    ctx = parallel_context()
+                    with ctx.Pool(n_cores_to_use, maxtasksperchild=20) as pool:
+                        iterator = pool.imap(partial(self._curate_row, lock, skip_if_found),
+                                                [tuple(item) for item in items], chunksize=1)
+                        while True:
+                            try:
+                                result = iterator.next(timeout=self.parallel_timeout)
+                                if result is not None:
+                                    results.append(result)
+                            except StopIteration:
+                                break
+                            except mp.TimeoutError:
+                                pool.terminate()
+                                raise RuntimeError(
+                                    f'A parallel protein curation worker produced no result for '
+                                    f'{self.parallel_timeout} s working on structures, so it is '
+                                    f'treated as stalled and the run was stopped. Either raise '
+                                    f'parallel_timeout if the features requested are simply '
+                                    f'slow on these structures, or set parallel=False to measure '
+                                    f'in series.') from None
+                else:
+                    results = [t for t in (self._curate_row(lock, skip_if_found, i) for i in items)
+                            if t is not None]
 
-            if self.biological_assembly:
-                self.collect_assembly_log()
+                if self.biological_assembly:
+                    self.collect_assembly_log()
 
-            if self.minimise_af or self.minimise_pdb:
-                self.collect_minimisation_log()
-                if self.minimisation_skipped:
-                    print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised '
-                          f'and will be measured unrelaxed; see minimisation_log.csv')
+                if self.minimise_af or self.minimise_pdb:
+                    self.collect_minimisation_log()
+                    if self.minimisation_skipped:
+                        print(f'>> {len(self.minimisation_skipped)} structure(s) were not minimised'
+                            f' and will be measured unrelaxed; see minimisation_log.csv')
 
-            if not results:
-                print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be curated, '
-                      f'for more details, see uncuratable_pdb_files.csv')
-                return
-            df_tmp = pd.concat(results, ignore_index=True)
+                if not results:
+                    print(f'>> No structures of the {len(uniprot_df)} uniprot codes could be '
+                          f'curated, for more details, see uncuratable_pdb_files.csv')
+                    return
+                df_tmp = pd.concat(results, ignore_index=True)
 
-            self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
+                self.df = pd.concat([self.df, df_tmp], ignore_index=True).reset_index(drop=True)
+
+                af.report_af_plddt(outfolder=self.outdir)
 
 
     def _curate_row(self, lock, skip_if_found, row_details):
@@ -885,9 +890,8 @@ class PDB(object):
                     # find the PLDDT codes for AF structures
                     out_print_trap_af_plddt = io.StringIO()
                     with redirect_stdout(out_print_trap_af_plddt):
-                        with lock:
-                            af.find_af_plddt(pdb_code,outfolder=self.outdir,
-                                             resnames=self.resnames_of_interest)
+                        af.find_af_plddt(pdb_code, outfolder=self.outdir,
+                                        resnames=self.resnames_of_interest)
                     print_statements.append(out_print_trap_af_plddt.getvalue())
                 except Exception as e:
                     print(f'> Failed to calculate PLDDT values for Af structure: '
@@ -1027,6 +1031,16 @@ class PDB(object):
         return org_dets
 
 
+    def _keeps_modification(self, resname):
+        '''
+        Return True or False based on if the resname fits the criteria setup in the class
+        within ``keep_modifications``.
+
+        :param resname: Resname of interest to check against keep criteria
+        :type resname: str
+        '''
+        return (self.keep_modifications == 'all'
+                or resname.strip().upper() in self.keep_modifications)
 
 
     def _record_geometry(self, geometry, stage, align_details={}):
@@ -1151,10 +1165,10 @@ class PDB(object):
                 if self.minimise_termini == 'capped' and PDBFIXER_AVAILABLE:
                     self.add_missing_capping_atoms(pdb_path=f)
 
-                fname, largest_gap, geometry = patcher.curate(
+                P = Patcher()
+                fname, largest_gap, geometry = P.curate(
                     f, fasta_loc, outdir=self.curated_dir,
-                    gap=self.gap, include_hetatm=self.include_hetatm,
-                    block_bulk_modeller_output=block_bulk_modeller_output)
+                    gap=self.gap, include_hetatm=self.include_hetatm)
 
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())
@@ -1417,8 +1431,8 @@ class PDB(object):
                     representative_struc = int(line.split(':')[-1].strip())
                 except Exception as e:
                     if self.nmr_conformer_selection == 'representative':
-                        print('>> Failed to get representative structure from the pdb file, '
-                              'keeping the representative structure as 1.')
+                        print(f'>> Failed to get representative structure from the pdb file, '
+                              f'keeping the representative structure as 1. Error: {str(e)}')
                     representative_struc = 1
 
             # check for modified residues
@@ -1429,30 +1443,35 @@ class PDB(object):
                 norm_code = line[24:27]
                 if self.keep_modifications == ():
                     modres_sites[chain + res_num] = norm_code
-                elif ((mod_code not in self.keep_modifications or
-                      mod_code != self.keep_modifications) and
-                      self.keep_modifications != 'all'):
+                elif not self._keeps_modification(mod_code):
                     modres_sites[chain + res_num] = norm_code
 
             # check for resid insertion code in position 26 on ATOM records
             if line[:4] == 'ATOM' and len(line) > 26 and line[26].isalpha():
                 res_insertion_codes.append(line[26])
 
-            if self.keep_modifications != 'all' and 'MSE' not in self.keep_modifications:
+            if not self._keeps_modification('MSE'):
                 # replace selenomethionine with methionine
                 if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'MSE':
+                    print(f'>> MSE found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
                     line = 'ATOM  ' + selenium_to_sulfur(line, 'MET', 'SD')[6:]
                     test_mse = True
 
-            if self.keep_modifications != 'all' and 'SEC' not in self.keep_modifications and 'SEC' != self.keep_modifications:
+            if not self._keeps_modification('SEC'):
                 # replace selenocysteine with cysteine
                 if line[:6] in ('ATOM  ', 'HETATM') and line[17:20] == 'SEC':
+                    print(f'>> SEC found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
                     line = selenium_to_sulfur(line, 'CYS', 'SG')
                     test_sec = True
 
-            if self.keep_modifications != 'all' and 'KCX' not in self.keep_modifications:
+            if not self._keeps_modification('KCX'):
                 #transform carboxylated lysine into a normal lysine
                 if line[17:20] == 'KCX':
+
+                    print(f'>> KCX found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
 
                     if line[12:16].strip() in ['CX', 'OQ1', 'OQ2']:
                         continue
@@ -1471,9 +1490,7 @@ class PDB(object):
             if line[:4] == 'ATOM' and line[17:20].strip().upper() not in STANDARD_RESIDS:
                 het_key = line[21] + line[22:26].strip()
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
-                    if (self.keep_modifications == 'all' or
-                        line[17:20].strip().upper() in self.keep_modifications or
-                        line[17:20].strip().upper() == self.keep_modifications):
+                    if self._keeps_modification(line[17:20].strip().upper()):
                         write_file.write(line)
                     continue
 
@@ -1485,9 +1502,7 @@ class PDB(object):
                 if het_key not in modres_sites and het_key not in list_prev_mod_resids:
                     if self._keep_hetatm(line, element_col):
                         write_file.write(line)
-                    elif (self.keep_modifications == 'all' or
-                          line[17:20].strip().upper() in self.keep_modifications or
-                          line[17:20].strip().upper() == self.keep_modifications):
+                    elif self._keeps_modification(line[17:20].strip().upper()):
                         line = line.replace('HETATM', 'ATOM  ')
                         write_file.write(line)
                     continue
@@ -1512,48 +1527,18 @@ class PDB(object):
                 aa_num = int(line[22:26].strip())
                 old_mod_aa_code = line[17:20]
 
-                if uniprot_code != '':
-                    if uniprot_fasta == '':
-                        tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
-                        fasta_text = requests.get(tmp_url, timeout=20).text
-                        uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
+                if not self._keeps_modification(old_mod_aa_code):
+                    print(f'>> {old_mod_aa_code} found in structure at chain: {line[21]}; '
+                          f'resid {line[22:26].strip()}, removing...')
+                    parent_aa_code = modres_sites[(line[21] + line[22:26].strip())].strip().upper()
+                    if parent_aa_code in STANDARD_RESIDUES:
+                        line = line.replace('HETATM', 'ATOM  ').replace(old_mod_aa_code,
+                                                                        parent_aa_code)
+                        list_prev_mod_resids[line[21] + str(aa_num)] = parent_aa_code
+                        print(f'replaced modification {old_mod_aa_code} with {parent_aa_code}')
 
-                    M = bb.Molecule()
-                    M.import_pdb(filename=read_file_path, include_hetatm=True)
-                    M = M.get_subset(M.atomselect('*', '*', 'CA',
-                                                  use_resname=True,
-                                                  get_index=True)[1])
-                    subset_data = M.data.iloc[M.atomselect('*', '*', 'CA',
-                                                           use_resname=True,
-                                                           get_index=True)[1]]
-                    pdb_seqs = {}
-                    for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
-                        tmp_data = subset_data[subset_data['chain'] == chain]
-                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
-                                                   list(STANDARD_RESIDS.keys())
-                                                   else 'X' for a in list(tmp_data['resname'])])
-                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
-                                                                 'resid']))
-                    aligner = PairwiseAligner()
-                    aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
-                    aligner.open_gap_score = -11
-                    aligner.extend_gap_score = -11
-                    aligner.end_gap_score = 0.0
-                    alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
-
-                    res_mapper = {}
-
-                    for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                        for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1), range(pdb_start, pdb_end)):
-                            res_mapper[chain_res_list[pdb_pos]] = uni_pos
-
-                    aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
-                    if aa_interest in list(STANDARD_RESIDS.values()):
-                        line = line.replace('HETATM', 'ATOM  ')
-                        line = line.replace(old_mod_aa_code, standard_resids_inv[aa_interest])
-                        list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
-
-                        # edit the fasta file to change the code at desired position
+                        # add mod into the fasta file for modeller to work with - as modeller
+                        # reads this in to patch with
                         fasta_name = os.path.join(self.raw_dir, f'{pdb.split("-")[0]}.fasta')
                         if os.path.getsize(fasta_name) == 0:
                             self.download_fasta(pdb=pdb)
@@ -1584,22 +1569,29 @@ class PDB(object):
 
                             new_fasta = open(fasta_name, 'w')
                             for header, chain, seq in zip(fasta_headers,
-                                                          fasta_chain_letters,
-                                                          fasta_seqs):
+                                                        fasta_chain_letters,
+                                                        fasta_seqs):
                                 new_fasta.write(header)
                                 seq = seq[0].strip()
-                                if chain[0] == line[21]:
 
+                                if chain[0] == line[21]:
                                     F = bb.Molecule()
                                     F.import_pdb(filename=read_file_path, include_hetatm=True)
-                                    F = F.get_subset(F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1])
-                                    subset_data = F.data.iloc[F.atomselect('*', '*', 'CA', use_resname=True, get_index=True)[1]]
+                                    F = F.get_subset(F.atomselect('*', '*', 'CA',
+                                                                use_resname=True,
+                                                                get_index=True)[1])
+                                    subset_data = F.data.iloc[F.atomselect('*', '*', 'CA',
+                                                                        use_resname=True,
+                                                                        get_index=True)[1]]
                                     pdb_seqs = {}
                                     for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
                                         tmp_data = subset_data[subset_data['chain'] == chain]
-                                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in list(STANDARD_RESIDS.keys())
-                                                                   else 'X' for a in list(tmp_data['resname'])])
-                                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21], 'resid']))
+                                        pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                                   list(STANDARD_RESIDS.keys())
+                                                                else 'X' for a in
+                                                                list(tmp_data['resname'])])
+                                    chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                                 'resid']))
                                     aligner = PairwiseAligner()
                                     aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
                                     aligner.open_gap_score = -11
@@ -1607,10 +1599,15 @@ class PDB(object):
                                     aligner.end_gap_score = 0.0
                                     alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
 
-                                    for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0], alignment.aligned[1]):
-                                        fasta_mapper = dict(zip(range(pdb_start, pdb_end), range(seq_start, seq_end)))
+                                    for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                                          alignment.aligned[1]):
+                                        fasta_mapper = dict(zip(range(pdb_start, pdb_end),
+                                                                range(seq_start, seq_end)))
 
-                                    seq = seq[:(fasta_mapper[aa_num] - 1)] + aa_interest + seq[fasta_mapper[aa_num]:]
+                                    seq = (seq[:(fasta_mapper[aa_num] - 1)] +
+                                           STANDARD_RESIDS[parent_aa_code] +
+                                           seq[fasta_mapper[aa_num]:])
+
                                 seq = seq + '\n'
                                 new_fasta.write(seq)
                             new_fasta.close()
@@ -1621,9 +1618,141 @@ class PDB(object):
                                 f.close()
                             fasta_chains = {}
 
-                else:
-                    raise Exception(f'Error in patching file: could not get residue type for '
-                                    f'modified residue to convert to standard; file: {pdb}')
+                    # if the parent aa code from modres isnt a standard resid, go to alternate
+                    # methods below which will only work for rows which have a uniprot code attached
+                    else:
+                        if uniprot_code != '':
+                            if uniprot_fasta == '':
+                                tmp_url = f'https://rest.uniprot.org/uniprotkb/{uniprot_code}.fasta'
+                                fasta_text = requests.get(tmp_url, timeout=20).text
+                                uniprot_fasta = ''.join(fasta_text.split('\n')[1:])
+
+                            M = bb.Molecule()
+                            M.import_pdb(filename=read_file_path, include_hetatm=True)
+                            M = M.get_subset(M.atomselect('*', '*', 'CA',
+                                                        use_resname=True,
+                                                        get_index=True)[1])
+                            subset_data = M.data.iloc[M.atomselect('*', '*', 'CA',
+                                                                use_resname=True,
+                                                                get_index=True)[1]]
+                            pdb_seqs = {}
+                            for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                                tmp_data = subset_data[subset_data['chain'] == chain]
+                                pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                        list(STANDARD_RESIDS.keys())
+                                                        else 'X' for a in list(tmp_data['resname'])])
+                            chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                        'resid']))
+                            aligner = PairwiseAligner()
+                            aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+                            aligner.open_gap_score = -11
+                            aligner.extend_gap_score = -11
+                            aligner.end_gap_score = 0.0
+                            alignment = aligner.align(uniprot_fasta, pdb_seqs[line[21]])[0]
+
+                            res_mapper = {}
+
+                            for (uni_start, uni_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                                  alignment.aligned[1]):
+                                for uni_pos, pdb_pos in zip(range(uni_start+1, uni_end+1),
+                                                            range(pdb_start, pdb_end)):
+                                    res_mapper[chain_res_list[pdb_pos]] = uni_pos
+
+                            aa_interest = uniprot_fasta[res_mapper[aa_num] - 1]
+                            if aa_interest in list(STANDARD_RESIDS.values()):
+                                line = line.replace('HETATM', 'ATOM  ')
+                                line = line.replace(old_mod_aa_code,
+                                                    standard_resids_inv[aa_interest])
+                                list_prev_mod_resids[line[21] + str(aa_num)] = standard_resids_inv[aa_interest]
+
+                                # edit the fasta file to change the code at desired position
+                                fasta_name = os.path.join(self.raw_dir,
+                                                          f'{pdb.split("-")[0]}.fasta')
+                                if os.path.getsize(fasta_name) == 0:
+                                    self.download_fasta(pdb=pdb)
+                                try:
+                                    f = open(fasta_name, 'r')
+                                    fasta_headers = []
+                                    fasta_chain_letters = []
+                                    fasta_seqs = []
+                                    for fasta_line in f:
+                                        if ">" in fasta_line:
+                                            fasta_headers.append(fasta_line)
+                                            chain_raw_info = fasta_line.split("|")[1][6:].split(",")
+                                            if len(chain_raw_info[0]) == 1:
+                                                chain_info = chain_raw_info
+                                            else:
+                                                chain_info = [a.strip()[0] for a in chain_raw_info]
+                                            fasta_chain_letters.append(chain_info)
+                                            if "fasta_seq" in locals():
+                                                fasta_seqs.append(fasta_seq)
+
+                                            fasta_seq = []
+
+                                        else:
+                                            fasta_seq.append(fasta_line)
+
+                                    fasta_seqs.append(fasta_seq)
+                                    f.close()
+
+                                    new_fasta = open(fasta_name, 'w')
+                                    for header, chain, seq in zip(fasta_headers,
+                                                                fasta_chain_letters,
+                                                                fasta_seqs):
+                                        new_fasta.write(header)
+                                        seq = seq[0].strip()
+                                        if chain[0] == line[21]:
+
+                                            F = bb.Molecule()
+                                            F.import_pdb(filename=read_file_path,
+                                                         include_hetatm=True)
+                                            F = F.get_subset(F.atomselect('*', '*', 'CA',
+                                                                        use_resname=True,
+                                                                        get_index=True)[1])
+                                            subset_data = F.data.iloc[F.atomselect('*', '*', 'CA',
+                                                                                use_resname=True,
+                                                                                get_index=True)[1]]
+                                            pdb_seqs = {}
+                                            for chain in list(OrderedDict.fromkeys(subset_data['chain'])):
+                                                tmp_data = subset_data[subset_data['chain'] == chain]
+                                                pdb_seqs[chain] = ''.join([STANDARD_RESIDS[a] if a in
+                                                                           list(STANDARD_RESIDS.keys())
+                                                                        else 'X' for a in
+                                                                        list(tmp_data['resname'])])
+                                            chain_res_list = sorted(list(subset_data.loc[subset_data['chain'] == line[21],
+                                                                                         'resid']))
+                                            aligner = PairwiseAligner()
+                                            aligner.substitution_matrix = substitution_matrices.load("BLOSUM62")
+                                            aligner.open_gap_score = -11
+                                            aligner.extend_gap_score = -11
+                                            aligner.end_gap_score = 0.0
+                                            alignment = aligner.align(seq, pdb_seqs[line[21]])[0]
+
+                                            for (seq_start, seq_end), (pdb_start, pdb_end) in zip(alignment.aligned[0],
+                                                                                                  alignment.aligned[1]):
+                                                fasta_mapper = dict(zip(range(pdb_start, pdb_end),
+                                                                        range(seq_start, seq_end)))
+
+                                            seq = (seq[:(fasta_mapper[aa_num] - 1)] +
+                                                   aa_interest +
+                                                   seq[fasta_mapper[aa_num]:])
+
+                                        seq = seq + '\n'
+                                        new_fasta.write(seq)
+                                    new_fasta.close()
+
+                                except Exception as e:
+                                    print(f'FASTA file parsing failed. Error: {str(e)}')
+                                    if 'f' in locals():
+                                        f.close()
+                                    fasta_chains = {}
+
+                        else:
+                            # this could be left as continue if you wanted to leave a gap and try
+                            # and get modeller to patch as unknown, though most features would fail
+                            # with this, hence why it is left to block these structures
+                            raise Exception(f'Error in patching file: could not get residue type for '
+                                            f'modified residue to convert to standard; file: {pdb}')
 
             # write lines and ignore hydrogen atoms
             if line[:4] == 'ATOM':
@@ -1672,7 +1801,8 @@ class PDB(object):
         :type rep_struc: int
         '''
 
-        rep_struc_written = False
+        if isinstance(self.nmr_conformer_selection, list):
+            nmr_conf_list_written = {k: False for k in self.nmr_conformer_selection}
         number = 1
         name = f'{pdb}-alt-{str(number)}.pdb'
 
@@ -1718,40 +1848,31 @@ class PDB(object):
                         break
 
                     elif re.search('ENDMDL', line):
+                        selec_nmr_conf = self.nmr_conformer_selection
+                        max_conf = self.max_nmr_conformers
+                        keep_conf = (number in selec_nmr_conf if isinstance(selec_nmr_conf, list)
+                                     else number == rep_struc if selec_nmr_conf == 'representative'
+                                     else max_conf is None or number <= max_conf)
+                        f_write.write(line)
+                        f_write.close()
+                        if not keep_conf:
+                            os.remove(path_rename)
+
                         if isinstance(self.nmr_conformer_selection, list):
-                            print(number)
                             if number in self.nmr_conformer_selection:
-                                print(number)
-                                f_write.write(line)
-                                f_write.close()
+                                nmr_conf_list_written[number] = True
+
+                            if all(nmr_conf_list_written.values()):
+                                break
 
                         elif self.nmr_conformer_selection == 'first':
-                            if number < self.max_nmr_conformers:
-                                f_write.write(line)
-                                f_write.close()
-
-                            else:
-                                f_write.close()
-                                f.close()
-                                os.remove(path)
+                            if number > self.max_nmr_conformers:
                                 break
 
                         elif self.nmr_conformer_selection == 'representative':
                             if number == rep_struc:
-                                f_write.write(line)
-                                f_write.close()
-                                rep_struc_written = True
-
-                            if rep_struc_written:
-                                f_write.close()
-                                f.close()
-                                os.remove(path)
                                 break
 
-                        else:
-                            # 'all' or default track
-                            f_write.write(line)
-                            f_write.close()
 
                         number += 1
 
@@ -2463,6 +2584,9 @@ class PDB(object):
             N.write_pdb(relaxed_path)
 
             relaxed_geometry, _ = check_geometry(relaxed_path)
+            if not align_details and 'AF-' in pdb:
+                align_details = {'numbering': 'AF',
+                                 'chains_author_numbering': ''}
             self._record_geometry(relaxed_geometry, 'relaxed', align_details)
 
             details = {'platform_used': simulation.context.getPlatform().getName(),

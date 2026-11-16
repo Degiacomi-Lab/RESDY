@@ -238,12 +238,14 @@ class Test_Minimisation_Pipeline(unittest.TestCase):
                         os.path.join(self.outdir, 'demo_input.csv'))
         UP = RD.Uniprot()
         UP.from_csv_file(os.path.join(self.outdir, 'demo_input.csv'))
-        P = RD.PDB(outdir=self.outdir, gap=10, parallel=False, PDB_only=False,
+        PDB = RD.PDB(outdir=self.outdir, gap=10, parallel=False, PDB_only=False,
                    minimise_strucs='AF', max_nmr_conformers=2)
-        P.gather_proteins(UP.df.head(1), skip_if_found=False)
-        self.assertEqual(1, len(P.df))
+        PDB.gather_proteins(UP.df[(UP.df['Uniprot_Entry'] == 'P40616') &
+                                  (UP.df['Method'] == 'Predicted')],
+                            skip_if_found=False)
+        self.assertEqual(1, len(PDB.df))
 
-        log = P.collect_minimisation_log()
+        log = PDB.collect_minimisation_log()
         af_rows = log[log['structure'].str.startswith('AF-P40616')]
         self.assertEqual(len(af_rows), 1)
         self.assertEqual(af_rows['status'].iloc[0], 'relaxed')

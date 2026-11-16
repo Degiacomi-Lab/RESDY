@@ -43,6 +43,7 @@ class Viewer(object):
 
         self.df_measures.columns.name = 'Feature'
         self.outdir = outdir
+        os.makedirs(self.outdir, exist_ok=True)
         self.render_mode = render_mode
         if self.render_mode not in ['auto', 'svg', 'webgl']:
             print('>> Given render mode is not one accepted, setting render_mode to auto')
@@ -107,7 +108,10 @@ class Viewer(object):
                                     features_to_analyse=self.features)
 
             self.U = Uniprot(outdir=self.outdir)
-            self.U.GO_get_data(uniprot=list(self.df_scalar_measures['Uniprot_Entry']))
+            if os.path.exists(os.path.join(self.outdir, 'GO_metadata.json')):
+                self.U.load_GO_metadata(os.path.join(self.outdir, 'GO_metadata.json'))
+            else:
+                self.U.GO_get_data(uniprot=list(self.df_scalar_measures['Uniprot_Entry']))
             self.GO_codes = {k: f'{k}: {v}' for k,v in self.U.code_to_name.items()}
             self.GO_codes_reverse = {v:k for k,v in self.GO_codes.items()}
             self.GO_dict = self.U.GO_dict
@@ -854,8 +858,9 @@ class Viewer(object):
 
             if len(custom_hover_data) == 3:
                 uniprot_entry = custom_hover_data[0]
-                chain = custom_hover_data['customdata'][1]
-                resid = custom_hover_data['customdata'][2]
+                resid = custom_hover_data[1]
+                chain = custom_hover_data[2]
+
 
                 if subset == 'Uniprot Code + Chain + Resid':
                     dff = self.df_scalar_measures[(self.df_scalar_measures['Uniprot_Entry'] == uniprot_entry) &
@@ -1077,10 +1082,11 @@ class Viewer(object):
                 dff = dff[(dff[feat_col] > feat_low) & (dff[feat_col] < feat_high)]
                 if uniprot != 'All':
                     dff = dff[dff['Uniprot_Entry'] == uniprot]
-                    pot_chains = list(dff['Chain'].unique())
+                    if 'Chain' in dff.columns:
+                        pot_chains = list(dff['Chain'].unique())
+                        if chain != 'All' and chain in list(dff['Chain']):
+                            dff = dff[dff['Chain'] == chain]
                     pot_resids = list(dff['Resid'].unique())
-                    if chain != 'All' and chain in list(dff['Chain']):
-                        dff = dff[dff['Chain'] == chain]
                     if resid != 'All' and resid in list(dff['Resid']):
                         dff = dff[dff['Resid'] == resid]
 

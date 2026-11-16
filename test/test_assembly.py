@@ -1,13 +1,13 @@
 import unittest
-import sys
 import os
+import sys
 import json
 import shutil
 import tempfile
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import biobox as bb
+sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 from resdy import assembly
 
 # a 180 degree rotation about z, and a translation along x

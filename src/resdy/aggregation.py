@@ -203,7 +203,7 @@ class Aggregation:
 
         data_cols_entered = self.df_measurements.columns.values
         cols_required = [a for a in self.df_measurements.columns if
-                         a in self.res_key + ['PDB_Code', 'class']]
+                         a in self.res_key + ['PDB_Code', 'class', 'Method']]
         cols_removed = [f for f in self.features_to_include if
                         f not in data_cols_entered]
         self.features_to_include = [f for f in self.features_to_include if
@@ -327,7 +327,8 @@ class Aggregation:
                                 (c in b for c in max_features) and not any
                                 (c in b for c in min_features)] if 'avg' in a]
                 self.df_agg = df_stats.drop(columns=[a for a in self.features_to_include if a not in
-                                                     max_feat_cols + min_feat_cols + avg_features])
+                                                     max_feat_cols + min_feat_cols + avg_features
+                                                     and a not in not_cols])
 
             case 'minmax':
                 self.df_agg = df_stats.drop(columns=[a for a in [b for b in df_stats.columns if not
