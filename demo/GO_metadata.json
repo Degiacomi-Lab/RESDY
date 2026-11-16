@@ -23,6 +23,55 @@
     ],
     "name": "protein dephosphorylation"
   },
+  "0070062": {
+    "uniprot": [
+      "P02185",
+      "P0CG48"
+    ],
+    "name": "extracellular exosome"
+  },
+  "0016528": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "sarcoplasm"
+  },
+  "0020037": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "heme binding"
+  },
+  "0098809": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "nitrite reductase activity"
+  },
+  "0019825": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "oxygen binding"
+  },
+  "0005344": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "oxygen carrier activity"
+  },
+  "0004601": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "peroxidase activity"
+  },
+  "0019430": {
+    "uniprot": [
+      "P02185"
+    ],
+    "name": "removal of superoxide radicals"
+  },
   "0005737": {
     "uniprot": [
       "P40616"
@@ -32,8 +81,8 @@
   "0005829": {
     "uniprot": [
       "P40616",
-      "P0CG48",
-      "P10724"
+      "P10724",
+      "P0CG48"
     ],
     "name": "cytosol"
   },
@@ -127,54 +176,29 @@
     ],
     "name": "vesicle-mediated transport"
   },
-  "0070062": {
+  "0008784": {
     "uniprot": [
-      "P02185",
-      "P0CG48"
+      "P10724"
     ],
-    "name": "extracellular exosome"
+    "name": "alanine racemase activity"
   },
-  "0016528": {
+  "0030170": {
     "uniprot": [
-      "P02185"
+      "P10724"
     ],
-    "name": "sarcoplasm"
+    "name": "pyridoxal phosphate binding"
   },
-  "0020037": {
+  "0030632": {
     "uniprot": [
-      "P02185"
+      "P10724"
     ],
-    "name": "heme binding"
+    "name": "D-alanine biosynthetic process"
   },
-  "0098809": {
+  "0009252": {
     "uniprot": [
-      "P02185"
+      "P10724"
     ],
-    "name": "nitrite reductase activity"
-  },
-  "0019825": {
-    "uniprot": [
-      "P02185"
-    ],
-    "name": "oxygen binding"
-  },
-  "0005344": {
-    "uniprot": [
-      "P02185"
-    ],
-    "name": "oxygen carrier activity"
-  },
-  "0004601": {
-    "uniprot": [
-      "P02185"
-    ],
-    "name": "peroxidase activity"
-  },
-  "0019430": {
-    "uniprot": [
-      "P02185"
-    ],
-    "name": "removal of superoxide radicals"
+    "name": "peptidoglycan biosynthetic process"
   },
   "0022626": {
     "uniprot": [
@@ -265,29 +289,5 @@
       "P0CG48"
     ],
     "name": "protein ubiquitination"
-  },
-  "0008784": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "alanine racemase activity"
-  },
-  "0030170": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "pyridoxal phosphate binding"
-  },
-  "0030632": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "D-alanine biosynthetic process"
-  },
-  "0009252": {
-    "uniprot": [
-      "P10724"
-    ],
-    "name": "peptidoglycan biosynthetic process"
   }
 }

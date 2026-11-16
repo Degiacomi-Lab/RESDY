@@ -1,0 +1,15 @@
+Uniprot_Entry,PDB_Code,Method,Resolution,Chains,Organism_Name,Organism_TaxID
+P02185,1A6M,X-ray,1.00,A,Physeter macrocephalus,9755
+P0CG48,2MWS,NMR,-,A,Homo sapiens,9606
+P10724,13LD,X-ray,1.90,A/B/C/D,Geobacillus stearothermophilus 10,272567
+P40616,AF-P40616-F1-model_v6,Predicted,,,Homo sapiens,9606
+P40616,1UPT,X-ray,1.70,A/C/E/G,Homo sapiens,9606
+P40616,4DCN,X-ray,3.01,A/B,Homo sapiens,9606
+P40616,5EE5,X-ray,2.28,B,Homo sapiens,9606
+P40616,5J5C,X-ray,3.40,A,Homo sapiens,9606
+Q16825,AF-Q16825-F1-model_v6,Predicted,,,Homo sapiens,9606
+Q16825,8GVL,X-ray,2.10,A/B,Homo sapiens,9606
+Q16825,8GVV,X-ray,1.80,A,Homo sapiens,9606
+Q16825,8GWH,X-ray,2.00,A,Homo sapiens,9606
+Q16825,8GXE,X-ray,3.00,A,Homo sapiens,9606
+Q16825,8Y8Y,X-ray,2.10,A,Homo sapiens,9606

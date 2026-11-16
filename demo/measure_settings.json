@@ -70,7 +70,7 @@
     }
   },
   "run_in_parallel": true,
-  "parallel_worker_timeout": 2,
+  "parallel_worker_timeout": 20000,
   "num_cores_requested": 0,
   "use_big_protein_mode": false
 }
