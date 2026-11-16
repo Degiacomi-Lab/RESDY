@@ -9,7 +9,7 @@ import itertools
 import numpy as np
 import biobox as bb
 
-
+sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 from resdy import patcher
 from resdy.geometry import check_geometry

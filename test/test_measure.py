@@ -1,10 +1,12 @@
 import unittest
 import os
+import sys
 import shutil
 import tempfile
 import importlib
 import pandas as pd
 
+sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
 def _backend_available(module):

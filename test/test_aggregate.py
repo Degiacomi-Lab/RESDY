@@ -1,10 +1,12 @@
 import unittest
 from unittest.mock import Mock, patch
 import os
+import sys
 import shutil
 import tempfile
 import pandas as pd
 
+sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
 

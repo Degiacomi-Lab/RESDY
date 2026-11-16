@@ -1,12 +1,13 @@
 import unittest
 from unittest.mock import Mock, patch
-
+import sys
 import os
 import shutil
 import tempfile
 import pandas as pd
 import numpy as np
 
+sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
 class Test_Analysis(unittest.TestCase):

@@ -3,6 +3,7 @@ import sys
 import os
 import numpy as np
 
+sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 from resdy.geometry import distance_to_other_chains
 
 
