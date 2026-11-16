@@ -9,7 +9,8 @@ import itertools
 import numpy as np
 import biobox as bb
 
-sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
+
+import resdy as RD
 from resdy import patcher
 from resdy.geometry import check_geometry
 
@@ -19,8 +20,12 @@ class Test_Patcher(unittest.TestCase):
         os.makedirs(self.outdir, exist_ok=True)
         os.makedirs(os.path.join(self.outdir, 'conformations'), exist_ok=True)
 
-        shutil.copyfile(os.path.join('demo', 'conformations', '2MWS-alt-1.pdb'), os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb'))
-        shutil.copyfile(os.path.join('demo', 'conformations', '2MWS.fasta'), os.path.join(self.outdir, 'conformations', '2MWS.fasta'))
+        shutil.copyfile(os.path.join('demo', 'conformations', '2MWS-alt-1.pdb'),
+                        os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb'))
+        shutil.copyfile(os.path.join('demo', 'conformations', '2MWS.fasta'),
+                        os.path.join(self.outdir, 'conformations', '2MWS.fasta'))
+
+        self.P = RD.Patcher()
 
     def tearDown(self):
         shutil.rmtree(self.outdir, ignore_errors=True)
@@ -41,7 +46,7 @@ class Test_Patcher(unittest.TestCase):
         pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
         fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
         gap = 10
-        outname, largest, geometry = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=gap)
+        outname, largest, geometry = self.P.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=gap)
         self.assertTrue(os.path.isfile(outname))
         self.assertEqual(largest, 0)
 
@@ -54,7 +59,7 @@ class Test_Patcher(unittest.TestCase):
         pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
         fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
         before = self._chain_centroids(pdb)
-        outname, _, _ = patcher.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=10)
+        outname, _, _ = self.P.curate(pdb=pdb, fasta=fasta, outdir=self.outdir, gap=10)
         after = self._chain_centroids(outname)
 
         self.assertEqual(sorted(before), sorted(after))
@@ -71,7 +76,7 @@ class Test_Patcher(unittest.TestCase):
         '''curate must hand back a geometry report for the assembled structure.'''
         pdb = f"{self.outdir}{os.sep}conformations{os.sep}2MWS-alt-1.pdb"
         fasta = f"{self.outdir}{os.sep}conformations{os.sep}2MWS.fasta"
-        outname, largest, geometry = patcher.curate(pdb=pdb, fasta=fasta,
+        outname, largest, geometry = self.P.curate(pdb=pdb, fasta=fasta,
                                                     outdir=self.outdir, gap=10)
         for key in ('n_atoms', 'n_clashes', 'min_contact', 'n_modelled_residues',
                     'involves_modelled', 'inter_chain'):
@@ -122,7 +127,7 @@ class Test_Patcher(unittest.TestCase):
         src = os.path.join(self.outdir, 'conformations', '2MWS-alt-1.pdb')
         M = bb.Molecule()
         M.import_pdb(src, include_hetatm=True)
-        before = patcher.analyze_protein(M)
+        before = self.P.analyze_protein(M)
 
         last = int(M.data['resid'].max())
         with_water = os.path.join(self.outdir, 'with_water.pdb')
@@ -139,7 +144,7 @@ class Test_Patcher(unittest.TestCase):
         N = bb.Molecule()
         N.import_pdb(with_water, include_hetatm=True)
         self.assertGreater(len(N.data), len(M.data))
-        self.assertEqual(patcher.analyze_protein(N), before)
+        self.assertEqual(self.P.analyze_protein(N), before)
 
     def test_analyze_protein_with_no_polymer(self):
         '''A chain holding only heteroatoms has no sequence, so it has no gaps.'''
@@ -151,7 +156,7 @@ class Test_Patcher(unittest.TestCase):
             fout.write('END\n')
         M = bb.Molecule()
         M.import_pdb(only_water, include_hetatm=True)
-        self.assertEqual(patcher.analyze_protein(M), [0, 0, 0])
+        self.assertEqual(self.P.analyze_protein(M), [0, 0, 0])
 
     def test_superpose_onto_restores_a_displaced_chain(self):
         '''
@@ -168,7 +173,7 @@ class Test_Patcher(unittest.TestCase):
                     line = f'{line[:30]}{v[0]:8.3f}{v[1]:8.3f}{v[2]:8.3f}{line[54:]}'
                 fout.write(line)
 
-        n_fit, rmsd = patcher.superpose_onto(moved, src)
+        n_fit, rmsd = self.P.superpose_onto(moved, src)
         self.assertGreater(n_fit, 100)
         self.assertLess(rmsd, 1e-3)
         recovered = self._chain_centroids(moved)
@@ -200,7 +205,7 @@ class Test_Patcher(unittest.TestCase):
                      + atom(5, 'N', 'LYS', 3, 21.11, 52.0) + atom(6, 'CA', 'LYS', 3, 22.22, 52.0)
                      + atom(7, 'CB', 'LYS', 3, 0.0, 52.0))
 
-        n_template, n_built = patcher.restore_template_columns(
+        n_template, n_built = self.P.restore_template_columns(
             model, template, pairs=[(0, 0), (2, 1)])
         self.assertEqual((n_template, n_built), (4, 3))
         columns = {(int(l[22:26]), l[12:16].strip()): (float(l[54:60]), float(l[60:66]))
@@ -251,7 +256,7 @@ class Test_Patcher(unittest.TestCase):
         fasta = os.path.join(self.outdir, 'conformations', '1A6M.fasta')
         shutil.copyfile(os.path.join('demo', 'conformations', '1A6M.fasta'), fasta)
 
-        outname, largest, _ = patcher.curate(pdb=gapped, fasta=fasta, outdir=self.outdir, gap=10)
+        outname, largest, _ = self.P.curate(pdb=gapped, fasta=fasta, outdir=self.outdir, gap=10)
         self.assertEqual(largest, 1)
 
         def columns(path):

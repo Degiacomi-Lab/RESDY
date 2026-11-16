@@ -1,12 +1,10 @@
 import unittest
-import sys
 import os
 import json
 import shutil
 import tempfile
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import biobox as bb
 from resdy import assembly
 

@@ -24,6 +24,7 @@ from . import patcher
 from . import assembly
 from .residues import AA_PRESETS
 from .geometry import check_geometry, GEOMETRY_COLUMNS
+from .patcher import Patcher
 require_biobox(bb)
 
 try:
@@ -1164,10 +1165,10 @@ class PDB(object):
                 if self.minimise_termini == 'capped' and PDBFIXER_AVAILABLE:
                     self.add_missing_capping_atoms(pdb_path=f)
 
-                fname, largest_gap, geometry = patcher.curate(
+                P = Patcher()
+                fname, largest_gap, geometry = P.curate(
                     f, fasta_loc, outdir=self.curated_dir,
-                    gap=self.gap, include_hetatm=self.include_hetatm,
-                    block_bulk_modeller_output=block_bulk_modeller_output)
+                    gap=self.gap, include_hetatm=self.include_hetatm)
 
                 if len(replacement_dict) > 0:
                     reverse_replacement_dict = dict((v,k) for k,v in replacement_dict.items())

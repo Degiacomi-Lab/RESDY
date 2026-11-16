@@ -17,7 +17,7 @@ from contextlib import redirect_stdout
 import pandas as pd
 import numpy as np
 import biobox as bb
-from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children, parallel_context
+from .helper import require_biobox, get_worker_lock, mp_hide_main_from_children, parallel_context, METADATA_COLUMNS
 from .features import *
 from .residues import residue_key, resolve_residue, PROTEIN_RESNAMES
 from .geometry import distance_to_other_chains, distance_to_modified, distance_to_nearest_termini
@@ -1233,7 +1233,7 @@ class Measure(object):
         return pd.concat(frames_df_list, ignore_index=True)
 
 
-    def recover_from_log(self, log_path):
+    def recover_from_log(self, log_path='measure_log.txt'):
         '''
         Take the log file produced through running measure_dataframe() and convert this to a csv
 
@@ -1253,7 +1253,8 @@ class Measure(object):
         if self.PDB_only:
             return 'Function not callable.'
 
-        base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid']
+        base_columns = ['Uniprot_Entry', 'PDB_Code', 'Method', 'Resolution', 'Chain', 'Resid', 'Source']
+        metadata_cols = [a for a in METADATA_COLUMNS if a not in base_columns]
         log_to_df = pd.DataFrame(columns=base_columns)
         log_path = os.path.join(self.outdir, log_path)
         print(f'Recovering measured data from file: {log_path}')
@@ -1262,8 +1263,7 @@ class Measure(object):
 
         test_lines = 0
         columns_all_set = False
-        potential_col_names = {'1': 'propka', '2': 'pkaANI', '3': 'sasa',
-                               '4': 'depth', '5': 'aev', '6': 'das'}
+        potential_col_names = {str(i+1): m for i,m in enumerate(ALL_FEATURES)}
         with open(log_path, "rb") as f:
             num_lines = sum(1 for _ in f)
         curr_line = 0
@@ -1274,14 +1274,15 @@ class Measure(object):
                 # check if it is a header line, check if doesn't start with number or -
                 if line[0].isalpha() or line[0] == ' ':
                     parts = line.split()
+                    print(parts, len(parts))
                     # check that columns have been written to the log file correctly
                     if columns_all_set:
                         continue
-                    elif len(parts) <= 6 and not columns_all_set:
+                    elif len(parts) <= 7 and not columns_all_set:
                         print('Columns were not set correctly in the log file.')
-                        print(f'The first 6 columns are assumed to be: {base_columns}')
+                        print(f'The first 7 columns are assumed to be: {base_columns}')
                         continue
-                    elif len(parts) >= 6 and not columns_all_set:
+                    elif len(parts) >= 7 and not columns_all_set:
                         # if all seems correct with the writing check that all the columns
                         # can be found in the current columns, if not, add in
                         for part in parts:
