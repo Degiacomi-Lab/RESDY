@@ -356,9 +356,8 @@ class Uniprot(object):
             raise Exception(f'Failed to get data from .csv file. {e}') from e
 
         self.parallel = True
-        stan_prots = []
-        multi_prots = {'uniprot_code': [],
-                       'pdb_code': []}
+        multi_prot_sets = {'uniprot_code': [],
+                           'pdb_code': []}
 
         for i, r in csv_df.iterrows():
             try:
@@ -366,7 +365,8 @@ class Uniprot(object):
                 pdb_code = r['PDB_Code']
 
                 if pdb_code == 0:
-                    stan_prots.append(uniprot_code)
+                    multi_prot_sets['uniprot_code'].append(uniprot_code)
+                    multi_prot_sets['pdb_code'].append('')
 
                 elif pdb_code == 'AF':
                     pdb_code = f'AF-{uniprot_code}-F1-model_v6'
@@ -377,24 +377,17 @@ class Uniprot(object):
                                         ignore_index=True)
 
                 else:
-                    multi_prots['uniprot_code'].append(uniprot_code)
-                    multi_prots['pdb_code'].append(pdb_code)
+                    multi_prot_sets['uniprot_code'].append(uniprot_code)
+                    multi_prot_sets['pdb_code'].append(pdb_code)
 
             except Exception as e:
                 print(f'>> Error {e}')
                 continue
 
-        print(multi_prots['uniprot_code'])
-        print(multi_prots['pdb_code'])
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for result in executor.map(self.get_protein_data, stan_prots, timeout=60):
-                self.df = pd.concat([self.df, result], ignore_index=True)
-
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for result in executor.map(self.get_protein_data,
-                                       multi_prots['uniprot_code'],
-                                       multi_prots['pdb_code'],
+                                       multi_prot_sets['uniprot_code'],
+                                       multi_prot_sets['pdb_code'],
                                        timeout=60):
                 self.df = pd.concat([self.df, result], ignore_index=True)
 

@@ -11,7 +11,8 @@ import resdy as RD
 class Test_Uniprot(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
-        shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        shutil.copyfile(os.path.join('demo', 'measures.csv'),
+                        os.path.join(self.outdir, 'measures.csv'))
         self.UP = RD.Uniprot(outdir=self.outdir)
         self.demo_csv = f'demo{os.sep}demo_input.csv'
 
@@ -44,7 +45,7 @@ class Test_Uniprot(unittest.TestCase):
 
         self.UP.df = pd.DataFrame()
         self.UP.get_protein_data('P09167')
-        print(self.UP.df)
+
         self.assertTrue(all(a in self.UP.df.columns for a in ['Organism_Name', 'Organism_TaxID']))
         self.assertEqual(list(self.UP.df['Organism_Name'].unique()), ['Aeromonas hydrophila'])
         self.assertEqual(list(self.UP.df['Organism_TaxID'].unique()), ['644'])

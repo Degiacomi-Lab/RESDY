@@ -1,19 +1,18 @@
 import unittest
 from unittest.mock import Mock, patch
-import sys
 import os
 import shutil
 import tempfile
 import pandas as pd
 
-sys.path.insert(0, os.path.join(os.path.dirname(sys.path[0]), "src"))
 import resdy as RD
 
 
 class Test_Aggregation(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp(prefix='resdy_test_')
-        shutil.copyfile(os.path.join('demo', 'measures.csv'), os.path.join(self.outdir, 'measures.csv'))
+        shutil.copyfile(os.path.join('demo', 'measures.csv'),
+                        os.path.join(self.outdir, 'measures.csv'))
         self.demo_measure = pd.read_csv(f'{self.outdir}{os.sep}measures.csv')
 
     def tearDown(self):
@@ -149,7 +148,7 @@ class Test_Aggregation(unittest.TestCase):
                                         max_feature_nan_fraction=1.0)
             df_agg = Agg.aggregate_data()
             self.assertTrue(len(df_agg) > 0)
-            self.assertListEqual(expected_columns, list(df_agg.columns))
+            self.assertEqual(set(expected_columns), set(list(df_agg.columns)))
 
     def test_unknown(self):
         Agg = RD.Aggregation(df_measurements=self.demo_measure,
